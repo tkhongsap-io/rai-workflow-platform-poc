@@ -2,6 +2,8 @@
 
 ## Current state: 2026-09-20
 
+Product anchors: [PRD](PRD.md) and [BUILD_PLAN](BUILD_PLAN.md). Build packages W0-W8 are not started.
+
 Documentation foundation prepared. Application implementation has not started. No services, dependencies, models, data stores, deployments or runtime tests exist.
 
 Owner: Ta. Proposed gate operator: Nakhun (confirmation pending). Organization-level acceptance is not established by this repository.

@@ -4,7 +4,14 @@
 
 A review desk for one submitted AI-use-case pack, with parallel AI/COE, DPO and IT/Security review, versioned send-back and soft document QC. This is not True's official AI register and does not operate the eight-stage AI lifecycle.
 
-## Start here
+## Product and build anchors
+
+- **[PRD.md](PRD.md)** — problem, users, scope, requirements and success criteria.
+- **[BUILD_PLAN.md](BUILD_PLAN.md)** — ordered work packages, dependencies, deliverables and evidence required to finish each one.
+
+These are the starting points for the future app build. The plan under changes/2026-09-20-documentation-foundation covers repository setup only.
+
+## Supporting contracts
 
 1. Read the [v1 source specification](docs/product/source-spec.md) and [open decisions](docs/product/decisions.md).
 2. Follow the [workflow](docs/product/workflow.md), [data contract](docs/product/data-contract.md) and [planned architecture](docs/architecture/README.md).

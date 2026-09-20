@@ -1,6 +1,6 @@
 # Agent contract
 
-This repository is in documentation-only phase. Read [README](README.md), [DEVLOG](DEVLOG.md), the [source spec](docs/product/source-spec.md), [decisions](docs/product/decisions.md), [adoption profile](docs/engineering/adoption.md) and [TESTING](TESTING.md) before changes.
+This repository is in documentation-only phase. Read [PRD](PRD.md), [BUILD_PLAN](BUILD_PLAN.md), [README](README.md), [DEVLOG](DEVLOG.md), the [source spec](docs/product/source-spec.md), [decisions](docs/product/decisions.md), [adoption profile](docs/engineering/adoption.md) and [TESTING](TESTING.md) before changes.
 
 - Do not create application code, runnable starters, package manifests, deployment files or automated workflows until Ta explicitly authorizes implementation. Do not interpret repository setup as permission to build.
 - Keep the product a review desk. Never replace TPM/VRO/AI Reporting Tool or claim to write to them.
