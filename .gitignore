@@ -1,0 +1,15 @@
+# Local/editor material
+.DS_Store
+.idea/
+.vscode/
+*.swp
+# Never store credentials or submitted evidence here
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+uploads/
+case-data/
+private-evidence/
+.tmp/

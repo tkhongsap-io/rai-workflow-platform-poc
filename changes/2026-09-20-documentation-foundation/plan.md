@@ -19,4 +19,4 @@ Verification commands and expected outcomes are in [TESTING](../../TESTING.md). 
 
 ## Deviations
 
-None at plan creation. Initial plan is committed before the remaining foundation documents. No application code at any step.
+Initial plan committed as 6dee36b before the remaining foundation documents. Added docs/goals/2026-09-20-ai-console-review-desk.md as a provenance pointer so the unchanged source snapshot's relative goal link resolves. This does not copy or complete the product goal. No application code at any step.
