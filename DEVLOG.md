@@ -4,7 +4,7 @@
 
 Product anchors: [PRD](PRD.md) and [BUILD_PLAN](BUILD_PLAN.md). Build packages W0-W8 are not started.
 
-Documentation foundation prepared. Application implementation has not started. No services, dependencies, models, data stores, deployments or runtime tests exist.
+Documentation foundation and interactive Claude Design prototype prepared. Core synthetic owner/SPOC/reviewer/admin journey browser-tested; responsive/copy corrections completed and affected paths retested. See [handoff](docs/design/DEVELOPER_HANDOFF.md) and [test evidence](docs/design/TEST_RUNS.md). Application implementation has not started. No production services, dependencies, models, data stores or deployments exist. Prototype UI observations are not application runtime acceptance.
 
 Owner: Ta. Proposed gate operator: Nakhun (confirmation pending). Organization-level acceptance is not established by this repository.
 

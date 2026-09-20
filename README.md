@@ -1,6 +1,6 @@
 # RAI Workflow Platform PoC
 
-**Working product name: RAI web. Status: documentation only. Application implementation is not authorized.**
+**Working product name: RAI web. Status: documentation and interactive design prototype. Production application implementation is not authorized.**
 
 A review desk for one submitted AI-use-case pack, with parallel AI/COE, DPO and IT/Security review, versioned send-back and soft document QC. This is not True's official AI register and does not operate the eight-stage AI lifecycle.
 
@@ -10,6 +10,10 @@ A review desk for one submitted AI-use-case pack, with parallel AI/COE, DPO and 
 - **[BUILD_PLAN.md](BUILD_PLAN.md)** — ordered work packages, dependencies, deliverables and evidence required to finish each one.
 
 These are the starting points for the future app build. The plan under changes/2026-09-20-documentation-foundation covers repository setup only.
+
+## Workflow design
+
+Start with the [interactive design handoff](docs/design/DEVELOPER_HANDOFF.md), [browser test evidence](docs/design/TEST_RUNS.md), and [Claude Design artifact](https://claude.ai/artifact/25FPuPyj6aczLrXca3P9Mz) (owner-private). The [workflow and card brief](docs/design/WORKFLOW_DESIGN.md) anchors the journeys. Prototype design only; implementation remains gated.
 
 ## Supporting contracts
 
