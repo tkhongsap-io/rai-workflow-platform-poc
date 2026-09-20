@@ -8,7 +8,7 @@ Date: 2026-09-20. Review type: author self-review across correctness, security a
 - Frozen specification bytes equal the Life-OS source; SHA-256 92c4f7123058b8fec3c2ba7abdf10538fad034778624b0675975b39de440b354.
 - Acceptance matrix includes R1-R10 and L1-L12. Semantic review covers role scope, nine slots, parallel lanes, immutable versions, three soft-QC triggers, version-specific thresholds and the final disposition condition.
 - Relative Markdown link and file-type audit executed with Python standard library; final pass recorded below. The first pass found only this then-unwritten review file; no source correction was required.
-- Whitespace checked with git diff --check, including staged content before commit.
+- Staged whitespace check reported one preserved source exception: source-spec.md line 193 has a Markdown two-space hard break. Retained intentionally to keep the snapshot byte-identical. Authored documents pass the whitespace check when the frozen source is excluded.
 - Inventory permits Markdown and .gitignore only. No application code, scripts, package manifests, CI workflows, deployment or credentials were intentionally created. Source snapshot is the requested product spec; raw private case artifacts were not copied. Manual sensitive-content review completed; no automated secret-scanner claim.
 
 ## Findings and disposition
