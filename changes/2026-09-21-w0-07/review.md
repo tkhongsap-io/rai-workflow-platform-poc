@@ -121,6 +121,21 @@ Checks rerun after the fix: table below.
 | `shasum -a 256 docs/product/source-spec.md` | `92c4f7123058b8fec3c2ba7abdf10538fad034778624b0675975b39de440b354`, matches docs/sources.md |
 | Relative-link and anchor audit over the two touched files (GitHub slug rule) | 30 links, 0 broken |
 
+## Fix round 8 (review findings on PR #60; the review workflow numbers this pass "round 1" of a new cycle)
+
+One blocking finding, resolved in `docs/engineering/qc-boundary-and-mail-sink.md`:
+
+1. **`digestDay` was a free variable in the dedup key.** 4.4 built the key as `${…}:${event.versionId ?? digestDay}:…` while `buildDedupKey(event, recipient)` takes only `CommittedEvent` and `AuthorizedRecipient`, and `CommittedEvent` carried no digest-day field or derivation, so W1-00 could not write `shared/src/mail/dedup.ts` and W1-11 could not assert `sla_breach_digest:2026-09-21:-:<address>` without inventing the input. `CommittedEvent` (4.2) now carries `digestDay: string | null`: the digest's calendar day as `YYYY-MM-DD` in Asia/Bangkok (D06), non-null only for `sla_breach_digest`, set once by the W3-03 digest job from the instant its job run started (the W0-10 7.3 `started_at`; the W3-05 fixture clock in tests) converted to Asia/Bangkok, never from `committedAt` at key-building time and never from a recipient's clock, so every recipient of one run gets the same day and a run crossing midnight still produces one. 4.3 gains a `malformed_request` check that the dedup identity is complete (digest: `digestDay` matches `^\d{4}-\d{2}-\d{2}$` and `versionId` null; other kinds: non-empty `versionId` and `digestDay` null), with `error.message` naming the field. 4.4 replaces the one-line formula with the `buildDedupKey` body W1-00 creates: the version position is `event.digestDay` for the digest and `event.versionId` otherwise, and a null there throws a `RangeError` named after the field so no key ever contains `null`; a sentence states the function is pure over its two typed inputs. The 4.8 "dedup key is the W0-04 identity" row names `event.digestDay` as the source (with a `committedAt` on the previous day to prove the key does not read it) and adds the two throwing cases; the "malformed or oversize request" row adds a digest with `digestDay = null` → `failed:malformed_request` naming `digestDay`. Section 9 W1-00 and W3-03 rows follow. No other section, decision or spec changed.
+
+Checks rerun after the fix: table below.
+
+| Command | Result |
+|---|---|
+| `node --test tests/*.test.mjs` | 22 pass, 0 fail, 0 skipped |
+| `git diff --check` | clean |
+| `shasum -a 256 docs/product/source-spec.md` | `92c4f7123058b8fec3c2ba7abdf10538fad034778624b0675975b39de440b354`, matches docs/sources.md |
+| Relative-link and anchor audit over the two touched files (GitHub slug rule) | 30 links, 0 broken |
+
 ## Done-when check (W0-07 section and W0 exit checklist row "Identity, persistence/artifacts, QC and mail interfaces with error contracts and test substitutes")
 
 - [x] QC inputs: version reference and authorized artifact references (spec 3.1, 3.3).
