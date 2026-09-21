@@ -8,3 +8,4 @@ export * from './artifact-slot.js';
 export * from './configuration-revision.js';
 export * from './audit-event.js';
 export * from './idempotency-key.js';
+export * from './session.js';

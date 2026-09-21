@@ -8,6 +8,13 @@
       "when": 1790004852329,
       "tag": "0000_w1_00_substrate",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790008568789,
+      "tag": "0001_w1_01_session",
+      "breakpoints": true
     }
   ]
 }

@@ -1,12 +1,14 @@
 // `npm run db:cleanup [--report]` (W0-02 section 3.3; W0-04 "Retention and deletion"): expires idempotency keys
-// older than IDEMPOTENCY_TTL_HOURS as rai_operator; `--report` lists stale drafts (dry run; deletion waits for D08)
-// and, once W1-03 lands the blob store, orphan blobs. Never runs inside the request path.
+// older than IDEMPOTENCY_TTL_HOURS and removes expired and revoked session rows (W0-03 section 6.3, W1-01) as
+// rai_operator; `--report` lists stale drafts (dry run; deletion waits for D08) and, once W1-03 lands the blob
+// store, orphan blobs. Never runs inside the request path.
 
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { sql } from 'drizzle-orm';
 import { parseDatabaseConfig, readEnv } from '../config.js';
 import { createDb } from '../db/client.js';
+import { sweepSessions } from '../identity/session.js';
 
 const DRAFT_STALE_DAYS = 180; // proposed; D08 decides
 
@@ -31,6 +33,8 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
       sql`DELETE FROM idempotency_key WHERE created_at < now() - make_interval(hours => ${ttlHours})`,
     );
     console.log(`db:cleanup: expired ${result.rowCount ?? 0} idempotency key(s) older than ${ttlHours} h`);
+    const sessions = await sweepSessions(handle.db);
+    console.log(`db:cleanup: removed ${sessions} expired or revoked session row(s)`);
   } finally {
     await handle.close();
   }
