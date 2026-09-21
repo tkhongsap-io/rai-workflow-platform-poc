@@ -13,7 +13,14 @@ export const ALLOWED_MEDIA_TYPES = [
   'image/jpeg',
 ] as const;
 export type AllowedMediaType = (typeof ALLOWED_MEDIA_TYPES)[number];
-export const AllowedMediaTypeSchema = Type.Union(ALLOWED_MEDIA_TYPES.map((v) => Type.Literal(v)));
+// A literal tuple, not a mapped array: TypeBox infers `never` from a Union over `TLiteral<union>[]` (W1-03 fix).
+export const AllowedMediaTypeSchema = Type.Union([
+  Type.Literal(ALLOWED_MEDIA_TYPES[0]),
+  Type.Literal(ALLOWED_MEDIA_TYPES[1]),
+  Type.Literal(ALLOWED_MEDIA_TYPES[2]),
+  Type.Literal(ALLOWED_MEDIA_TYPES[3]),
+  Type.Literal(ALLOWED_MEDIA_TYPES[4]),
+]);
 
 export const ArtifactRefSchema = Type.Object({
   artifactId: Type.String(),

@@ -3,8 +3,10 @@
 // loopback check (S16: close and exit 78 when the bound address is not loopback). main.ts never migrates (W0-04).
 
 import type { AddressInfo } from 'node:net';
+import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from './app.js';
+import { createFilesystemBlobStore } from './artifacts/blob-store.js';
 import { createScopeFactsSource } from './authz/facts.js';
 import {
   businessUnitsFromGrants,
@@ -130,8 +132,11 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
     ...(overrides.fixtureBusinessUnits ?? (await loadFixtureBusinessUnits()) ?? []),
     ...businessUnitsFromGrants(knownIdentities.flatMap((u) => [...u.roles])),
   ]);
+  const store = createFilesystemBlobStore(path.resolve(config.blobDir));
+  await store.init(); // root 0700, tmp/ emptied at process start (W0-08 section 6)
   const { fastify, emitter } = buildApp({
     config,
+    artifacts: { store, db: db.db, limits: config.upload },
     identity: {
       adapter,
       sessionStore: createPgSessionStore(db.db),

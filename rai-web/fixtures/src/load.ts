@@ -24,7 +24,8 @@ import { applyConfigurationSeed, SEED_KINDS } from '@rai/server/configuration/se
 import { parseDatabaseConfig, parseNodeEnv, readEnv, type Env } from '@rai/server/config';
 import { FIXTURE_CASES, fixtureCaseOwner, storedReason, type FixtureCase } from './data/cases/index.js';
 import { FIXTURE_DOCUMENTS, MEDIA_TYPE_BY_KIND, findFixtureDocument } from './data/documents/index.js';
-import { writeBlob } from './generate/blob-layout.js';
+import { Readable } from 'node:stream';
+import { createFilesystemBlobStore } from '@rai/server/artifacts/blob-store';
 import {
   assertManifestMatches,
   generateAll,
@@ -99,11 +100,14 @@ export async function loadFixtures(db: Db, options: LoadOptions): Promise<LoadRe
 
   // Objects first (W0-04: the blob is committed before its row; an orphan object after a failed transaction is
   // harmless, a row without an object is not), then one transaction for every row.
+  // Through the same blob interface uploads use (W0-08 8.7; the W1-09 review handed this one call site to W1-03).
+  const store = createFilesystemBlobStore(options.blobDir);
   const byDocumentId = new Map<string, GeneratedDocument>();
   let blobsWritten = 0;
   let blobsDeduplicated = 0;
   for (const g of generated) {
-    const written = await writeBlob(options.blobDir, g.bytes);
+    const written = await store.put(Readable.from([g.bytes]), { maxBytes: g.bytes.length });
+    if (!written.ok) throw new Error(`${g.document.fixtureDocumentId}: blob store refused the object`);
     if (written.deduplicated) blobsDeduplicated += 1;
     else blobsWritten += 1;
     byDocumentId.set(g.document.fixtureDocumentId, g);

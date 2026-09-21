@@ -11,6 +11,7 @@ import cookie from '@fastify/cookie';
 import { InvalidInputError, isContractError, internalErrorResponse } from '@rai/shared/errors';
 import type { CorrelationId } from '@rai/shared/ids';
 import type { AppConfig } from './config.js';
+import { registerArtifactRoutes, type ArtifactRouteDeps } from './artifacts/routes.js';
 import { registerAuthorization, type ScopeFactsSource } from './authz/middleware.js';
 import { registerCaseRoutes, type CaseRouteDeps } from './cases/routes.js';
 import type { FixtureIdentityProvider } from './identity/fixture.js';
@@ -34,6 +35,10 @@ export interface AppDeps {
   identity?: IdentityDeps;
   /** W1-02: the case routes' dependencies (database, configured BUs, subject directory). Needs `identity`. */
   cases?: Omit<CaseRouteDeps, 'emitter'>;
+  /** The blob store, database and W0-08 limits for the W1-03 artifact routes; needs `identity`. */
+  artifacts?: Omit<ArtifactRouteDeps, 'emitter'>;
+  /** Test seam: where the pino lines go instead of stdout, so a suite can assert on emitted events. */
+  logStream?: NodeJS.WritableStream;
 }
 
 export interface App {
@@ -67,7 +72,10 @@ function validationToInvalidInput(error: FastifyError): InvalidInputError {
 
 export function buildApp(deps: AppDeps): App {
   const fastify = Fastify({
-    logger: loggerOptions(deps.config.log),
+    logger:
+      deps.logStream === undefined
+        ? loggerOptions(deps.config.log)
+        : { ...(loggerOptions(deps.config.log) as object), stream: deps.logStream },
     genReqId: () => mintCorrelationId(), // the request id IS the correlation id; a client header is never read
     requestIdHeader: false,
     trustProxy: deps.config.trustProxy,
@@ -99,6 +107,14 @@ export function buildApp(deps: AppDeps): App {
     }
     if ((error as FastifyError).validation !== undefined) {
       const invalid = validationToInvalidInput(error as FastifyError);
+      void reply.status(invalid.status).send(invalid.toResponse(correlationId));
+      return;
+    }
+    // W0-06 section 8: Fastify's own body replies are mapped: malformed or empty JSON and an unsupported media
+    // type are 422 invalid_input (the content-type parser errors, FST_ERR_CTP_*); nothing else is contract-shaped.
+    const code = (error as FastifyError).code;
+    if (typeof code === 'string' && code.startsWith('FST_ERR_CTP_')) {
+      const invalid = new InvalidInputError([{ path: 'body', messageKey: 'validation.required' }]);
       void reply.status(invalid.status).send(invalid.toResponse(correlationId));
       return;
     }
@@ -141,6 +157,7 @@ export function buildApp(deps: AppDeps): App {
         done();
       });
     }
+    if (deps.artifacts !== undefined) registerArtifactRoutes(fastify, { ...deps.artifacts, emitter });
   }
 
   return { fastify, emitter };
