@@ -120,6 +120,15 @@ test('a direct SQL UPDATE or DELETE on audit_event is rejected as rai_app (grant
 });
 
 test('rai_app cannot DELETE from any business table; rai_operator may delete idempotency keys only', async () => {
+  const roles = await Promise.all(
+    (['app', 'owner', 'operator'] as const).map((role) =>
+      db.raw(
+        role,
+        async (c) => (await c.query<{ current_user: string }>('SELECT current_user')).rows[0]!.current_user,
+      ),
+    ),
+  );
+  assert.deepEqual(roles, ['rai_app', 'rai_owner', 'rai_operator'], 'each handle connects as its W0-04 role');
   for (const table of [
     'case',
     'pack_version',

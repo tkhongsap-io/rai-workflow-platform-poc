@@ -35,8 +35,25 @@ export const BUSINESS_TABLES = [
   'configuration_revision',
 ] as const;
 
+/**
+ * The rai_operator connection for the grant tests. `DATABASE_OPERATOR_URL` is optional locally (empty means the
+ * commands fall back to `DATABASE_MIGRATE_URL`, W0-02 section 5), but a test that asserts what rai_operator may do
+ * must connect as that role, so an empty value derives it from `DATABASE_URL` with the synthetic local credential
+ * docker/postgres/init creates (user and password both `rai_operator`). Each file asserts `current_user`.
+ */
+export function operatorUrlForTests(env: Readonly<Record<string, string | undefined>>): string {
+  const explicit = env.DATABASE_OPERATOR_URL?.trim();
+  if (explicit !== undefined && explicit !== '') return explicit;
+  const derived = new URL(parseDatabaseConfig(env).url);
+  derived.username = 'rai_operator';
+  derived.password = 'rai_operator';
+  return derived.toString();
+}
+
 export async function openTestDatabase(): Promise<TestDatabase> {
-  const { url, migrateUrl, operatorUrl } = parseDatabaseConfig(readEnv());
+  const env = readEnv();
+  const { url, migrateUrl } = parseDatabaseConfig(env);
+  const operatorUrl = operatorUrlForTests(env);
   await runMigrations(migrateUrl, MIGRATIONS_FOLDER);
   const handles: Record<'app' | 'owner' | 'operator', DbHandle> = {
     app: createDb(url, { max: 4 }),
