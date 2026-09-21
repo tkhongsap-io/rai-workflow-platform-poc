@@ -43,3 +43,17 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: next ticket in the dependency map.
 - Author: operator=ta session=build-workflow model=claude-opus-5
 - Evidence: https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/59
+
+## 2026-09-21 (time not recorded) — W0-03 merged
+- What: Identity adapter spec: modes local-google/network/production with fail-closed start-up table S1-S18, session, fixture provider with dual-role identity, test obligations. PR #62.
+- Why: Ticket W0-03 of the delivery pack; two independent reviewer agents passed before merge.
+- Next: next ticket in the dependency map.
+- Author: operator=ta session=build-workflow model=claude-opus-5
+- Evidence: https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/62
+
+## 2026-09-21 (time not recorded) — W0-08 merged
+- What: Upload safety policy and synthetic fixture strategy: allowed types, limits, sniffing rules, filename rule, hostile test rows, four fixture cases and users. PR #64.
+- Why: Ticket W0-08 of the delivery pack; two independent reviewer agents passed before merge.
+- Next: next ticket in the dependency map.
+- Author: operator=ta session=build-workflow model=claude-opus-5
+- Evidence: https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/64
