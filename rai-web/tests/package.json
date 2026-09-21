@@ -1,0 +1,12 @@
+{
+  "name": "@rai/tests",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Cross-module suites: integration (node:test against the real Postgres) and browser (Playwright). Lane C owns support/.",
+  "type": "module",
+  "dependencies": {
+    "@rai/fixtures": "0.0.0",
+    "@rai/server": "0.0.0",
+    "@rai/shared": "0.0.0"
+  }
+}

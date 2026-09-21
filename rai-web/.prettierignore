@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.local/
+package-lock.json
+server/drizzle/meta/
+playwright-report/
+test-results/

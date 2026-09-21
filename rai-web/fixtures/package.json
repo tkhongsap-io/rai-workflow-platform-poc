@@ -1,0 +1,26 @@
+{
+  "name": "@rai/fixtures",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Lane C synthetic data and substitutes; never in the production build (W0-02 section 1). W1-00 owns data/users.ts.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "rai-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./*": {
+      "rai-source": "./src/*.ts",
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@rai/server": "0.0.0",
+    "@rai/shared": "0.0.0"
+  }
+}

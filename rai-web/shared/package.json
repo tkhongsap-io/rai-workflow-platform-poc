@@ -1,0 +1,29 @@
+{
+  "name": "@rai/shared",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The typed contract both halves import: ids, constants, error contract, request/response schemas, locale catalogues (W0-02 section 7; Lane A owns, contract PRs only).",
+  "type": "module",
+  "exports": {
+    ".": {
+      "rai-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./*": {
+      "rai-source": "./src/*.ts",
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    },
+    "./locales/*.json": {
+      "rai-source": "./src/locales/*.json",
+      "default": "./src/locales/*.json"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "typebox": "1.3.34"
+  }
+}
