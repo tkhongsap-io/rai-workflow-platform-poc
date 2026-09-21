@@ -11,17 +11,18 @@ import type { AllowedMediaType, ArtifactRef } from '@rai/shared/schemas/artifact
 import type { CaseWritableFields, ModelType } from '@rai/shared/schemas/cases';
 import type { PackDraft, StageContext } from '@rai/shared/schemas/pack';
 
-// W1-02 spelled `ModelTypeSchema` out; the cast is gone and this is an identity function kept so the three
-// construction sites stay uniform until `AllowedMediaTypeSchema` is spelled out too.
+// W1-02 spelled `ModelTypeSchema` out; the cast is gone. All three helpers are now identity functions kept
+// only so the construction sites stay uniform; they can be inlined in a later tidy-up.
 export function asContractModelType(value: ModelType): CaseWritableFields['modelType'] {
   return value;
 }
 
-// W1-02/W1-03 spelled `StageContextSchema` out; identity function, same reason as above.
+// `StageContextSchema` spelled out in this PR; identity function, same reason as above.
 export function asContractStageContext(value: StageContext): PackDraft['stageContext'] {
   return value;
 }
 
+// W1-03 spelled `AllowedMediaTypeSchema` out; identity function, same reason as above.
 export function asContractMediaType(value: AllowedMediaType): ArtifactRef['mediaType'] {
-  return value as unknown as ArtifactRef['mediaType'];
+  return value;
 }
