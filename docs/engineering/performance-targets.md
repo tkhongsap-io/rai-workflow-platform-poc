@@ -1,6 +1,6 @@
 # Performance targets (W0-09)
 
-Status: **targets, not measurements.** Recorded at the W0 exit review on 2026-09-21 (ticket W0-09, issue #14; [exit review](../../changes/2026-09-21-w0-exit/review.md)) as the BUILD_PLAN W0 clause "expected local workload and measurable performance budgets" asks. Nothing below has been measured: no application exists yet (W1-00 creates the skeleton), so every number is what slice 1 is designed for and what W3-06 and the W7 rehearsal will measure against. A target that a measurement misses is a finding for the lead, not a gate failure, until Ta records otherwise at a package exit. The workload numbers come from the source spec's scale (one review desk for one company's AI use cases) and Ta's planning instruction; the operator (Nakhun, D01) has not yet confirmed them, which W7-00 records.
+Status: **targets, not measurements.** Recorded at the W0 exit review on 2026-09-21 (ticket W0-09, issue #14; [exit review](../../changes/2026-09-21-w0-exit/review.md)) as the BUILD_PLAN W0 clause "expected local workload and measurable performance budgets" asks. Nothing below has been measured: no application exists yet (W1-00 creates the skeleton), so every number is what slice 1 is designed for and what W3-06 and the W7 rehearsal will measure against. A target that a measurement misses is a finding for the lead, not a gate failure, until Ta records otherwise at a package exit. The workload numbers in section 1 are a ticket-flow proposal sized from the source spec's scale (one review desk for one company's AI use cases); no instruction from Ta fixes them, and neither Ta nor the operator (Nakhun, D01) has confirmed them. They are pending Ta's and the operator's confirmation at exit-record review (the W0 contract's W0-09 line: "agree the expected local workload with Ta and the operator"; [exit review](../../changes/2026-09-21-w0-exit/review.md) section 10); W7-00 records the operator's confirmation if it has not been recorded by then.
 
 Owners of the mechanisms these numbers bound: [W0-02](implementation-plan-w1-w3.md) (routes, commands), [W0-04](persistence-and-artifact-store.md) (locks, blob store), [W0-06](workflow-transition-and-error-contract.md) (transaction order), [W0-07](qc-boundary-and-mail-sink.md) (QC timeout, mail retry), [W0-08](upload-safety-and-fixtures.md) (upload limits), [W0-10](observability-contract.md) (probes, `durationMs`).
 
@@ -8,9 +8,9 @@ Owners of the mechanisms these numbers bound: [W0-02](implementation-plan-w1-w3.
 
 | Quantity | Target | Basis |
 |---|---|---|
-| New cases | ≤ 50 per month | Ta's planning instruction; one desk for one company |
+| New cases | ≤ 50 per month | Ticket-flow proposal, pending Ta's and the operator's confirmation at exit-record review; one desk for one company |
 | Versions per case | ≤ 5 (one submission plus send-back cycles) | Workflow contract; D05 full re-review |
-| Pack size | ≤ 9 files per version, ≤ 25 MiB per file (26,214,400 bytes), ≤ 150 MiB per version (157,286,400 bytes) | W0-08 section 3, accepted for synthetic data at W0 exit |
+| Pack size | ≤ 9 files per version, ≤ 25 MiB per file (26,214,400 bytes), ≤ 150 MiB per version (157,286,400 bytes) | W0-08 section 3, presented for Ta's acceptance in the W0 exit record (pending) |
 | Documents stored | ≤ 3,000 artifact rows and ≤ 50 GiB of blobs in the first year | 50 cases × 5 versions × 9 files, with dedup by content hash (W0-04) reducing the blob count |
 | Signed-in users | ≤ 40 accounts, ≤ 10 concurrent | Six roles across a few business units; fixture set has 8 |
 | Reviewer actions | ≤ 30 lane decisions and ≤ 100 dispositions per week | Three lanes × cases in review |

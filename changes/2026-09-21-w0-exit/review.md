@@ -2,7 +2,7 @@
 
 2026-09-21. Ticket W0-09 (issue #14), lane Lead, owner type Human; the record is written by the delegated ticket flow (D03 amendment) for Ta's review. Branch `codex/w0-09-w0-exit-review`, worktree `/Users/tkhongsap/github/rai-wt/W0-09`, base `main` at `d16ddaf` (W0-05 merged). Proves: W0 exit. All nine other W0 tickets were merged on `main` before this review started (PRs #57, #65, #61, #63, #59, #62, #64, #60, #58).
 
-This record holds (1) the document and link audit, (2) the cross-spec consistency read with every mismatch and the fix applied to the non-owning document, (3) the TESTING check, (4) the performance targets, (5) the W0-08 acceptance, (6) the W0 exit checklist with evidence, (7) the recorded decisions carried, (8) the stop-condition check, (9) the exact commands and outputs, (10) what remains for Ta and the lead, and (11) the tracker actions.
+This record holds (1) the document and link audit, (2) the cross-spec consistency read with every mismatch and the fix applied to the non-owning document, (3) the TESTING check, (4) the performance targets, (5) the W0-08 policy presented for Ta's acceptance, (6) the W0 exit checklist with evidence, (7) the recorded decisions carried, (8) the stop-condition check, (9) the exact commands and outputs, (10) what remains for Ta and the lead, and (11) the tracker actions.
 
 ## 1. Documents and links
 
@@ -24,7 +24,7 @@ Every W0 document exists on `main`:
 Link and anchor audit: a zero-dependency Node script (kept in the session scratchpad, reproduced in section 9 so it can be rerun; W1-12 ships the permanent `scripts/check-links.mjs`) resolves every relative Markdown link in the ten documents above plus `adr/README.md`, `docs/delivery/w0-technical-contract.md`, `docs/architecture/README.md`, `TESTING.md`, `BUILD_PLAN.md` and this review, and checks every `#anchor` against the target's headings using GitHub's slug rule (lower-case, punctuation dropped, one hyphen per space, so `## W0-02 — file-level implementation plan` is `#w0-02--file-level-implementation-plan`). Links inside fenced code blocks are ignored.
 
 - Before any edit (14 documents present, the two this ticket creates missing): `relative links: 366; broken: 0`.
-- After the reconciliation edits and the two new files: `Documents checked: 16/16; relative links: 426; broken: 0; missing documents: 0`, exit 0.
+- After the reconciliation edits and the two new files: `Documents checked: 16/16; relative links: 428; broken: 0; missing documents: 0`, exit 0 (426 before review fix round 1 added two links).
 
 ## 2. Cross-spec consistency read
 
@@ -140,11 +140,11 @@ Confirmed present and mirroring W0-02 section 3 before the reconciliation. After
 
 ## 4. Performance targets
 
-Recorded in `docs/engineering/performance-targets.md`, marked **targets, not measurements**: ≤ 50 cases per month; packs ≤ 9 files × 25 MiB and ≤ 150 MiB per version; p95 page < 1 s and p95 API < 300 ms on localhost; plus the time budgets the specs asked W0-09 to fix (lock wait 5 s, API request 30 s, upload request 120 s, in-flight uploads per session 2, QC deadline 10 s, mail backoff 1/5/25 s, readiness probe 2 s and 5 s cache, graceful shutdown 10 s). W0-06 section 11 and W0-08 sections 3 and 10 now point at it. The operator has not confirmed the workload numbers; W7-00 records that.
+Recorded in `docs/engineering/performance-targets.md`, marked **targets, not measurements**: ≤ 50 cases per month; packs ≤ 9 files × 25 MiB and ≤ 150 MiB per version; p95 page < 1 s and p95 API < 300 ms on localhost; plus the time budgets the specs asked W0-09 to fix (lock wait 5 s, API request 30 s, upload request 120 s, in-flight uploads per session 2, QC deadline 10 s, mail backoff 1/5/25 s, readiness probe 2 s and 5 s cache, graceful shutdown 10 s). W0-06 section 11 and W0-08 sections 3 and 10 now point at it. The workload numbers are a ticket-flow proposal: no instruction from Ta fixes them, and neither Ta nor the operator has confirmed them (section 10).
 
-## 5. W0-08 acceptance (synthetic data)
+## 5. W0-08 policy presented for Ta's acceptance (synthetic data)
 
-Accepted on Ta's behalf under the D03 delegated ticket flow (register row "D03 (amendment)": the ticket flow implements and Ta reviews the package exit record), for synthetic data only: the allowed list PDF / DOCX / XLSX / PNG / JPEG with everything else refused; 25 MiB per file, 150 MiB per pack version, 40 MP images, the ZIP bounds and the 200-code-point filename rule; the byte-level PDF active-content scan; no malware scanning in slice 1; the fixture identities (W0-03), business-unit labels, cases and the operator address; and that IT/Security was not named by W0 exit, so D08 re-examines every limit before real data. Recorded in W0-08's status line and section 9. If Ta rejects any item on reviewing this record, the W0-08 owner amends the spec before W1-03 starts.
+Presented for Ta's acceptance in this exit record (D03 amendment: Ta reviews it); pending until Ta records acceptance. The ticket flow cannot accept on Ta's behalf: the W0 contract names Ta as the acceptor, and the D03 amendment delegates merging, not acceptance. The items, for synthetic data only: the allowed list PDF / DOCX / XLSX / PNG / JPEG with everything else refused; 25 MiB per file, 150 MiB per pack version, 40 MP images, the ZIP bounds and the 200-code-point filename rule; the byte-level PDF active-content scan; no malware scanning in slice 1; the fixture identities (W0-03), business-unit labels, cases and the operator address; and that IT/Security was not named by W0 exit, so D08 re-examines every limit before real data. W0-08's status line and section 9 carry the same pending status. Listed in section 10 as an item for Ta. If Ta rejects any item, the W0-08 owner amends the spec before W1-03 starts.
 
 ## 6. W0 exit checklist
 
@@ -155,7 +155,7 @@ Ticked in `docs/delivery/w0-technical-contract.md` with evidence per line; repea
 - [x] Identity, persistence/artifacts, QC and mail interfaces with error contracts and test substitutes (W0-03, W0-04, W0-07): identity adapter 2 / 6.4 / 7; persistence "Interfaces" / "Error contract" / "Test substitutes"; QC and mail 3.3 / 3.8 / 3.9 / 4.2 / 4.7 / 5.
 - [x] Recorded D05, D06 and D11 rules carried as written; D04 recorded; D07-D10 open at their gates: section 7 below.
 - [x] `vendor_involved`, `model_type` and the four status fields confirmed and recorded (W0-04): register row "W0-04 fields"; W0-04 "Desk-local Case fields"; W0-05 section 5; W0-06 4.10.
-- [x] Upload types and safety limits defined (W0-08): sections 2, 3, 9; accepted for synthetic data (section 5 above).
+- [x] Upload types and safety limits defined (W0-08): sections 2, 3, 9. Ticked as defined only, which is all BUILD_PLAN requires; the policy is presented for Ta's acceptance (section 5 above), pending.
 - [x] Repeatable verification commands specified, no claim of runtime success (W0-09): TESTING mirrors W0-02 section 3; performance targets are targets.
 - [x] Observability contract, audit-log rules, schema-evolution rules, UI quality bar and language rule written (W0-02, W0-04, W0-10): observability contract; W0-04 "Audit log" and "Schema evolution"; W0-02 sections 9 and 10.
 - [x] Stop condition checked: section 8 below.
@@ -188,7 +188,7 @@ Shell: `export PATH=$HOME/.nvm/versions/node/v24.21.0/bin:$PATH` (node v24.21.0)
 | Command | Output |
 |---|---|
 | `node /…/scratchpad/check-w0-links.mjs .` (before edits) | `Documents checked: 14/16; relative links: 366; broken: 0; missing documents: 2` (the two files this ticket creates), exit 1 |
-| same, after edits | `Documents checked: 16/16; relative links: 426; broken: 0; missing documents: 0`, exit 0 |
+| same, after edits | `Documents checked: 16/16; relative links: 428; broken: 0; missing documents: 0`, exit 0 (426 before the review fix round 1 added two links) |
 | `node --test tests/*.test.mjs` | `tests 22, pass 22, fail 0, skipped 0` |
 | `git diff --check` | clean |
 | `shasum -a 256 docs/product/source-spec.md` | `92c4f7123058b8fec3c2ba7abdf10538fad034778624b0675975b39de440b354`, equals `docs/sources.md` |
@@ -243,12 +243,13 @@ process.exit(broken || missing.length ? 1 : 0);
 
 ## 10. Limitations and items for Ta and the lead
 
+- **W0-08 upload policy (section 5): for Ta.** The allowed types, limits, PDF scan rule, absence of malware scanning, fixture set and the IT/Security gap are presented for Ta's acceptance for synthetic data; pending until Ta records acceptance. The exit checklist ticks W0-08 as defined only.
+- **Workload numbers (section 4, performance targets section 1): for Ta and the operator.** ≤ 50 new cases per month and the derived storage, user, action, notification and QC counts are a ticket-flow proposal, not Ta's figures; the W0 contract asks to agree them with Ta and the operator, and neither agreement is recorded. Pending confirmation at this exit-record review; W7-00 records the operator's confirmation if it is still open then.
 - **UI quality bar (W0-02 section 9) and the sub-ticket split (W0-02 11.1, now including W3-07a/b):** written, as the exit checklist requires; Ta's confirmation of the bar as the UI tickets' Done-when standard and the lead's confirmation of the split are still due before W1-06 and W1-01 start. This review could not confirm them on Ta's behalf: the W0 contract names Ta and the lead, not the ticket flow.
 - **Eighth fixture identity.** The W0 contract's W0-03 text says "six synthetic single-role users plus one dual-role identity". W0-05's scope negatives need a second owner in the same BU, so `fx-user-owner-cm-2` was added as an additional single-role user (the contract's set is intact). If Ta prefers the contract's count kept literal, W0-05 T3, T7, T8, T11, T27, T31, T32 and T33 need another actor and the lead decides which.
 - **Fifth fixture case** `fx-case-hr-dualrole` added to W0-08 so the case that W0-02, W0-03 and W0-05 already named exists; the contract's four required cases are unchanged.
 - **Mixed variable prefixes.** Following the recorded ownership (W0-03 owns `RAI_IDENTITY_*`, `RAI_SECRET_*`, `RAI_SESSION_*`; W0-02 the rest) leaves `.env.example` with `RAI_IDENTITY_MODE` beside `HOST` and `DATABASE_URL`. Consistent and unambiguous, but a lead who wants one prefix can rename in the W1-00 PR by editing W0-02 section 5 and W0-03 9.1 together.
 - **Delivery README** (`docs/delivery/README.md`) still says "W1-W3 tickets are blocked by W0 exit" in its status line; the ticket brief limited status edits to BUILD_PLAN, so it is left for the merge step or a docs PR.
-- **Operator workload numbers** in the performance targets are Ta's planning figures, not yet confirmed by the operator (W7-00).
 - The consistency read covered the six named seams and the items the specs assigned to W0-09, plus the contradictions met on the way (section 2.7); it does not claim that no wording difference remains anywhere in about 4,700 lines of specs. Every reconciliation is marked "W0-09:" in the document it touched, so a reviewer can find and revert any single one. No runtime claim is made for any command in TESTING's product section.
 
 ## 11. Tracker actions
