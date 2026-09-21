@@ -5,17 +5,11 @@
 
 import type { JSX } from 'react';
 import type { CaseView, LaneProjectionStatus, ReadinessProjectionStatus } from '@rai/shared/schemas/cases';
-import { useLocale, useT } from './locale.js';
-import { StatusBadge, type BadgeTone } from './status-badge.js';
-import { formatDateTime, modelTypeKey, nextActionKey, statusKey, submissionLine } from './view-model.js';
-
-const STATUS_TONE: Readonly<Record<CaseView['status'], BadgeTone>> = {
-  draft: 'neutral',
-  in_review: 'warn',
-  sent_back: 'danger',
-  awaiting_disposition: 'warn',
-  ready_for_launch: 'ok',
-};
+import { Badge, StatusBadge, type BadgeTone } from '../../components/status-badge.js';
+import { formatDateTime } from '../../i18n/format.js';
+import { useLocale } from '../../i18n/locale-provider.js';
+import { NEXT_ACTION_KEY } from '../cases/case-list.view-model.js';
+import { modelTypeKey, submissionLine } from './view-model.js';
 
 const PROJECTION_TONE: Readonly<Record<LaneProjectionStatus, BadgeTone>> = {
   pending: 'neutral',
@@ -29,37 +23,32 @@ const READINESS_TONE: Readonly<Record<ReadinessProjectionStatus, BadgeTone>> = {
 };
 
 export function CaseOverview({ view }: { view: CaseView }): JSX.Element {
-  const t = useT();
-  const locale = useLocale();
+  const { t, locale } = useLocale();
   const submission = submissionLine(view);
   const source =
     view.sourceRecordId.kind === 'known' ? view.sourceRecordId.value : t('case.field.source_record_unknown');
   return (
-    <header className="rai-case-head">
-      <div className="rai-case-head__top">
-        <div className="rai-case-head__identity">
-          <p className="rai-case-head__meta">
-            <span className="rai-case-head__registry">{view.registryId}</span>
-            <span aria-hidden="true">·</span>
+    <header className={'card case-head'}>
+      <div className={'case-head-top'}>
+        <div>
+          <p className={'case-head-meta'}>
+            <span className={'case-head-registry'}>{view.registryId}</span>
+            <span aria-hidden={true}>·</span>
             <span>{t(submission.key, submission.params)}</span>
           </p>
-          <h1 className="rai-case-head__title">{view.useCaseName}</h1>
+          <h1>{view.useCaseName}</h1>
         </div>
-        <div className="rai-case-head__status">
-          <span className="rai-label">{t('case.status_label')}</span>
-          <StatusBadge
-            status={view.status}
-            tone={STATUS_TONE[view.status]}
-            label={t(statusKey(view.status))}
-          />
+        <div className={'case-head-status'}>
+          <span className={'eyebrow'}>{t('case.status_label')}</span>
+          <StatusBadge status={view.status} />
         </div>
       </div>
 
-      <p className="rai-case-head__next">
-        <span className="rai-label">{t('case.next_action.label')}</span> {t(nextActionKey(view.status))}
+      <p className={'case-next'}>
+        <span className={'eyebrow'}>{t('case.next_action.label')}</span> {t(NEXT_ACTION_KEY[view.status])}
       </p>
 
-      <dl className="rai-facts">
+      <dl className={'facts'}>
         <div>
           <dt>{t('case.field.business_unit')}</dt>
           <dd>
@@ -98,35 +87,35 @@ export function CaseOverview({ view }: { view: CaseView }): JSX.Element {
         </div>
       </dl>
 
-      <div className="rai-lanes" aria-label={t('case.lane_status.heading')} role="group">
-        <span className="rai-label">{t('case.lane_status.heading')}</span>
-        <span className="rai-lanes__item">
+      <div className={'lanes'} aria-label={t('case.lane_status.heading')} role={'group'}>
+        <span className={'eyebrow'}>{t('case.lane_status.heading')}</span>
+        <span className={'lanes-item'}>
           {t('case.lane.rai')}{' '}
-          <StatusBadge
+          <Badge
             status={view.raiStatus}
             tone={PROJECTION_TONE[view.raiStatus]}
             label={t(`projection.${view.raiStatus}`)}
           />
         </span>
-        <span className="rai-lanes__item">
+        <span className={'lanes-item'}>
           {t('case.lane.privacy')}{' '}
-          <StatusBadge
+          <Badge
             status={view.privacyStatus}
             tone={PROJECTION_TONE[view.privacyStatus]}
             label={t(`projection.${view.privacyStatus}`)}
           />
         </span>
-        <span className="rai-lanes__item">
+        <span className={'lanes-item'}>
           {t('case.lane.security')}{' '}
-          <StatusBadge
+          <Badge
             status={view.securityStatus}
             tone={PROJECTION_TONE[view.securityStatus]}
             label={t(`projection.${view.securityStatus}`)}
           />
         </span>
-        <span className="rai-lanes__item">
+        <span className={'lanes-item'}>
           {t('case.lane.readiness')}{' '}
-          <StatusBadge
+          <Badge
             status={view.aiReadinessStatus}
             tone={READINESS_TONE[view.aiReadinessStatus]}
             label={t(`readiness.${view.aiReadinessStatus}`)}

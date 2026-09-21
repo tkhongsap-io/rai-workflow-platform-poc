@@ -1,9 +1,9 @@
-// W1-06: case overview, nine-slot pack editor and version navigation as one flow, on the W1-13 substitute
-// (playwright.substitute.config.ts). Proves A02 only once W1-INT runs it against the real server; a substitute
-// run is a development aid (W0-02 section 8.1). Interacts only through the UI (roles, labels, keyboard); the
-// API is called directly only to sign in (tests/browser/support/sign-in.ts), to reset the substitute between
-// tests, to read what the substitute serves for comparison, and to produce a concurrent edit for the
-// stale-version case. Fixture ids: fx-case-missing-slot (RAI-2000-0003), fx-case-nonvendor (RAI-2000-0001),
+// W1-06: case overview, nine-slot pack editor and version navigation as one flow, inside the W1-07 shell, on the
+// W1-13 substitute (playwright.substitute.config.ts). Proves A02 only once W1-INT runs it against the real
+// server; a substitute run is a development aid (W0-02 section 8.1). Interacts only through the UI (roles,
+// labels, keyboard); the API is called directly only to sign in (tests/browser/support/sign-in.ts), to reset the
+// substitute between tests, to read what the substitute serves for comparison, and to produce a concurrent edit
+// for the stale-version case. Fixture ids: fx-case-missing-slot (RAI-2000-0003), fx-case-nonvendor (RAI-2000-0001),
 // fx-case-na-reasons (RAI-2000-0004); users fx-user-owner-cm, fx-user-owner-cm-2.
 
 import { test, expect, type Page } from '@playwright/test';
@@ -51,7 +51,7 @@ async function readDraft(page: Page, caseId: string): Promise<PackDraft> {
 }
 
 function slotRow(page: Page, slot: number) {
-  return page.locator(`.rai-slot[data-slot="${slot}"]`);
+  return page.locator(`.slot-row[data-slot="${slot}"]`);
 }
 
 function changeButton(page: Page, slot: number, slotNameKey: LocaleKey) {
@@ -95,13 +95,13 @@ test.describe('W1-06 case flow on the W1-13 substitute (fx-case-missing-slot, fx
     await expect(page.getByText(MISSING_SLOT_CASE, { exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Field Technician Dispatch Optimiser');
     await expect(page.getByText(t('th', 'case.submission.none'), { exact: true })).toBeVisible();
-    await expect(page.locator('[data-status="draft"]').first()).toHaveText(t('th', 'status.draft'));
-    await expect(page.getByText(t('th', 'case.next_action.draft'))).toBeVisible();
+    await expect(page.locator('[data-status="draft"]').first()).toContainText(t('th', 'status.draft'));
+    await expect(page.getByText(t('th', 'next_action.draft'))).toBeVisible();
     await expect(page.getByText('AIR-FX-2304', { exact: true })).toBeVisible(); // the known source id, unchanged
-    await expect(page.locator('.rai-slot')).toHaveCount(9);
+    await expect(page.locator('.slot-row')).toHaveCount(9);
     // The fixture's slot facts render as received: 7 missing, 8 not yet, 3 and 4 N/A by the non-vendor default.
-    await expect(slotRow(page, 7).locator('[data-status]')).toHaveText(t('th', 'slot.state.missing'));
-    await expect(slotRow(page, 8).locator('[data-status]')).toHaveText(t('th', 'slot.state.not_yet'));
+    await expect(slotRow(page, 7).locator('[data-status]')).toContainText(t('th', 'slot.state.missing'));
+    await expect(slotRow(page, 8).locator('[data-status]')).toContainText(t('th', 'slot.state.not_yet'));
     await expect(slotRow(page, 3)).toContainText(t('th', 'slot.na.reason.non_vendor_default'));
     await expect(slotRow(page, 1).getByRole('link')).toHaveText('RiskScreening_DispatchOptimiser.pdf');
     await expect(page.getByRole('navigation', { name: t('th', 'version.nav_heading') })).toContainText(
@@ -164,7 +164,9 @@ test.describe('W1-06 case flow on the W1-13 substitute (fx-case-missing-slot, fx
     await tabUntil(page, (info) => info.tag === 'button' && info.text === apply, 10);
     await page.keyboard.press('Enter');
     await expect(dialog).toBeHidden();
-    await expect(slotRow(page, 7).locator('[data-status]')).toHaveText(t('th', 'slot.state.not_applicable'));
+    await expect(slotRow(page, 7).locator('[data-status]')).toContainText(
+      t('th', 'slot.state.not_applicable'),
+    );
     await expect(slotRow(page, 7)).toContainText('ระบบทดสอบภายใน');
     expect((await focusedElement(page))?.text).toBe(t('th', 'pack.action.change'));
     await expect(button7).toBeFocused();
@@ -176,7 +178,7 @@ test.describe('W1-06 case flow on the W1-13 substitute (fx-case-missing-slot, fx
     await page.keyboard.press('ArrowUp'); // missing → not_yet
     await tabUntil(page, (info) => info.tag === 'button' && info.text === apply, 10);
     await page.keyboard.press('Enter');
-    await expect(slotRow(page, 7).locator('[data-status]')).toHaveText(t('th', 'slot.state.not_yet'));
+    await expect(slotRow(page, 7).locator('[data-status]')).toContainText(t('th', 'slot.state.not_yet'));
 
     // Missing (back to the saved state: the row is no longer marked pending).
     await expect(button7).toBeFocused();
@@ -184,8 +186,8 @@ test.describe('W1-06 case flow on the W1-13 substitute (fx-case-missing-slot, fx
     await page.keyboard.press('ArrowDown'); // not_yet → missing
     await tabUntil(page, (info) => info.tag === 'button' && info.text === apply, 10);
     await page.keyboard.press('Enter');
-    await expect(slotRow(page, 7).locator('[data-status]')).toHaveText(t('th', 'slot.state.missing'));
-    await expect(slotRow(page, 7)).not.toHaveClass(/rai-slot--pending/);
+    await expect(slotRow(page, 7).locator('[data-status]')).toContainText(t('th', 'slot.state.missing'));
+    await expect(slotRow(page, 7)).not.toHaveClass(/slot-row-pending/);
 
     // Attached: an upload through 7.4, then the slot points at the artifact.
     await page.keyboard.press('Enter');
@@ -204,9 +206,9 @@ test.describe('W1-06 case flow on the W1-13 substitute (fx-case-missing-slot, fx
     await tabUntil(page, (info) => info.tag === 'button' && info.text === apply, 10);
     await page.keyboard.press('Enter');
     await expect(dialog).toBeHidden();
-    await expect(slotRow(page, 7).locator('[data-status]')).toHaveText(t('th', 'slot.state.attached'));
+    await expect(slotRow(page, 7).locator('[data-status]')).toContainText(t('th', 'slot.state.attached'));
     await expect(slotRow(page, 7).getByRole('link')).toHaveText('SecurityAssessment_synthetic.pdf');
-    await expect(slotRow(page, 7)).toHaveClass(/rai-slot--pending/);
+    await expect(slotRow(page, 7)).toHaveClass(/slot-row-pending/);
 
     // Slot 8 to N/A with a reason, then save both with the keyboard.
     await changeButton(page, 8, 'slot.s8.name').focus();
@@ -269,26 +271,35 @@ test.describe('W1-06 case flow on the W1-13 substitute (fx-case-missing-slot, fx
     await expect(dialog).toBeHidden();
     await expect(button).toBeFocused();
 
-    // Unsaved reason: Escape asks; keep editing returns to the field; close and discard closes.
+    // Unsaved reason: Escape asks through the shared dialog's confirm (dialog.discard_confirm); declining keeps
+    // the dialog and the typed text, accepting closes and discards. Both answers are keyboard operations of the
+    // native confirm; here the test answers them.
     await page.keyboard.press('Enter');
     await expect(dialog).toBeVisible();
     await page.keyboard.press('ArrowDown');
     await tabUntil(page, (info) => info.tag === 'textarea', 5);
     await page.keyboard.type('draft reason');
+    const asked: string[] = [];
+    page.once('dialog', (confirm) => {
+      asked.push(confirm.message());
+      void confirm.dismiss();
+    });
     await page.keyboard.press('Escape');
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByText(t('th', 'slot.dialog.discard_prompt'))).toBeVisible();
-    expect((await focusedElement(page))?.text).toBe(t('th', 'slot.dialog.discard_confirm'));
-    await pressTab(page);
-    expect((await focusedElement(page))?.text).toBe(t('th', 'slot.dialog.discard_keep'));
-    await page.keyboard.press('Enter');
-    expect((await focusedElement(page))?.tag).toBe('textarea');
+    expect(asked).toEqual([t('th', 'dialog.discard_confirm')]);
+    await expect(dialog.getByRole('textbox', { name: t('th', 'slot.dialog.reason_label') })).toHaveValue(
+      'draft reason',
+    );
+    await expectFocusInsideDialog(page);
+    page.once('dialog', (confirm) => {
+      asked.push(confirm.message());
+      void confirm.accept();
+    });
     await page.keyboard.press('Escape');
-    expect((await focusedElement(page))?.text).toBe(t('th', 'slot.dialog.discard_confirm'));
-    await page.keyboard.press('Enter');
     await expect(dialog).toBeHidden();
+    expect(asked).toHaveLength(2);
     await expect(button).toBeFocused();
-    await expect(slotRow(page, 7).locator('[data-status]')).toHaveText(t('th', 'slot.state.missing'));
+    await expect(slotRow(page, 7).locator('[data-status]')).toContainText(t('th', 'slot.state.missing'));
   });
 
   test('a save after another session saved shows the 409 guidance and reload recovers', async ({ page }) => {
@@ -310,10 +321,10 @@ test.describe('W1-06 case flow on the W1-13 substitute (fx-case-missing-slot, fx
     const alert = page.getByRole('alert');
     await expect(alert).toContainText(t('th', 'error.stale_version'));
     await expect(alert).toContainText(t('th', 'error.stale_version.guidance.revision_changed'));
-    await expect(slotRow(page, 7).locator('[data-status]')).toHaveText(t('th', 'slot.state.not_yet')); // nothing lost yet
+    await expect(slotRow(page, 7).locator('[data-status]')).toContainText(t('th', 'slot.state.not_yet')); // nothing lost yet
     await alert.getByRole('button', { name: t('th', 'action.reload') }).click();
-    await expect(slotRow(page, 8).locator('[data-status]')).toHaveText(t('th', 'slot.state.missing')); // the other save
-    await expect(slotRow(page, 7).locator('[data-status]')).toHaveText(t('th', 'slot.state.missing')); // pending dropped
+    await expect(slotRow(page, 8).locator('[data-status]')).toContainText(t('th', 'slot.state.missing')); // the other save
+    await expect(slotRow(page, 7).locator('[data-status]')).toContainText(t('th', 'slot.state.missing')); // pending dropped
     await expect(page.getByText(t('th', 'pack.draft_revision', { number: 1, revision: 2 }))).toBeVisible();
   });
 
@@ -328,12 +339,12 @@ test.describe('W1-06 case flow on the W1-13 substitute (fx-case-missing-slot, fx
     await expect(
       page.getByRole('heading', { level: 2, name: t('th', 'version.heading', { number: 1 }) }),
     ).toBeVisible();
-    await expect(page.locator('[data-status="in_review"]')).toHaveText(t('th', 'status.in_review'));
+    await expect(page.locator('[data-status="in_review"]')).toContainText(t('th', 'status.in_review'));
     await expect(
       page.getByText(t('th', 'case.submission.version', { number: 1 }), { exact: true }),
     ).toBeVisible();
-    await expect(page.getByText(t('th', 'case.next_action.in_review'))).toBeVisible();
-    await expect(page.locator('.rai-slot')).toHaveCount(9);
+    await expect(page.getByText(t('th', 'next_action.in_review'))).toBeVisible();
+    await expect(page.locator('.slot-row')).toHaveCount(9);
     await expect(page.getByRole('button', { name: t('th', 'pack.action.change') })).toHaveCount(0); // read-only
     await expect(page.getByRole('button', { name: t('th', 'pack.action.submit') })).toHaveCount(0);
     await expect(page.getByText('fixture:fx-user-owner-cm').last()).toBeVisible(); // submittedBy as recorded
@@ -355,7 +366,7 @@ test.describe('W1-06 case flow on the W1-13 substitute (fx-case-missing-slot, fx
       );
       await expect(links.nth(index)).toHaveAttribute('href', `/cases/${caseId}/versions/${item.versionId}`);
     }
-    await expect(nav.locator('[data-status="latest"]')).toHaveText(t('th', 'version.latest'));
+    await expect(nav.locator('[data-status="latest"]')).toContainText(t('th', 'version.latest'));
     await expect(nav.getByText(t('th', 'version.nav_draft', { number: 1 }))).toHaveCount(0); // no open draft after submit
     await expectStatusElementsHaveText(page);
     await expectNoHorizontalScroll(page);
@@ -408,7 +419,7 @@ test.describe('W1-06 case flow on the W1-13 substitute (fx-case-missing-slot, fx
     expect(locale.status()).toBe(204);
     await page.goto(`/cases/${caseId}`);
     await expect(page.getByRole('heading', { level: 2, name: t('en', 'pack.heading') })).toBeVisible();
-    await expect(page.locator('[data-status="draft"]').first()).toHaveText(t('en', 'status.draft'));
+    await expect(page.locator('[data-status="draft"]').first()).toContainText(t('en', 'status.draft'));
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     await expectStatusElementsHaveText(page);
     await expectAccessible(page, testInfo, { name: 'overview-draft-en', lang: 'en' });

@@ -12,7 +12,13 @@ import {
   type JSX,
   type ReactNode,
 } from 'react';
-import { DEFAULT_LOCALE, t as render, type Locale, type LocaleKey } from '@rai/shared/locales/keys';
+import {
+  DEFAULT_LOCALE,
+  isLocaleKey,
+  t as render,
+  type Locale,
+  type LocaleKey,
+} from '@rai/shared/locales/keys';
 
 export const LOCALE_STORAGE_KEY = 'rai.locale';
 
@@ -82,4 +88,12 @@ export function useLocale(): LocaleContextValue {
   const value = useContext(LocaleContext);
   if (value === null) throw new Error('useLocale outside LocaleProvider');
   return value;
+}
+
+/**
+ * Renders a key the API sent as a string (a W0-06 envelope's messageKey, guidanceKey or a field's messageKey;
+ * section 10 item 3): through the catalogue when it knows the key, verbatim otherwise so it is visible, never blank.
+ */
+export function translateApiKey(t: Translate, key: string, params?: Record<string, string | number>): string {
+  return isLocaleKey(key) ? t(key, params) : key;
 }

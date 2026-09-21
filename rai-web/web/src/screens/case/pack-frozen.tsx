@@ -5,9 +5,10 @@
 import type { JSX } from 'react';
 import { CURRENT_LANE_MAPPING, LANE_MAPPINGS_BY_VERSION } from '@rai/shared/constants';
 import type { SubmittedVersion, VersionSummary } from '@rai/shared/schemas/versions';
-import { useLocale, useT } from './locale.js';
+import { formatDateTime } from '../../i18n/format.js';
+import { useLocale } from '../../i18n/locale-provider.js';
 import { SlotRows, type SlotRowData } from './slot-rows.js';
-import { SLOT_NUMBERS, formatDateTime, slotCounts, stageKey } from './view-model.js';
+import { SLOT_NUMBERS, slotCounts, stageKey } from './view-model.js';
 
 export function PackFrozen({
   version,
@@ -16,8 +17,7 @@ export function PackFrozen({
   version: SubmittedVersion;
   versions: readonly VersionSummary[];
 }): JSX.Element {
-  const t = useT();
-  const locale = useLocale();
+  const { t, locale } = useLocale();
   const mapping = LANE_MAPPINGS_BY_VERSION[version.laneMappingVersion] ?? CURRENT_LANE_MAPPING;
   const rows: SlotRowData[] = SLOT_NUMBERS.map((slot) => {
     const frozen = version.slots[slot];
@@ -33,17 +33,15 @@ export function PackFrozen({
   const counts = slotCounts(version.slots);
   const parent = versions.find((v) => v.versionId === version.parentVersionId);
   return (
-    <section className="rai-panel" aria-labelledby="frozen-heading">
-      <div className="rai-panel__head">
+    <section className={'card'} aria-labelledby={'frozen-heading'}>
+      <div className={'panel-head'}>
         <div>
-          <h2 id="frozen-heading" className="rai-panel__title">
-            {t('version.heading', { number: version.versionNumber })}
-          </h2>
-          <p className="rai-muted">{t('version.frozen_note')}</p>
+          <h2 id={'frozen-heading'}>{t('version.heading', { number: version.versionNumber })}</h2>
+          <p className={'muted'}>{t('version.frozen_note')}</p>
         </div>
-        <p className="rai-muted rai-panel__summary">{t('pack.summary', { ...counts })}</p>
+        <p className={'muted panel-summary'}>{t('pack.summary', { ...counts })}</p>
       </div>
-      <dl className="rai-facts">
+      <dl className={'facts'}>
         <div>
           <dt>{t('version.field.submitted_by')}</dt>
           <dd>{version.submittedBy}</dd>
@@ -74,12 +72,12 @@ export function PackFrozen({
             <code>{version.laneMappingVersion}</code>
           </dd>
         </div>
-        {parent !== undefined && (
+        {parent !== undefined ? (
           <div>
             <dt>{t('version.field.parent')}</dt>
             <dd>{t('version.nav_submitted', { number: parent.versionNumber })}</dd>
           </div>
-        )}
+        ) : null}
       </dl>
       <SlotRows rows={rows} mapping={mapping} />
     </section>

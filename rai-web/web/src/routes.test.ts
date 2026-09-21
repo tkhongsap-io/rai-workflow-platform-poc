@@ -16,6 +16,7 @@ test('safeReturnTo keeps SPA paths and drops absolute URLs, protocol-relative pa
   assert.equal(safeReturnTo(undefined), undefined);
 });
 
-test('the case path encodes its id', () => {
+test('the case and version paths encode their ids', () => {
   assert.equal(ROUTES.case('a b'), '/cases/a%20b');
+  assert.equal(ROUTES.caseVersion('c 1', 'v/2'), '/cases/c%201/versions/v%2F2');
 });

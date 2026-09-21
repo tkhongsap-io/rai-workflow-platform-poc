@@ -4,7 +4,7 @@
 // action is a button or a native control, so the whole editor is keyboard-operable (section 9, item 5).
 // Nothing here decides who may save or submit: the API answers, and its envelope is rendered as received.
 
-import { useEffect, useRef, useState, type JSX } from 'react';
+import { useCallback, useState, type JSX } from 'react';
 import { CURRENT_LANE_MAPPING } from '@rai/shared/constants';
 import type { ArtifactRef } from '@rai/shared/schemas/artifacts';
 import type { ConfigurationView } from '@rai/shared/schemas/cases';
@@ -15,8 +15,8 @@ import {
   type SlotState,
   type StageContext,
 } from '@rai/shared/schemas/pack';
-import { useApiT, useT } from './locale.js';
-import { ErrorNotice } from './error-notice.js';
+import { ErrorNotice, describeError } from '../../components/error-notice.js';
+import { translateApiKey, useLocale } from '../../i18n/locale-provider.js';
 import { SlotDialog } from './slot-dialog.js';
 import { SlotRows, type ArtifactLookup, type SlotRowData } from './slot-rows.js';
 import {
@@ -27,7 +27,6 @@ import {
   slotNameKey,
   slotOfFieldPath,
   stageKey,
-  type ErrorPresentation,
   type PendingSlots,
 } from './view-model.js';
 
@@ -44,7 +43,7 @@ export interface PackEditorProps {
   pendingSlots: PendingSlots;
   pendingSettings: PendingSettings;
   busy: 'idle' | 'saving' | 'submitting';
-  error: ErrorPresentation | null;
+  error: unknown;
   notice: { key: 'pack.saved' | 'pack.submitted'; params: Record<string, string | number> } | null;
   onSlotChange: (slot: SlotNumber, next: SlotState, artifact: ArtifactRef | undefined) => void;
   onSettingsChange: (next: PendingSettings) => void;
@@ -56,28 +55,18 @@ export interface PackEditorProps {
 }
 
 export function PackEditor(props: PackEditorProps): JSX.Element {
-  const t = useT();
-  const ta = useApiT();
+  const { t } = useLocale();
   const { draft, configuration, pendingSlots, pendingSettings, busy } = props;
   const [dialogSlot, setDialogSlot] = useState<SlotNumber | null>(null);
-  const invokerRef = useRef<HTMLButtonElement | null>(null);
-  const changeButtons = useRef(new Map<SlotNumber, HTMLButtonElement>());
-
-  // Section 9, item 3: focus returns to the invoking control when the dialog closes (the dialog is unmounted,
-  // so the native return does not apply).
-  useEffect(() => {
-    if (dialogSlot === null && invokerRef.current !== null) {
-      invokerRef.current.focus();
-      invokerRef.current = null;
-    }
-  }, [dialogSlot]);
+  const closeDialog = useCallback(() => setDialogSlot(null), []);
 
   const slots = mergedSlots(draft.slots, pendingSlots);
   const unsaved = pendingCount(pendingSlots) + Object.keys(pendingSettings).length;
+  const error = props.error === null || props.error === undefined ? null : describeError(props.error);
   const fieldErrorBySlot = new Map<SlotNumber, string>();
-  for (const field of props.error?.fields ?? []) {
+  for (const field of error?.fields ?? []) {
     const slot = slotOfFieldPath(field.path);
-    if (slot !== null) fieldErrorBySlot.set(slot, ta(field.messageKey, field.params));
+    if (slot !== null) fieldErrorBySlot.set(slot, translateApiKey(t, field.messageKey, field.params));
   }
   const rows: SlotRowData[] = SLOT_NUMBERS.map((slot) => {
     const state = slots[slot];
@@ -102,29 +91,25 @@ export function PackEditor(props: PackEditorProps): JSX.Element {
     current !== null && current.state === 'attached' ? props.artifacts.get(current.artifactId) : undefined;
 
   return (
-    <section className="rai-panel" aria-labelledby="pack-heading">
-      <div className="rai-panel__head">
+    <section className={'card'} aria-labelledby={'pack-heading'}>
+      <div className={'panel-head'}>
         <div>
-          <h2 id="pack-heading" className="rai-panel__title">
-            {t('pack.heading')}
-          </h2>
-          <p className="rai-muted">{t('pack.intro')}</p>
+          <h2 id={'pack-heading'}>{t('pack.heading')}</h2>
+          <p className={'muted'}>{t('pack.intro')}</p>
         </div>
-        <p className="rai-muted rai-panel__summary">
+        <p className={'muted panel-summary'}>
           {t('pack.draft_revision', { number: draft.versionNumber, revision: draft.draftRevision })}
           <br />
           {t('pack.summary', { ...counts })}
         </p>
       </div>
 
-      <fieldset className="rai-fieldset rai-settings" disabled={busy !== 'idle'}>
+      <fieldset className={'field pack-settings'} disabled={busy !== 'idle'}>
         <legend>{t('pack.settings_heading')}</legend>
-        <div className="rai-field">
-          <label htmlFor="pack-template" className="rai-field__label">
-            {t('pack.template_version')}
-          </label>
+        <div className={'field'}>
+          <label htmlFor={'pack-template'}>{t('pack.template_version')}</label>
           <select
-            id="pack-template"
+            id={'pack-template'}
             value={templateValue}
             onChange={(event) => {
               const value = event.currentTarget.value;
@@ -141,14 +126,12 @@ export function PackEditor(props: PackEditorProps): JSX.Element {
             ))}
           </select>
         </div>
-        <div className="rai-field">
-          <label htmlFor="pack-stage" className="rai-field__label">
-            {t('pack.stage_context')}
-          </label>
+        <div className={'field'}>
+          <label htmlFor={'pack-stage'}>{t('pack.stage_context')}</label>
           <select
-            id="pack-stage"
+            id={'pack-stage'}
             value={stageValue}
-            aria-describedby="pack-stage-hint"
+            aria-describedby={'pack-stage-hint'}
             onChange={(event) => {
               const value = event.currentTarget.value as StageContext;
               const next = { ...pendingSettings };
@@ -163,7 +146,7 @@ export function PackEditor(props: PackEditorProps): JSX.Element {
               </option>
             ))}
           </select>
-          <p className="rai-muted" id="pack-stage-hint">
+          <p className={'field-hint'} id={'pack-stage-hint'}>
             {t('pack.stage_context_hint')}
           </p>
         </div>
@@ -174,88 +157,83 @@ export function PackEditor(props: PackEditorProps): JSX.Element {
         mapping={CURRENT_LANE_MAPPING}
         action={(row) => (
           <button
-            type="button"
-            className="rai-btn rai-btn--secondary rai-btn--small"
+            type={'button'}
+            className={'btn btn-secondary btn-small'}
             aria-label={t('pack.change_slot', { number: row.slot, name: t(slotNameKey(row.slot)) })}
             disabled={busy !== 'idle'}
-            ref={(element) => {
-              if (element !== null) changeButtons.current.set(row.slot, element);
-              else changeButtons.current.delete(row.slot);
-            }}
-            onClick={() => {
-              invokerRef.current = changeButtons.current.get(row.slot) ?? null;
-              setDialogSlot(row.slot);
-            }}
+            onClick={() => setDialogSlot(row.slot)}
           >
             {t('pack.action.change')}
           </button>
         )}
       />
 
-      {props.error !== null && (
-        <ErrorNotice
-          error={props.error}
-          onReload={props.error.refreshPath !== null ? props.onReload : undefined}
-          onDismiss={props.onDismissError}
-        />
-      )}
-      {props.notice !== null && (
-        <p className="rai-notice rai-notice--ok" role="status">
+      {error !== null ? (
+        <ErrorNotice error={props.error}>
+          {error.refreshPath !== undefined ? (
+            <button type={'button'} className={'btn btn-secondary'} onClick={props.onReload}>
+              {t('action.reload')}
+            </button>
+          ) : null}
+          <button type={'button'} className={'btn btn-ghost'} onClick={props.onDismissError}>
+            {t('action.dismiss')}
+          </button>
+        </ErrorNotice>
+      ) : null}
+      {props.notice !== null ? (
+        <p className={'notice notice-success'} role={'status'}>
           {t(props.notice.key, props.notice.params)}
         </p>
-      )}
+      ) : null}
 
-      <div className="rai-actions rai-actions--bar">
+      <div className={'form-actions'}>
         <button
-          type="button"
-          className="rai-btn rai-btn--primary"
+          type={'button'}
+          className={'btn btn-primary'}
           disabled={busy !== 'idle' || unsaved === 0}
           onClick={props.onSave}
         >
           {busy === 'saving' ? t('pack.saving') : t('pack.action.save')}
         </button>
         <button
-          type="button"
-          className="rai-btn rai-btn--secondary"
+          type={'button'}
+          className={'btn btn-secondary'}
           disabled={busy !== 'idle' || unsaved === 0}
           onClick={props.onDiscard}
         >
           {t('pack.action.discard')}
         </button>
         <button
-          type="button"
-          className="rai-btn rai-btn--secondary"
+          type={'button'}
+          className={'btn btn-secondary'}
           disabled={busy !== 'idle' || unsaved > 0}
-          aria-describedby="pack-submit-hint"
+          aria-describedby={'pack-submit-hint'}
           onClick={props.onSubmit}
         >
           {busy === 'submitting' ? t('pack.submitting') : t('pack.action.submit')}
         </button>
-        <span className="rai-muted" id="pack-submit-hint">
+        <span className={'muted small'} id={'pack-submit-hint'}>
           {unsaved > 0 ? t('pack.pending_changes', { count: unsaved }) : t('pack.no_pending_changes')}
           {' · '}
           {unsaved > 0 ? t('pack.submit_save_first') : t('pack.submit_hint')}
         </span>
       </div>
 
-      {dialogSlot !== null && current !== null && (
-        <SlotDialog
-          key={dialogSlot}
-          caseId={props.caseId}
-          slot={dialogSlot}
-          current={current}
-          currentArtifact={
-            currentArtifact === 'loading' || currentArtifact === 'unavailable' ? undefined : currentArtifact
-          }
-          onApply={(next, artifact) => {
-            props.onSlotChange(dialogSlot, next, artifact);
-            setDialogSlot(null);
-          }}
-          onClose={() => {
-            setDialogSlot(null);
-          }}
-        />
-      )}
+      {/* Always mounted: the shared Dialog opens with showModal(), traps Tab, and returns focus to the Change
+          button on close (section 9 item 3); the form inside remounts per slot. */}
+      <SlotDialog
+        caseId={props.caseId}
+        slot={dialogSlot}
+        current={current}
+        currentArtifact={
+          currentArtifact === 'loading' || currentArtifact === 'unavailable' ? undefined : currentArtifact
+        }
+        onApply={(slot, next, artifact) => {
+          props.onSlotChange(slot, next, artifact);
+          setDialogSlot(null);
+        }}
+        onClose={closeDialog}
+      />
     </section>
   );
 }

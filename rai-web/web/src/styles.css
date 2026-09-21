@@ -339,7 +339,15 @@ h2 {
   opacity: 0.55;
 }
 
-/* Status badge (section 9 item 2: text plus icon plus colour, never colour alone) ----------------------------- */
+.btn-small {
+  padding: 5px 12px;
+  min-height: 32px;
+  font-size: 13px;
+}
+
+/* Status badge (section 9 item 2: text plus icon plus colour, never colour alone). The tone is set by the
+   component (components/status-badge.tsx: case statuses, and the W1-06 slot states and lane projections); each
+   pairs a light background with a dark ink so text contrast stays above 4.5:1 (item 1). -------------------- */
 
 .status-badge {
   display: inline-flex;
@@ -355,25 +363,29 @@ h2 {
   border: 1px solid var(--border);
 }
 
-.status-badge[data-status='in_review'] {
+.status-badge[data-tone='muted'] {
+  color: var(--color-muted);
+}
+
+.status-badge[data-tone='info'] {
   background: var(--info-bg);
   color: var(--info-ink);
   border-color: transparent;
 }
 
-.status-badge[data-status='sent_back'] {
+.status-badge[data-tone='danger'] {
   background: var(--danger-bg);
   color: var(--danger-ink);
   border-color: transparent;
 }
 
-.status-badge[data-status='awaiting_disposition'] {
+.status-badge[data-tone='warn'] {
   background: var(--warn-bg);
   color: var(--warn-ink);
   border-color: transparent;
 }
 
-.status-badge[data-status='ready_for_launch'] {
+.status-badge[data-tone='ok'] {
   background: var(--success-bg);
   color: var(--success-ink);
   border-color: transparent;
@@ -413,6 +425,14 @@ h2 {
 .notice ul {
   margin: 6px 0 0;
   padding-left: 20px;
+}
+
+.notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
 }
 
 /* Case list -------------------------------------------------------------------------------------------------- */
@@ -541,7 +561,9 @@ h2 {
 }
 
 .field input[type='text'],
-.field select {
+.field input[type='file'],
+.field select,
+.field textarea {
   width: 100%;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
@@ -551,8 +573,14 @@ h2 {
   min-height: 42px;
 }
 
+.field textarea {
+  resize: vertical;
+  min-height: 4.5em;
+}
+
 .field input[aria-invalid='true'],
-.field select[aria-invalid='true'] {
+.field select[aria-invalid='true'],
+.field textarea[aria-invalid='true'] {
   border-color: var(--color-primary);
 }
 
@@ -626,6 +654,12 @@ dialog.dialog {
 
 dialog.dialog::backdrop {
   background: rgba(48, 60, 70, 0.45);
+}
+
+dialog.dialog-wide {
+  max-width: 560px;
+  max-height: calc(100vh - 32px);
+  overflow: auto;
 }
 
 .dialog-actions {

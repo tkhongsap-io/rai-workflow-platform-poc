@@ -7,9 +7,10 @@ import type { JSX } from 'react';
 import { NavLink } from 'react-router-dom';
 import type { DraftSummary } from '@rai/shared/schemas/pack';
 import type { VersionSummary } from '@rai/shared/schemas/versions';
-import { useLocale, useT } from './locale.js';
-import { StatusBadge } from './status-badge.js';
-import { casePath, formatDateTime, versionPath } from './view-model.js';
+import { Badge, StatusBadge } from '../../components/status-badge.js';
+import { formatDateTime } from '../../i18n/format.js';
+import { useLocale } from '../../i18n/locale-provider.js';
+import { ROUTES } from '../../routes.js';
 
 export interface VersionNavProps {
   caseId: string;
@@ -18,37 +19,38 @@ export interface VersionNavProps {
 }
 
 export function VersionNav({ caseId, draft, versions }: VersionNavProps): JSX.Element {
-  const t = useT();
-  const locale = useLocale();
+  const { t, locale } = useLocale();
   const className = ({ isActive }: { isActive: boolean }): string =>
-    isActive ? 'rai-versions__link rai-versions__link--active' : 'rai-versions__link';
+    isActive ? 'version-link version-link-active' : 'version-link';
   return (
-    <nav className="rai-versions" aria-label={t('version.nav_heading')}>
-      <h2 className="rai-versions__title">{t('version.nav_heading')}</h2>
-      <ol className="rai-versions__list">
-        {draft !== null && (
+    <nav className={'card versions-nav'} aria-label={t('version.nav_heading')}>
+      <h2>{t('version.nav_heading')}</h2>
+      <ol className={'versions-list'}>
+        {draft !== null ? (
           <li>
-            <NavLink to={casePath(caseId)} end className={className}>
-              <span className="rai-versions__name">
+            <NavLink to={ROUTES.case(caseId)} end={true} className={className}>
+              <span className={'version-name'}>
                 {t('version.nav_draft', { number: draft.versionNumber })}
               </span>
-              <StatusBadge status="draft" tone="neutral" label={t('status.draft')} />
-              <span className="rai-muted rai-versions__meta">
+              <StatusBadge status={'draft'} />
+              <span className={'muted small version-meta'}>
                 {t('case.field.updated_at')}
                 {': '}
                 <time dateTime={draft.updatedAt}>{formatDateTime(locale, draft.updatedAt)}</time>
               </span>
             </NavLink>
           </li>
-        )}
+        ) : null}
         {versions.map((version) => (
           <li key={version.versionId}>
-            <NavLink to={versionPath(caseId, version.versionId)} end className={className}>
-              <span className="rai-versions__name">
+            <NavLink to={ROUTES.caseVersion(caseId, version.versionId)} end={true} className={className}>
+              <span className={'version-name'}>
                 {t('version.nav_submitted', { number: version.versionNumber })}
               </span>
-              {version.isLatest && <StatusBadge status="latest" tone="info" label={t('version.latest')} />}
-              <span className="rai-muted rai-versions__meta">
+              {version.isLatest ? (
+                <Badge status={'latest'} tone={'info'} label={t('version.latest')} />
+              ) : null}
+              <span className={'muted small version-meta'}>
                 {t('version.submitted_by', { subject: version.submittedBy })}
                 {' · '}
                 <time dateTime={version.submittedAt}>{formatDateTime(locale, version.submittedAt)}</time>
@@ -56,7 +58,7 @@ export function VersionNav({ caseId, draft, versions }: VersionNavProps): JSX.El
             </NavLink>
           </li>
         ))}
-        {versions.length === 0 && <li className="rai-muted rai-versions__none">{t('version.nav_none')}</li>}
+        {versions.length === 0 ? <li className={'muted versions-none'}>{t('version.nav_none')}</li> : null}
       </ol>
     </nav>
   );

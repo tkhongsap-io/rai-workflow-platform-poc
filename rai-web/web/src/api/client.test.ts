@@ -3,7 +3,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ApiError, NetworkError, createApiClient, type FetchLike } from './client.js';
+import { ApiError, NetworkError, artifactDownloadPath, createApiClient, type FetchLike } from './client.js';
 
 function fetchAnswering(status: number, body: unknown, headers: Record<string, string> = {}): FetchLike {
   return () =>
@@ -113,4 +113,80 @@ test('createCase sends the caller-minted Idempotency-Key and the JSON body; list
 test('a 204 resolves to undefined', async () => {
   const client = createApiClient(fetchAnswering(204, null));
   assert.equal(await client.signOut(), undefined);
+});
+
+test('W1-06: uploadArtifact sends one multipart part named `file` and lets the browser set the boundary', async () => {
+  const calls: { input: string; init: RequestInit | undefined }[] = [];
+  const client = createApiClient((input, init) => {
+    calls.push({ input, init });
+    return Promise.resolve(
+      new Response(JSON.stringify({ artifactId: 'a-1' }), {
+        status: 201,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+  });
+  await client.uploadArtifact('c 1', new File(['%PDF-1.4'], 'synthetic.pdf', { type: 'application/pdf' }));
+  assert.equal(calls[0]?.input, '/api/cases/c%201/artifacts');
+  assert.equal(calls[0]?.init?.method, 'POST');
+  const form = calls[0]?.init?.body;
+  assert.ok(form instanceof FormData);
+  assert.deepEqual([...form.keys()], ['file']);
+  assert.equal((form.get('file') as File).name, 'synthetic.pdf');
+  const headers = calls[0]?.init?.headers as Record<string, string>;
+  assert.equal(headers['content-type'], undefined); // the boundary is the browser's to set
+});
+
+test('W1-06: saveDraft PUTs the body; submitDraft POSTs with the caller-minted key; version paths are encoded', async () => {
+  const calls: { input: string; init: RequestInit | undefined }[] = [];
+  const client = createApiClient((input, init) => {
+    calls.push({ input, init });
+    return Promise.resolve(
+      new Response(JSON.stringify({}), { status: 200, headers: { 'content-type': 'application/json' } }),
+    );
+  });
+  const expectedVersion = { versionId: 'd-1', revision: 1 };
+  await client.saveDraft('c1', { expectedVersion, slots: { 7: { state: 'missing' } } });
+  assert.equal(calls[0]?.input, '/api/cases/c1/draft');
+  assert.equal(calls[0]?.init?.method, 'PUT');
+  const sent = JSON.parse(calls[0]?.init?.body as string) as { expectedVersion: { revision: number } };
+  assert.equal(sent.expectedVersion.revision, 1);
+  await client.submitDraft('c1', { expectedVersion }, 'key-7');
+  assert.equal(calls[1]?.input, '/api/cases/c1/draft/submit');
+  assert.equal((calls[1]?.init?.headers as Record<string, string>)['idempotency-key'], 'key-7');
+  await client.getVersion('c1', 'v/2');
+  assert.equal(calls[2]?.input, '/api/cases/c1/versions/v%2F2');
+  await client.getArtifactMeta('a 1');
+  assert.equal(calls[3]?.input, '/api/artifacts/a%201/meta');
+  assert.equal(artifactDownloadPath('a 1'), '/api/artifacts/a%201');
+});
+
+test('W1-06: a 409 stale_version exposes its guidance and refresh path; other codes expose none', async () => {
+  const client = createApiClient(
+    fetchAnswering(409, {
+      error: {
+        code: 'stale_version',
+        messageKey: 'error.stale_version',
+        correlationId: 'c-9',
+        details: {
+          guidanceKey: 'error.stale_version.guidance.revision_changed',
+          current: { versionId: 'd-1', revision: 2 },
+          refreshPath: '/cases/c1',
+        },
+      },
+    }),
+  );
+  await assert.rejects(client.getDraft('c1'), (err: unknown) => {
+    assert.ok(err instanceof ApiError);
+    assert.equal(err.stale?.guidanceKey, 'error.stale_version.guidance.revision_changed');
+    assert.equal(err.stale?.refreshPath, '/cases/c1');
+    return true;
+  });
+  const forbidden = createApiClient(
+    fetchAnswering(403, { error: { code: 'forbidden', messageKey: 'error.forbidden', correlationId: 'c' } }),
+  );
+  await assert.rejects(
+    forbidden.getDraft('c1'),
+    (err: unknown) => err instanceof ApiError && err.stale === undefined,
+  );
 });

@@ -1,14 +1,15 @@
 // W1-07 (Lane B): the route table. RequireSession sends a viewer without a session to the sign-in screen with
 // `returnTo` set (W0-02 7.2 deep links); it never decides scope: an in-scope check is the API's 200 or 403 on
-// the screen behind it. W1-06 replaces the `/cases/:caseId` element; W2 and W3 add their screens here.
+// the screen behind it. W1-06 renders the case flow at `/cases/:caseId` (the open draft, or the latest version)
+// and `/cases/:caseId/versions/:versionId` (a frozen version); W2 and W3 add their screens here.
 
 import type { JSX, ReactNode } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useLocale } from './i18n/locale-provider.js';
 import { useSession } from './session/session-provider.js';
 import { RETURN_TO_PARAM, ROUTES } from './routes.js';
+import { CaseScreen } from './screens/case/case-screen.js';
 import { CaseListScreen } from './screens/cases/case-list-screen.js';
-import { CasePlaceholderScreen } from './screens/cases/case-placeholder-screen.js';
 import { NewCaseScreen } from './screens/cases/new-case-screen.js';
 import { NotFoundScreen } from './screens/not-found-screen.js';
 import { SignInScreen } from './screens/sign-in/sign-in-screen.js';
@@ -58,7 +59,15 @@ export function AppRoutes(): JSX.Element {
         path={'/cases/:caseId'}
         element={
           <RequireSession>
-            <CasePlaceholderScreen />
+            <CaseScreen />
+          </RequireSession>
+        }
+      />
+      <Route
+        path={'/cases/:caseId/versions/:versionId'}
+        element={
+          <RequireSession>
+            <CaseScreen />
           </RequireSession>
         }
       />

@@ -7,11 +7,10 @@ import type { LaneMapping } from '@rai/shared/constants';
 import type { ArtifactRef } from '@rai/shared/schemas/artifacts';
 import type { NotApplicableReason, SlotNumber } from '@rai/shared/schemas/pack';
 import { artifactDownloadPath } from '../../api/client.js';
-import { useLocale, useT } from './locale.js';
-import { StatusBadge, type BadgeTone } from './status-badge.js';
+import { Badge, type BadgeTone } from '../../components/status-badge.js';
+import { formatBytes, formatDateTime } from '../../i18n/format.js';
+import { useLocale } from '../../i18n/locale-provider.js';
 import {
-  formatBytes,
-  formatDateTime,
   laneKey,
   reasonDisplay,
   slotLanes,
@@ -41,29 +40,27 @@ export interface SlotRowData {
 }
 
 export function SlotStateBadge({ state }: { state: SlotStateName }): JSX.Element {
-  const t = useT();
-  return <StatusBadge status={state} tone={TONE_BY_STATE[state]} label={t(slotStateKey(state))} />;
+  const { t } = useLocale();
+  return <Badge status={state} tone={TONE_BY_STATE[state]} label={t(slotStateKey(state))} />;
 }
 
 export function SlotDocument({ row }: { row: SlotRowData }): JSX.Element {
-  const t = useT();
-  const locale = useLocale();
+  const { t, locale } = useLocale();
   if (row.state === 'attached') {
     if (row.artifact === undefined || row.artifact === 'loading')
-      return <span className="rai-muted">{t('pack.artifact_loading')}</span>;
+      return <span className={'muted'}>{t('pack.artifact_loading')}</span>;
     if (row.artifact === 'unavailable')
-      return <span className="rai-muted">{t('pack.artifact_unavailable')}</span>;
+      return <span className={'muted'}>{t('pack.artifact_unavailable')}</span>;
     const ref = row.artifact;
     return (
-      <span className="rai-doc">
+      <span className={'doc'}>
         <a
-          className="rai-link"
           href={artifactDownloadPath(ref.artifactId)}
           aria-label={t('pack.download', { filename: ref.filename })}
         >
           {ref.filename}
         </a>
-        <span className="rai-muted rai-doc__meta">
+        <span className={'muted small'}>
           {t('pack.file_meta', {
             size: formatBytes(locale, ref.sizeBytes),
             at: formatDateTime(locale, ref.uploadedAt),
@@ -75,16 +72,16 @@ export function SlotDocument({ row }: { row: SlotRowData }): JSX.Element {
   if (row.state === 'not_applicable' && row.reason !== undefined) {
     const shown = reasonDisplay(row.reason);
     return shown.kind === 'key' ? (
-      <span className="rai-reason">
-        <span className="rai-muted">{t('slot.reason_default_label')}</span>
+      <span>
+        <span className={'muted'}>{t('slot.reason_default_label')}</span>
         {': '}
         {t(shown.key)}
       </span>
     ) : (
-      <span className="rai-reason">{shown.text}</span>
+      <span>{shown.text}</span>
     );
   }
-  return <span className="rai-muted">—</span>;
+  return <span className={'muted'}>—</span>;
 }
 
 export interface SlotRowsProps {
@@ -95,43 +92,43 @@ export interface SlotRowsProps {
 }
 
 export function SlotRows({ rows, mapping, action }: SlotRowsProps): JSX.Element {
-  const t = useT();
+  const { t } = useLocale();
   return (
-    <ol className="rai-slots" aria-label={t('pack.table_label')}>
+    <ol className={'slots'} aria-label={t('pack.table_label')}>
       {rows.map((row) => {
         const lanes = slotLanes(row.slot, mapping);
         return (
           <li
             key={row.slot}
-            className={row.pending ? 'rai-slot rai-slot--pending' : 'rai-slot'}
+            className={row.pending ? 'slot-row slot-row-pending' : 'slot-row'}
             data-slot={row.slot}
             aria-labelledby={`slot-${row.slot}-name`}
           >
-            <span className="rai-slot__number" aria-hidden="true">
+            <span className={'slot-number'} aria-hidden={true}>
               {row.slot}
             </span>
-            <span className="rai-slot__name">
-              <span id={`slot-${row.slot}-name`} className="rai-slot__title">
+            <span className={'slot-name'}>
+              <span id={`slot-${row.slot}-name`} className={'slot-title'}>
                 {t('slot.dialog.title', { number: row.slot, name: t(slotNameKey(row.slot)) })}
               </span>
-              <span className="rai-slot__gates rai-muted">
+              <span className={'slot-gates muted small'}>
                 {lanes.length === 0
                   ? t('pack.gates_none')
                   : t('pack.gates', { lanes: lanes.map((lane) => t(laneKey(lane))).join(', ') })}
               </span>
             </span>
-            <span className="rai-slot__state">
+            <span className={'slot-state'}>
               <SlotStateBadge state={row.state} />
             </span>
-            <span className="rai-slot__doc">
+            <span className={'slot-doc'}>
               <SlotDocument row={row} />
-              {row.fieldError !== null && (
-                <span className="rai-field__error" role="alert">
+              {row.fieldError !== null ? (
+                <span className={'field-error'} role={'alert'}>
                   {row.fieldError}
                 </span>
-              )}
+              ) : null}
             </span>
-            {action !== undefined && <span className="rai-slot__actions">{action(row)}</span>}
+            {action !== undefined ? <span className={'slot-actions'}>{action(row)}</span> : null}
           </li>
         );
       })}

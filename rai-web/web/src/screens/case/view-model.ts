@@ -1,15 +1,15 @@
 // Pure view-model functions for the case flow (W1-06). No DOM, no fetch: unit-tested under `npm run test:unit`
 // (W0-02 section 8.1: web unit tests cover view models and formatting only). Every label is a locale key
-// rendered by the screen through t() (D12); dates render in Asia/Bangkok with the Gregorian calendar (D06,
-// section 10.5). Nothing here decides access (W0-05: the SPA only shows what the API returned).
+// rendered by the screen through t() (D12). Dates and sizes render through web/src/i18n/format.ts; paths come
+// from web/src/routes.ts; the envelope is described by components/error-notice.ts. Nothing here decides access
+// (W0-05: the SPA only shows what the API returned).
 
-import { APP_TIMEZONE, LANE_MAPPING_V1, lanesForSlot, type Lane } from '@rai/shared/constants';
-import type { Locale, LocaleKey } from '@rai/shared/locales/keys';
-import type { CaseStatus, CaseView } from '@rai/shared/schemas/cases';
+import { LANE_MAPPING_V1, lanesForSlot, type Lane, type LaneMapping } from '@rai/shared/constants';
+import type { LocaleKey } from '@rai/shared/locales/keys';
+import type { CaseView } from '@rai/shared/schemas/cases';
 import type { NotApplicableReason, SlotNumber, SlotState } from '@rai/shared/schemas/pack';
 import type { FrozenSlot } from '@rai/shared/schemas/versions';
 import { NON_VENDOR_DEFAULT_REASON_KEY } from '@rai/shared/schemas/pack';
-import type { ApiError } from '../../api/client.js';
 
 export const SLOT_NUMBERS: readonly SlotNumber[] = Object.freeze([1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
@@ -40,16 +40,8 @@ export function laneKey(lane: Lane): LocaleKey {
 }
 
 /** The lanes that gate a slot under the D02 mapping frozen on the version (or the current one for the draft). */
-export function slotLanes(slot: SlotNumber, mapping = LANE_MAPPING_V1): Lane[] {
+export function slotLanes(slot: SlotNumber, mapping: LaneMapping = LANE_MAPPING_V1): Lane[] {
   return lanesForSlot(slot, mapping);
-}
-
-export function statusKey(status: CaseStatus): LocaleKey {
-  return `status.${status}` as LocaleKey;
-}
-
-export function nextActionKey(status: CaseStatus): LocaleKey {
-  return `case.next_action.${status}` as LocaleKey;
 }
 
 export function stageKey(stage: string): LocaleKey {
@@ -138,71 +130,6 @@ export function slotCounts(slots: Record<SlotNumber, SlotState | FrozenSlot>): S
   const counts: SlotCounts = { attached: 0, not_yet: 0, missing: 0, not_applicable: 0 };
   for (const slot of SLOT_NUMBERS) counts[slots[slot].state] += 1;
   return counts;
-}
-
-/** Section 10.5: Asia/Bangkok, Gregorian calendar even in Thai (`th-TH-u-ca-gregory`); never Buddhist era by accident. */
-export function formatDateTime(locale: Locale, iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  return new Intl.DateTimeFormat(locale === 'th' ? 'th-TH-u-ca-gregory' : 'en-GB', {
-    timeZone: APP_TIMEZONE,
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date);
-}
-
-/** File sizes through Intl unit formatting so the unit is localised, never a hard-coded string. */
-export function formatBytes(locale: Locale, bytes: number): string {
-  const tag = locale === 'th' ? 'th-TH' : 'en-GB';
-  if (bytes < 1024) return new Intl.NumberFormat(tag, { style: 'unit', unit: 'byte' }).format(bytes);
-  if (bytes < 1024 * 1024)
-    return new Intl.NumberFormat(tag, { style: 'unit', unit: 'kilobyte', maximumFractionDigits: 0 }).format(
-      bytes / 1024,
-    );
-  return new Intl.NumberFormat(tag, { style: 'unit', unit: 'megabyte', maximumFractionDigits: 1 }).format(
-    bytes / (1024 * 1024),
-  );
-}
-
-export function casePath(caseId: string): string {
-  return `/cases/${encodeURIComponent(caseId)}`;
-}
-
-export function versionPath(caseId: string, versionId: string): string {
-  return `${casePath(caseId)}/versions/${encodeURIComponent(versionId)}`;
-}
-
-export function signInPath(returnTo: string): string {
-  return `/sign-in?returnTo=${encodeURIComponent(returnTo)}`;
-}
-
-/** Keys as the API sent them (strings): rendered through the catalogue when known, shown verbatim otherwise. */
-export interface ErrorPresentation {
-  messageKey: string;
-  guidanceKey: string | null;
-  correlationId: string | null;
-  refreshPath: string | null;
-  fields: { path: string; messageKey: string; params?: Record<string, string | number> }[];
-}
-
-/** Turns the W0-06 8.2 envelope into what the screen renders: keys only, never text (section 10.3). */
-export function presentError(
-  error: Pick<ApiError, 'messageKey' | 'correlationId' | 'fields' | 'stale'>,
-): ErrorPresentation {
-  const stale = error.stale;
-  return {
-    messageKey: error.messageKey,
-    guidanceKey: stale === undefined ? null : stale.guidanceKey,
-    correlationId: error.correlationId,
-    refreshPath: stale === undefined ? null : stale.refreshPath,
-    fields: error.fields.map((f) =>
-      f.params === undefined ? { path: f.path, messageKey: f.messageKey } : f,
-    ),
-  };
 }
 
 /** The `slots[n]` a field path of an invalid_input answer points at, so the row can show the message. */

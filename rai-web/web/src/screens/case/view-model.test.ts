@@ -1,21 +1,21 @@
-/// <reference types="node" />
-// W1-06 view-model unit tests (W0-02 section 8.1: web unit tests cover view models and formatting only).
+// W1-06 view-model unit tests (W0-02 section 8.1: web unit tests cover view models and formatting only). Dates,
+// sizes (i18n/format.test.ts), paths (routes.test.ts) and the envelope (api/client.test.ts) are tested where
+// they live.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { isLocaleKey } from '@rai/shared/locales/keys';
 import type { SlotNumber, SlotState } from '@rai/shared/schemas/pack';
+import { NEXT_ACTION_KEY } from '../cases/case-list.view-model.js';
+import { STATUS_LABEL_KEY } from '../../components/status-badge.js';
 import {
   SLOT_NUMBERS,
   SLOT_STATE_ORDER,
   applySlotChange,
-  formatBytes,
-  formatDateTime,
   laneKey,
   mergedSlots,
-  nextActionKey,
+  modelTypeKey,
   pendingCount,
-  presentError,
   reasonDisplay,
   reasonIsValid,
   sameSlotState,
@@ -26,10 +26,7 @@ import {
   slotOfFieldPath,
   slotStateKey,
   stageKey,
-  statusKey,
   submissionLine,
-  versionPath,
-  signInPath,
 } from './view-model.js';
 
 const allMissing = (): Record<SlotNumber, SlotState> => {
@@ -52,10 +49,11 @@ test('every derived label is a key present in both catalogues (D12, section 10.1
     'awaiting_disposition',
     'ready_for_launch',
   ] as const) {
-    assert.ok(isLocaleKey(statusKey(status)), status);
-    assert.ok(isLocaleKey(nextActionKey(status)), status);
+    assert.ok(isLocaleKey(STATUS_LABEL_KEY[status]), status);
+    assert.ok(isLocaleKey(NEXT_ACTION_KEY[status]), status);
   }
   for (const stage of ['idea', 'pre_build', 'pre_launch']) assert.ok(isLocaleKey(stageKey(stage)), stage);
+  for (const modelType of ['classic_ml', 'llm', 'other']) assert.ok(isLocaleKey(modelTypeKey(modelType)));
   assert.ok(isLocaleKey(submissionLine({ currentVersion: null }).key));
   const line = submissionLine({
     currentVersion: { versionId: 'v', versionNumber: 2, submittedBy: 's', submittedAt: 't', isLatest: true },
@@ -143,52 +141,8 @@ test('sameSlotState compares state, artifact and reason', () => {
   );
 });
 
-test('dates render in Asia/Bangkok with the Gregorian year in Thai and English (D06, section 10.5)', () => {
-  const th = formatDateTime('th', '2026-09-21T03:00:00Z'); // 10:00 in Bangkok
-  const en = formatDateTime('en', '2026-09-21T03:00:00Z');
-  assert.match(th, /2026/, th); // not 2569 (Buddhist era)
-  assert.match(th, /10:00/, th);
-  assert.match(en, /2026/, en);
-  assert.match(en, /10:00/, en);
-  assert.equal(formatDateTime('en', 'not-a-date'), 'not-a-date');
-});
-
-test('file sizes use Intl unit formatting', () => {
-  assert.match(formatBytes('en', 512), /512/);
-  assert.match(formatBytes('en', 20 * 1024), /20/);
-  assert.match(formatBytes('en', 3 * 1024 * 1024 + 200_000), /3\.2/);
-  assert.match(formatBytes('th', 3 * 1024 * 1024), /3/);
-});
-
-test('an envelope is presented as keys: stale_version carries guidance and the refresh path; invalid_input its fields', () => {
-  const stale = presentError({
-    messageKey: 'error.stale_version',
-    correlationId: 'c-1',
-    fields: [],
-    stale: {
-      reason: 'revision_changed',
-      guidanceKey: 'error.stale_version.guidance.revision_changed',
-      current: { versionId: 'd', versionNumber: 1, revision: 3, state: 'draft', ready: false },
-      refreshPath: '/cases/x',
-    },
-  });
-  assert.equal(stale.guidanceKey, 'error.stale_version.guidance.revision_changed');
-  assert.equal(stale.refreshPath, '/cases/x');
-  assert.equal(stale.correlationId, 'c-1');
-  const invalid = presentError({
-    messageKey: 'error.invalid_input',
-    correlationId: null,
-    fields: [{ path: 'body.slots[4].reason', messageKey: 'validation.reason_required' }],
-    stale: undefined,
-  });
-  assert.equal(invalid.guidanceKey, null);
-  assert.equal(invalid.fields.length, 1);
-  assert.equal(slotOfFieldPath(invalid.fields[0]!.path), 4);
+test('the slot a field path of an invalid_input answer points at', () => {
+  assert.equal(slotOfFieldPath('body.slots[4].reason'), 4);
   assert.equal(slotOfFieldPath('body.checklistTemplateVersion'), null);
   assert.equal(slotOfFieldPath('slots[0].reason'), null);
-});
-
-test('paths encode their identifiers', () => {
-  assert.equal(versionPath('c 1', 'v/2'), '/cases/c%201/versions/v%2F2');
-  assert.equal(signInPath('/cases/c1'), '/sign-in?returnTo=%2Fcases%2Fc1');
 });

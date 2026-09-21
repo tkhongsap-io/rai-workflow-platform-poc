@@ -1,34 +1,74 @@
 // W1-07 (Lane B): renders an API failure the way section 10 item 3 asks: the envelope's messageKey in the viewer's
 // locale plus the correlation id for the operator; a NetworkError gets its own key. No text is ever taken from
-// the response body.
+// the response body. W1-06 adds what the case flow needs: the stale-version guidance key, the invalid_input
+// field list (each a key, rendered through t()) and an optional actions row (`children`: reload, dismiss).
+// Nothing here interprets an error as a permission rule.
 
-import type { JSX } from 'react';
-import { isLocaleKey } from '@rai/shared/locales/keys';
+import type { JSX, ReactNode } from 'react';
+import type { FieldError } from '@rai/shared/errors';
 import { ApiError, NetworkError } from '../api/client.js';
-import { useLocale } from '../i18n/locale-provider.js';
+import { translateApiKey, useLocale } from '../i18n/locale-provider.js';
 
-export function describeError(error: unknown): { messageKey: string; correlationId?: string } {
-  if (error instanceof ApiError) {
-    const out: { messageKey: string; correlationId?: string } = { messageKey: error.messageKey };
-    if (error.correlationId !== undefined) out.correlationId = error.correlationId;
-    return out;
-  }
-  if (error instanceof NetworkError) return { messageKey: 'common.network_error' };
-  return { messageKey: 'error.internal_error' };
+export interface ErrorDescription {
+  messageKey: string;
+  correlationId?: string;
+  /** W0-06 8.2 `stale_version.guidanceKey`, when the error is a 409. */
+  guidanceKey?: string;
+  /** W0-06 8.2 `stale_version.refreshPath`: the SPA path of the current version. */
+  refreshPath?: string;
+  fields: FieldError[];
 }
 
-export function ErrorNotice({ error, id }: { error: unknown; id?: string }): JSX.Element {
+export function describeError(error: unknown): ErrorDescription {
+  if (error instanceof ApiError) {
+    const out: ErrorDescription = { messageKey: error.messageKey, fields: error.fieldErrors };
+    if (error.correlationId !== undefined) out.correlationId = error.correlationId;
+    const stale = error.stale;
+    if (stale !== undefined) {
+      out.guidanceKey = stale.guidanceKey;
+      out.refreshPath = stale.refreshPath;
+    }
+    return out;
+  }
+  if (error instanceof NetworkError) return { messageKey: 'common.network_error', fields: [] };
+  return { messageKey: 'error.internal_error', fields: [] };
+}
+
+export function ErrorNotice({
+  error,
+  id,
+  children,
+}: {
+  error: unknown;
+  id?: string;
+  /** Actions offered with the notice (W1-06: reload after a stale version, dismiss). */
+  children?: ReactNode;
+}): JSX.Element {
   const { t } = useLocale();
-  const { messageKey, correlationId } = describeError(error);
-  const message = isLocaleKey(messageKey) ? t(messageKey) : messageKey;
+  const { messageKey, correlationId, guidanceKey, fields } = describeError(error);
   return (
     <div className={'notice notice-error'} role={'alert'} id={id} tabIndex={-1}>
       <p>
         <strong>{t('common.error_title')}</strong>
       </p>
-      <p>{message}</p>
+      <p>{translateApiKey(t, messageKey)}</p>
+      {guidanceKey !== undefined ? <p>{translateApiKey(t, guidanceKey)}</p> : null}
+      {fields.length > 0 ? (
+        <ul aria-label={t('error.field_list')}>
+          {fields.map((field) => (
+            <li key={`${field.path}:${field.messageKey}`}>
+              <code>{field.path}</code>
+              {': '}
+              {translateApiKey(t, field.messageKey, field.params)}
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {correlationId !== undefined ? (
         <p className={'small'}>{t('common.correlation_id', { correlationId })}</p>
+      ) : null}
+      {children !== undefined && children !== null ? (
+        <div className={'notice-actions'}>{children}</div>
       ) : null}
     </div>
   );

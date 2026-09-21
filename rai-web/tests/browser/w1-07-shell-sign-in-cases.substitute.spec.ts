@@ -198,8 +198,11 @@ test.describe('W1-07 sign-in and scoped list (fx-user-*, fx-case-* of slice1-syn
     await page.getByLabel(th['auth.fixture_user_select']).selectOption('fx-user-spoc-cm');
     await page.getByRole('button', { name: th['auth.sign_in'], exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`${target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`));
-    // The route resolves inside the SPA and required a session; scope is the API's answer on the W1-06 screen.
-    await expect(page.getByRole('heading', { level: 1, name: th['case.placeholder_title'] })).toBeVisible();
+    // The route resolves inside the SPA and required a session; scope is the API's answer on the W1-06 screen:
+    // the CM SPOC is out of scope for an HR case, so the server's 403 is what the screen shows, and nothing of
+    // the case (its name) is rendered.
+    await expect(page.getByRole('alert')).toContainText(th['error.forbidden']);
+    await expect(page.getByRole('button', { name: th['pack.action.change'] })).toHaveCount(0);
     await signOut(page);
   });
 
@@ -323,7 +326,9 @@ test.describe('W1-07 keyboard-only, dialog, locale and reflow (fx-user-spoc-cm)'
     const openCase = await tabUntil(page, (info) => info.tag === 'a' && info.text === th['cases.open']);
     expect(openCase.text).toBe(th['cases.open']);
     await page.keyboard.press('Enter');
-    await expect(page.getByRole('heading', { level: 1, name: th['case.placeholder_title'] })).toBeVisible();
+    // The W1-06 case screen: its level-1 heading is the use-case name, under the case's registry id.
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: th['version.nav_heading'] })).toBeVisible();
 
     // New case by keyboard: Shift+Tab from the main landmark reaches the last primary-navigation link, then every
     // field with Tab, then Enter on the submit button.
