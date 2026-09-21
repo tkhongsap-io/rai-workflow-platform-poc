@@ -2,6 +2,8 @@
 
 ## 2026-09-21
 
+- Opened GitHub issues for W0-W3: four epics, 45 tickets, labels, milestones and dependency links; documented the tracker in the delivery README.
+
 - Closed G0: recorded D01 (Nakhun), D02, D03 (W0-W3 authorized, synthetic data), D05, D06, D11 and D12; propagated the answers through PRD, workflow, data contract, acceptance, BUILD_PLAN, AGENTS, README, TESTING and the delivery pack. D04, D07-D10 remain open.
 
 - Reviewed and restructured the delivery pack for parallel lanes (contract-first W1-00, Lane C, Wx-INT, `Done when`, merge order); added W0 observability/audit/schema/accessibility/language rules, BUILD_PLAN principles, risks and dated status, ADR template and index, build board, architecture boundary map; added D12 (register row) and A11 (acceptance), both accepted by Ta on 2026-09-21. Planning only.
