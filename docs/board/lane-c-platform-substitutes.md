@@ -50,3 +50,10 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: next ticket in the dependency map.
 - Author: operator=ta session=build-workflow model=claude-opus-5
 - Evidence: https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/77
+
+## 2026-09-21 (time not recorded) — W1-13 merged
+- What: Lint green on main: StageContextSchema spelled out as a literal tuple (byte-identical JSON schema); the substitute contract-cast helpers are identity functions. PR #79.
+- Why: Ticket W1-13 of the delivery pack; two independent reviewer agents passed before merge.
+- Next: next ticket in the dependency map.
+- Author: operator=ta session=build-workflow model=claude-opus-5
+- Evidence: https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/79
