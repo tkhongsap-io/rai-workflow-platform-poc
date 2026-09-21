@@ -11,12 +11,15 @@ import type { AllowedMediaType, ArtifactRef } from '@rai/shared/schemas/artifact
 import type { CaseWritableFields, ModelType } from '@rai/shared/schemas/cases';
 import type { PackDraft, StageContext } from '@rai/shared/schemas/pack';
 
+// W1-02 spelled `ModelTypeSchema` out; the cast is gone and this is an identity function kept so the three
+// construction sites stay uniform until `AllowedMediaTypeSchema` is spelled out too.
 export function asContractModelType(value: ModelType): CaseWritableFields['modelType'] {
-  return value as unknown as CaseWritableFields['modelType'];
+  return value;
 }
 
+// W1-02/W1-03 spelled `StageContextSchema` out; identity function, same reason as above.
 export function asContractStageContext(value: StageContext): PackDraft['stageContext'] {
-  return value as unknown as PackDraft['stageContext'];
+  return value;
 }
 
 export function asContractMediaType(value: AllowedMediaType): ArtifactRef['mediaType'] {
