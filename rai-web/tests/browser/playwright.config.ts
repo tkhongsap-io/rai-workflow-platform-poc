@@ -23,7 +23,7 @@ export default defineConfig({
     { name: 'phone-390', use: { ...devices['Desktop Chrome'], viewport: { width: 390, height: 844 } } },
   ],
   webServer: {
-    command: 'npm run build && node server/dist/main.js',
+    command: 'npm run build && npm run build -w fixtures && node server/dist/main.js',
     cwd: '../..',
     // Readiness: the process listens only after config.ts has accepted the environment (fail closed, exit 78
     // otherwise), so a TCP accept on the port is the ready signal. W3-07a adds GET /healthz; switch to
