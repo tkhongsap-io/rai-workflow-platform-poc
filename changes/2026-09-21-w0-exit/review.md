@@ -255,4 +255,10 @@ process.exit(broken || missing.length ? 1 : 0);
 
 Run after the branch was pushed, as the ticket brief instructs (results recorded verbatim in the commit that follows):
 
-TRACKER_RESULTS_PLACEHOLDER
+| Command | Result |
+|---|---|
+| `gh issue edit <n> --remove-label status:blocked-by-gate --add-label status:ready` for n = 16 … 30 | 15 issues updated; `gh issue list --label package:W1` afterwards shows `status:ready` on #16-#30 (epic #52 keeps its own `status:blocked-by-gate` label; the brief did not ask to relabel the epic) |
+| `gh issue comment 52 --body "W0 exit recorded; W1 ready. …"` | https://github.com/tkhongsap-io/rai-workflow-platform-poc/issues/52#issuecomment-5762408964 |
+| `gh issue close 51 --comment "W0 exit recorded on 2026-09-21 by ticket W0-09 … Review: <link to this file on the branch>"` | `✓ Closed issue tkhongsap-io/rai-workflow-platform-poc#51`; state `CLOSED` |
+
+The comments link this file on the branch; once the PR merges the same path resolves on `main`.
