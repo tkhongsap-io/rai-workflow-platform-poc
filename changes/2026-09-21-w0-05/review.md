@@ -17,7 +17,7 @@ Both blocking findings pointed at the same gap: `case.create` was declared with 
 - Section 7 gains T6 (spoc-b1 creates in B2 -> 403 `scope`), T7 (owner-a names owner-b -> 403 `scope`; spoc-b1 in B1 naming owner-a -> 201, owner = owner-a, audit actor = spoc-b1) and T8 (owner-b's and spoc-b1's `case.list` omit out-of-scope cases); former T6-T27 renumbered T9-T30. No obligation was removed or weakened.
 - Section 8 gains one item for the reviewers: the W0-02 create shape must carry the optional `owner_subject_id` this rule reads.
 
-Not edited, on purpose: `docs/product/decisions.md` (no decision recorded; D05, D06, W0-04 fields carried as written; D07-D10 untouched), `docs/product/source-spec.md` (frozen; hash unchanged), `adr/0003-stack-and-deployment-boundary.md` (its W0-05 open-item checkbox is outside this ticket's files; W0-09 ticks it at the exit review), `adr/README.md` (nothing to change: W0-05 produces an interface spec, not an ADR), `docs/architecture/README.md` and `TESTING.md` (W0-02 only), the ticket row status (issue #10 tracks it), DEVLOG/CHANGELOG/board (appended by the merge step). Sibling W0 specs are linked through their W0-contract section anchors because their `docs/engineering/` files are on parallel branches.
+Not edited, on purpose: `docs/product/decisions.md` (no decision recorded; D05, D06, W0-04 fields carried as written; D07-D10 untouched), `docs/product/source-spec.md` (frozen; hash unchanged), `adr/0003-stack-and-deployment-boundary.md` (its W0-05 open-item checkbox is outside this ticket's files; W0-09 ticks it at the exit review), `adr/README.md` (nothing to change: W0-05 produces an interface spec, not an ADR), `docs/architecture/README.md` and `TESTING.md` (W0-02 only), the ticket row status (issue #10 tracks it), DEVLOG/CHANGELOG/board (appended by the merge step). Sibling W0 specs were linked through their W0-contract section anchors while their `docs/engineering/` files were on parallel branches; fix round 4 repointed the merged ones.
 
 ## Fix round 2 (review findings on PR #58)
 
@@ -37,16 +37,29 @@ One blocking finding, same class as fix round 2: two 3.2 write actions with a st
 
 No obligation was removed or weakened; numbering is unchanged. Sweep after the change: every identifier in the `Action` union appears in a section 7 row except `config.read_effective`, whose 3.2 row is Yes for every role (no stated denial to exercise; its `operator_recipients` exclusion is a field projection covered by the W3-07 seed, not an authorization row).
 
+## Fix round 4 (review findings on PR #58, after W0-02/W0-04/W0-06/W0-10 merged)
+
+One blocking finding: section 2 fixed role, lane and scope identifiers (`reviewer_aicoe`/`reviewer_dpo`/`reviewer_itsec`, lanes `aicoe`/`dpo`/`itsec`, scope kinds `own`/`bu`/`all`) that contradicted the sibling specs merged to main after this branch was cut. W0-02 section 7.2 fixes `Role = 'owner'|'bu_spoc'|'ai_coe'|'dpo'|'it_security'|'admin'`, `Lane = 'ai_coe'|'dpo'|'it_security'` and scope kinds `own_cases`/`business_unit`/`all_cases`; W0-04 stores `qc_finding.owning_lane` with the same lane values and keys SPOC scope on `business_unit_id = ANY($bus)`, not the descriptive `business_unit` text; and W0-02 section 7.3 carries `businessOwner: SubjectId` on the create shape, not an optional `owner_subject_id`. Changes, all in `docs/engineering/authorization-policy-matrix.md`:
+
+- Branch rebased onto `origin/main` (32e16ee) so the merged sibling files exist in the tree; the sibling-spec paragraph now links W0-02, W0-04, W0-06 and W0-10 at their `docs/engineering/` files and anchors, and states that a merged sibling's identifiers are used verbatim. W0-03 and W0-07 still link to the contract sections (not merged).
+- Section 2 roles table and the TypeScript block now reproduce the W0-02 `Role`, `Lane` and `RoleScope` types by reference (W0-02 is authoritative; matrix headings and the Own/BU/All cell shorthands are declared prose for `own_cases`/`business_unit`/`all_cases`). `Actor` is `Pick<Principal, 'subjectId' | 'roles'>`.
+- `CaseScopeFacts` is `{ caseId?, ownerSubjectId (W0-04 owner_subject_id), businessUnitId (W0-04 business_unit_id) }`; the scope predicate table, `isOwnerOrSpocOnCase`, the 3.2 create row, the 3.3 recipient scopes, `ScopeRule`, the `finding` target comment and the Drizzle predicate (`business_unit_id = ANY($bus)`, aligned with W0-04's `scopedCases(tx, actor)`) use these names. The descriptive `business_unit` and `business_owner` columns are named explicitly as never used for access.
+- The create-target subsection reads the owner from W0-02 `businessOwner: SubjectId` (stored as `owner_subject_id`) and the BU key from the W0-02 `businessUnit` field, and no longer asserts a field W0-02 does not carry. The section 8 create-target row is rewritten to match, and three reconciliation items are added for the W0-02/W0-04 owners rather than decided here: which body field feeds `business_unit_id` versus the `business_unit` text; whether the shape needs a display-name field for `business_owner`; and a second owner fixture in BU `CM` (`owner-b`) that the W0-02 section 8.3 list lacks.
+- Section 7 placeholders are mapped to the W0-02 section 8.3 fixture identifiers in a table (`fx-user-owner-cm`, `fx-user-spoc-cm`, `fx-user-dpo`, `fx-user-admin`, `fx-user-dpo-spoc-hr`, BUs `CM`/`HR`); T6, T7, T13, T17 and T23 use the W0-02 field and lane spellings (`businessUnit`, `businessOwner`, `privacyStatus`, `it_security`).
+- Principle 7 names the W0-10 log event `authz.denied` next to the audit event kind `authorization.denied`.
+
+No matrix row, rule or test obligation was removed or weakened; T1-T30 numbering is unchanged. The fix-round-1 note above about an "optional `owner_subject_id`" in the W0-02 shape is superseded by this round.
+
 ## Checks
 
 Shell: `export PATH=$HOME/.nvm/versions/node/v24.21.0/bin:$PATH` (node v24.21.0).
 
 | Command | Result |
 |---|---|
-| `node --test tests/*.test.mjs` | 22 pass, 0 fail, 0 skipped (rerun after fix round 2: 22 pass, 0 fail; after fix round 3: 22 pass, 0 fail) |
+| `node --test tests/*.test.mjs` | 22 pass, 0 fail, 0 skipped (rerun after fix round 2: 22 pass, 0 fail; after fix round 3: 22 pass, 0 fail; after fix round 4 on the rebased branch: 22 pass, 0 fail) |
 | `git diff --check` (after `git add -N` of the new files) | clean |
 | `shasum -a 256 docs/product/source-spec.md` | `92c4f7123058b8fec3c2ba7abdf10538fad034778624b0675975b39de440b354`, matches docs/sources.md |
-| Relative-link and anchor audit over the new document (script in the PR description) | 36 links, 0 broken (fix round 1; 30 before). Rerun after fix round 2 with a fresh script: 35 relative links, 0 broken; no link was changed |
+| Relative-link and anchor audit over the new document (script in the PR description) | 36 links, 0 broken (fix round 1; 30 before). Rerun after fix round 2 with a fresh script: 35 relative links, 0 broken; no link was changed. Rerun after fix round 4 (sibling links repointed at the merged `docs/engineering/` files, anchors checked against those files): 47 relative links, 0 broken |
 
 No product suite exists yet (the application skeleton arrives with W1-00 under the layout W0-02 assigns), so `npm test`, lint, typecheck and Playwright do not apply to this ticket.
 
