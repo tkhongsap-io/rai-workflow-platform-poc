@@ -158,6 +158,11 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
       uploadTrigger: noopUploadTrigger,
       ...(overrides.now === undefined ? {} : { now: overrides.now }),
     },
+    // W1-05: submit/freeze and version navigation (W0-02 7.6).
+    versions: {
+      db: db.db,
+      ...(overrides.now === undefined ? {} : { now: overrides.now }),
+    },
   });
   const close = async () => {
     await fastify.close();

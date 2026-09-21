@@ -5,7 +5,8 @@
 // only place scope is enforced) and the sign-in surface (identity/routes.ts); a schema validation failure maps to
 // 422 invalid_input with field paths (W0-06 8.2). Routes arrive with W1-02 onwards and declare `config.auth`;
 // W1-02 registers the case routes (cases/routes.ts) when `cases` deps are given; W1-04 the pack draft routes
-// (pack/routes.ts) when `pack` deps are given.
+// (pack/routes.ts) when `pack` deps are given; W1-05 the submit and version routes (versions/routes.ts) when
+// `versions` deps are given.
 
 import Fastify, { LogController, type FastifyError, type FastifyInstance } from 'fastify';
 import cookie from '@fastify/cookie';
@@ -16,6 +17,7 @@ import { registerArtifactRoutes, type ArtifactRouteDeps } from './artifacts/rout
 import { registerAuthorization, type ScopeFactsSource } from './authz/middleware.js';
 import { registerCaseRoutes, type CaseRouteDeps } from './cases/routes.js';
 import { registerPackRoutes, type PackRouteDeps } from './pack/routes.js';
+import { registerVersionRoutes, type VersionRouteDeps } from './versions/routes.js';
 import type { FixtureIdentityProvider } from './identity/fixture.js';
 import { registerAuthRoutes } from './identity/routes.js';
 import { cookieNames, type SessionStore } from './identity/session.js';
@@ -41,6 +43,8 @@ export interface AppDeps {
   artifacts?: Omit<ArtifactRouteDeps, 'emitter'>;
   /** W1-04: the pack draft routes' dependencies (database, pack limit, the W0-07 upload hook). Needs `identity`. */
   pack?: Omit<PackRouteDeps, 'emitter'>;
+  /** W1-05: the submit and version-navigation routes' dependencies (database). Needs `identity`. */
+  versions?: VersionRouteDeps;
   /** Test seam: where the pino lines go instead of stdout, so a suite can assert on emitted events. */
   logStream?: NodeJS.WritableStream;
 }
@@ -166,6 +170,13 @@ export function buildApp(deps: AppDeps): App {
     if (packDeps !== undefined) {
       void fastify.register((instance, _opts, done) => {
         registerPackRoutes(instance, { ...packDeps, emitter });
+        done();
+      });
+    }
+    const versionDeps = deps.versions;
+    if (versionDeps !== undefined) {
+      void fastify.register((instance, _opts, done) => {
+        registerVersionRoutes(instance, versionDeps);
         done();
       });
     }
