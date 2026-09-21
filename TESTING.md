@@ -55,10 +55,12 @@ Authorized on 2026-09-21 (D03). The commands below are specified by the [W0-02 f
 
 All `npm` commands run from `rai-web/` with Node 24 (`export PATH=$HOME/.nvm/versions/node/v24.21.0/bin:$PATH` or `nvm use`). Docker must be running for anything that touches Postgres.
 
-Install (once per checkout; `npx playwright install chromium` once per machine):
+Install (once per checkout; `npx playwright install chromium` once per machine). The second line generates `SESSION_SECRET`: the sample placeholder is accepted only under `NODE_ENV=test`, so `npm run dev` refuses to start without it. `npm run dev` also needs a local Google OAuth client (`OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` in `.env`, never committed; plan section 3.1); the test commands need neither, because they run with `NODE_ENV=test` and the fixture identity provider.
 
 ```sh
-cd rai-web && cp .env.example .env && npm ci && npx playwright install chromium
+cd rai-web && cp .env.example .env
+sed -i.bak "s/^SESSION_SECRET=.*/SESSION_SECRET=$(openssl rand -hex 32)/" .env && rm .env.bak
+npm ci && npx playwright install chromium
 ```
 
 Local Postgres (from the repository root; `POSTGRES_PORT` selects the loopback host port, default 54320; per-ticket isolation uses `-p rai-<ticket-id>` and port `54320 + <ticket number>`, with `DATABASE_URL` in that worktree's `.env` set to match):
@@ -79,7 +81,7 @@ npm run reset              # db:down, db:up, migrate, fixtures:load, remove rai-
 Run:
 
 ```sh
-npm run dev                # API http://127.0.0.1:8787 (fixture identity by default) + Vite http://127.0.0.1:5174
+npm run dev                # API http://127.0.0.1:8787 (local-google identity, loopback only) + Vite http://127.0.0.1:5174
 npm run build && npm start # the one deployable: server/dist serving web/dist
 ```
 

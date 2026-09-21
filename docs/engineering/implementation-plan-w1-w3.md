@@ -171,10 +171,13 @@ All `npm` commands run from `rai-web/`. Shell prerequisite on the development ma
 
 ```sh
 cd rai-web
-cp .env.example .env            # first time only; edit nothing for fixture-mode development
-npm ci                          # exact versions from package-lock.json; fails on drift
-npx playwright install chromium # once per machine, for the browser suite
+cp .env.example .env                                                              # first time only
+sed -i.bak "s/^SESSION_SECRET=.*/SESSION_SECRET=$(openssl rand -hex 32)/" .env && rm .env.bak   # generate the cookie key; the placeholder is refused outside NODE_ENV=test
+npm ci                                                                            # exact versions from package-lock.json; fails on drift
+npx playwright install chromium                                                   # once per machine, for the browser suite
 ```
+
+Then, for `npm run dev` (section 3.4), set `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` in `.env` from a Google OAuth client you create for yourself (type "Web application", authorised redirect URI exactly `http://127.0.0.1:8787/auth/callback`); this is the L11 development login and the client stays in your local `.env`. The test commands in section 3.5 need neither step: they run with `NODE_ENV=test`, where the fixture identity provider and the placeholder secret are accepted.
 
 ### 3.2 Database
 
@@ -205,7 +208,7 @@ npm run build              # shared → web (vite build to web/dist) → server 
 npm start                  # node server/dist/main.js: the one deployable, serving web/dist and the API on HOST:PORT
 ```
 
-`IDENTITY_MODE=fixture` (default in `.env.example`, allowed only when `NODE_ENV` is `development` or `test`) signs in the six synthetic users and the dual-role identity without Google. `IDENTITY_MODE=local-google` needs a local OAuth client in `.env` (never committed) and binds loopback only; anything else refuses to start (W0-03). Lane B may also run the web app alone against the in-memory substitute: `VITE_API_SUBSTITUTE=true npm run dev -w web` (W1-13; never evidence).
+`IDENTITY_MODE=local-google` (default in `.env.example`; the L11 development login) needs a local OAuth client in `.env` (never committed; section 3.1) and binds loopback only. `IDENTITY_MODE=fixture` signs in the six synthetic users and the dual-role identity without Google and is accepted only when `NODE_ENV=test` (W0 contract, W0-03: "usable only in the test environment"); the test commands in section 3.5 set that themselves, and `npm run dev` never does. Anything else refuses to start (W0-03). Lane B may also run the web app alone against the in-memory substitute: `VITE_API_SUBSTITUTE=true npm run dev -w web` (W1-13; never evidence).
 
 ### 3.5 Test, lint, typecheck
 
@@ -220,6 +223,8 @@ npm run typecheck          # tsc -b (project references over all five workspaces
 npm run verify             # lint, typecheck, test — the command every PR runs locally before it opens
 npm run verify:full        # verify, build, check:substitute-absent, test:browser — what CI runs (section 6)
 ```
+
+`test:unit`, `test:integration` and `test:browser` run with `NODE_ENV=test` and `IDENTITY_MODE=fixture` set by the npm script itself (POSIX `VAR=value` prefix; CI and development machines are POSIX), overriding `.env`; no test ever reads the developer's Google client.
 
 Repository-level checks, from the repository root (unchanged from today plus the two scripts W1-12 adds):
 
@@ -312,12 +317,12 @@ Rules: no secret in Git, ever; `.env` is gitignored; `.env.example` (created by 
 | `BLOB_DIR` | `./.local/blobs` | server | Private artifact directory; created on start with mode `0700`; content-hash keyed (`<sha256[0:2]>/<sha256>`). |
 | `UPLOAD_MAX_FILE_BYTES` | `<value from W0-08>` | server | Per-file limit enforced by `@fastify/multipart` before hashing (W0-08 sets the number; D08 revisits before real data). |
 | `UPLOAD_MAX_PACK_BYTES` | `<value from W0-08>` | server | Per-pack total across a draft's attached artifacts (W0-08). |
-| `IDENTITY_MODE` | `fixture` | server | `fixture` (only when `NODE_ENV` ≠ `production`) \| `local-google` (loopback only) \| `network` \| `production`. Unknown value: refuse to start. |
+| `IDENTITY_MODE` | `local-google` | server | `local-google` (loopback only; the L11 development login) \| `fixture` (only when `NODE_ENV=test`; W0-03) \| `network` \| `production`. Unknown value, or `fixture` outside `NODE_ENV=test`: refuse to start. |
 | `OIDC_ISSUER` | `https://accounts.google.com` | server | Required for `local-google`; production issuer (Entra) is set at W8 under D10. |
 | `OIDC_CLIENT_ID` | `replace-me-local-only` | server | Required for `local-google`; empty → refuse to start in that mode. |
 | `OIDC_CLIENT_SECRET` | `replace-me-local-only` | server | Same; never committed; `network`/`production` read it from custody, not from here. |
 | `OIDC_REDIRECT_URI` | `http://127.0.0.1:8787/auth/callback` | server | Must be loopback in `local-google`. |
-| `SESSION_SECRET` | `replace-me-run-openssl-rand-hex-32` | server | Cookie signing key, ≥ 32 bytes; the placeholder value is rejected outside `NODE_ENV=test`. |
+| `SESSION_SECRET` | `replace-me-run-openssl-rand-hex-32` | server | Cookie signing key, ≥ 32 bytes; generated at install (section 3.1); the placeholder is accepted only under `NODE_ENV=test` and refused in every other mode. |
 | `SESSION_TTL_MINUTES` | `480` | server | Idle session lifetime. |
 | `MAIL_MODE` | `sink-file` | server | `sink-file` \| `sink-memory` in slice 1. No transport value exists until W7 authorizes one (W0-07). |
 | `MAIL_SINK_DIR` | `./.local/mail` | server | Where `sink-file` writes one JSON file per delivery attempt. |
@@ -372,7 +377,7 @@ volumes:
 | 10 | Dependency advisories | `npm audit --omit=dev --audit-level=high` | Yes |
 | 11 | Whitespace | `git diff --check origin/main...HEAD` | Yes |
 
-Rules: no `continue-on-error`, no `test.skip` or `test.todo` merged to `main` (ESLint rule `no-restricted-syntax` over `describe.skip`, `test.skip`, `test.todo` in `tests/`); a red check is fixed in the same PR, never bypassed. A PR that changes `.github/`, `scripts/`, `docker-compose.yml` or section 4 is HRR and reviewed by the lead. CI never has Google, mail or external credentials; every check runs with `IDENTITY_MODE=fixture`, `MAIL_MODE=sink-memory`, `QC_MODE=substitute`.
+Rules: no `continue-on-error`, no `test.skip` or `test.todo` merged to `main` (ESLint rule `no-restricted-syntax` over `describe.skip`, `test.skip`, `test.todo` in `tests/`); a red check is fixed in the same PR, never bypassed. A PR that changes `.github/`, `scripts/`, `docker-compose.yml` or section 4 is HRR and reviewed by the lead. CI never has Google, mail or external credentials; every check runs with `NODE_ENV=test`, `IDENTITY_MODE=fixture`, `MAIL_MODE=sink-memory`, `QC_MODE=substitute`.
 
 Frozen-source hash: `scripts/check-frozen-source.mjs` reads the SHA-256 for `docs/product/source-spec.md` from `docs/sources.md` and compares it with the file, so the expected value is never a second literal; `tests/source.test.mjs` keeps its own literal check as today.
 
@@ -497,7 +502,7 @@ export type SourceRecordId =
   | { kind: 'unknown' };                 // the literal Unknown of the source spec
 
 export type ModelType = 'llm' | 'classic_ml' | 'other';                   // desk-local (W0-04 fields)
-export type RiskTier = 'high' | 'medium' | 'low';                          // read-only in slice 1; W5 proposes it (D07)
+export type RiskTier = string;   // opaque placeholder: the tier labels are recorded by D07 before W5; no literal set is fixed here
 export type LaneProjectionStatus = 'pending' | 'approved' | 'sent_back';   // vocabulary confirmed by W0-04
 export type ReadinessProjectionStatus = 'not_ready' | 'ready';
 export type CaseStatus =
@@ -523,7 +528,7 @@ export interface CaseView extends CaseWritableFields {
   caseId: CaseId;
   registryId: RegistryId;
   status: CaseStatus;
-  riskTier: RiskTier | null;             // null throughout slice 1
+  riskTier: RiskTier | null;             // null throughout slice 1; W5's contract PR replaces the placeholder with D07's labels
   privacyStatus: LaneProjectionStatus;   // written only by the workflow: DPO approval (W0-04 fields)
   securityStatus: LaneProjectionStatus;  // IT/Security approval
   raiStatus: LaneProjectionStatus;       // AI/COE approval
@@ -791,7 +796,7 @@ Applying the rule to the four candidates the working agreement names, each sub-t
 
 | Sub-ticket | Outcome | Module | Depends on | Done when (inherits the parent's clauses named) |
 |---|---|---|---|---|
-| **W1-01a** | Identity adapter: interface, `local-google` mode with `openid-client` on loopback only, `fixture` mode gated to non-production, `network`/`production` fail closed without custody credentials, Postgres session store and cookie | `server/src/identity/` | W1-00, W0-03 | `local-google` refuses a non-loopback bind and an unknown mode; each fixture user including the dual-role identity signs in and receives its (role, scope) pairs; a session expires and is revocable |
+| **W1-01a** | Identity adapter: interface, `local-google` mode with `openid-client` on loopback only, `fixture` mode gated to `NODE_ENV=test`, `network`/`production` fail closed without custody credentials, Postgres session store and cookie | `server/src/identity/` | W1-00, W0-03 | `local-google` refuses a non-loopback bind and an unknown mode; each fixture user including the dual-role identity signs in and receives its (role, scope) pairs; a session expires and is revocable |
 | **W1-01b** | Authorization middleware: the only place scope is enforced; route declaration of the policy row; request principal context | `server/src/authz/` | W1-01a, W0-05 | A request without a session is unauthenticated; a wrong-role request is forbidden; a route without a declared policy row fails at start-up |
 | **W1-03a** | Upload safety pipeline and blob store: size limits, sniffing, allowed-type list, hashing, per-pack total, `BlobStore` interface with the filesystem implementation; no HTTP route | `server/src/artifacts/` (no routes) | W1-00, W0-08 | A permitted file's hash is recorded; an executable disguised by extension is rejected with `unsafe_upload`; oversize rejected; identical bytes share one blob; the blob directory is created `0700` |
 | **W1-03b** | Upload and download routes under authorization, Thai filenames, download headers, audit events | `server/src/artifacts/` (routes) | W1-03a, W1-01b, W1-09 | A direct file URL without a session is refused; downloaded bytes match the stored hash; a Thai filename round-trips unchanged; another BU's user gets `forbidden` |
@@ -832,4 +837,6 @@ Not split, with the reason: **W1-00** is declared "in one PR" by the work breakd
 - Owning lane for slot 5, slot 9, pack-level and QC-unavailable findings: **W0-06** refinement by the review leads before W2-05; the A09 row in 8.2 tests whatever it records.
 - Projection-status vocabulary (`LaneProjectionStatus`, `ReadinessProjectionStatus` in 7.3): **W0-04** confirms the words; the rule (workflow-only writer) is recorded (W0-04 fields).
 - Performance budgets and the W0 exit review: **W0-09**.
+- Whether the fixture identity provider may also serve a development run (`NODE_ENV=development`) for UI work against the real API without a Google client: **W0-03** decides. This plan keeps the contract's rule (`fixture` accepted only under `NODE_ENV=test`); until W0-03 says otherwise, development uses `local-google` (L11) or the W1-13 substitute for the web app alone.
+- Risk-tier labels (`RiskTier` in 7.3 is an opaque `string` and `riskTier` is `null` throughout slice 1): **D07** records the questionnaire, rubric version and labels before W5; W5's contract PR replaces the placeholder type.
 - D07-D10 stay open at their gates; nothing in this plan pre-empts them (no rubric, no retention rule, no model, no host).

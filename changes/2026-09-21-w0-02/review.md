@@ -46,3 +46,13 @@ No product suite exists yet (the skeleton arrives with W1-00), so `npm test`, li
 - Upload limits (W0-08), the 403-versus-404 answer (W0-05), `not_found` confirmation and the slot-5/pack-level owning-lane rule (W0-06), and the projection-status vocabulary (W0-04) are carried as marked placeholders, not chosen here.
 - Technical choices inside the D04 stack that this plan makes and that a reviewer may want to weigh: TypeBox (Fastify's native type provider) for the shared schemas rather than zod; a Postgres session table behind `@fastify/cookie` rather than a session library; no i18n or date library (typed key union plus `Intl`); Chromium-only Playwright; ESLint 9 and TypeScript 5.9 rather than the newest majors, for plugin compatibility. None is a D-item.
 - Board CLAIM: not appended, following the W0-01 precedent that the merge step writes the lead stream and to avoid conflicts with the parallel W0 branches; the lead may append one.
+
+## Fix round 1 (PR #65 review findings)
+
+Four blocking findings, all resolved in `docs/engineering/implementation-plan-w1-w3.md` and `TESTING.md`; no other file changed.
+
+1. **`SESSION_SECRET` placeholder versus "edit nothing"** (two findings, same defect). The fail-closed rule is kept: the placeholder is accepted only under `NODE_ENV=test`. Section 3.1 and the TESTING.md install block now generate the secret at install (`sed -i.bak "s/^SESSION_SECRET=.*/SESSION_SECRET=$(openssl rand -hex 32)/" .env`) and the section 5 row says "generated at install; placeholder accepted only under `NODE_ENV=test`".
+2. **Fixture identity widened to development.** Reverted to the W0 contract's rule: `IDENTITY_MODE=fixture` is accepted only when `NODE_ENV=test`; `local-google` is the `.env.example` default and the development login (L11), with the local Google OAuth client steps in section 3.1. Sections 3.4, 3.5, 5, 6 and 11.1 (W1-01a) now say so consistently; whether a development run may use the fixture provider is listed in section 13 as W0-03's decision, not made here.
+3. **`RiskTier` fixed the rubric labels.** Section 7.3 now declares `export type RiskTier = string` as an opaque placeholder (`riskTier` stays `null` throughout slice 1); the labels are D07's, recorded before W5, and the item is listed in section 13.
+
+Checks rerun after the fixes (same shell): `node --test tests/*.test.mjs` 22 pass, 0 fail; `git diff --check` clean; frozen-source hash unchanged; relative-link and anchor audit over the touched Markdown files: 0 broken.
