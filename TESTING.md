@@ -47,7 +47,7 @@ Screenshot captures supplied by the current browser tool are lossy JPEG even whe
 
 ## Repository checks
 
-Run git diff --check, inspect git status and relative Markdown links, verify frozen source SHA-256 against docs/sources.md, and inspect the change review for unresolved scope/acceptance gaps. Product sources remain immutable. Only synthetic fixtures belong in demo/ and tests/; no credentials or real case material.
+Run git diff --check, inspect git status, run the two zero-dependency scripts W1-12 added from the repository root (`node scripts/check-links.mjs` for relative Markdown links and heading anchors; `node scripts/check-frozen-source.mjs` for the SHA-256 of docs/product/source-spec.md against the first row of docs/sources.md, which is the only place the expected value is stated), and inspect the change review for unresolved scope/acceptance gaps. `node --test scripts/*.test.mjs` runs the tests of those scripts, including the one that proves a deliberately altered copy of the snapshot fails the hash check. Product sources remain immutable. Only synthetic fixtures belong in demo/ and tests/; no credentials or real case material.
 
 ## Product build (W0-W3)
 
@@ -103,16 +103,17 @@ npm run verify             # lint + typecheck + test: run before every PR
 npm run verify:full        # verify + build + substitute-absence check + browser suite: what CI runs
 ```
 
-Repository checks (from the repository root; the two scripts arrive with W1-12):
+Repository checks (from the repository root; the scripts and their tests arrived with W1-12):
 
 ```sh
 node --test tests/*.test.mjs        # legacy demo suite and frozen-source hash
-node scripts/check-links.mjs        # relative Markdown links resolve
-node scripts/check-frozen-source.mjs
+node scripts/check-links.mjs        # relative Markdown links and heading anchors resolve
+node scripts/check-frozen-source.mjs  # docs/product/source-spec.md hash equals the docs/sources.md row
+node --test scripts/*.test.mjs      # tests of the two scripts (altered snapshot copy fails; broken link fails)
 git diff --check
 ```
 
-Every PR runs the eleven CI checks in the plan's [section 6](docs/engineering/implementation-plan-w1-w3.md#6-ci-checks-on-every-pr); all block merge. Evidence records cite the fixture set identity (`fixture set slice1-synthetic@1 <sha256[0:12]>`) from the plan's [section 8.3](docs/engineering/implementation-plan-w1-w3.md#83-fixture-identity-convention) next to each command's output. Substitute runs (`VITE_API_SUBSTITUTE=true`) are never evidence.
+Every PR runs the eleven CI checks in the plan's [section 6](docs/engineering/implementation-plan-w1-w3.md#6-ci-checks-on-every-pr) through [.github/workflows/ci.yml](.github/workflows/ci.yml) (W1-12; one job per row plus a `required` aggregate job that branch protection on `main` must require); all block merge. The browser job runs `npm run test:browser` against the one deployable started in test mode on loopback with Chromium only, and uploads the Playwright report and the axe results attached to each test. The browser harness helpers live in `rai-web/tests/browser/support/` (axe audit with the five WCAG tag sets, keyboard-only helpers, fixture sign-in) and the integration harness in `rai-web/tests/support/` (database bootstrap, spawned test server with log capture, fixture sign-in by `inject`); `rai-web/tests/browser/w1-12-harness.spec.ts` and `rai-web/tests/integration/w1-12-harness.test.ts` prove the runner itself. No browser or integration test reaches an external service. Evidence records cite the fixture set identity (`fixture set slice1-synthetic@1 <sha256[0:12]>`) from the plan's [section 8.3](docs/engineering/implementation-plan-w1-w3.md#83-fixture-identity-convention) next to each command's output. Substitute runs (`VITE_API_SUBSTITUTE=true`) are never evidence.
 
 ## Production gates
 
