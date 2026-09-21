@@ -1,12 +1,12 @@
 # File-level implementation plan: W1-W3
 
-Status: **W0-02 draft for tech-lead and Ta review** (ticket [W0-02](../delivery/w0-technical-contract.md#w0-02--file-level-implementation-plan), issue #7). Makes [ADR-0003](../../adr/0003-stack-and-deployment-boundary.md) (D04) concrete: paths, commands, pinned dependencies, local configuration, CI checks, the W1 request/response shapes, the test-layer map, the UI quality bar and the language rule. Nothing here is installed or built; [W1-00](../delivery/slice-1-work-breakdown.md#w1--scoped-case-and-versioned-pack) creates the skeleton exactly as written here and [W1-12](../delivery/slice-1-work-breakdown.md#w1--scoped-case-and-versioned-pack) wires the CI checks.
+Status: **W0-02 plan, reconciled at the W0 exit review** (ticket [W0-02](../delivery/w0-technical-contract.md#w0-02--file-level-implementation-plan), issue #7; cross-spec fixes applied by [W0-09](../../changes/2026-09-21-w0-exit/review.md) on 2026-09-21, each marked "W0-09:" where it lands). Makes [ADR-0003](../../adr/0003-stack-and-deployment-boundary.md) (D04) concrete: paths, commands, pinned dependencies, local configuration, CI checks, the W1 request/response shapes, the test-layer map, the UI quality bar and the language rule. Nothing here is installed or built; [W1-00](../delivery/slice-1-work-breakdown.md#w1--scoped-case-and-versioned-pack) creates the skeleton exactly as written here and [W1-12](../delivery/slice-1-work-breakdown.md#w1--scoped-case-and-versioned-pack) wires the CI checks.
 
 What this document is not: it records no D01-D12 decision, resolves nothing in D07-D10, and does not edit the frozen [source spec](../product/source-spec.md). Where it names a value that another W0 spec owns (upload limits from W0-08, the 403-versus-404 answer from W0-05, the slot-5 and pack-level owning-lane rule from W0-06), it references that spec and carries a marked placeholder. Two items are proposals for Ta to confirm at the W0 exit review (W0-09): the [UI quality bar](#9-ui-quality-bar) and the [sub-ticket split](#11-pr-size-branch-rules-and-slice-1-sub-tickets); both are marked.
 
 Read with: [W0 technical contract](../delivery/w0-technical-contract.md), [slice-1 work breakdown](../delivery/slice-1-work-breakdown.md), [team and roles](../delivery/team-and-roles.md), [architecture](../architecture/README.md), [decision register](../product/decisions.md), [workflow](../product/workflow.md), [data contract](../product/data-contract.md), [acceptance](../acceptance.md), [threat model](../security/threat-model.md), [design handoff](../design/DEVELOPER_HANDOFF.md), [TESTING](../../TESTING.md).
 
-Sibling W0 specs this plan consumes (each lands in `docs/engineering/` under its own ticket; links point at the contract row until the spec merges): [W0-03 identity adapter](../delivery/w0-technical-contract.md#w0-03--identity-adapter-spec), [W0-04 persistence and artifact store](../delivery/w0-technical-contract.md#w0-04--persistence-and-artifact-store-spec), [W0-05 authorization matrix](../delivery/w0-technical-contract.md#w0-05--authorization-policy-matrix), [W0-06 workflow transition and error contract](../delivery/w0-technical-contract.md#w0-06--workflow-transition-and-error-contract), [W0-07 QC boundary and mail sink](../delivery/w0-technical-contract.md#w0-07--qc-boundary-and-mail-sink), [W0-08 upload safety and fixtures](../delivery/w0-technical-contract.md#w0-08--upload-safety-policy-and-fixtures), [W0-10 observability](../delivery/w0-technical-contract.md#w0-10--observability-contract-for-the-desk-runtime).
+Sibling W0 specs this plan consumes, all merged: [W0-03 identity adapter](identity-adapter.md), [W0-04 persistence and artifact store](persistence-and-artifact-store.md), [W0-05 authorization matrix](authorization-policy-matrix.md), [W0-06 workflow transition and error contract](workflow-transition-and-error-contract.md), [W0-07 QC boundary and mail sink](qc-boundary-and-mail-sink.md), [W0-08 upload safety and fixtures](upload-safety-and-fixtures.md), [W0-10 observability](observability-contract.md), [performance targets](performance-targets.md) (W0-09). Ownership at the seams, as reconciled at W0 exit: this plan owns routes, request/response shapes, commands, layout paths and the non-identity environment variables; W0-03 owns identity behaviour and the `RAI_IDENTITY_*`, `RAI_SECRET_*` and `RAI_SESSION_*` variable names; W0-04 owns storage, indexes and database roles; W0-06 owns the error contract and the order of checks; W0-08 owns upload safety and the fixture content; W0-10 owns the log field allow-list.
 
 ---
 
@@ -24,6 +24,7 @@ rai-workflow-platform-poc/
 │   ├── check-links.mjs                    #   relative Markdown links resolve
 │   └── check-frozen-source.mjs            #   docs/product/source-spec.md hash equals docs/sources.md
 ├── docker-compose.yml                     # Postgres 16 for local + CI; POSTGRES_PORT selects the host port (W1-00)
+├── docker/postgres/init/                  # init SQL creating the W0-04 roles rai_owner, rai_app, rai_operator (W1-00)
 ├── .github/workflows/ci.yml               # the PR checks in section 6 (W1-12; agents never edit)
 ├── .gitignore                             # .env, .local/, node_modules/, dist/, playwright-report/, test-results/
 └── rai-web/                               # npm workspace root; every npm command runs from here
@@ -43,15 +44,15 @@ rai-workflow-platform-poc/
     ├── shared/                            # @rai/shared — the typed contract both halves import (Lane A owns; contract PRs only)
     │   └── src/
     │       ├── index.ts
-    │       ├── errors.ts                  # the eight error codes, HTTP status map, ApiError shape (section 7.1)
+    │       ├── errors.ts                  # the eight error codes, HTTP_STATUS_BY_CODE, ErrorResponse envelope (section 7.1; W0-06 8.2)
     │       ├── ids.ts                     # branded id types, RegistryId format
-    │       ├── constants.ts               # APP_TIMEZONE = 'Asia/Bangkok' (D06), LANE_MAPPING (D02, versioned), SLOTS
+    │       ├── constants.ts               # APP_TIMEZONE = 'Asia/Bangkok' (D06), LANE_MAPPING_V1 / CURRENT_LANE_MAPPING (D02, W0-06 section 3), SLOTS
     │       ├── schemas/                   # TypeBox schemas per section 7; types are inferred from them
     │       │   ├── auth.ts                #   sign-in (7.2)
     │       │   ├── cases.ts               #   case create/edit/read/list, configuration read (7.3)
     │       │   ├── artifacts.ts           #   upload/download (7.4)
     │       │   ├── pack.ts                #   pack draft (7.5)
-    │       │   ├── versions.ts            #   submit and version navigation (7.6)
+    │       │   ├── versions.ts            #   submit and version navigation (7.6); ExpectedVersion (W0-06 5.1)
     │       │   ├── review.ts              #   W2 shapes — added by the W2-02 / W2-05 contract PRs (empty until then)
     │       │   └── queue.ts               #   W3 shapes — added by the W3-01 / W3-05 contract PRs (empty until then)
     │       ├── qc/types.ts                # typed finding, unavailable result, owning lane (W0-07)
@@ -99,8 +100,9 @@ rai-workflow-platform-poc/
     │
     ├── fixtures/                          # @rai/fixtures — Lane C synthetic data and substitutes; never in production build
     │   └── src/
-    │       ├── data/                      # W1-09: users.ts (W1-00 owns the six users + dual-role identity), cases/, documents/
+    │       ├── data/                      # W1-09: users.ts (W1-00 owns the eight W0-03 fixture identities), cases/, documents/
     │       │   └── manifest.json          #   fixture set name, version, sha256 of the data directory (section 8.3)
+    │       ├── generate.ts                # npm run fixtures:generate — writes the W0-08 documents to a gitignored output dir (W1-09)
     │       ├── load.ts                    # npm run fixtures:load — loads data/ into an empty database
     │       ├── substitutes/
     │       │   ├── qc/                    # W1-10 scripted findings, unavailable, timeout
@@ -142,11 +144,11 @@ A PR touches one module from this table unless it is a declared contract PR or t
 
 Rules that follow from the layout:
 
-- **`process.env` is read only in `server/src/config.ts`** and `web/vite.config.ts`. Everything else receives a typed config object. A misconfiguration is a start-up failure, never a default (W0-03, W0-10).
+- **`process.env` is read only in `server/src/config.ts`** and `web/vite.config.ts` (the identity adapter's `parseIdentityConfig(env, bind)` receives the environment object from `config.ts`, W0-03 section 5). Everything else receives a typed config object. A misconfiguration is a start-up failure, never a default (W0-03, W0-10).
 - **Scope is enforced only in `server/src/authz/`.** Routes declare the policy row they need; no route, service or query adds its own check ([merge order](../delivery/slice-1-work-breakdown.md#merge-order-and-shared-contract)). The SPA never decides access; it only hides what the API refuses.
 - **`audit/` exports insert and read functions only.** No update or delete function exists in the data-access layer, and the migration that creates the table revokes `UPDATE` and `DELETE` on it from the application role (W0-04, A11).
 - **Migrations run only through `npm run migrate`.** `main.ts` never migrates. A migration file is never edited after it merges; a correction is a new migration (W0-04 schema evolution).
-- **`fixtures/` is a devDependency of `server` and `web`.** The production build (`npm run build`) must not contain `substitute-marker.ts`; `check-substitute-absent` proves it. The QC substitute (W1-10) is the slice-1 QC implementation by design and is bound in `server/src/qc/` behind `QC_MODE=substitute`, labelled as a substitute in the operator view; it is not "QC implemented" (W4).
+- **`fixtures/` is a devDependency of `server` and `web`.** The production build (`npm run build`) must not contain `substitute-marker.ts`; `check-substitute-absent` proves it. The QC substitute (W1-10) is the slice-1 QC implementation by design and is bound in `server/src/qc/` behind `QC_MODE=substitute`, labelled as a substitute in the operator view; it is not "QC implemented" (W4). W0-09: the colocated unit tests of the QC and mail-sink substitutes (`fixtures/src/substitutes/**/*.test.ts`, W0-07 sections 3.9 and 4.8) are part of `npm run test:unit` (section 3.5).
 - **`demo/` is never imported** by any `rai-web` package; ESLint `no-restricted-imports` blocks `../demo` and `../../demo`.
 
 ---
@@ -172,12 +174,11 @@ All `npm` commands run from `rai-web/`. Shell prerequisite on the development ma
 ```sh
 cd rai-web
 cp .env.example .env                                                              # first time only
-sed -i.bak "s/^SESSION_SECRET=.*/SESSION_SECRET=$(openssl rand -hex 32)/" .env && rm .env.bak   # generate the cookie key; the placeholder is refused outside NODE_ENV=test
 npm ci                                                                            # exact versions from package-lock.json; fails on drift
 npx playwright install chromium                                                   # once per machine, for the browser suite
 ```
 
-Then, for `npm run dev` (section 3.4), set `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` in `.env` from a Google OAuth client you create for yourself (type "Web application", authorised redirect URI exactly `http://127.0.0.1:8787/auth/callback`); this is the L11 development login and the client stays in your local `.env`. The test commands in section 3.5 need neither step: they run with `NODE_ENV=test`, where the fixture identity provider and the placeholder secret are accepted.
+Then, for `npm run dev` (section 3.4), set `RAI_IDENTITY_GOOGLE_CLIENT_ID` and `RAI_IDENTITY_GOOGLE_CLIENT_SECRET` in `.env` from a Google OAuth client you create for yourself (type "Web application", authorised redirect URI exactly `http://127.0.0.1:8787/auth/callback`, which the adapter derives from `PUBLIC_BASE_URL`; W0-03 section 4.1); this is the L11 development login and the client stays in your local `.env`. The test commands in section 3.5 need this step only if they are run outside `NODE_ENV=test`, which they never are: they set `NODE_ENV=test` and `RAI_IDENTITY_MODE=fixture` themselves. W0-09: there is no `SESSION_SECRET` to generate; the session cookie is a random value looked up by hash in the Postgres `sessions` table, so no signing key exists (W0-03 section 6.3, confirmed at W0 exit).
 
 ### 3.2 Database
 
@@ -194,11 +195,17 @@ From `rai-web/` the same two steps are `npm run db:up` and `npm run db:down`; th
 ### 3.3 Migrate, seed, reset
 
 ```sh
-npm run migrate            # applies pending forward-only SQL migrations from server/drizzle/ to DATABASE_URL; explicit, never on start
+npm run migrate            # applies pending forward-only SQL migrations from server/drizzle/ to DATABASE_MIGRATE_URL as rai_owner (W0-04); explicit, never on start
 npm run migrate:generate   # drizzle-kit generate: writes a new numbered SQL file from schema changes for review (lead/HRR ticket only)
-npm run fixtures:load      # loads rai-web/fixtures/src/data into an empty database (W1-09); refuses to run on a non-empty one
-npm run reset              # db:down, db:up, migrate, fixtures:load, and removes rai-web/.local (blobs and mail sink)
+npm run fixtures:generate  # writes the W0-08 synthetic documents from fixtures/src/data/manifest.json into the gitignored output directory; prints the fixture set name, version and manifest hash (W1-09)
+npm run fixtures:load      # runs fixtures:generate if the output is absent, then loads rai-web/fixtures/src/data into an empty database (W1-09); refuses to run on a non-empty one and outside NODE_ENV development/test
+npm run reset              # db:down, db:up, migrate, fixtures:load, and removes rai-web/.local (blobs and mail sink); development and test only
+npm run db:cleanup         # operator command (rai_operator, W0-04): expires idempotency keys; --report lists stale drafts and orphan blobs (dry run only until D08)
+npm run store:verify       # operator command: re-hashes every blob an artifact row references; non-zero exit on any mismatch (W0-04; W1-12 migration tests, W7-00)
+npm run store:cleanup      # operator command: removes stale temp files under BLOB_DIR/tmp; orphan-blob removal only after D08
 ```
+
+W0-09: the three operator commands are carried from W0-04 "Configuration and commands handed to W0-02" under this plan's naming (`migrate` and `reset` replace W0-04's proposed `db:migrate` and `db:reset`; `fixtures:generate` is W0-08's name, kept).
 
 ### 3.4 Run
 
@@ -208,12 +215,12 @@ npm run build              # shared → web (vite build to web/dist) → server 
 npm start                  # node server/dist/main.js: the one deployable, serving web/dist and the API on HOST:PORT
 ```
 
-`IDENTITY_MODE=local-google` (default in `.env.example`; the L11 development login) needs a local OAuth client in `.env` (never committed; section 3.1) and binds loopback only. `IDENTITY_MODE=fixture` signs in the six synthetic users and the dual-role identity without Google and is accepted only when `NODE_ENV=test` (W0 contract, W0-03: "usable only in the test environment"); the test commands in section 3.5 set that themselves, and `npm run dev` never does. Anything else refuses to start (W0-03). Lane B may also run the web app alone against the in-memory substitute: `VITE_API_SUBSTITUTE=true npm run dev -w web` (W1-13; never evidence).
+`RAI_IDENTITY_MODE=local-google` (default in `.env.example`; the L11 development login) needs a local OAuth client in `.env` (never committed; section 3.1) and binds loopback only. `RAI_IDENTITY_MODE=fixture` signs in the fixture identities of W0-03 section 7 without Google and is accepted only when `NODE_ENV=test` and the bind is loopback (W0-03 rows S13, S14); the test commands in section 3.5 set that themselves, and `npm run dev` never does. Anything else refuses to start with exit code 78 (W0-03 section 5). Lane B may also run the web app alone against the in-memory substitute: `VITE_API_SUBSTITUTE=true npm run dev -w web` (W1-13; never evidence).
 
 ### 3.5 Test, lint, typecheck
 
 ```sh
-npm run test:unit          # node --import tsx --test across server/src, shared/src, web/src *.test.ts; no database
+npm run test:unit          # node --import tsx --test across server/src, shared/src, web/src, fixtures/src *.test.ts; no database
 npm run test:integration   # node --import tsx --test tests/integration/**/*.test.ts against DATABASE_URL (real Postgres) + substitutes
 npm test                   # test:unit then test:integration
 npm run test:browser       # playwright test -c tests/browser/playwright.config.ts (builds, starts the API in test mode, runs journeys + axe)
@@ -224,7 +231,7 @@ npm run verify             # lint, typecheck, test — the command every PR runs
 npm run verify:full        # verify, build, check:substitute-absent, test:browser — what CI runs (section 6)
 ```
 
-`test:unit`, `test:integration` and `test:browser` run with `NODE_ENV=test` and `IDENTITY_MODE=fixture` set by the npm script itself (POSIX `VAR=value` prefix; CI and development machines are POSIX), overriding `.env`; no test ever reads the developer's Google client.
+`test:unit`, `test:integration` and `test:browser` run with `NODE_ENV=test` and `RAI_IDENTITY_MODE=fixture` set by the npm script itself (POSIX `VAR=value` prefix; CI and development machines are POSIX), overriding `.env`; no test ever reads the developer's Google client.
 
 Repository-level checks, from the repository root (unchanged from today plus the two scripts W1-12 adds):
 
@@ -256,19 +263,18 @@ Exact versions (no `^`/`~`) in every `package.json`; `package-lock.json` is comm
 | `fastify` | 5.12.5 | server | D04. Plain routes, built-in ajv validation, streaming multipart, pino logging, no framework auth or data layer to fight (ADR-0003 criteria 1, 2). Node ≥ 20. |
 | `@fastify/static` | 10.1.4 | server | Serves `web/dist` from the API process (one deployable, one origin). |
 | `@fastify/multipart` | 10.1.1 | server | Streamed uploads with size limits enforced before bytes reach the blob store (W0-08). |
-| `@fastify/cookie` | 11.1.2 | server | Signed, `HttpOnly`, `SameSite=Lax` session cookie carrying an opaque session id; the session row lives in Postgres (`identity/session-store.ts`), so revocation and expiry are server-side and no session library is needed. |
+| `@fastify/cookie` | 11.1.2 | server | Parses and sets the `HttpOnly`, `SameSite=Lax` session cookie. W0-09: the cookie value is a 256-bit random string looked up by its SHA-256 in the Postgres `sessions` table (W0-03 section 6.3), so the cookie is not signed, no `SESSION_SECRET` exists, and revocation and expiry are server-side; no session library is needed. |
 | `@fastify/helmet` | 13.1.1 | server | Strict CSP for the served SPA, `X-Content-Type-Options: nosniff`, no-store on API responses (ADR-0003 consequences). |
 | `@fastify/type-provider-typebox` | 6.1.0 | server | Fastify's native type provider: the section 7 TypeBox schemas validate requests with Fastify's ajv and give route handlers inferred types, so the shared schema is the single definition. |
 | `typebox` | 1.3.34 | shared | Schema-to-type library the shared contract is written in; imported by server (validation), web (types, client-side form hints) and the W1-13 substitute. |
 | `drizzle-orm` | 0.45.3 | server | D04. Typed SQL over `pg` with plain transactions and `FOR UPDATE`; migrations are SQL files applied by an explicit migrator call (W0-04). |
 | `pg` | 8.23.0 | server | node-postgres driver Drizzle's `node-postgres` adapter uses; a dedicated client per transaction (freeze, decide, Ready). |
 | `openid-client` | 6.8.8 | server | D04. Certified OIDC client; Google today, Entra later behind one adapter (W0-03). |
-| `file-type` | 22.1.1 | server | Magic-byte sniffing of the allowed types (PDF, DOCX, XLSX, PNG, JPEG proposed in W0-08); the extension is never trusted. Node ≥ 22. |
 | `react` | 19.3.0 | web | D04. |
 | `react-dom` | 19.3.0 | web | D04. |
 | `react-router-dom` | 7.18.4 | web | Deep links to cases and versions (A05 links must resolve inside the SPA and still require sign-in). |
 
-Not added, on purpose: no i18n library (section 10 uses a typed key union, `Intl` and a 40-line `t()`), no date library (`Intl.DateTimeFormat` with `timeZone: 'Asia/Bangkok'`), no state-management library, no CSS framework (design tokens from the handoff as CSS custom properties), no separate logger (Fastify bundles pino), no session library (see `@fastify/cookie`), no mail transport (slice 1 has only the sink; a transport is a W7 decision), no ORM migration runner beyond Drizzle's own.
+Not added, on purpose: no i18n library (section 10 uses a typed key union, `Intl` and a 40-line `t()`), no date library (`Intl.DateTimeFormat` with `timeZone: 'Asia/Bangkok'`), no state-management library, no CSS framework (design tokens from the handoff as CSS custom properties), no separate logger (Fastify bundles pino), no session library (see `@fastify/cookie`), no mail transport (slice 1 has only the sink; a transport is a W7 decision), no ORM migration runner beyond Drizzle's own, and no file-type detector: W0-09 removed the earlier `file-type` row because W0-08 section 2.5 specifies a hand-written sniff over Node built-ins (five explicit structures, deny by default); reconsidering a library detector is a D08 item.
 
 ### 4.2 Development (`devDependencies`)
 
@@ -304,7 +310,7 @@ Not added, on purpose: no i18n library (section 10 uses a typed key union, `Intl
 
 ## 5. Local configuration and secrets
 
-Rules: no secret in Git, ever; `.env` is gitignored; `.env.example` (created by W1-00) contains only the placeholders below; `server/src/config.ts` parses every variable at start, applies the fail-closed rules and exposes a typed object; an invalid combination exits with the error code and a locale-keyed message before any port is bound. Networked or production identity, mail and store credentials come from the custody mechanism approved under D10, never from `.env`; the adapter refuses to start in `network` or `production` mode without them (W0-03). For `local-google`, the OAuth client is held in the developer's local `.env` and never committed (W1-08).
+Rules: no secret in Git, ever; `.env` is gitignored; `.env.example` (created by W1-00) contains only the placeholders below; `server/src/config.ts` parses every variable at start, applies the fail-closed rules and exposes a typed object; an invalid combination exits with the error code and a locale-keyed message before any port is bound (identity misconfiguration exits 78, W0-03 section 5). Networked or production identity, mail and store credentials come from the custody mechanism approved under D10 (`RAI_SECRET_SOURCE`, W0-03 section 8), never from `.env`; the adapter refuses to start in `network` or `production` mode without them (W0-03). For `local-google`, the OAuth client is held in the developer's local `.env` and never committed (W1-08). W0-09: the identity, secret-source and session variables carry W0-03's `RAI_IDENTITY_*`, `RAI_SECRET_*` and `RAI_SESSION_*` names (W0-03 owns them, section 9.1 there); every other variable keeps this plan's unprefixed name (W0-03 section 9.1: "W0-02 owns their final names"). The earlier `IDENTITY_MODE`, `OIDC_*`, `SESSION_SECRET` and `SESSION_TTL_MINUTES` rows are withdrawn.
 
 | Variable | Placeholder in `.env.example` | Used by | Rule |
 |---|---|---|---|
@@ -312,29 +318,43 @@ Rules: no secret in Git, ever; `.env` is gitignored; `.env.example` (created by 
 | `HOST` | `127.0.0.1` | server | Bind address. Non-loopback is refused unless `IDENTITY_MODE` is `network` or `production` (W0-03, BUILD_PLAN W7). |
 | `PORT` | `8787` | server | API and SPA port. Not 5173 (the demo). |
 | `PUBLIC_BASE_URL` | `http://127.0.0.1:8787` | server | Origin for deep links in mail and for the OIDC redirect; must match `HOST`/`PORT` in local modes. |
-| `DATABASE_URL` | `postgres://rai:rai-local@127.0.0.1:54320/rai` | server, drizzle-kit, tests | The synthetic local credentials that `docker-compose.yml` sets; the port follows `POSTGRES_PORT`. Production credentials come from custody (D10). |
+| `TRUST_PROXY` | `false` | server | Fastify `trustProxy`; `true` is refused in `local-google` (W0-03 row S5) and is set only by the W8 host configuration under D10. |
+| `DATABASE_URL` | `postgres://rai_app:rai_app@127.0.0.1:54320/rai` | server, tests | The `rai_app` connection (W0-04 database roles: SELECT/INSERT, UPDATE on the mutable tables only, no DELETE, no DDL); synthetic local credentials created by `docker/postgres/init/`; the port follows `POSTGRES_PORT`. Production credentials come from custody (D10). |
+| `DATABASE_MIGRATE_URL` | `postgres://rai_owner:rai_owner@127.0.0.1:54320/rai` | `npm run migrate`, drizzle-kit | The `rai_owner` connection that owns the schema (W0-04); the only connection that runs DDL. |
+| `DATABASE_OPERATOR_URL` | empty | `db:cleanup`, `store:verify`, `store:cleanup`, `reset` | The `rai_operator` connection (W0-04); when empty the commands use `DATABASE_MIGRATE_URL` locally. |
 | `POSTGRES_PORT` | `54320` | docker compose | Host port Postgres is published on (loopback only). Per-ticket: `54320 + <nn>`. |
-| `BLOB_DIR` | `./.local/blobs` | server | Private artifact directory; created on start with mode `0700`; content-hash keyed (`<sha256[0:2]>/<sha256>`). |
-| `UPLOAD_MAX_FILE_BYTES` | `<value from W0-08>` | server | Per-file limit enforced by `@fastify/multipart` before hashing (W0-08 sets the number; D08 revisits before real data). |
-| `UPLOAD_MAX_PACK_BYTES` | `<value from W0-08>` | server | Per-pack total across a draft's attached artifacts (W0-08). |
-| `IDENTITY_MODE` | `local-google` | server | `local-google` (loopback only; the L11 development login) \| `fixture` (only when `NODE_ENV=test`; W0-03) \| `network` \| `production`. Unknown value, or `fixture` outside `NODE_ENV=test`: refuse to start. |
-| `OIDC_ISSUER` | `https://accounts.google.com` | server | Required for `local-google`; production issuer (Entra) is set at W8 under D10. |
-| `OIDC_CLIENT_ID` | `replace-me-local-only` | server | Required for `local-google`; empty → refuse to start in that mode. |
-| `OIDC_CLIENT_SECRET` | `replace-me-local-only` | server | Same; never committed; `network`/`production` read it from custody, not from here. |
-| `OIDC_REDIRECT_URI` | `http://127.0.0.1:8787/auth/callback` | server | Must be loopback in `local-google`. |
-| `SESSION_SECRET` | `replace-me-run-openssl-rand-hex-32` | server | Cookie signing key, ≥ 32 bytes; generated at install (section 3.1); the placeholder is accepted only under `NODE_ENV=test` and refused in every other mode. |
-| `SESSION_TTL_MINUTES` | `480` | server | Idle session lifetime. |
+| `BLOB_DIR` | `./.local/blobs` | server | Private artifact directory; created on start with mode `0700`, files `0600`; content-hash keyed `sha256/<h[0:2]>/<h[2:4]>/<h>` with temp files under `tmp/` (W0-04 "Layout and write path"). |
+| `UPLOAD_MAX_FILE_BYTES` | `26214400` | server | Per-file limit (25 MiB, W0-08 section 3) enforced by `@fastify/multipart` before hashing; a configured value larger than the default is refused at start in `local-google` and test modes (W0-08); D08 revisits before real data. |
+| `UPLOAD_MAX_PACK_BYTES` | `157286400` | server | Per-pack total (150 MiB, W0-08 section 3) across a draft's attached artifacts plus the file being uploaded. |
+| `UPLOAD_MAX_IMAGE_PIXELS` | `40000000` | server | Width × height cap for PNG and JPEG (W0-08 section 3). |
+| `IDEMPOTENCY_TTL_HOURS` | `72` | `db:cleanup` | Idempotency-key expiry (W0-04). |
+| `BLOB_ORPHAN_MIN_AGE_HOURS` | `24` | `store:cleanup` | Orphan-blob age threshold (W0-04); removal itself waits for D08. |
+| `BLOB_TMP_MAX_AGE_HOURS` | `1` | `store:cleanup` | Stale temp-file threshold (W0-04). |
+| `RAI_IDENTITY_MODE` | `local-google` | server | `local-google` (loopback only; the L11 development login) \| `fixture` (only when `NODE_ENV=test` and the bind is loopback; W0-03 S13, S14) \| `network` \| `production`. Missing or unknown value: refuse to start (`mode_unknown`). Name and values: W0-03 section 9.1. |
+| `RAI_IDENTITY_GOOGLE_CLIENT_ID` | `set-locally` | server | Required in `local-google` (S4); forbidden in `production` and `network`/`ad` (S10). The issuer is fixed at `https://accounts.google.com` in that mode (W0-03 section 4.1) and is not a variable. |
+| `RAI_IDENTITY_GOOGLE_CLIENT_SECRET` | `set-in-custody` | server | Same; held in the developer's local `.env`, never committed. `set-in-custody`, empty or whitespace counts as absent (S15). |
+| `RAI_IDENTITY_LOCAL_ROLE_MAP` | empty | server | `local-google` only: optional path to an untracked allow-list-format JSON; absent means every account is `owner` (W0-03 section 4.1). |
+| `RAI_IDENTITY_NETWORK_SOURCE` | `allow-list` | server | `network` only: `allow-list` or `ad` (S6). |
+| `RAI_IDENTITY_OIDC_ISSUER_URL` | `https://issuer.example.test` | server | `network`/`allow-list` only (S7). |
+| `RAI_IDENTITY_OIDC_CLIENT_ID`, `RAI_IDENTITY_OIDC_CLIENT_SECRET` | `set-in-custody` | server | `network` and `production` (S7, S9); read through `RAI_SECRET_SOURCE`, never from `.env` on a networked host. |
+| `RAI_IDENTITY_ALLOW_LIST_JSON` | `set-in-custody` | server | `network`/`allow-list` only (S7, S8); a secret because it holds staff addresses. |
+| `RAI_IDENTITY_ENTRA_TENANT_ID` | `00000000-0000-0000-0000-000000000000` | server | `network`/`ad` and `production` (S9, S11). |
+| `RAI_SECRET_SOURCE` | `env` | server | `env` \| `file` (W0-03 section 8). |
+| `RAI_SECRET_DIR` | `/run/secrets` | server | `file` source only. |
+| `RAI_SESSION_ABSOLUTE_HOURS` | `12` | server | Absolute session lifetime, 1-24 (W0-03 section 6.3). |
+| `RAI_SESSION_IDLE_MINUTES` | `120` | server | Idle session lifetime, 5-720 (W0-03 section 6.3). |
 | `MAIL_MODE` | `sink-file` | server | `sink-file` \| `sink-memory` in slice 1. No transport value exists until W7 authorizes one (W0-07). |
 | `MAIL_SINK_DIR` | `./.local/mail` | server | Where `sink-file` writes one JSON file per delivery attempt. |
 | `QC_MODE` | `substitute` | server | The only slice-1 value (W1-10). W4 adds a real implementation under ADR-0006. |
 | `LOG_LEVEL` | `info` | server | pino level. |
-| `LOG_PRETTY` | `true` | server | `pino-pretty` transport in development only; refused when `NODE_ENV=production`. |
+| `LOG_PRETTY` | `true` | server | `pino-pretty` transport in development only; refused when `NODE_ENV=production` and never set by the test commands (W0-10 section 3.1). |
+| `BUILD_COMMIT` | `dev` | server | Reported as `build.commit` by `GET /readyz` (W0-10 section 5.3); set by the build in CI and on the host. |
 | `VITE_API_SUBSTITUTE` | `false` | web (build time) | `true` bundles the W1-13 in-memory substitute into a dev build; `npm run build` forces `false` and `check-substitute-absent` verifies it. |
-| `PLAYWRIGHT_BASE_URL` | `http://127.0.0.1:8788` | tests | The browser suite starts its own API instance on this port with `NODE_ENV=test`, `IDENTITY_MODE=fixture`, its own `BLOB_DIR` and `MAIL_SINK_DIR` under `.local/test/`. |
+| `PLAYWRIGHT_BASE_URL` | `http://127.0.0.1:8788` | tests | The browser suite starts its own API instance on this port with `NODE_ENV=test`, `RAI_IDENTITY_MODE=fixture`, its own `BLOB_DIR` and `MAIL_SINK_DIR` under `.local/test/`. |
 
 Not configuration: the timezone (`Asia/Bangkok`, D06) and the lane mapping (D02) are constants in `shared/src/constants.ts`; SLA working-day values (DPO 3, others 5, D01) and `operator_recipients` are configuration *revisions* in the database seeded by W1-00, not environment variables (L12, D06). No TPM, VRO or AI Reporting Tool endpoint or credential exists in any configuration (L3, L6).
 
-Docker Compose (`docker-compose.yml`, repository root, created by W1-00):
+Docker Compose (`docker-compose.yml`, repository root, created by W1-00). W0-09: the init script mount and the three application roles come from W0-04 "Database roles" (`rai_owner` owns the schema, `rai_app` is the process, `rai_operator` runs the cleanup and verify commands); the superuser below is used only by the init script.
 
 ```yaml
 services:
@@ -343,16 +363,17 @@ services:
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-54320}:5432"
     environment:
-      POSTGRES_USER: rai
-      POSTGRES_PASSWORD: rai-local   # synthetic, loopback-only development credential; production uses custody (D10)
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres-local   # synthetic, loopback-only development credential; production uses custody (D10)
       POSTGRES_DB: rai
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U rai -d rai"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d rai"]
       interval: 2s
       timeout: 2s
       retries: 30
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro   # creates rai_owner, rai_app, rai_operator with the W0-04 grants (synthetic passwords rai_owner / rai_app / rai_operator)
 volumes:
   pgdata: {}
 ```
@@ -377,7 +398,7 @@ volumes:
 | 10 | Dependency advisories | `npm audit --omit=dev --audit-level=high` | Yes |
 | 11 | Whitespace | `git diff --check origin/main...HEAD` | Yes |
 
-Rules: no `continue-on-error`, no `test.skip` or `test.todo` merged to `main` (ESLint rule `no-restricted-syntax` over `describe.skip`, `test.skip`, `test.todo` in `tests/`); a red check is fixed in the same PR, never bypassed. A PR that changes `.github/`, `scripts/`, `docker-compose.yml` or section 4 is HRR and reviewed by the lead. CI never has Google, mail or external credentials; every check runs with `NODE_ENV=test`, `IDENTITY_MODE=fixture`, `MAIL_MODE=sink-memory`, `QC_MODE=substitute`.
+Rules: no `continue-on-error`, no `test.skip` or `test.todo` merged to `main` (ESLint rule `no-restricted-syntax` over `describe.skip`, `test.skip`, `test.todo` in `tests/`); a red check is fixed in the same PR, never bypassed. A PR that changes `.github/`, `scripts/`, `docker-compose.yml` or section 4 is HRR and reviewed by the lead. CI never has Google, mail or external credentials; every check runs with `NODE_ENV=test`, `RAI_IDENTITY_MODE=fixture`, `MAIL_MODE=sink-memory`, `QC_MODE=substitute`.
 
 Frozen-source hash: `scripts/check-frozen-source.mjs` reads the SHA-256 for `docs/product/source-spec.md` from `docs/sources.md` and compares it with the file, so the expected value is never a second literal; `tests/source.test.mjs` keeps its own literal check as today.
 
@@ -390,9 +411,9 @@ The contract Lane A serves (W1-01 to W1-05), Lane C substitutes (W1-13) and Lane
 Conventions:
 
 - JSON over HTTPS-in-production, HTTP on loopback. All paths are under `/api`; OIDC paths are under `/auth`. Field names are `camelCase` in JSON; the database columns keep the data contract's `snake_case` names.
-- Every response carries `X-Correlation-Id` (W0-10). A client may send one; otherwise the server generates it. The same value is written to the audit event, the notification record and the QC run of that request.
-- Every mutating request that the workflow treats as idempotent (submit in W1; decide, send back, resubmit, disposition, Ready in W2) carries an `Idempotency-Key` header (UUID generated by the client per user action). A replay with the same key and same actor returns the original success response and changes nothing (A07). A replay with a different body under the same key is `invalid_input`.
-- Optimistic concurrency uses `expected*Revision` fields in the body; a mismatch is `stale_version` and changes nothing (W0-06).
+- Every response carries `X-Correlation-Id` (W0-10). W0-09: the value is always server-minted; a client-supplied header is never read (W0-10 section 2.2). The same value is written to the audit event, the notification record and the QC run of that request.
+- Every mutating request that the workflow treats as idempotent (create and submit in W1; decide, send back, resubmit and disposition in W2; Ready is system-triggered and has no key) carries an `Idempotency-Key` header (UUID generated by the client per user action; W0-06 section 5.3). A replay with the same key and same actor returns the original success response and changes nothing (A07). A replay with a different body under the same key is `invalid_input` (`error.invalid_input.idempotency_key_reused`). Records expire after `IDEMPOTENCY_TTL_HOURS` (W0-04).
+- Optimistic concurrency uses the W0-06 section 5.1 `ExpectedVersion { versionId, revision }` for draft and version actions (`expectedVersion` in the body; `versionId` is the draft's or version's id, `revision` the W0-04 `case.row_version` counter that every draft-time write on the case increments) and `expectedCaseRevision` for case-field edits (the same counter); a mismatch is `409 stale_version` with the W0-06 8.2 `reason`, `guidanceKey`, `current` and `refreshPath`, and changes nothing.
 - Timestamps are RFC 3339 UTC strings (`2026-09-21T03:00:00Z`); the client renders them in `Asia/Bangkok` (section 10).
 - Every user-facing message from the API is a `LocaleKey` (`'error.forbidden'`), never rendered text (section 10).
 
@@ -410,45 +431,54 @@ export type ConfigurationRevisionId = string;
 export type CorrelationId = string;
 export type LocaleKey = string;     // a key present in shared/src/locales/th.json and en.json
 
-// rai-web/shared/src/errors.ts
+// rai-web/shared/src/errors.ts — W0-09: the envelope is W0-06 section 8.2, reproduced here; W0-06 is authoritative
 export type ErrorCode =
   | 'unauthenticated'       // 401
   | 'forbidden'             // 403
   | 'stale_version'         // 409
   | 'invalid_input'         // 422
   | 'unsafe_upload'         // 422
-  | 'qc_unavailable'        // 503
+  | 'qc_unavailable'        // 503 (only from a synchronous QC endpoint; none in slice 1)
   | 'mail_delivery_failed'  // 502 (on the notification record, never on the actor's business action)
-  | 'not_found';            // 404, in-scope reference that does not exist (ADR-0003; W0-06 confirms)
+  | 'not_found';            // 404, in-scope reference that does not exist (ADR-0003; confirmed by W0-06 8.1)
+// Outside the contract types: HTTP 500 with code 'internal_error' (W0-06 8.1), body = messageKey 'error.internal_error' + correlationId only.
 
-export const HTTP_STATUS: Record<ErrorCode, 401 | 403 | 404 | 409 | 422 | 502 | 503>;
+export const HTTP_STATUS_BY_CODE: Readonly<Record<ErrorCode, number>>;   // W0-06 8.2 values
 
 export interface FieldError {
-  path: string;             // JSON pointer-ish: 'sourceRecordId.value', 'slots.3.reason'
-  messageKey: LocaleKey;    // 'validation.required', 'validation.not_in_configured_list', ...
+  path: string;             // request JSON path: 'sourceRecordId.value', 'slots[3].reason', 'header.idempotency-key'
+  messageKey: LocaleKey;    // 'validation.required', 'validation.not_in_configured_list', 'error.invalid_input.projected_field', ...
   params?: Record<string, string | number>;
 }
 
-export type ErrorDetails =
-  | { code: 'invalid_input'; fields: FieldError[] }
-  | { code: 'stale_version'; current: { revision: number; versionId?: VersionId; draftId?: DraftId } }
-  | { code: 'unsafe_upload'; reasonKey:
-        | 'upload.type_not_allowed'      // sniffed type not in the W0-08 list
-        | 'upload.sniff_mismatch'        // declared type or extension disagrees with sniffed bytes
-        | 'upload.too_large'             // > UPLOAD_MAX_FILE_BYTES
-        | 'upload.pack_total_exceeded'   // > UPLOAD_MAX_PACK_BYTES
-        | 'upload.empty' }
-  | { code: 'qc_unavailable' | 'mail_delivery_failed' | 'unauthenticated' | 'forbidden' | 'not_found' };
+export type StaleReason = 'version_superseded' | 'revision_changed' | 'version_closed' | 'lane_already_decided' | 'qc_run_superseded';   // W0-06 8.2
 
-export interface ApiError {
-  code: ErrorCode;
-  messageKey: LocaleKey;    // 'error.<code>' by default
-  correlationId: CorrelationId;
-  details?: ErrorDetails;
+export interface ErrorDetails {
+  invalid_input: { fields: FieldError[] };
+  stale_version: {
+    reason: StaleReason;
+    guidanceKey: `error.stale_version.guidance.${StaleReason | 'ready'}`;
+    current: { versionId: string; versionNumber: number; revision: number; state: 'draft' | 'submitted'; ready: boolean };
+    refreshPath: string;    // relative SPA path of the current version
+  };
+  unsafe_upload: { reasonKey: `error.unsafe_upload.${UnsafeUploadReason}`; params?: Record<string, string | number> };   // reason vocabulary: W0-08 section 5 (13 reasons); params carry the limit for too_large, pack_total_exceeded, image_too_large
+  qc_unavailable: { qcRunId?: string };
+  mail_delivery_failed: { notificationId: string; attempts: number; nextRetryAt?: string };
+  not_found: { resource: 'case' | 'version' | 'finding' | 'artifact' | 'notification' };
+  unauthenticated: never; forbidden: never;      // nothing about the resource leaks
+}
+
+export interface ErrorResponse<C extends ErrorCode = ErrorCode> {
+  error: {
+    code: C;
+    messageKey: `error.${C}`;   // Thai default (D12)
+    correlationId: CorrelationId;
+    details?: ErrorDetails[C];
+  };
 }
 ```
 
-Scope rule for every read below: an in-scope reference that does not exist → `404 not_found`; an out-of-scope reference → `403 forbidden` in W1, with the body never revealing whether the case exists. Whether out-of-scope becomes `404` is decided in W0-05 with the threat model; until recorded, W1 implements `403` (ADR-0003 open item). Every request without a valid session → `401 unauthenticated`, checked before anything else, including on `GET /api/artifacts/{id}` (the "direct file URL" negative of A01).
+Scope rule for every read below, as recorded by [W0-05 section 4](authorization-policy-matrix.md#4-out-of-scope-references-403-with-non-guessable-identifiers) at W0 exit: an out-of-scope reference → `403 forbidden`, with the body never revealing whether the case exists (route identifiers are non-guessable UUIDs); an unresolvable case or artifact id → `404 not_found` only for an actor holding an `all_cases` row for the action (reviewers, Admin), and `403 forbidden` for an owner or BU SPOC, so an out-of-scope caller gets 403 whether or not the case exists; a version, finding or artifact id that does not resolve under an authorized case → `404 not_found` with `details.resource`. Every request without a valid session → `401 unauthenticated`, checked before anything else, including on `GET /api/artifacts/{id}` (the "direct file URL" negative of A01).
 
 ### 7.2 Sign-in (W0-03; served by W1-01a, consumed by W1-07)
 
@@ -458,17 +488,17 @@ export type Role = 'owner' | 'bu_spoc' | 'ai_coe' | 'dpo' | 'it_security' | 'adm
 export type Lane = 'ai_coe' | 'dpo' | 'it_security';
 
 export type RoleScope =
-  | { role: 'owner';       scope: { kind: 'own_cases' } }                        // cases whose businessOwner is this subject
+  | { role: 'owner';       scope: { kind: 'own_cases' } }                        // cases whose owner_subject_id (W0-04) is this subject
   | { role: 'bu_spoc';     scope: { kind: 'business_unit'; businessUnit: string } }
   | { role: 'ai_coe';      scope: { kind: 'all_cases'; lane: 'ai_coe' } }
   | { role: 'dpo';         scope: { kind: 'all_cases'; lane: 'dpo' } }
   | { role: 'it_security'; scope: { kind: 'all_cases'; lane: 'it_security' } }
   | { role: 'admin';       scope: { kind: 'all_cases' } };                        // configuration only; never lane authority
 
-export interface Principal {
-  subjectId: SubjectId;
+export interface Principal {                // W0-09: the shape W0-03 section 2 follows (the W0-02 spelling is authoritative, W0-03 section 14 d)
+  subjectId: SubjectId;                     // '<issuerKey>:<subject>', W0-03 section 2.2; never the email
   displayName: string;
-  email: string;
+  email: string;                            // lower-cased; display and notification addressing only
   roles: RoleScope[];       // one or more; the dual-role fixture identity has two (W0-03)
 }
 
@@ -484,12 +514,13 @@ export interface SessionInfo {
 
 | Endpoint | Request | Success | Errors |
 |---|---|---|---|
-| `GET /api/session` | — | `200 SessionInfo` | `401` no or expired session |
+| `GET /api/session` | — | `200 SessionInfo`; `Cache-Control: no-store` | `401` no, expired, idle-expired or revoked session (W0-03 section 6.4); the body is the plain W0-06 envelope with no details |
 | `POST /api/session/locale` | `{ locale: 'th' \| 'en' }` | `204` | `401`; `422 invalid_input` |
-| `POST /auth/sign-in` | `{ returnTo?: string }` (path only, same-origin) | `200 { redirectUrl: string }` in `local-google`, `network`, `production`; the route does not exist in `fixture` mode | `422 invalid_input` when `returnTo` is not a same-origin path. There is no "identity unavailable" error: a misconfigured adapter refuses to start (W0-03), so the API is never up with a broken sign-in |
-| `GET /auth/callback?code&state` | OIDC redirect | `303` to `returnTo` or `/`, sets the session cookie | `401 unauthenticated` on state mismatch or a provider error; in `production` a Google issuer is refused at start, not here |
-| `POST /auth/fixture/sign-in` | `{ fixtureUserId: string }` | `200 SessionInfo`, sets cookie | `404 not_found` unknown fixture user; the route does not exist unless `IDENTITY_MODE=fixture` (W1-13 substitute mirrors it) |
-| `POST /auth/sign-out` | — | `204`, session row deleted, cookie cleared | `401` |
+| `POST /auth/sign-in` | `{ returnTo?: string }` (path only, same-origin) | `200 { redirectUrl: string }` in `local-google`, `network`, `production`; stores the W0-03 `SignInTransaction` in the short-lived transaction cookie; the route does not exist in `fixture` mode | `422 invalid_input` when `returnTo` is not a same-origin path. There is no "identity unavailable" error: a misconfigured adapter refuses to start (W0-03), so the API is never up with a broken sign-in |
+| `GET /auth/callback?code&state` | OIDC redirect | `303` to `returnTo` or `/`, sets the session cookie, clears the transaction cookie | `401 unauthenticated` (`auth.sign_in_failed`) on state, nonce or transaction-cookie mismatch, a failed code exchange or an unverified email; `403 forbidden` (`auth.not_permitted`) for a verified login with no (role, scope) pair (W0-03 section 6.4); in `production` a Google issuer is refused at start, not here |
+| `GET /auth/fixture/users` | — | `200 { users: Array<{ fixtureUserId: string; displayName: string; roles: RoleScope[] }> }`: the fixture identities of W0-03 section 7 for the test sign-in picker (W1-07 shows the picker when this route answers 200 and the Google button when it answers 404) | `404 not_found` in every mode but `fixture`. W0-09: carried into this table from W0-03 section 6.1 |
+| `POST /auth/fixture/sign-in` | `{ fixtureUserId: string }` | `200 SessionInfo`, sets cookie | `404 not_found` unknown fixture user; the route does not exist (404) unless `RAI_IDENTITY_MODE=fixture` (W1-13 substitute mirrors it) |
+| `POST /auth/sign-out` | — | `204`, session row revoked, cookie cleared | `401`; `403 forbidden` when `Sec-Fetch-Site` is neither `same-origin` nor `none` (W0-03 section 6.1 CSRF rule) |
 
 Deep links: a request to any `/cases/...` SPA path without a session renders the sign-in screen with `returnTo` set; after sign-in the case loads only if in scope (A05 "link alone grants nothing").
 
@@ -505,18 +536,18 @@ export type ModelType = 'llm' | 'classic_ml' | 'other';                   // des
 export type RiskTier = string;   // opaque placeholder: the tier labels are recorded by D07 before W5; no literal set is fixed here
 export type LaneProjectionStatus = 'pending' | 'approved' | 'sent_back';   // vocabulary confirmed by W0-04
 export type ReadinessProjectionStatus = 'not_ready' | 'ready';
-export type CaseStatus =
-  | 'draft'                 // W1: created, never submitted
-  | 'submitted'             // W1: current version frozen; W2-01 replaces this with 'in_review' once lanes open
-  | 'in_review'             // W2
+export type CaseStatus =                  // W0-09: the W0-06 section 2.4 derived vocabulary, verbatim; no other value exists
+  | 'draft'                 // current version is a draft with no parent (never submitted)
+  | 'in_review'             // current version is submitted and at least one lane is pending (from the first submit in W1; W2-01 opens the lanes)
   | 'sent_back'             // W2: a successor draft exists
-  | 'awaiting_disposition'  // W2
+  | 'awaiting_disposition'  // W2: all three lanes approved, at least one undispositioned finding
   | 'ready_for_launch';     // W2 (desk completion only; not Council or ITSM)
 
 export interface CaseWritableFields {
   useCaseName: string;                   // 1..200 chars
-  businessUnit: string;                  // 1..100 chars
-  businessOwner: SubjectId;              // defaults to the actor for role owner; a BU SPOC may name an owner in its BU
+  businessUnitId: string;                // W0-09: the scope key stored in W0-04 case.business_unit_id; must be a configured BU key (fixture BUs 'CM', 'HR'; W0-03 section 7) or 422 invalid_input; the value W0-05 compares (W0-05 section 8 reconciliation)
+  businessUnit: string;                  // 1..100 chars; the inherited descriptive text (W0-04 case.business_unit); never used for access
+  businessOwner: SubjectId;              // stored as W0-04 case.owner_subject_id; defaults to the actor for role owner; a BU SPOC may name an owner in its BU. The server fills the W0-04 descriptive business_owner text from that subject's display name (W0-05 section 8 reconciliation)
   technicalOwner: string;                // free text 1..200 (a name, synthetic in fixtures)
   sourceRecordId: SourceRecordId;
   useCaseGroup: string;                  // must be in ConfigurationView.useCaseGroups (D11)
@@ -535,14 +566,14 @@ export interface CaseView extends CaseWritableFields {
   aiReadinessStatus: ReadinessProjectionStatus; // Ready transition
   currentVersion: VersionSummary | null; // latest submitted version, null while never submitted
   draft: DraftSummary | null;            // the editable draft, null while the current version is under review
-  caseRevision: number;                  // increments on every case-level write; used for expectedCaseRevision
+  caseRevision: number;                  // W0-04 case.row_version: increments on every case-level or draft write on this case; used for expectedCaseRevision and as ExpectedVersion.revision
   createdBy: SubjectId;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface CaseSummary {           // list row
-  caseId: CaseId; registryId: RegistryId; useCaseName: string; businessUnit: string;
+  caseId: CaseId; registryId: RegistryId; useCaseName: string; businessUnitId: string; businessUnit: string;
   businessOwner: SubjectId; useCaseGroup: string; status: CaseStatus;
   currentVersionNumber: number | null; updatedAt: string;
 }
@@ -567,9 +598,9 @@ export interface ConfigurationView {     // the published revision that applies 
 
 | Endpoint | Request | Success | Errors |
 |---|---|---|---|
-| `POST /api/cases` | `CaseCreateRequest` | `201 CaseView` with `status: 'draft'`, a `draft` (W1-04 creates the nine slots with defaults), `caseRevision: 1`; writes audit `case.created` | `401`; `403` role is not owner or bu_spoc, or bu_spoc names a BU outside its scope, or owner names a `businessOwner` other than itself; `422 invalid_input` (`useCaseGroup` not in list, empty name, `sourceRecordId.value` without `TPM-`/`VRO-` prefix) |
+| `POST /api/cases` | header `Idempotency-Key` (W0-06 5.3); `CaseCreateRequest` | `201 CaseView` with `status: 'draft'`, a `draft` (W1-04 creates the nine slots with defaults), `caseRevision: 1`; writes audit `case.created` | `401`; `403` role is not owner or bu_spoc, or bu_spoc names a `businessUnitId` outside its grants, or owner names a `businessOwner` other than itself (W0-05 create target); `422 invalid_input` (`useCaseGroup` not in list, empty name, `sourceRecordId.value` without `TPM-`/`VRO-` prefix, unknown `businessUnitId`, unresolvable `businessOwner`, missing `Idempotency-Key`, a projected status field in the body → `error.invalid_input.projected_field`) |
 | `GET /api/cases/{caseId}` | — | `200 CaseView` | `401`; `403` out of scope (other BU, other owner); `404` |
-| `PATCH /api/cases/{caseId}` | `CaseUpdateRequest` | `200 CaseView`, `caseRevision + 1`; writes audit `case.updated` | `401`; `403` (reviewer roles and admin never write cases; other BU); `404`; `409 stale_version`; `422 invalid_input` including any attempt to write `privacyStatus`, `securityStatus`, `raiStatus`, `aiReadinessStatus`, `riskTier`, `registryId` or `status` |
+| `PATCH /api/cases/{caseId}` | `CaseUpdateRequest` | `200 CaseView`, `caseRevision + 1`; writes audit `draft.saved` with the changed-field list (W0-06 4.2; a change of `businessOwner` or `businessUnitId` records the old and new scope values, W0-05 edit target) | `401`; `403` (reviewer roles and admin never write cases; other BU; a scope-field change that would move the case out of the actor's scope, W0-05); `404`; `409 stale_version` (`revision_changed`, or `version_superseded` when the case has no open draft); `422 invalid_input` including any attempt to write `privacyStatus`, `securityStatus`, `raiStatus`, `aiReadinessStatus`, `riskTier`, `registryId` or `status` (`error.invalid_input.projected_field`) |
 | `GET /api/cases?page&pageSize` | `CaseListQuery` | `200 CaseListResponse`, scoped: owner → own cases; bu_spoc → its BU; reviewers and admin → all. `total` counts only in-scope cases | `401`; `422 invalid_input` on a bad page |
 | `GET /api/configuration/current` | — | `200 ConfigurationView` | `401` |
 
@@ -598,11 +629,11 @@ export interface ArtifactRef {
 
 | Endpoint | Request | Success | Errors |
 |---|---|---|---|
-| `POST /api/cases/{caseId}/artifacts` | `multipart/form-data`, one part named `file`; the case must have a draft | `201 ArtifactRef`; bytes hashed while streaming, sniffed, then written to `BLOB_DIR` under the hash (a second upload of identical bytes reuses the blob and creates a new metadata row); writes audit `artifact.uploaded` | `401`; `403` role not owner/bu_spoc for this case; `404` case; `422 unsafe_upload` with `reasonKey` (bytes discarded, nothing written); `422 invalid_input` when no `file` part or the case has no draft (`validation.no_open_draft`) |
+| `POST /api/cases/{caseId}/artifacts` | `multipart/form-data`, one part named `file`, no other field is read (W0-08 section 3); the case must have a draft; no idempotency key (idempotent by content hash, W0-06 5.3) | `201 ArtifactRef`; bytes hashed while streaming, sniffed, then written to `BLOB_DIR` under the hash (a second upload of identical bytes reuses the blob and creates a new metadata row); writes audit `artifact.uploaded`. Attaching the artifact to a slot is the separate `PUT /api/cases/{caseId}/draft` (7.5), which fires the on-upload QC trigger after it commits (W0-07 3.2) | `401`; `403` role not owner/bu_spoc for this case; `404` case; `422 unsafe_upload` with `details.reasonKey` from the W0-08 section 5 vocabulary (bytes discarded, nothing written); `422 invalid_input` when no `file` part or the case has no draft (`validation.no_open_draft`) |
 | `GET /api/artifacts/{artifactId}` | — | `200` bytes, `Content-Type: <mediaType>`, `Content-Disposition: attachment; filename*=UTF-8''<RFC 8187 percent-encoded original>`, `X-Content-Type-Options: nosniff`, `Cache-Control: no-store`; writes audit `artifact.downloaded` | `401` (no session, including with a copied URL); `403` case out of scope; `404` |
 | `GET /api/artifacts/{artifactId}/meta` | — | `200 ArtifactRef` | as above |
 
-Safety pipeline (W1-03a, W0-08): size limit at the multipart layer → sniff the first bytes with `file-type` → compare with the allowed list and the declared extension → reject archives, executables, HTML and anything unrecognised → hash → per-pack total check → write. The reason key is the only detail returned; the rejected bytes are never stored or logged.
+Safety pipeline (W1-03a, W0-08 section 4, checks 1-13): filename rule → stream with the per-file limit while hashing → non-empty → magic sniff on the first 8 KiB with the hand-written W0-08 section 2 sniffer (no library detector) → sniffed kind must match the declared extension's row → structural check on the full bytes (PDF active-content scan, ZIP central-directory rules, PNG/JPEG rules) → per-pack total (the draft's attached artifacts plus this file; re-checked at attach) → blob write → artifact row and audit event in one transaction. The reason key is the only detail returned; the rejected bytes are never stored or logged.
 
 ### 7.5 Pack draft (W1-04; consumed by W1-06)
 
@@ -622,21 +653,21 @@ export type SlotState =
   | { state: 'not_applicable'; reason: NotApplicableReason };
 
 export interface PackDraft {
-  draftId: DraftId;
+  draftId: DraftId;                    // the draft pack_version row's id (W0-04); ExpectedVersion.versionId for draft actions
   caseId: CaseId;
   versionNumber: number;               // 1 for a new case; N+1 for a send-back successor (W2-03)
   parentVersionId: VersionId | null;
   checklistTemplateVersion: string;    // must be in ConfigurationView.checklistTemplateVersions
   stageContext: StageContext;
   slots: Record<SlotNumber, SlotState>;
-  draftRevision: number;
+  draftRevision: number;               // = CaseView.caseRevision (W0-04 case.row_version, one counter per case); ExpectedVersion.revision
   updatedAt: string;
 }
 
 export interface DraftSummary { draftId: DraftId; versionNumber: number; updatedAt: string }
 
 export interface PackDraftUpdateRequest {
-  expectedDraftRevision: number;
+  expectedVersion: ExpectedVersion;    // { versionId: draftId, revision: draftRevision } (W0-06 5.1; type in 7.6)
   checklistTemplateVersion?: string;
   stageContext?: StageContext;
   slots?: Partial<Record<SlotNumber, SlotState>>;   // only the slots being changed
@@ -648,7 +679,7 @@ Defaults when a draft is created (W1-02 create, W2-03 send-back): every slot `mi
 | Endpoint | Request | Success | Errors |
 |---|---|---|---|
 | `GET /api/cases/{caseId}/draft` | — | `200 PackDraft` | `401`; `403`; `404` case or no open draft |
-| `PUT /api/cases/{caseId}/draft` | `PackDraftUpdateRequest` | `200 PackDraft`, `draftRevision + 1`; writes audit `draft.saved` | `401`; `403` role not owner/bu_spoc of this case; `404`; `409 stale_version`; `422 invalid_input`: `not_applicable` with an empty `text` reason (`validation.reason_required`), `attached` with an `artifactId` that belongs to another case or is unknown (`validation.artifact_not_in_case`), template version not configured, unknown slot number |
+| `PUT /api/cases/{caseId}/draft` | `PackDraftUpdateRequest` | `200 PackDraft`, `draftRevision + 1`; writes audit `draft.saved`; a slot newly `attached` fires the W0-07 `upload` QC trigger after commit | `401`; `403` role not owner/bu_spoc of this case; `404` case; `409 stale_version` `revision_changed` (someone else saved) or `version_superseded` (`expectedVersion.versionId` is not the open draft: the draft was submitted meanwhile, or no draft is open; W0-06 4.2); `422 invalid_input`: `not_applicable` with an empty `text` reason (`validation.reason_required`), `attached` with an `artifactId` that belongs to another case or is unknown (`error.artifact_case_mismatch`, W0-04), template version not configured, unknown slot number; `422 unsafe_upload` `pack_total_exceeded` when attaching would take the version over `UPLOAD_MAX_PACK_BYTES` (W0-08 check 10) |
 
 ### 7.6 Submit and version navigation (W1-05; consumed by W1-06, W2-07)
 
@@ -680,13 +711,14 @@ export interface VersionSummary {
   versionId: VersionId; versionNumber: number; submittedBy: SubjectId; submittedAt: string; isLatest: boolean;
 }
 
-export interface SubmitRequest { expectedDraftRevision: number }
+export interface ExpectedVersion { versionId: string; revision: number }   // W0-06 section 5.1, verbatim; versionId = draftId for draft actions
+export interface SubmitRequest { expectedVersion: ExpectedVersion }
 export interface VersionListResponse { items: VersionSummary[] }    // ascending by versionNumber
 ```
 
 | Endpoint | Request | Success | Errors |
 |---|---|---|---|
-| `POST /api/cases/{caseId}/draft/submit` | header `Idempotency-Key`; `SubmitRequest` | `201 SubmittedVersion`. In one transaction: freeze the draft into a version row plus frozen slot rows, copy the artifact references, record `configurationRevisionId` and `laneMappingVersion`, set the case's `currentVersion`, close the draft, store the idempotency key, write audit `version.submitted` with actor, version and correlation id. W2-01 extends the same transaction to open the three lanes. Replay with the same key → the same `201` body | `401`; `403`; `404`; `409 stale_version`; `422 invalid_input` when a slot is invalid at submit time (`validation.reason_required`) or the header is missing; missing documents are *not* an error (soft QC, L7): they become findings in W2 |
+| `POST /api/cases/{caseId}/draft/submit` | header `Idempotency-Key`; `SubmitRequest` | `201 SubmittedVersion`. In one transaction (W0-06 4.3): freeze the draft into a version row plus frozen slot rows, copy the artifact references, record `configurationRevisionId` and `laneMappingVersion`, set the case's `currentVersion`, close the draft, reset the three lane projections to `pending`, store the idempotency key, write audit `version.submitted` with actor, version and correlation id. W2-01 extends the same transaction to open the three lanes (`lane.opened` × 3, outbox rows). Pack QC runs after commit in its own transaction (W0-06 4.3, W0-07 3.4); the response does not wait for it. Replay with the same key → the same `201` body | `401`; `403`; `404`; `409 stale_version` (`revision_changed`, `version_superseded`); `422 invalid_input` when a slot is invalid at submit time (`validation.reason_required`) or the header is missing (`header.idempotency-key`); missing documents are *not* an error (soft QC, L7): they become findings in W2 |
 | `GET /api/cases/{caseId}/versions` | — | `200 VersionListResponse` | `401`; `403`; `404` |
 | `GET /api/cases/{caseId}/versions/{versionId}` | — | `200 SubmittedVersion`, byte-identical on every read for the life of the row | `401`; `403`; `404` (also when the version belongs to another case) |
 | `GET /api/cases/{caseId}/versions/latest` | — | `200 SubmittedVersion` | `401`; `403`; `404` when never submitted |
@@ -741,8 +773,8 @@ Negative tests for A01 are always direct-API integration tests, never only UI as
 ### 8.3 Fixture identity convention
 
 - The fixture set lives in `rai-web/fixtures/src/data/` and is loaded only by `npm run fixtures:load` (empty database) and `tests/support/db.ts` (per file). Contents are synthetic: no text copied from any real case or Life-OS evidence, no real names, addresses or identifiers (W0-08; a reviewer confirms this in W1-09).
-- `manifest.json` names the set: `{ "name": "slice1-synthetic", "version": "1", "sha256": "<hash of the sorted data files>" }`. `fixtures:load` writes the name, version and hash into a `fixture_set` row; every evidence record (`changes/<date>-<slug>/review.md`) cites `fixture set <name>@<version> <sha256[0:12]>` next to the command output. Changing any fixture bumps `version` and the hash in the same PR.
-- Identifiers are stable and self-describing: users `fx-user-<role>[-<qualifier>]` (`fx-user-owner-cm`, `fx-user-spoc-cm`, `fx-user-ai-coe`, `fx-user-dpo`, `fx-user-it-security`, `fx-user-admin`, and the dual-role `fx-user-dpo-spoc-hr`, a DPO reviewer who is also BU SPOC of fixture BU `HR`); cases `fx-case-<kind>` (`fx-case-nonvendor`, `fx-case-vendor`, `fx-case-missing-slot`, `fx-case-na-reasons`, `fx-case-hr-dualrole`); documents `fx-doc-<slot>-<kind>.<ext>`, including one Thai-named file (`fx-doc-05-แผนธุรกิจ.pdf`). Email addresses use the reserved domain `rai-desk.example`; the single operator recipient is `operator@rai-desk.example` (D06 `operator_recipients` seed, W1-00).
+- `manifest.json` names the set: `{ "name": "slice1-synthetic", "version": "1", "sha256": "<hash of the sorted data files>" }`. `fixtures:generate` prints it and `fixtures:load` writes the name, version and hash into a `fixture_set` row; every evidence record (`changes/<date>-<slug>/review.md`) cites `fixture set <name>@<version> <sha256[0:12]>` next to the command output. Changing any fixture bumps `version` and the hash in the same PR. (W0-08 section 8.1 follows this convention since W0-09.)
+- Identifiers are stable and self-describing: users `fx-user-<role>[-<qualifier>]` (`fx-user-owner-cm`, `fx-user-owner-cm-2` (W0-09: the second owner W0-05 section 8 asked for; owns no fixture case), `fx-user-spoc-cm`, `fx-user-ai-coe`, `fx-user-dpo`, `fx-user-it-security`, `fx-user-admin`, and the dual-role `fx-user-dpo-spoc-hr`, a DPO reviewer who is also BU SPOC of fixture BU `HR`; display names, subjects and (role, scope) pairs in [W0-03 section 7](identity-adapter.md#7-test-substitute-the-fixture-identity-provider)); cases `fx-case-<kind>` (`fx-case-nonvendor`, `fx-case-vendor`, `fx-case-missing-slot`, `fx-case-na-reasons`, `fx-case-hr-dualrole`; content in [W0-08 section 8.3](upload-safety-and-fixtures.md#83-cases-owned-by-w1-09)); documents carry the fixture id `fx-doc-<case number>-<slot>` and a realistic `filename` from [W0-08 section 8.4](upload-safety-and-fixtures.md#84-documents-owned-by-w1-09), including one Thai-named file (`fx-doc-0002-09`, `เอกสารประกอบ_ผู้ให้บริการ_2569.pdf`; W0-09 aligned this example to W0-08, which owns the fixture content). Email addresses use the reserved domain `rai-desk.example`; the single operator recipient is `operator-digest@rai-desk.example` (W0-08 section 8.2; D06 `operator_recipients` seed, W1-00).
 - Registry ids in fixtures use the reserved year `RAI-2000-<nnnn>` so they can never collide with a server-generated id.
 - A test names the fixture ids it uses in its `describe` title, so a failure names the data.
 
@@ -804,6 +836,8 @@ Applying the rule to the four candidates the working agreement names, each sub-t
 | **W2-02b** | Lane decision: approve or send back on own lane with expected version and idempotency key; send-back requires feedback naming an artifact; Admin has no lane authority; audit event | `server/src/workflow/` | W2-02a | The parent's remaining clauses |
 | **W3-03a** | Notification composer and templates: lane open, send-back, Ready, from committed events only, through the W1-11 sink, locale-keyed bilingual templates, Thai-safe subject, deep link | `server/src/notifications/` | W2-08, W1-11, W3-05 contract | No mail for a rolled-back transition; each of the three events produces one mail with the specified contents; deep link without session is unauthenticated; Thai subject intact |
 | **W3-03b** | SLA-breach daily digest to `operator_recipients` using the W3-05 breach query | `server/src/notifications/` | W3-03a, W3-05 | A breach mail lists only cases past SLA; one digest per day; recipients come from configuration, never a role |
+| **W3-07a** (W0-09: listed from W0-10 section 7.4 for the lead) | Observability baseline API: correlation IDs, redacted logger, `/healthz`, `/readyz`, `GET /api/operator/desk-health`, the `operator_job_run` migration | `server/src/observability/` | W3-03, W3-04, W0-10 | OBS-01 to OBS-16 of W0-10 section 8.2 |
+| **W3-07b** (same) | Operator page `/operator/desk-health` in the SPA | `web/src/screens/operator/` | W3-07a | OBS-17 of W0-10 section 8.2; UI quality bar |
 
 Not split, with the reason: **W1-00** is declared "in one PR" by the work breakdown because every later ticket extends it; it is the one deliberately large substrate PR and the lead reviews it as HRR. **W1-06** ("as one flow") stays whole; if its PR exceeds the size rule, the lead splits it at W1 into W1-06a (pack editor) and W1-06b (case overview and version navigation) under the same rule as above. **W1-INT, W2-INT, W3-INT** are the declared multi-module exceptions.
 
@@ -813,7 +847,7 @@ Not split, with the reason: **W1-00** is declared "in one PR" by the work breakd
 
 | Consumer ticket | Uses from this document |
 |---|---|
-| W1-00 | Sections 1, 2, 3, 4, 5 (creates the skeleton, `.env.example`, `docker-compose.yml`, `shared/` with the 7.1-7.6 TypeBox schemas transcribed from this document and the empty 7.7 and 7.8 files, the audit and configuration modules; it is the only ticket that creates shared modules) |
+| W1-00 | Sections 1, 2, 3, 4, 5 (creates the skeleton, `.env.example`, `docker-compose.yml` with `docker/postgres/init/`, `shared/` with the 7.1-7.6 TypeBox schemas transcribed from this document and the empty 7.7 and 7.8 files, the audit and configuration modules; it is the only ticket that creates shared modules) |
 | W1-01a/b | 7.2, 5 (`IDENTITY_MODE`, `HOST` rule), 8.2 A01 |
 | W1-02 | 7.3, 8.2 A02 |
 | W1-03a/b | 7.4, 5 (`BLOB_DIR`, upload limits from W0-08), 10.6 filenames |
@@ -827,16 +861,16 @@ Not split, with the reason: **W1-00** is declared "in one PR" by the work breakd
 | W2-02a, W2-05, W3-01, W3-05 | 7.7 / 7.8 (they write it) |
 | W1-INT, W2-INT, W3-INT | 8.1 browser layer, 8.2 rows, 3.6 |
 | W1-08, W2-08, W3-06 | 8.3 fixture identity in the evidence record; 3.5 commands |
-| W0-09 | Verifies section 3 is mirrored in [TESTING](../../TESTING.md) "Product build (W0-W3)"; confirms the section 9 proposal and 11.1 split with Ta |
+| W0-09 | Verified section 3 is mirrored in [TESTING](../../TESTING.md) "Product build (W0-W3)" and reconciled this plan with the sibling specs ([exit review](../../changes/2026-09-21-w0-exit/review.md)); the section 9 proposal and the 11.1 split remain for Ta and the lead to confirm before W1-06 and W1-01 start; [performance targets](performance-targets.md) recorded |
 
 ## 13. Open items carried, not resolved here
 
-- Upload type list, per-file and per-pack limits: **W0-08** (placeholders in section 5 and 7.4).
-- Out-of-scope reference answers 403 (W1) or 404: **W0-05** with the threat model.
-- `not_found` as the eighth error code: **W0-06** confirms (ADR-0003).
+Closed at W0 exit (W0-09), recorded here so the list stays honest: upload types and limits (W0-08 sections 2-3, values now in section 5); 403 versus 404 (W0-05 section 4: 403, non-guessable ids, 404 only for an `all_cases` holder); `not_found` and `internal_error` (W0-06 8.1); projection-status vocabulary (W0-04: `pending` / `approved` / `sent_back`, `not_ready` / `ready`); `fixture` mode outside `NODE_ENV=test` (W0-03 S13: no); performance targets ([performance targets](performance-targets.md)).
+
 - Owning lane for slot 5, slot 9, pack-level and QC-unavailable findings: **W0-06** refinement by the review leads before W2-05; the A09 row in 8.2 tests whatever it records.
-- Projection-status vocabulary (`LaneProjectionStatus`, `ReadinessProjectionStatus` in 7.3): **W0-04** confirms the words; the rule (workflow-only writer) is recorded (W0-04 fields).
-- Performance budgets and the W0 exit review: **W0-09**.
-- Whether the fixture identity provider may also serve a development run (`NODE_ENV=development`) for UI work against the real API without a Google client: **W0-03** decides. This plan keeps the contract's rule (`fixture` accepted only under `NODE_ENV=test`); until W0-03 says otherwise, development uses `local-google` (L11) or the W1-13 substitute for the web app alone.
+- Section 9 UI quality bar and the 11.1 sub-ticket split: proposals for Ta and the lead to confirm before W1-06 and W1-01 start (W0-09 could not confirm them on Ta's behalf; the W0 exit checklist requires only that they are written).
+- Configuration keys proposed by W0-07 section 10 (`QC_TIMEOUT_MS`, `MAIL_RETRY_BACKOFF_MS`, `MAIL_SINK_FAIL_NEXT`, a disabled `QC_MODE` value): not added; the values stay module constants (QC timeout 10 000 ms, backoff 1 s / 5 s / 25 s) recorded in [performance targets](performance-targets.md), and the lead may add keys in a W1-00 amendment.
+- Read-shape additions requested by W0-05 section 8 (`allowedActions: Action[]` and a per-action reason on case, version and finding reads): not added in W1; a W2-02 or W2-05 contract PR adds them if Lane B needs them.
+- W3-07 page split (W0-10 section 7.4: W3-07a API in Lane A, W3-07b page in Lane B): listed in 11.1 for the lead.
 - Risk-tier labels (`RiskTier` in 7.3 is an opaque `string` and `riskTier` is `null` throughout slice 1): **D07** records the questionnaire, rubric version and labels before W5; W5's contract PR replaces the placeholder type.
 - D07-D10 stay open at their gates; nothing in this plan pre-empts them (no rubric, no retention rule, no model, no host).

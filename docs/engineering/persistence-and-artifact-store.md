@@ -1,6 +1,6 @@
 # Persistence and artifact store (W0-04)
 
-**Status:** W0 interface spec, written 2026-09-21 for ticket W0-04 (issue [#9](https://github.com/tkhongsap-io/rai-workflow-platform-poc/issues/9)). Human review required before W1-00 starts. Nothing here is implemented; the tickets that implement it are named in [Consumers](#consumers).
+**Status:** W0 interface spec, written 2026-09-21 for ticket W0-04 (issue [#9](https://github.com/tkhongsap-io/rai-workflow-platform-poc/issues/9)); reconciled with the sibling specs at the W0 exit review ([W0-09](../../changes/2026-09-21-w0-exit/review.md), 2026-09-21; each applied change is marked "W0-09:"). Human review required before W1-00 starts. Nothing here is implemented; the tickets that implement it are named in [Consumers](#consumers).
 **Proves / feeds:** A07 (immutable versions, one successor, idempotent replay), R7 (keep every submission, always know the latest); enables A11 (append-only audit) and the W1 restart evidence.
 **Stack:** concrete for [ADR-0003](../../adr/0003-stack-and-deployment-boundary.md) (D04: Node 24, Fastify, Drizzle ORM, Postgres 16, local filesystem blob store, `node:test`, Playwright). The boundaries in [Layering](#layering) are stack-neutral in intent: a different database or blob backend replaces the adapter, not the rules.
 **Decisions carried as written:** D02 (lane mapping is a versioned constant recorded on each submitted version), D05 (dispositions append, owning lane records waived/N/A, owner proposes fixed), D06 (notification dedup key, retry count, operator recipients as configuration), D11 (`use_case_group`, `stage_context`), D12 (message keys, not strings, in stored findings), and the register row **W0-04 fields**. D07-D10 are left open; [Retention and deletion](#retention-and-deletion-options-for-d08) lists options for D08 and chooses none.
@@ -121,18 +121,18 @@ One review case. Mutable columns are the inherited descriptive fields (owner and
 | `id` | uuid PK | create | |
 | `registry_id` | text UNIQUE | create | Desk-local human ID, `RAI-YYYY-NNNN`, allocated from a per-year sequence inside the create transaction. Not an external ID (L3). |
 | `source_record_id` | text NOT NULL | owner / SPOC | `TPM-…`, `VRO-…` or the literal `Unknown` (L10). Never validated against an external system. |
-| `use_case_name`, `business_unit`, `business_owner`, `technical_owner` | text NOT NULL | owner / SPOC | Inherited descriptive fields. |
+| `use_case_name`, `business_unit`, `business_owner`, `technical_owner` | text NOT NULL | owner / SPOC | Inherited descriptive fields. W0-09 (W0-05 section 8 reconciliation): `business_unit` is the descriptive text of the W0-02 `businessUnit` body field and `business_owner` is written by the server as the display name of the subject in `owner_subject_id` at create and at every owner change; neither is ever read for access. |
 | `use_case_group` | text NOT NULL | owner / SPOC | D11: value must exist in the current `use_case_groups` configuration revision at write time; checked in the application, not by FK (revisions are immutable and the list may change later). |
 | `risk_tier` | text NULL | workflow (W5) | `high`, `medium`, `low` or NULL. Written only by the W5 risk proposal on submit; slice 1 never writes it. Never editable by owner or SPOC. |
 | `privacy_status`, `security_status`, `rai_status`, `ai_readiness_status` | text NOT NULL | **workflow only** | Read-only projections; see [the projection rule](#desk-local-case-fields-and-the-four-status-projections). |
 | `vendor_involved` | boolean NOT NULL | owner / SPOC | Desk-local (W0-04 fields). Drives the slot 3/4 default in W1-04. Never exported as a registry field. |
 | `model_type` | text NOT NULL | owner / SPOC | Desk-local (W0-04 fields). `llm`, `classic_ml` or `other`. Drives the classic-ML metric-or-N/A rule in W4. Never exported. |
-| `owner_subject_id` | text NOT NULL | create | Scope for the Owner role. The creator, or the owner named by a BU SPOC creating on an owner's behalf. Changes only through a W0-05-permitted action, which writes an audit event. |
-| `business_unit_id` | text NOT NULL | create | Scope for the BU SPOC role. A key from the fixture BU list (W1-09) in slice 1; the AD-group mapping arrives at W6/W8. |
-| `desk_status` | text NOT NULL | workflow | `draft`, `in_review`, `ready`. Queue display value derived from the same transactions that write the projections. Never a lifecycle stage (L2). |
+| `owner_subject_id` | text NOT NULL | create | Scope for the Owner role. The W0-02 `businessOwner` body field: the creator, or the owner named by a BU SPOC creating on an owner's behalf. Changes only through a W0-05-permitted action (`case.edit_draft` with the W0-05 edit-target check), which writes an audit event. |
+| `business_unit_id` | text NOT NULL | create | Scope for the BU SPOC role. The W0-02 `businessUnitId` body field; a key from the fixture BU list (`CM`, `HR`; W0-03 section 7) in slice 1; the AD-group mapping arrives at W6/W8. |
+| `desk_status` | text NOT NULL | workflow | `draft`, `in_review`, `ready`. Queue display value derived from the same transactions that write the projections. Never a lifecycle stage (L2). W0-09: the API `CaseStatus` is the W0-06 section 2.4 derivation (`draft`, `sent_back`, `in_review`, `awaiting_disposition`, `ready_for_launch`), computed from the rows; this column is its coarse stored mirror (`draft` ← draft or sent_back; `in_review` ← in_review or awaiting_disposition; `ready` ← ready_for_launch) for the queue index and is never returned as the status value. |
 | `current_version_id` | uuid NULL FK | workflow | The latest **submitted** version; NULL until first submit. "Always have the latest" (R7). |
 | `draft_version_id` | uuid NULL FK | workflow | The single open draft, or NULL. Uniqueness of the successor draft (D05) rests on this column plus the case row lock. |
-| `row_version` | integer NOT NULL | every update | Optimistic-concurrency counter for draft edits (`expected_row_version` in the W0-02 edit shape). Business actions use `current_version_id` instead. |
+| `row_version` | integer NOT NULL | every update | Optimistic-concurrency counter for draft-time edits on this case (case fields and draft slots); it is the W0-02 `caseRevision` / `draftRevision` and the W0-06 `ExpectedVersion.revision` (W0-09: one counter per case). Business actions use `current_version_id` instead. |
 | `created_by`, `created_at`, `updated_at` | text, timestamptz | | |
 
 Constraints: `CHECK (model_type IN ('llm','classic_ml','other'))`; `CHECK (desk_status IN ('draft','in_review','ready'))`; the four projection columns each `CHECK (... IN (...))` per the value table below; FKs to `pack_version` are `DEFERRABLE INITIALLY DEFERRED` because the version row references the case and the case references the version inside one transaction.
@@ -152,12 +152,13 @@ A draft becomes a submitted version in place: the row is mutable while `submitte
 | `checklist_template_version` | text NOT NULL | yes | L12. Recorded on the draft (W1-04) from the current configuration; frozen at submit. |
 | `configuration_revision_id` | uuid FK NULL → NOT NULL at submit | yes | The one published configuration revision in force at submit (QC rules, risk rubric, SLA values, calendar). Historical packs stay bound to it (data contract). |
 | `frozen_configuration` | jsonb NULL → NOT NULL at submit | yes | `{kind: revision_id}` for every configuration kind in force at submit; see `configuration_revision` below for why one FK is not enough. |
-| `lane_mapping_version` | text NULL → NOT NULL at submit | yes | D02: the identifier of the versioned constant in code (for example `lane-map-2026-09-21`) and, in `lane_mapping jsonb`, its content `{ai_coe:[1,5], dpo:[2,3,4,5], it_security:[5,6,7,8]}`, so a restored backup is self-describing. Not Admin configuration. |
-| `submitted_by`, `submitted_role`, `submitted_at` | text, text, timestamptz NULL | set once | The submit transaction sets all three. `submitted_at` non-NULL means frozen. The SLA clock for all three lanes starts here (D06); lane open time is not stored separately. |
+| `lane_mapping_version` | text NULL → NOT NULL at submit | yes | D02: the identifier of the versioned constant in code (`lane-mapping/v1`, the W0-06 section 3 `LANE_MAPPING_V1.version`) and, in `lane_mapping jsonb`, its content `{ai_coe:[1,5], dpo:[2,3,4,5], it_security:[5,6,7,8]}`, so a restored backup is self-describing. Not Admin configuration. |
+| `submitted_by`, `submitted_role`, `submitted_at` | text, text, timestamptz NULL | set once | The submit transaction sets all three. `submitted_at` non-NULL means frozen (the W0-06 `state = submitted`). The SLA clock for all three lanes starts here (D06); lane open time is not stored separately. |
+| `ready_at` | timestamptz NULL | set once | W0-09: added for W0-06 (sections 4.9, 6 and 9.2): the Ready transition sets it once on the current version in the same transaction as `case.ready_for_launch`; the frozen-row trigger permits exactly that one change on a submitted row (`ready_at` from NULL to a value, every other column unchanged). The W0-06 `ready_version_id` is `case.current_version_id` when `desk_status = 'ready'`. |
 | `manifest_hash` | text NULL → NOT NULL at submit | yes | SHA-256 over the canonical JSON of the nine slot rows (slot, state, reason, artifact hash, filename, media type, size). Lets A07 tests and the W7-00 restore check prove a version unchanged without diffing rows. |
 | `submit_correlation_id` | text NULL | yes | Same value as the submit audit event. |
 
-Lane state is **derived**, not stored: a lane on the current version is `pending` with no `lane_decision` row, otherwise the decision's value. This keeps one record per decision (L8); the case projections are the only denormalisation and they are workflow-written.
+Lane state is **derived**, not stored: a lane on the current version is `pending` with no `lane_decision` row, `approved` when the row's `decision` is `approve` and `sent_back` when it is `send_back` (the W0-06 2.3 and W0-02 `LaneProjectionStatus` words). This keeps one record per decision (L8); the case projections are the only denormalisation and they are workflow-written.
 
 ### `artifact_slot`
 
@@ -204,14 +205,14 @@ Append-only. One row per (version, lane): a lane decides a submitted version onc
 | `decision` | text NOT NULL | `approve`, `send_back` |
 | `actor_subject_id`, `actor_role` | text NOT NULL | W0-05 forbids Admin, and forbids an actor who is owner or BU SPOC on the case (D05). The store records; it does not check. |
 | `feedback` | jsonb NULL | Required for `send_back`: `[{slot: 1-9, artifact_id?: uuid, message: text}]`, at least one entry naming a slot (A09). `CHECK (decision <> 'send_back' OR feedback IS NOT NULL)`. |
-| `observed_qc_run_id` | uuid FK NULL | The approve-attempt QC run the reviewer saw before deciding (W0-07). NULL only when QC was not triggered for this decision in slice 1. |
+| `observed_qc_run_id` | uuid FK NULL | The approve-attempt QC run the reviewer saw before deciding (the W0-06 4.4 `qc_run_id`; W0-07). Required for `approve` (W0-06: `invalid_input` `lane_qc_not_run` without one); NULL permitted for `send_back`. |
 | `decided_at`, `correlation_id`, `idempotency_key_id` | | |
 
 ### `qc_run` and `qc_finding`
 
 Written by the workflow on behalf of the QC boundary (W0-07): the QC substitute returns a typed result and the workflow transaction inserts it. QC itself has no database credential.
 
-`qc_run`: `id`, `version_id` FK, `trigger` (`upload`, `submit`, `approve_attempt`), `slot` (smallint NULL; set for `upload`), `lane` (text NULL; set for `approve_attempt`), `engine_id` (text; `substitute-scripted` in slice 1), `rule_revision` (text; the QC rules revision from the frozen configuration), `status` (`completed`, `unavailable`), `requested_at`, `completed_at`, `correlation_id`. Immutable once `status` is set; the run row is inserted with its final status in the same transaction as the trigger, so it is never updated.
+`qc_run`: `id`, `version_id` FK, `trigger` (`upload`, `submit`, `approve_attempt`), `slot` (smallint NULL; set for `upload`), `lane` (text NULL; set for `approve_attempt`), `engine_id` (text; `substitute-scripted` in slice 1), `rule_revision` (text; the QC rules revision from the frozen configuration), `status` (`completed`, `unavailable`), `requested_at`, `completed_at`, `correlation_id`. Immutable once `status` is set: the run row is inserted once, with its final status, and is never updated. W0-09 (W0-06 owns the order): the run happens **after** the triggering action's transaction has committed, in its own transaction under the case row lock (W0-06 4.3 "the submit response does not wait for QC", 9.1; W0-07 3.4), with the trigger's `correlation_id`; the earlier "same transaction as the trigger" wording and the QC statements in the Submit and Decide rows below are withdrawn. The approve-attempt run is a separate call before the decision (the W0-06 4.4 lane-QC run endpoint), and the decision row references it through `observed_qc_run_id`.
 
 `qc_finding`: `id`, `run_id` FK, `version_id` FK (denormalised for the Ready predicate query), `slot` (smallint NULL; NULL for pack-level findings), `kind` (`defect`, `unavailable`), `rule_id`, `rule_revision`, `severity` (`high`, `medium`, `low`, `info`), `owning_lane` (`ai_coe`, `dpo`, `it_security`; assigned by the W0-06 rule; NOT NULL because an `unavailable` finding also carries one), `evidence` jsonb (`{artifact_id?, page?, locator?, excerpt_hash?}`: references only, never document text; an excerpt is at most a hash so that logs and audit stay clean), `metric`, `denominator`, `threshold` (numeric NULL, for the accuracy rule), `message_key` text NOT NULL (D12 locale key) and `message_params` jsonb, `created_at`. Append-only; no update or delete.
 
@@ -223,12 +224,12 @@ Append-only. The effective disposition of a finding is the **latest** event per 
 |---|---|---|
 | `id` | uuid PK | |
 | `finding_id` | uuid FK NOT NULL | |
-| `kind` | text NOT NULL | `fixed_proposed` (owner or SPOC), `fixed_confirmed` (owning lane), `waived` (owning lane), `not_applicable` (owning lane). Who may write which is W0-05; the store constrains only the vocabulary. |
+| `kind` | text NOT NULL | `fixed_proposed` (owner or SPOC), `fixed` (owning lane directly, no proposal; W0-06 4.8, added at W0-09), `fixed_confirmed` (owning lane), `waived` (owning lane), `not_applicable` (owning lane). Who may write which is W0-05; the store constrains only the vocabulary. |
 | `reason` | text NULL | `CHECK (kind NOT IN ('waived','not_applicable') OR reason IS NOT NULL)` (A09). |
 | `evidence_ref` | jsonb NULL | Reference to an artifact or slot, never bytes. |
 | `actor_subject_id`, `actor_role`, `created_at`, `correlation_id`, `idempotency_key_id` | | |
 
-A finding counts as **dispositioned** for the Ready predicate when its latest event is `fixed_confirmed`, `waived` or `not_applicable`. `fixed_proposed` does not count (D05: the owning lane confirms).
+A finding counts as **dispositioned** for the Ready predicate when its latest event is `fixed`, `fixed_confirmed`, `waived` or `not_applicable`. `fixed_proposed` does not count (D05: the owning lane confirms).
 
 ### `notification`
 
@@ -260,7 +261,7 @@ See [Audit log](#audit-log) for the rules. Columns:
 | `seq` | bigint GENERATED ALWAYS AS IDENTITY | Total order for reconstruction (A11); never exposed in URLs. |
 | `occurred_at` | timestamptz NOT NULL | |
 | `actor_subject_id`, `actor_role` | text NOT NULL | `system` / `system` for the breach digest and mail retry outcomes. |
-| `action` | text NOT NULL | `case.created`, `case.edited`, `artifact.uploaded`, `artifact.downloaded`, `draft.saved`, `version.submitted`, `lane.approved`, `lane.sent_back`, `draft.successor_created`, `version.resubmitted`, `finding.recorded`, `qc.unavailable`, `disposition.recorded`, `case.ready`, `configuration.published`, `notification.queued`, `notification.failed`, `audit.read`. New actions are added by the ticket that introduces them, in the shared union. |
+| `action` | text NOT NULL | W0-09: the workflow names are W0-06 section 9.4's, verbatim: `case.created`, `draft.saved` (case-field and slot edits, including the W0-05 scope-field change with old and new values), `version.submitted`, `version.resubmitted`, `lane.opened`, `lane.approved`, `lane.sent_back`, `draft.successor_created`, `disposition.proposed`, `disposition.confirmed`, `disposition.recorded`, `case.ready_for_launch`, `qc.run_recorded`. Non-workflow names this spec adds: `artifact.uploaded`, `artifact.downloaded`, `configuration.published`, `notification.queued`, `notification.failed`, `audit.read`; identity names from W0-03 section 10: `identity.signed_in`, `identity.sign_in_refused`, `identity.signed_out`. The earlier `case.edited`, `finding.recorded`, `qc.unavailable` and `case.ready` are withdrawn. New actions are added by the ticket that introduces them, in the shared union. |
 | `target_case_id` | uuid NULL | |
 | `target_version_id` | uuid NULL | |
 | `target_ref` | jsonb NULL | Other references: `{slot, artifact_id, finding_id, disposition_id, decision_id, configuration_revision_id, notification_id}`. IDs only. |
@@ -272,7 +273,7 @@ See [Audit log](#audit-log) for the rules. Columns:
 | Column | Type | Notes |
 |---|---|---|
 | `actor_subject_id` | text | PK part 1 |
-| `key` | text | PK part 2. Client-generated UUID, supplied per the W0-02 shape (header `Idempotency-Key` proposed). |
+| `key` | text | PK part 2. Client-generated UUID, supplied in the `Idempotency-Key` header (W0-02 section 7, W0-06 5.3; confirmed at W0-09). |
 | `action` | text NOT NULL | The route or service name. |
 | `target_case_id` | uuid NOT NULL | |
 | `request_digest` | text NOT NULL | SHA-256 of the canonical request body plus the expected version. |
@@ -295,8 +296,8 @@ Register row **W0-04 fields** (Ta, 2026-09-21), implemented as written:
 | `security_status` | same | same | IT/Security lane decision (W2-02) |
 | `rai_status` | same | same | AI/COE lane decision (W2-02) |
 | all three | `pending` | reset | Submit and resubmit (W1-05, W2-04): every submission reopens all lanes (D05) |
-| `ai_readiness_status` | `not_ready`, `ready` | `ready` | Ready predicate (W2-06), in the same transaction as the `case.ready` audit event |
-| `ai_readiness_status` | `not_ready` | reset | Resubmit (a Ready case that is resubmitted is no longer ready; W0-06 states whether resubmission after Ready is reachable at all) |
+| `ai_readiness_status` | `not_ready`, `ready` | `ready` | Ready predicate (W2-06), in the same transaction as the `case.ready_for_launch` audit event |
+| `ai_readiness_status` | `not_ready` | reset | Resubmit. W0-09: W0-06 section 4.12 records that no mutating event, resubmit included, is accepted on a Ready case in slice 1, so this reset is unreachable in slice 1 and stays as the rule for a later reopen decision (W0-06 section 11) |
 
 Enforcement, three layers, all required:
 
@@ -310,7 +311,7 @@ Rule (W0 contract): a submitted version and its artifact references are never up
 
 | Table | Insert | Update | Delete | Mechanism |
 |---|---|---|---|---|
-| `pack_version` | app | only while `submitted_at IS NULL`; the submit transaction is the last update | never | trigger `pack_version_frozen`: `IF OLD.submitted_at IS NOT NULL THEN RAISE EXCEPTION 'rai.frozen_version'`; no `DELETE` grant |
+| `pack_version` | app | only while `submitted_at IS NULL`; the submit transaction is the last update, except `ready_at` NULL → value once (Ready) | never | trigger `pack_version_frozen`: `IF OLD.submitted_at IS NOT NULL THEN RAISE EXCEPTION 'rai.frozen_version'` unless the only changed column is `ready_at` from NULL to a value (W0-06 9.2, W0-09); no `DELETE` grant |
 | `artifact_slot` | app (draft creation, successor copy) | only while the parent version is a draft | never | trigger `artifact_slot_frozen` joins the parent and raises when `submitted_at IS NOT NULL`; no `DELETE` grant |
 | `artifact` | app | never (`bytes_state` is the single D08 exception, gated like a projection) | never | trigger `artifact_frozen` raises on any change other than `bytes_state` under `rai.retention_write = 'on'`; no `DELETE` grant |
 | `lane_decision`, `qc_run`, `qc_finding`, `disposition_event` | app | never | never | triggers raise on UPDATE; no `UPDATE`/`DELETE` grant |
@@ -326,7 +327,7 @@ Database roles (created by the compose init script locally and by the D10 runboo
 |---|---|---|
 | `rai_owner` | migrations (`DATABASE_MIGRATE_URL`) | owns the schema; DDL; still subject to the triggers, so a migration that tries to rewrite a frozen row fails |
 | `rai_app` | the Fastify process (`DATABASE_URL`) | `SELECT`, `INSERT` on all tables; `UPDATE` only on `case`, `pack_version`, `artifact_slot`, `artifact`, `notification`; no `DELETE` anywhere; no DDL |
-| `rai_operator` | operator commands (`db:cleanup`, `store:verify`, `db:reset` locally) | `rai_app` plus `DELETE` on `idempotency_key`, on draft `pack_version`/`artifact_slot` rows through the cleanup function, and `TRUNCATE` only when `NODE_ENV <> 'production'` (enforced in the command, not the grant) |
+| `rai_operator` | operator commands (`db:cleanup`, `store:verify`, `store:cleanup`, `reset` locally) | `rai_app` plus `DELETE` on `idempotency_key`, on draft `pack_version`/`artifact_slot` rows through the cleanup function, and `TRUNCATE` only when `NODE_ENV <> 'production'` (enforced in the command, not the grant) |
 
 Both the trigger and the grant are required. The trigger protects against a privileged connection (a migration, an operator session); the grant protects against an application bug. The A11 test attempts `UPDATE` and `DELETE` on `audit_event` as `rai_app` and as `rai_owner` and expects both to fail (permission error and trigger error respectively).
 
@@ -359,7 +360,7 @@ The store knows nothing about cases, slots, roles or media types. Sniffing (W0-0
 
 ### Layout and write path
 
-- Root: `BLOB_DIR` (absolute path; local default `./var/blobs`, gitignored; a Docker volume or host directory in CI). Created with mode `0700`; files `0600`. Nothing under it is ever served statically; Fastify has no `@fastify/static` mount there.
+- Root: `BLOB_DIR` (absolute path; local default `./.local/blobs` per W0-02 section 5, gitignored; a Docker volume or host directory in CI). Created with mode `0700`; files `0600`. Nothing under it is ever served statically; Fastify has no `@fastify/static` mount there.
 - Key: `sha256/<h[0:2]>/<h[2:4]>/<h>` where `h` is the lowercase hex SHA-256 of the bytes. Two-level sharding keeps directories small; the full hash is the filename.
 - Write: stream to `tmp/<uuid>` under `BLOB_DIR`, hashing with `crypto.createHash('sha256')` and counting bytes; on end, `fsync` the file, `rename` to the key path (atomic on the same filesystem), `fsync` the directory. If the key already exists, the temp file is removed and `deduplicated: true` is returned after confirming the existing file's size equals the counted size (a size mismatch is an integrity error, not a silent dedupe).
 - No mutation: there is no `delete` or `overwrite` method. The D08 options add a retention command outside the request path; slice 1 ships without it.
@@ -368,7 +369,7 @@ The store knows nothing about cases, slots, roles or media types. Sniffing (W0-0
 
 Upload (W1-03): authorize (`case.edit` scope, W0-05) → stream with size cap → sniff (W0-08) → `put` → insert `artifact` row (`content_hash`, `size_bytes`, sniffed `media_type`, normalised `filename`, uploader, time, `case_id`, correlation) → audit `artifact.uploaded` → commit. The blob is committed before the row; an orphan blob after a failed transaction is harmless and collected later (see D08 options). A row is never inserted for bytes that were not committed.
 
-Download (W1-03): route by `artifact_id` inside a case URL → authorize against `artifact.case_id` under the case-view row (W0-05) → `open(hash)` → stream with `Content-Type` from the row, `Content-Disposition: attachment; filename="<ascii-fallback>"; filename*=UTF-8''<percent-encoded original>` (RFC 6266/5987, which is what makes a Thai filename round-trip), `X-Content-Type-Options: nosniff`, `Cache-Control: no-store`, `Content-Length` from the row → audit `artifact.downloaded` (the one audit event written outside a state change; it is still one insert in its own transaction with the request correlation ID). A request without a session gets 401; out of scope gets 403 (or 404 if W0-05 records that); an artifact ID under a different case's URL gets 404 `not_found`.
+Download (W1-03): the W0-02 7.4 route `GET /api/artifacts/{artifactId}` (keyed by the artifact id alone; W0-09 replaced the earlier "inside a case URL" wording) → resolve `artifact.case_id` and authorize under the case-view row (W0-05 "Downloads and deep links") → `open(hash)` → stream with `Content-Type` from the row, `Content-Disposition: attachment; filename="<ascii-fallback>"; filename*=UTF-8''<percent-encoded original>` (RFC 6266/5987, which is what makes a Thai filename round-trip), `X-Content-Type-Options: nosniff`, `Content-Security-Policy: sandbox`, `Cache-Control: no-store`, `Content-Length` from the row → audit `artifact.downloaded` (the one audit event written outside a state change; it is still one insert in its own transaction with the request correlation ID). A request without a session gets 401; out of scope gets 403; an unresolvable artifact id is 403 for an owner or BU SPOC and 404 `not_found` only for an `all_cases` holder (W0-05 section 4, recorded at W0 exit).
 
 Never exposed: the hash, the filesystem path, a pre-signed or token URL. The deep link in a mail (W3-03) is a case path, not an artifact path.
 
@@ -394,29 +395,29 @@ Isolation is `READ COMMITTED` (the Postgres default); correctness comes from the
 
 | Action (ticket) | Atomic statements, in order, after lock + idempotency + expected-version checks | Idempotency key | Expected version |
 |---|---|---|---|
-| Create case (W1-02) | insert `case` (allocate `registry_id`), insert draft `pack_version` v1 with nine `missing` slots, set `draft_version_id`, audit `case.created` | yes | none |
-| Edit case / save draft (W1-02, W1-04) | update editable `case` columns or draft slot rows with `row_version` check, audit `case.edited` / `draft.saved` | optional | `row_version` (409 `stale_version` on mismatch) |
-| Upload (W1-03) | blob committed first (outside the transaction, see above); then insert `artifact`, audit `artifact.uploaded` | yes | none |
-| **Submit** (W1-05, W2-01) | resolve current configuration revisions and the lane-mapping constant; run submit QC through W0-07 and insert `qc_run` + `qc_finding` rows (an `unavailable` result is a finding, not an exception); update draft `pack_version`: `submitted_*`, frozen columns, `manifest_hash`; update `case`: `current_version_id = draft`, `draft_version_id = NULL`, `desk_status = 'in_review'`, three projections `pending`; insert three `notification` rows (`lane_open`, one per lane); audit `version.submitted` | yes | `draft_version_id` must equal the submitted draft; `row_version` for the draft |
-| **Decide** approve / send back (W2-02) | run approve-attempt QC (approve only) and insert its rows; insert `lane_decision`; update the lane's projection; for `send_back`: if `draft_version_id IS NULL` insert successor `pack_version` N+1 (`parent_version_id = N`, `stage_context`, `checklist_template_version` copied) and nine slot rows copied from N, set `draft_version_id`, audit `draft.successor_created`; insert `notification` (`send_back` to owner, `lane` = the deciding lane); audit `lane.approved` / `lane.sent_back` | yes | `current_version_id` |
+| Create case (W1-02) | insert `case` (allocate `registry_id`), insert draft `pack_version` v1 with nine `missing` slots (3 and 4 `not_applicable` with the default reason when `vendor_involved` is false), set `draft_version_id`, audit `case.created` | yes | none |
+| Edit case / save draft (W1-02, W1-04) | update editable `case` columns or draft slot rows with `row_version` check, audit `draft.saved` (W0-06 4.2; changed-field list as references) | no (W0-06 5.3: the revision check makes a duplicate save fail closed) | `row_version` (409 `stale_version` `revision_changed`; `version_superseded` when the named draft is no longer the open draft) |
+| Upload (W1-03) | blob committed first (outside the transaction, see above); then insert `artifact`, audit `artifact.uploaded` | no (idempotent by content hash, W0-06 5.3) | none |
+| **Submit** (W1-05, W2-01) | resolve current configuration revisions and the lane-mapping constant; update draft `pack_version`: `submitted_*`, frozen columns, `manifest_hash`; update `case`: `current_version_id = draft`, `draft_version_id = NULL`, `desk_status = 'in_review'`, three projections `pending`; insert three `notification` rows (`lane_open`, one per lane); audit `version.submitted` then `lane.opened` × 3 (W0-06 4.3). Pack QC runs after commit in its own transaction (`qc_run` paragraph above) | yes | `draft_version_id` must equal the submitted draft; `row_version` for the draft |
+| **Decide** approve / send back (W2-02) | (approve-attempt QC ran earlier as its own call and its `qc_run` row exists; the request names it) insert `lane_decision` with `observed_qc_run_id`; update the lane's projection; for `send_back`: if `draft_version_id IS NULL` insert successor `pack_version` N+1 (`parent_version_id = N`, `stage_context`, `checklist_template_version` copied) and nine slot rows copied from N, set `draft_version_id`, audit `draft.successor_created`; insert `notification` (`send_back` to owner, `lane` = the deciding lane); audit `lane.approved` / `lane.sent_back`; for approve, evaluate the Ready predicate and apply the Ready row below in the same transaction when it holds (W0-06 4.4, 4.9) | yes | `current_version_id` |
 | **Send back, concurrent** (W2-03) | the second send-back waits on the case lock, then finds `draft_version_id` set and appends only its own decision and its own `send_back` notification (a distinct `lane` in the dedup key, so the second row cannot collide with the first lane's row; a retry of either lane replays through its idempotency key and inserts nothing); exactly one successor exists (`UNIQUE (case_id, version_number)` would also refuse a second N+1) | yes | `current_version_id` |
 | **Resubmit** (W2-04) | same as submit on the successor draft; additionally `ai_readiness_status = 'not_ready'`; audit `version.resubmitted` with `before_ref.current_version_id = N` | yes | as submit |
-| Disposition (W2-05) | insert `disposition_event`; audit `disposition.recorded` | yes | `current_version_id` (a finding on a superseded version cannot be dispositioned; W0-06 confirms) |
-| **Ready** (W2-06) | recheck under the lock: three `lane_decision` rows with `decision = 'approve'` on `current_version_id`, one per lane, and zero `qc_finding` rows on that version whose latest `disposition_event` is absent or `fixed_proposed`; if either fails, return the W0-06 not-ready result and write nothing; else update `case`: `ai_readiness_status = 'ready'`, `desk_status = 'ready'`; insert `notification` (`ready`); audit `case.ready` | yes | `current_version_id` |
+| Disposition (W2-05) | insert `disposition_event`; audit `disposition.recorded` (`disposition.proposed` for `fixed_proposed`, `disposition.confirmed` for `fixed_confirmed`; W0-06 4.7); evaluate the Ready predicate and apply the Ready row when it holds | yes | `current_version_id` (a finding on a superseded version cannot be dispositioned: W0-06 5.2 `version_superseded`, confirmed) |
+| **Ready** (W2-06; applied inside the approve or disposition transaction, never a request of its own) | recheck under the lock: three `lane_decision` rows with `decision = 'approve'` on `current_version_id`, one per lane, and zero `qc_finding` rows on that version whose latest `disposition_event` is absent or `fixed_proposed`; if either fails, write nothing beyond the triggering event; else update `pack_version.ready_at`, update `case`: `ai_readiness_status = 'ready'`, `desk_status = 'ready'`; insert `notification` (`ready`); audit `case.ready_for_launch` with `triggered_by` = the triggering event | n/a (the triggering event's key) | `current_version_id` |
 | Publish configuration (W1-00 seed, W6) | insert `configuration_revision` with `revision_number = max + 1` for the kind (under a per-kind advisory lock); audit `configuration.published` | yes | none |
 | Mail attempt (W3-04) | update the four delivery columns; audit `notification.failed` on the final failure only | n/a (dedup key is the row identity) | none |
 
 Ready is evaluated **only** inside this transaction, never from a cached count and never from the projections. The predicate query is the one in [Interfaces](#interfaces) so that W2-06 and the W2-08 exit evidence read the same SQL.
 
-Idempotency-key rules: the key is scoped to the actor; a replay with the same digest returns the stored response and writes nothing (not even an audit event; the original already carries the correlation ID, and the replay is logged by W0-10 with its own ID and a reference to the original); a replay with a different digest is `invalid_input` (`idempotency_key_reused`); a key is stored only on success, so a failed action can be retried with the same key. Because the key check happens under the case lock, two concurrent requests with the same key cannot both apply.
+Idempotency-key rules: the key is scoped to the actor; a replay with the same digest returns the stored response and writes nothing (not even an audit event; the original already carries the correlation ID, and the replay is logged by W0-10 with its own ID and a reference to the original); a replay with a different digest is `invalid_input` (`error.invalid_input.idempotency_key_reused`, W0-06 8.5); a key is stored only on success, so a failed action can be retried with the same key. Because the key check happens under the case lock, two concurrent requests with the same key cannot both apply. Keys are required on create, submit, resubmit, approve, send back and disposition and not used on save draft or upload (W0-06 5.3); rows expire after `IDEMPOTENCY_TTL_HOURS` (72 by default), which W0-06 5.3 now cites.
 
 ## Restart proof
 
 W1 exit evidence (BUILD_PLAN, W1-05, W1-INT): the same case reopens after a process restart.
 
 - Postgres data directory is a named Docker volume (`rai_pgdata_<project>`) in `docker-compose.yml`; `BLOB_DIR` is a host path, not `tmpfs`. `docker compose down` without `-v` keeps both; `-v` is the documented reset.
-- The Fastify process holds no state that a request depends on: no in-memory case cache, no in-process idempotency map, no session-bound draft. Sessions (W0-03) either live in Postgres or are re-established at sign-in; either way a restart never loses a committed row.
-- Integration recipe (`rai-web/tests/integration/restart.test.ts`, path per W0-02): start the server against the ticket's Postgres → create, attach, submit through the API → record `registry_id`, `current_version_id`, `manifest_hash` and the artifact hash → `SIGTERM` the server process and wait for exit → start a new process on the same `DATABASE_URL` and `BLOB_DIR` → read the case, version, slots and download the artifact → assert equality of every recorded value and that the downloaded bytes hash to the stored hash. The Playwright journey in W1-INT repeats the same through the UI.
+- The Fastify process holds no state that a request depends on: no in-memory case cache, no in-process idempotency map, no session-bound draft. Sessions (W0-03 section 6.3) live in Postgres, so a restart never loses a committed row or a signed-in session.
+- Integration recipe (`rai-web/tests/integration/w1-05-restart.test.ts`, the W0-02 section 1 naming): start the server against the ticket's Postgres → create, attach, submit through the API → record `registry_id`, `current_version_id`, `manifest_hash` and the artifact hash → `SIGTERM` the server process and wait for exit → start a new process on the same `DATABASE_URL` and `BLOB_DIR` → read the case, version, slots and download the artifact → assert equality of every recorded value and that the downloaded bytes hash to the stored hash. The Playwright journey in W1-INT repeats the same through the UI.
 
 Graceful shutdown: on `SIGTERM` the server stops accepting connections, waits up to 10 s for in-flight transactions, then exits; a transaction cut short by a hard kill is rolled back by Postgres, which is why every action is one transaction and why the blob is committed before its row (an orphan blob is safe; a row without a blob is not).
 
@@ -430,15 +431,15 @@ Rules from the W0 contract, each with its mechanism and test:
 | Written in the same transaction as the state change | `append` takes the transaction handle; there is no `append` without one; `withWorkflowTransaction` refuses to commit if the action returned without an audit event (`ctx.auditWritten` flag checked before commit) | W1-05, W2-02 to W2-06: a forced failure after the state change leaves no audit row and no state change |
 | Carries the request correlation ID | `correlation_id NOT NULL`; value from `AsyncLocalStorage` seeded by Fastify `request.id` (W0-10 format) | W1-05, W3-07: the audit row, the log line and the notification row share one value |
 | Fields are references, never document bytes | `before_ref`, `after_ref`, `target_ref` are validated against a shared JSON schema that permits only IDs, enum values and numbers; strings longer than 64 characters are rejected at `append` | W1-00: `append` with a text excerpt is rejected |
-| Readable only by Admin and the D06 operator audience under the same server-side check as everything else | One read route; policy row `audit.read` in the W0-05 matrix decides; the operator audience has no seventh role (D06), so W0-05 states which role reads the operator view (Admin in slice 1 unless W0-05 records otherwise); the read itself writes `audit.read` | W3-07 negatives: every non-Admin fixture user gets 403 on the audit route |
+| Readable only by Admin and the D06 operator audience under the same server-side check as everything else | One read route; policy row `audit.read` in the W0-05 matrix decides; the operator audience has no seventh role (D06), and W0-05 section 8 records Admin as the slice-1 audience for `audit.read` and `operator.view`; the read itself writes `audit.read` | W3-07 negatives: every non-Admin fixture user gets 403 on the audit route |
 | Full journey reconstructable from the audit trail alone (A11) | Every transaction above writes exactly the events named; `seq` orders them; `before_ref`/`after_ref` carry the version and status references | W2-08: a test replays the audit rows for the fixture case and rebuilds the sequence v1 → send-back → v2 → three approvals → dispositions → Ready without reading any other table |
 
 Retention of audit rows differs from business data; see the D08 options.
 
 ## Schema evolution
 
-- **Tooling.** Drizzle Kit generates SQL migrations from the Drizzle schema (`drizzle-kit generate`), committed as `NNNN_<slug>.sql` plus the journal, under the path W0-02 assigns (proposed `rai-web/server/migrations/`). Triggers, grants and functions are hand-written SQL in the same migration files; Drizzle's schema file describes tables and indexes only. The `drizzle-kit push` command is forbidden (it diffs and mutates the live schema).
-- **Explicit step.** `npm run db:migrate` (name per W0-02) runs pending migrations with `DATABASE_MIGRATE_URL` as `rai_owner`, inside a transaction per file, recording each in Drizzle's migrations table. The server never calls the migrator. On start the server compares the highest applied migration with the version it was built for; if behind, `/ready` (W0-10) reports `schema: behind` and the process refuses to serve any other route (fails closed). If ahead by an additive migration, it serves (that is the rollback expectation for additive migrations).
+- **Tooling.** Drizzle Kit generates SQL migrations from the Drizzle schema (`npm run migrate:generate`), committed as `NNNN_<slug>.sql` plus the journal under `rai-web/server/drizzle/` (W0-02 section 1). Triggers, grants and functions are hand-written SQL in the same migration files; Drizzle's schema file describes tables and indexes only. The `drizzle-kit push` command is forbidden (it diffs and mutates the live schema).
+- **Explicit step.** `npm run migrate` (W0-02 section 3.3) runs pending migrations with `DATABASE_MIGRATE_URL` as `rai_owner`, inside a transaction per file, recording each in Drizzle's migrations table. The server never calls the migrator. On start the server compares the highest applied migration with the version it was built for; if behind, `GET /readyz` (W0-10 section 5) reports `store.migrations: pending` and the process refuses to serve any other route (fails closed). If ahead by an additive migration, it serves (that is the rollback expectation for additive migrations).
 - **Forward-only.** No down migrations are written or run. Each migration file begins with a header:
 
   ```sql
@@ -498,7 +499,7 @@ export type Readiness = 'not_ready' | 'ready';
 export type DeskStatus = 'draft' | 'in_review' | 'ready';
 export type ModelType = 'llm' | 'classic_ml' | 'other';
 export type StageContext = 'idea' | 'pre_build' | 'pre_launch';
-export type DispositionKind = 'fixed_proposed' | 'fixed_confirmed' | 'waived' | 'not_applicable';
+export type DispositionKind = 'fixed_proposed' | 'fixed' | 'fixed_confirmed' | 'waived' | 'not_applicable';   // W0-06 4.8
 
 // rai-web/server: request context every repository call receives
 export interface ActionContext {
@@ -585,7 +586,7 @@ Persistence errors are typed in the server and mapped once, in the Fastify error
 
 | Persistence error (TypeScript class) | Raised when | Mapped to (ADR-0003) |
 |---|---|---|
-| `StaleVersion { currentVersionId }` | expected version or row version mismatch under the lock | 409 `stale_version`, body carries the current reference |
+| `StaleVersion { currentVersionId }` | expected version or row version mismatch under the lock | 409 `stale_version`, body carries the W0-06 8.2 `reason`, `guidanceKey`, `current` and `refreshPath` |
 | `FrozenVersion` | an update reached a submitted version or its slots (trigger `rai.frozen_version`) | 409 `stale_version` with `reason: 'frozen'` (the client acted on a version that has since been submitted); also an internal alert (W0-10) because a correct client never hits it |
 | `ProjectionWriteForbidden` | trigger `rai.projection_write_forbidden` | 500 internal; alert. Unreachable through a valid route because the shape rejects the fields first (422 `invalid_input`) |
 | `IdempotencyKeyReused` | same key, different request digest | 422 `invalid_input`, field `idempotencyKey`, key `error.idempotency_key_reused` |
@@ -593,10 +594,10 @@ Persistence errors are typed in the server and mapped once, in the Fastify error
 | `NotFound { kind, id }` | in-scope reference to a missing row or blob metadata | 404 `not_found` |
 | `BlobTooLarge` | `put` exceeded `maxBytes` | 422 `unsafe_upload` (W0-08 owns the message key) |
 | `BlobIntegrity { hash, reason }` | `verify` failure, size mismatch on dedupe, or hash mismatch on a re-hashed download | 500 internal; alert; the download is aborted, never served partially as valid |
-| `StoreUnavailable` | connection refused, `lock_timeout`, `BLOB_DIR` unwritable | 500 internal; `/ready` reports `store: unreachable` (W0-10) |
+| `StoreUnavailable` | connection refused, `lock_timeout`, `BLOB_DIR` unwritable | 500 internal; `GET /readyz` reports `store.db: unreachable` or `store.blob: not_writable` (W0-10 section 5.3) |
 | `UniqueViolation` on `(case_id, version_number)` or `(version_id, lane)` | a second successor or second decision slipped past the lock (should not happen) | 409 `stale_version`; alert |
 
-Internal failures answer with HTTP 500, `code: 'internal_error'`, a generic locale key and the correlation ID; the body never carries a SQL message, a path or a hash. `internal_error` is not one of the seven W0-06 contract types; it is the catch-all W0-10 categorises, listed here for W0-06 to confirm alongside `not_found`. No persistence failure ever surfaces as a clean or approved state (threat model).
+Internal failures answer with HTTP 500, `code: 'internal_error'`, a generic locale key and the correlation ID; the body never carries a SQL message, a path or a hash. `internal_error` is not one of the seven W0-06 contract types; it is the catch-all W0-10 categorises, confirmed by W0-06 8.1 alongside `not_found`. No persistence failure ever surfaces as a clean or approved state (threat model).
 
 ## Test substitutes and test map
 
@@ -627,37 +628,38 @@ Which ticket proves which clause of this document:
 
 ## Configuration and commands handed to W0-02
 
-W0-02 lists environment variables and commands; this document names the ones it needs so the two specs agree. If W0-02 merges first with different names, W0-02's names win and this section is updated in the W1-00 PR.
+W0-02 section 5 (variables) and 3.3 (commands) are the register; W0-09 reconciled this section to W0-02's names on 2026-09-21 and W0-02 carries every row below.
 
-| Variable | Purpose | Local placeholder |
+| Variable (W0-02 section 5) | Purpose | Local placeholder |
 |---|---|---|
-| `DATABASE_URL` | `rai_app` connection for the process; port follows `POSTGRES_PORT` | `postgres://rai_app:rai_app@127.0.0.1:${POSTGRES_PORT}/rai` |
-| `DATABASE_MIGRATE_URL` | `rai_owner` connection for `db:migrate` | `postgres://rai_owner:rai_owner@127.0.0.1:${POSTGRES_PORT}/rai` |
+| `DATABASE_URL` | `rai_app` connection for the process; port follows `POSTGRES_PORT` | `postgres://rai_app:rai_app@127.0.0.1:54320/rai` |
+| `DATABASE_MIGRATE_URL` | `rai_owner` connection for `npm run migrate` | `postgres://rai_owner:rai_owner@127.0.0.1:54320/rai` |
 | `DATABASE_OPERATOR_URL` | `rai_operator` connection for cleanup and verify commands; optional locally (defaults to `DATABASE_MIGRATE_URL`) | unset |
 | `POSTGRES_PORT` | host port the compose file binds (per-ticket isolation: 54320 + ticket number) | `54320` |
-| `BLOB_DIR` | private blob root | `./var/blobs` |
-| `UPLOAD_MAX_BYTES`, `PACK_MAX_BYTES` | W0-08 limits passed to the store and the route | W0-08 values |
+| `BLOB_DIR` | private blob root | `./.local/blobs` |
+| `UPLOAD_MAX_FILE_BYTES`, `UPLOAD_MAX_PACK_BYTES`, `UPLOAD_MAX_IMAGE_PIXELS` | W0-08 limits passed to the store and the route | `26214400`, `157286400`, `40000000` (W0-08 section 3) |
 | `IDEMPOTENCY_TTL_HOURS` | cleanup threshold | `72` |
 | `BLOB_ORPHAN_MIN_AGE_HOURS`, `BLOB_TMP_MAX_AGE_HOURS` | cleanup thresholds | `24`, `1` |
 
 Passwords above are local Docker placeholders for synthetic data only; networked and production credentials come from the D10 custody mechanism (W0-03 secrets rule) and never from a file in Git.
 
-| Command (name per W0-02) | Runs as | Does |
+| Command (W0-02 section 3.3) | Runs as | Does |
 |---|---|---|
-| `db:migrate` | `rai_owner` | applies pending migrations; the only path that changes the schema |
-| `db:reset` | `rai_operator` | non-production only: drops and recreates the database, migrates, loads W1-09 fixtures, empties `BLOB_DIR` |
+| `migrate` | `rai_owner` | applies pending migrations; the only path that changes the schema |
+| `reset` | `rai_operator` | development and test only: `db:down`, `db:up`, `migrate`, `fixtures:load`, and empties `rai-web/.local` (blobs, mail sink) |
 | `db:cleanup [--report]` | `rai_operator` | idempotency-key expiry; draft and orphan reports (dry-run only until D08) |
 | `store:verify` | `rai_operator` | re-hashes every blob referenced by an `artifact` row; reports missing, mismatched and orphan blobs; exit code non-zero on any mismatch |
 | `store:cleanup` | `rai_operator` | removes stale temp files and, after D08, orphan blobs |
 
-`docker-compose.yml` (W1-00): Postgres 16 image pinned by W0-02, `POSTGRES_PORT:5432` mapping, named volume, and an init script under `docker/postgres/init/` that creates the three roles and the database. Two tickets run side by side by giving each its own project name and port.
+`docker-compose.yml` (W1-00; W0-02 section 5 shows it): Postgres 16 image pinned by W0-02, `POSTGRES_PORT:5432` mapping, named volume, and an init script under `docker/postgres/init/` that creates the three roles and the database. Two tickets run side by side by giving each its own project name and port.
 
 ## Open items
 
-- [ ] W0-05: which role reads the operator audit view (D06 audience with no seventh role); 403 versus 404 for out-of-scope references (also affects `artifact` downloads). Until recorded: Admin, and 403.
-- [ ] W0-06: confirm `UNIQUE (version_id, lane)` as the transition rule; whether a finding on a superseded version can be dispositioned; whether resubmit after Ready is reachable; confirm `not_found` and `internal_error` as codes beyond the seven types.
-- [ ] W0-02: confirm the variable and command names above, the migrations path, the shared package name and the `Idempotency-Key` header.
-- [ ] W0-08: the sniffing rule and the two size limits the store enforces; the normalisation rule for filenames.
+- [x] W0-05: Admin reads the audit log and the operator view in slice 1 (W0-05 section 8); out-of-scope references answer 403, an unresolvable id 404 only for an `all_cases` holder (W0-05 section 4). Recorded at W0 exit.
+- [x] W0-06: `UNIQUE (version_id, lane)` confirmed (W0-06 9.3); a finding on a superseded version cannot be dispositioned (`version_superseded`, W0-06 5.2); resubmit after Ready is not reachable in slice 1 (W0-06 4.12); `not_found` and `internal_error` confirmed (W0-06 8.1). Recorded at W0 exit.
+- [x] W0-02: variable and command names, the migrations path (`rai-web/server/drizzle/`), the shared package (`@rai/shared`) and the `Idempotency-Key` header confirmed and applied above (W0-09).
+- [x] W0-08: sniffing rule (W0-08 section 2, hand-written, no library), the limits (25 MiB per file, 150 MiB per pack version) and the filename rule (200 NFC code points, no path or control characters) recorded in W0-08 section 3; the store's `maxBytes` and the temp-file layout (`tmp/`, `sha256/...`) are this spec's and W0-08 section 6 follows them (W0-09).
+- [ ] W0-07 proposals to this spec (W0-07 section 10): a nullable `qc_run.run_key` column with a partial unique index for replay lookup by key. Not added at W0 exit; the column-based lookup in W0-07 3.7 stands until the W2-05 contract PR asks for it. The `operator_job_run` table proposed by W0-10 section 7.3 is W3-07's migration, not this spec's schema.
 - [ ] D08 (DPO + IT/Security, before real data): choose among deletion options A/B/C; retention periods for business data, audit, notifications; draft retention; whether audit purge exists. ADR-0005 drafted then.
 - [ ] D10 (IT/Security + accountable owner): key custody for option B; production database roles and backup target for the restore test.
 - [ ] W5: `risk_tier` writer arrives with the rubric (D07); the column and its write gate exist from W1-00 so that no earlier ticket writes it.

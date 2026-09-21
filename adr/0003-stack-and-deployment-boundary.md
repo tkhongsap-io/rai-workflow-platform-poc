@@ -138,9 +138,9 @@ Not-found for an in-scope reference is 404 `not_found` (an eighth code beyond th
 - [ ] True host runtime, Node/Postgres versions available there, backup target and incident channels — IT/Security + accountable owner, **D10** (before networked test or W8). This ADR assumes only a Node LTS runtime, a Postgres instance and a private disk.
 - [ ] Production identity details (Entra tenant, AD group-to-role mapping) — W6/W8 at D10; W0-03 fixes only the configuration shape and the fail-closed rule.
 - [ ] Whether W4 QC runs in-process or in a worker — W4 entry, ADR-0006 (D08, D09).
-- [ ] Exact pinned versions of Node, Fastify, React, Vite, Drizzle, openid-client, Playwright and Postgres image — W0-02 records them with reasons; installed under W1-00 and W1-12.
-- [ ] Repository layout (app, tests, fixtures and config paths, docker-compose location, the architecture README's "Path in repo" column) — **W0-02**; see "Proposed for W0-02" below.
-- [ ] Whether an out-of-scope reference answers 403 (current contract) or 404 to hide case existence from probing — **W0-05** with the [threat model](../docs/security/threat-model.md); W0-06 confirms `not_found` as an eighth error code. Until recorded, W1 implements 403.
+- [x] Exact pinned versions of Node, Fastify, React, Vite, Drizzle, openid-client, Playwright and Postgres image — recorded with reasons in the [W0-02 plan](../docs/engineering/implementation-plan-w1-w3.md#4-pinned-dependencies) (merged 2026-09-21); installed under W1-00 and W1-12.
+- [x] Repository layout (app, tests, fixtures and config paths, docker-compose location, the architecture README's "Path in repo" column) — recorded in the [W0-02 plan](../docs/engineering/implementation-plan-w1-w3.md#1-repository-layout) (merged 2026-09-21), which accepted the proposal below.
+- [x] Whether an out-of-scope reference answers 403 (current contract) or 404 to hide case existence from probing — recorded by [W0-05 section 4](../docs/engineering/authorization-policy-matrix.md#4-out-of-scope-references-403-with-non-guessable-identifiers) (403, conditioned on non-guessable identifiers; 404 only for an `all_cases` holder on an unresolvable id) and carried into [W0-06 section 8](../docs/engineering/workflow-transition-and-error-contract.md#8-error-contract), which also confirms `not_found` as the eighth code and `internal_error` as the 500 catch-all. Closed at the W0 exit review ([W0-09](../changes/2026-09-21-w0-exit/review.md), 2026-09-21).
 
 ### Proposed for W0-02 (not part of D04)
 

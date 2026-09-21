@@ -1,8 +1,8 @@
 # Workflow transition and error contract (W0-06)
 
-Status: **W0 interface spec, written 2026-09-21 under ticket W0-06 (issue #11). Human review required (tech lead).** Nothing here is implemented; the consuming tickets are named per section. Source rules come from the frozen [source spec](../product/source-spec.md) and the [workflow contract](../product/workflow.md); recorded decisions D02, D05, D06, D11, D12 and the W0-04 field rule from the [register](../product/decisions.md) are carried as written. D07-D10 stay open and nothing below resolves them. HTTP codes come from [ADR-0003](../../adr/0003-stack-and-deployment-boundary.md) "Contract error codes"; this document confirms them and adds the body shapes.
+Status: **W0 interface spec, written 2026-09-21 under ticket W0-06 (issue #11). Human review required (tech lead). Reconciled with the sibling specs at the W0 exit review ([W0-09](../../changes/2026-09-21-w0-exit/review.md), 2026-09-21; each applied change is marked "W0-09:").** Nothing here is implemented; the consuming tickets are named per section. Source rules come from the frozen [source spec](../product/source-spec.md) and the [workflow contract](../product/workflow.md); recorded decisions D02, D05, D06, D11, D12 and the W0-04 field rule from the [register](../product/decisions.md) are carried as written. D07-D10 stay open and nothing below resolves them. HTTP codes come from [ADR-0003](../../adr/0003-stack-and-deployment-boundary.md) "Contract error codes"; this document confirms them and adds the body shapes.
 
-Stack (D04): TypeScript on Node 24, Fastify, Drizzle on Postgres 16, `node:test` and Playwright. The rules are stated so that they would hold under any stack; the stack-specific paragraphs say how to realise each rule with the chosen one. Repository paths follow the W0-02 file-level plan (`docs/engineering/implementation-plan-w1-w3.md`, written in parallel on its own branch; linked from here once it merges); where this document names a path it uses the `rai-web/*` layout that ADR-0003 proposed for W0-02, and W0-02 is authoritative if the two differ.
+Stack (D04): TypeScript on Node 24, Fastify, Drizzle on Postgres 16, `node:test` and Playwright. The rules are stated so that they would hold under any stack; the stack-specific paragraphs say how to realise each rule with the chosen one. Repository paths follow the [W0-02 file-level plan](implementation-plan-w1-w3.md#1-repository-layout); W0-02 is authoritative if the two differ. Column and table names in sections 2, 5 and 9 are the [W0-04 persistence spec](persistence-and-artifact-store.md)'s (W0-04 owns storage); section 2.5 maps this contract's field names onto them.
 
 Proves (when built): **A04** (one submission opens three lanes with the D02 mapping), **A07** (immutable versions, one successor on concurrent send-backs, stale actions fail, idempotent replay, every resubmission reopens all lanes), **A09** (Ready only from current-version approvals plus dispositions; no self-approval). Feeds A11 (audit trail reconstructs the journey).
 
@@ -50,7 +50,7 @@ Names follow the [data contract](../product/data-contract.md). Field-level persi
 - **Pack version.** `case_id`, `version_number` (1, 2, 3 ...; unique per case), `state` ∈ {`draft`, `submitted`}, `revision` (integer; see section 5.1), `parent_version_id` (null for v1), `submitted_by`, `submitted_at`, `checklist_template_version`, `config_revision_id` (QC, risk and SLA revision frozen at submit; W1-00, L12), `stage_context` (D11), `lane_mapping_version` (section 3), `ready_at` (null unless this version reached Ready). Exactly one draft may exist per case at a time (partial unique index; section 9.3).
 - **Artifact slot.** Nine per version: `slot` 1-9, `disposition` ∈ {`attached`, `not_yet`, `not_applicable`, `missing`}, `reason` (required for `not_applicable`), immutable blob reference and hash when attached (W1-03, W0-08).
 - **Lane.** A value, not a table row: `ai_coe`, `dpo`, `it_security`. A lane's state on a submitted version is derived from its lane decision (section 2.3).
-- **Lane decision.** `version_id`, `lane`, `decision` ∈ {`approved`, `sent_back`}, `actor_id`, `actor_role`, `decided_at`, `feedback` (required for `sent_back`; names at least one artifact slot and the deficiency), `qc_run_id` (approve: the lane-QC run the reviewer saw before deciding, which may be an `unavailable` run; send back: optional). Unique on (`version_id`, `lane`): one decision per lane per version, never updated.
+- **Lane decision.** `version_id`, `lane`, `decision` ∈ {`approve`, `send_back`} (the W0-04 column values; the derived lane states in 2.3 read `approved` / `sent_back`), `actor_subject_id`, `actor_role`, `decided_at`, `feedback` (required for `send_back`; names at least one artifact slot and the deficiency), `observed_qc_run_id` (approve: the lane-QC run the reviewer saw before deciding, which may be an `unavailable` run; send back: optional). Unique on (`version_id`, `lane`): one decision per lane per version, never updated.
 - **QC run and finding.** Written by the QC boundary (W0-07) through the workflow, never by QC directly. Each finding carries `version_id`, `rule_id`, `rule_revision`, `trigger` ∈ {`upload`, `submit`, `approve_attempt`}, `slot` (1-9 or null for pack-level), `kind` ∈ {`defect`, `unavailable`}, `severity`, evidence location and `owning_lane` (section 7). Append-only.
 - **Disposition event.** `finding_id`, `kind` ∈ {`fixed_proposed`, `fixed_confirmed`, `fixed`, `waived`, `not_applicable`}, `actor_id`, `actor_role`, `reason` (required for `waived` and `not_applicable`), `evidence`, `recorded_at`. Append-only; a finding's effective disposition is its latest event (section 4.8).
 - **Audit event.** `event_type` (section 4 names), `actor_id` (or `system`), `actor_role`, `case_id`, `version_id`, `lane` (nullable), `target_ref` (finding, decision or disposition ID), `correlation_id`, `idempotency_key` (nullable), `occurred_at`, `before_ref` and `after_ref` (references to the state rows, never document bytes). Append-only, same transaction as the change it describes (W0-04 audit rule).
@@ -75,8 +75,8 @@ A submitted version never changes state again. "Closed" is not a stored state; i
 | Lane state | Derived from |
 |---|---|
 | `pending` | No lane decision row for (version, lane) |
-| `approved` | Decision row with `decision = approved` |
-| `sent_back` | Decision row with `decision = sent_back` |
+| `approved` | Decision row with `decision = approve` |
+| `sent_back` | Decision row with `decision = send_back` |
 
 Lane states exist only on submitted versions. All three lanes are `pending` the instant a version is submitted (section 4.3). A lane's state on version N says nothing about version N+1 (D05).
 
@@ -98,14 +98,33 @@ There is no other value. "Ready for launch" means desk completion only, never Co
 
 The persistence spec must provide, at minimum: the fields listed in 2.1; the uniqueness constraints in 9.3; a row lock on Case (`SELECT ... FOR UPDATE`) usable from a Drizzle transaction; append-only lane decision, finding, disposition and audit tables with no update or delete path in the data-access layer; and the idempotency table of 5.3. Retention and deletion design stays W0-04's option list for D08 and is not touched by any event below.
 
+W0-09: W0-04 provides them under these names (W0-04 owns storage; this contract keeps its own field names in prose and this table is the mapping):
+
+| This contract | W0-04 column or derivation |
+|---|---|
+| Case `latest_submitted_version_id` | `case.current_version_id` (NULL until the first submit) |
+| Case `current_version_id` (latest by number, draft or submitted) | `case.draft_version_id` when set, else `case.current_version_id` |
+| Case `ready_version_id` | `case.current_version_id` when `case.desk_status = 'ready'`; the version row carries `pack_version.ready_at` |
+| Case `business_owner`, `business_unit` (scope) | `case.owner_subject_id`, `case.business_unit_id` (the descriptive text columns of the same names are never used for access) |
+| Version `state` ∈ {`draft`, `submitted`} | `pack_version.submitted_at IS NULL` / `IS NOT NULL` |
+| Version `revision` | `case.row_version`, one optimistic counter per case incremented by every draft-time write (W0-02 `caseRevision` = `draftRevision`) |
+| Version `config_revision_id`, `ready_at` | `pack_version.configuration_revision_id` (plus `frozen_configuration`), `pack_version.ready_at` (added for this contract at W0-09) |
+| Slot `disposition` | `artifact_slot.state` |
+| Decision `decision` ∈ {`approve`, `send_back`}, `actor_id`, `qc_run_id` | `lane_decision.decision`, `actor_subject_id`, `observed_qc_run_id` |
+| Finding `trigger` | `qc_run.trigger` of the finding's run |
+| Disposition `recorded_at` | `disposition_event.created_at` |
+| Idempotency record | `idempotency_key (actor_subject_id, key)` with `action`, `request_digest`, `response_status`, `response_body` (5.3) |
+| Audit event | `audit_event` with `action` = the 9.4 names |
+| Tables named in 9.2 and 9.3 | singular W0-04 names: `pack_version`, `artifact_slot`, `lane_decision`, `qc_finding`, `disposition_event`, `audit_event`, `idempotency_key` |
+
 ## 3. Lane mapping constant
 
 Recorded decision D02: AI/COE reviews slots 1 and 5; DPO 2, 3, 4, 5; IT/Security 5, 6, 7, 8; slot 9 has no lane gate. All lanes open regardless of proposed risk tier (source spec "Risk tier": High never skips a lane).
 
-The mapping is a **versioned constant in code**, exported from the shared package (`rai-web/shared`, path per W0-02), and is **not** a configuration revision: the source spec's Admin row covers document templates, QC rules and thresholds, SLA values and the production AD group-to-role mapping (R10, L12), not which lane reviews which slot. Admin cannot edit it, no endpoint writes it, and the configuration-revision store (W1-00) never holds it.
+The mapping is a **versioned constant in code**, exported from the shared package (`rai-web/shared/src/constants.ts`, W0-02 section 1), and is **not** a configuration revision: the source spec's Admin row covers document templates, QC rules and thresholds, SLA values and the production AD group-to-role mapping (R10, L12), not which lane reviews which slot. Admin cannot edit it, no endpoint writes it, and the configuration-revision store (W1-00) never holds it.
 
 ```ts
-// rai-web/shared/src/workflow/lane-mapping.ts  (path per W0-02)
+// rai-web/shared/src/constants.ts  (W0-02 section 1)
 export type Lane = 'ai_coe' | 'dpo' | 'it_security';
 export type Slot = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 
@@ -132,7 +151,7 @@ export const CURRENT_LANE_MAPPING = LANE_MAPPING_V1;
 
 Rules:
 
-- **Recorded on the version.** Submit and resubmit copy `CURRENT_LANE_MAPPING.version` into `pack_versions.lane_mapping_version` (W1-05 done-when). Every later read of a version's lanes resolves the mapping by that recorded version string, never by `CURRENT_LANE_MAPPING`, so a future `lane-mapping/v2` cannot reinterpret an old version.
+- **Recorded on the version.** Submit and resubmit copy `CURRENT_LANE_MAPPING.version` into `pack_version.lane_mapping_version` (W1-05 done-when; W0-04 also stores the content in `lane_mapping jsonb`). Every later read of a version's lanes resolves the mapping by that recorded version string, never by `CURRENT_LANE_MAPPING`, so a future `lane-mapping/v2` cannot reinterpret an old version.
 - **Changing it** is a code change that adds a new frozen constant (`LANE_MAPPING_V2`), keeps `LANE_MAPPING_V1` exported for old versions, and needs a new register row (a changed D02) before the constant switches. Agents may not do this (team-and-roles "may not").
 - **Frozen by test.** A unit test asserts the exact slot sets and the version string of `LANE_MAPPING_V1` (A04 expected values are frozen on D02); changing the constant fails that test until the test is deliberately updated in the same PR as the register row.
 - **Lane lookup helpers** (`lanesForSlot(slot, mapping): Lane[]`, `slotsForLane(lane, mapping): Slot[]`) are pure functions of the mapping argument; `lanesForSlot(5)` returns all three lanes, `lanesForSlot(9)` returns `[]`.
@@ -142,14 +161,14 @@ Rules:
 Every mutating event runs as **one Postgres transaction** that begins by locking the Case row (section 9.1) and ends by writing the audit event, so the state change, its audit row and any notification outbox row commit or roll back together. Checks run in the order below and the **first failure wins**; the response carries exactly one error code (section 8):
 
 1. **Authentication** — session verified by the identity adapter (W0-03) → else `unauthenticated`.
-2. **Authorization** — the W0-05 policy module answers role × action × scope; includes the D05 no-self-approval rule → else `forbidden` (or `not_found`, per the W0-05 open item in section 8.4).
-3. **Existence** — the case and version referenced exist in the actor's scope → else `not_found`.
+2. **Authorization** — the W0-05 policy module answers role × action × scope; includes the D05 no-self-approval rule → else `forbidden` (W0-09: the 403/404 item is closed by [W0-05 section 4](authorization-policy-matrix.md#4-out-of-scope-references-403-with-non-guessable-identifiers); `forbidden` only).
+3. **Existence** — the case and version referenced exist in the actor's scope → else `not_found`, where "in the actor's scope" is the W0-05 scope predicate: covered by an `all_cases` row, or resolved and covered by an `own_cases` / `business_unit` grant, so an unresolvable case id is `not_found` only for an `all_cases` holder and `forbidden` for an owner or BU SPOC.
 4. **Input validation** — shape, required fields, locale-keyed field errors → else `invalid_input`. Upload safety (W0-08) → else `unsafe_upload`.
 5. **Idempotency replay** — a stored response for (actor, action, key) is returned as-is (section 5.3).
 6. **Expected version and state** — section 5 → else `stale_version`.
 7. **Apply** — writes, audit row, outbox rows, projections; commit.
 
-Authorization is decided before existence so that an out-of-scope caller learns nothing from the difference between "no such case" and "not yours" (ADR-0003 open item; W0-05 records the final 403/404 choice).
+Authorization is decided before existence so that an out-of-scope caller learns nothing from the difference between "no such case" and "not yours" (ADR-0003 open item, recorded by W0-05 section 4: 403, with non-guessable identifiers). The W0-05 middleware realises steps 2 and 3 as one helper.
 
 Actor columns below summarise the W0-05 matrix for the workflow rows; W0-05 is authoritative for authorization and this document does not extend it.
 
@@ -160,7 +179,7 @@ Actor columns below summarise the W0-05 matrix for the workflow rows; W0-05 is a
 | Actor | Owner (becomes `business_owner`) or BU SPOC of the case's BU (may name the owner). Reviewers and Admin: `forbidden`. |
 | Input | Inherited fields incl. `source_record_id` or `Unknown` (L10), `use_case_group` from the configured list (D11), desk-local `vendor_involved` and `model_type` (W0-04 fields), `Idempotency-Key`. |
 | Preconditions | None beyond checks 1-5. |
-| Postconditions | Case row; pack version v1 in state `draft`, `revision = 1`, `parent_version_id = null`, nine slots initialised (`missing`, except slots 3 and 4 = `not_applicable` with the default reason when `vendor_involved = false`, W1-04); `current_version_id = v1`; the four inherited status fields at their W0-04 "not yet reviewed" value. |
+| Postconditions | Case row; pack version v1 in state `draft`, `revision = 1` (the case counter, W0-04 `row_version`), `parent_version_id = null`, nine slots initialised (`missing`, except slots 3 and 4 = `not_applicable` with the default reason when `vendor_involved = false`, W1-04); `current_version_id = v1`; the four inherited status fields at their W0-04 "not yet reviewed" value. |
 | Audit | `case.created` (actor, case, version v1, correlation ID). |
 | Errors | `unauthenticated`, `forbidden`, `invalid_input` (missing required field, `use_case_group` outside the configured list, a write to an inherited status field). |
 | Ticket | W1-02. |
@@ -172,7 +191,7 @@ Covers editing case fields on the draft, setting slot dispositions and reasons, 
 | | |
 |---|---|
 | Actor | Owner of the case or BU SPOC of its BU. Reviewers and Admin: `forbidden`. |
-| Input | Draft version reference with `expectedVersion` (section 5.1), the changed fields. |
+| Input | Draft version reference with `expectedVersion` (section 5.1), the changed fields. W0-09: on the W0-02 routes this is `PUT /api/cases/{caseId}/draft` (slots, template version, stage context; `expectedVersion` in the body) and `PATCH /api/cases/{caseId}` (case fields; `expectedCaseRevision`, the same `case.row_version` counter, so the two checks are one rule). |
 | Preconditions | Target version is the case's current version **and** in state `draft`; `expectedVersion.revision` equals the stored revision. Case is not Ready (a Ready case has no draft, so this follows). |
 | Postconditions | Fields written; `revision` incremented by exactly one; `not_applicable` without a reason is rejected before any write. |
 | Audit | `draft.saved` (actor, version, revision before/after, changed-field list as references; slot changes list slot numbers and new dispositions). Attaching an artifact also records the blob hash reference. |
@@ -202,7 +221,7 @@ Per-upload QC (source spec trigger "on each upload") runs after the attach commi
 | Input | Submitted version reference with `expectedVersion`, `lane`, `Idempotency-Key`, the `qc_run_id` the reviewer saw (an `unavailable` run has an ID too). |
 | Preconditions | Target version is `submitted`, is `latest_submitted_version_id`, is the case's **current** version (no successor draft exists) and is not Ready; lane state is `pending`. |
 | Lane QC | Source spec trigger "on each approve attempt": the lane's document rules run **before** the approval is recorded and their findings are shown to the reviewer. Two server calls: the reviewer workspace (W2-07) requests the lane-QC run for (version, lane) through the run endpoint the W2-02 contract PR adds to the W0-02 shapes (slice 1: the W1-10 substitute answers; an outage yields an `unavailable` finding, section 8.3), shows the findings, and only then offers the decision controls; the approve event carries that run's ID. The server rejects an approval whose `qc_run_id` is not the latest lane-QC run for that (version, lane) with `stale_version` reason `qc_run_superseded`, and an approval with no run at all with `invalid_input` (`lane_qc_not_run`), so a reviewer cannot approve past an unseen defect. An `unavailable` run is a valid run to have seen; it never counts as clean. |
-| Postconditions | Lane decision row (`approved`); W0-04 projection written in the same transaction (DPO → `privacy_status`, IT/Security → `security_status`, AI/COE → `rai_status`; section 4.10); Ready predicate evaluated (section 6) and, if satisfied, the Ready transition applied in the same transaction. |
+| Postconditions | Lane decision row (`decision = approve`); W0-04 projection written in the same transaction (DPO → `privacy_status`, IT/Security → `security_status`, AI/COE → `rai_status`; section 4.10); Ready predicate evaluated (section 6) and, if satisfied, the Ready transition applied in the same transaction. |
 | Audit | `lane.approved` (actor, role, version, lane, `qc_run_id`, correlation ID, idempotency key). If Ready follows: `case.ready_for_launch` in the same transaction with `triggered_by = this event`. |
 | Errors | `unauthenticated`, `forbidden` (wrong lane; Admin; owner/SPOC; self-approval), `not_found`, `invalid_input` (unknown lane; `qc_run_id` missing), `stale_version` (`version_superseded`: a newer submitted version exists; `version_closed`: a successor draft exists after another lane's send-back, or the version is Ready; `lane_already_decided`: this lane already approved or sent back this version; `qc_run_superseded`). |
 | Ticket | W2-02. |
@@ -216,7 +235,7 @@ Findings never become implicit approvals and approvals never disposition finding
 | Actor | As 4.4 (same lane ownership and no-self-approval rule; D05 applies to "approve a lane", and sending back is the other half of the same lane decision, so the same actor rule holds — W0-05 row "Approve or send back a lane"). |
 | Input | Submitted version reference with `expectedVersion`, `lane`, `Idempotency-Key`, `feedback` = `{ items: Array<{ slot: Slot; deficiency: string }>, summary?: string }` with at least one item (A09: artifact-specific adequacy feedback). |
 | Preconditions | Target version is `submitted`, is `latest_submitted_version_id`, is not Ready; lane state is `pending`. **Unlike approve, a successor draft may already exist** (concurrent send-back). |
-| Postconditions | Lane decision row (`sent_back`, feedback); projection for the lane written (section 4.10); **successor draft**: if no draft with `parent_version_id = N` exists, create version N+1 in state `draft`, `revision = 1`, slots and artifact references **copied** from N (the owner edits what the feedback names; nothing is silently dropped), `stage_context` copied, `case.current_version_id = N+1`, audit `draft.successor_created`; if one exists already, reuse it and write nothing to it (D05: concurrent send-backs merge into one successor draft). Version N stays readable and unchanged (A07). Notification outbox row `sent_back` to the owner (and BU SPOC scope per W0-05) naming the lane and carrying the feedback (W3-03). |
+| Postconditions | Lane decision row (`decision = send_back`, feedback); projection for the lane written (section 4.10); **successor draft**: if no draft with `parent_version_id = N` exists, create version N+1 in state `draft` (`revision` is the case counter, which continues), slots and artifact references **copied** from N (the owner edits what the feedback names; nothing is silently dropped), `stage_context` copied, `case.current_version_id = N+1`, audit `draft.successor_created`; if one exists already, reuse it and write nothing to it (D05: concurrent send-backs merge into one successor draft). Version N stays readable and unchanged (A07). Notification outbox row `sent_back` to the owner (and BU SPOC scope per W0-05) naming the lane and carrying the feedback (W3-03). |
 | Audit | `lane.sent_back` (actor, role, version N, lane, feedback reference, correlation ID); plus `draft.successor_created` (actor = the sending-back reviewer as trigger, version N+1, parent N) only on first send-back. |
 | Errors | `unauthenticated`, `forbidden`, `not_found`, `invalid_input` (feedback missing, empty items, an item without a slot or without a deficiency, slot outside 1-9), `stale_version` (`version_superseded`; `version_closed` only when N is Ready; `lane_already_decided`). |
 | Tickets | W2-02 (decision and feedback), W2-03 (successor draft, merge, N readable). |
@@ -269,7 +288,7 @@ Ready is a **system transition**, not a user action: no role has the authority t
 |---|---|
 | Actor | `system`; the audit event carries `triggered_by` = the ID of the approval or disposition event, whose actor is therefore attributable (A11). |
 | Preconditions | Section 6, rechecked under the Case row lock immediately before writing. |
-| Postconditions | `pack_versions.ready_at` set on the version; `case.ready_version_id = version`; `ai_readiness_status` projection written (W0-04 fields); notification outbox row `ready_for_launch` to the owner scope (W3-03). No further mutating event is accepted on the case in slice 1 (section 4.12). |
+| Postconditions | `pack_version.ready_at` set on the version; the case reads as Ready (`case.desk_status = 'ready'`, W0-04; this contract's `ready_version_id`); `ai_readiness_status` projection written (W0-04 fields); notification outbox row `ready_for_launch` to the owner scope (W3-03). No further mutating event is accepted on the case in slice 1 (section 4.12). |
 | Audit | `case.ready_for_launch` (system, version, `triggered_by`, the three approval decision IDs and the count of dispositioned findings as references). |
 | Errors | None returned to a caller; if the recheck fails, nothing is written and the triggering event still commits (a lane approval with open findings is valid on its own). |
 | Ticket | W2-06. |
@@ -282,13 +301,13 @@ The four inherited status fields are read-only projections written only by the w
 
 | Event | Writes |
 |---|---|
-| Create | All four to the W0-04 "not yet reviewed" value |
-| Submit, resubmit | The three lane projections to "pending review" (a resubmission reopens all lanes, so no approval reads through) |
-| Approve lane | That lane's projection to "approved" |
-| Send back | That lane's projection to "sent back" |
-| Ready | `ai_readiness_status` to "ready" |
+| Create | All four to the W0-04 "not yet reviewed" value: `pending` for the three lane projections, `not_ready` for `ai_readiness_status` |
+| Submit, resubmit | The three lane projections to `pending` (a resubmission reopens all lanes, so no approval reads through) |
+| Approve lane | That lane's projection to `approved` |
+| Send back | That lane's projection to `sent_back` |
+| Ready | `ai_readiness_status` to `ready` |
 
-The value vocabulary is W0-04's. They are never a second record of a decision: the lane-decision rows and `ready_at` are the authority, the projection is recomputable from them, and no owner or BU SPOC write path touches them (W1-02 rejects such a write with `invalid_input`).
+The value vocabulary is W0-04's (`pending` / `approved` / `sent_back`; `not_ready` / `ready`; W0-09 recorded the words here and closed the section 11 item). They are never a second record of a decision: the lane-decision rows and `ready_at` are the authority, the projection is recomputable from them, and no owner or BU SPOC write path touches them (W1-02 rejects such a write with `invalid_input`).
 
 ### 4.11 Notifications follow committed events
 
@@ -305,14 +324,14 @@ The source defines no transition out of Ready for launch. Slice 1 therefore acce
 Every mutating request carries the version the actor was looking at:
 
 ```ts
-// rai-web/shared/src/workflow/expected-version.ts (path per W0-02)
+// rai-web/shared/src/schemas/versions.ts (W0-02 section 7.6, verbatim)
 export interface ExpectedVersion {
-  versionId: string;      // pack version ID the client rendered
-  revision: number;       // that version's revision as rendered (frozen for submitted versions)
+  versionId: string;      // pack version ID the client rendered (the W0-02 draftId for draft actions)
+  revision: number;       // that version's revision as rendered: W0-04 case.row_version (frozen for submitted versions)
 }
 ```
 
-- `revision` starts at 1 on create or successor creation and increments by one on every committed save-draft. Submit freezes it; the submitted version's revision never changes, so for submitted-version actions `revision` is a consistency check only and the state checks below carry the meaning.
+- `revision` is the W0-04 `case.row_version` counter (W0-09 mapping, section 2.5): 1 at create, incremented by one on every committed draft-time write (case fields or slots) of the case. Submit freezes the value the client saw as the version's `revision`; a submitted version's revision never changes, so for submitted-version actions `revision` is a consistency check only and the state checks below carry the meaning.
 - The server compares against the rows under the Case lock (section 9.1). Any mismatch is `stale_version`, nothing is written, and the response carries the current reference and a reason (section 8.2).
 
 ### 5.2 Rules by action
@@ -336,7 +355,7 @@ The send-back row is the one deliberate asymmetry: a successor draft does not ma
 
 - **Required** on create, submit, resubmit, approve, send back and disposition, as the HTTP header `Idempotency-Key` (a client-generated UUID v4 per user action; a retry of the same action reuses it; a new action after refresh gets a new one). Missing → `invalid_input` with `path: 'header.idempotency-key'`.
 - **Not used** on save draft (the revision check makes a duplicate save fail closed as `stale_version`, which is the correct outcome once the first save applied) and on uploads (idempotent by content hash, W1-03). Ready is system-triggered and has no key.
-- **Stored** in `idempotency_records (actor_id, action, key) primary key, request_hash, response_status, response_body, case_id, created_at`, written inside the event's transaction. A retry with the same triple and the same `request_hash` returns the stored `response_status` and `response_body` **without re-running checks 6-7** (A07: "replay is idempotent"; ADR-0003: replay returns the original success, not an error). The same triple with a different `request_hash` is `invalid_input` (`path: 'header.idempotency-key'`, key `error.invalid_input.idempotency_key_reused`). Records expire after 24 hours (operator-configurable later; W0-04 cleanup rule).
+- **Stored** in the W0-04 `idempotency_key` table (`actor_subject_id, key` primary key; `action`, `target_case_id`, `request_digest`, `response_status`, `response_body`, `created_at`), written inside the event's transaction. A retry with the same actor and key and the same `request_digest` returns the stored `response_status` and `response_body` **without re-running checks 6-7** (A07: "replay is idempotent"; ADR-0003: replay returns the original success, not an error). The same actor and key with a different `request_digest` (which covers the action and the body) is `invalid_input` (`path: 'header.idempotency-key'`, key `error.invalid_input.idempotency_key_reused`). Records expire after `IDEMPOTENCY_TTL_HOURS`, 72 by default (W0-04 cleanup rule; W0-09 aligned the earlier 24 hours to W0-04).
 - The audit event of the applied action carries the key; a replay writes **no** audit event and no outbox row.
 
 ## 6. Ready predicate
@@ -446,7 +465,7 @@ export interface ErrorDetails {
     refreshPath: string;               // relative app path of the current version; never an absolute host
   };
   invalid_input: { fields: Array<{ path: string; messageKey: string; params?: Record<string, string | number> }> };
-  unsafe_upload: { reasonKey: string };                  // reason vocabulary owned by W0-08; no byte content
+  unsafe_upload: { reasonKey: string; params?: Record<string, string | number> };   // reasonKey = `error.unsafe_upload.<reason>`, reason vocabulary owned by W0-08 section 5; params carry the limit for too_large, pack_total_exceeded, image_too_large (W0-09); no byte content
   qc_unavailable: { qcRunId?: string };
   mail_delivery_failed: { notificationId: string; attempts: number; nextRetryAt?: string };
   not_found: { resource: 'case' | 'version' | 'finding' | 'artifact' | 'notification' };
@@ -464,11 +483,11 @@ Rules: every error response has `Cache-Control: no-store`; `forbidden` and `unau
 - **Unsafe upload.** Bytes are not persisted; no artifact row; a structured log line records only size, sniffed type and hash of the rejected bytes (no content). Distinct from soft QC: the promise of soft QC does not accept unsafe bytes (workflow "Failure behavior").
 - **QC unavailable.** On upload, submit and approve attempt the business action **succeeds** and an `unavailable` finding with an `owning_lane` (section 7) is appended; the reviewer sees it before deciding; it counts as an undispositioned finding for Ready until dispositioned. No silent cloud fallback. The 503 is reserved for synchronous QC endpoints.
 - **Mail delivery failed.** The committed event stands; the notification record carries `deliveryStatus = { code: 'mail_delivery_failed', attempts, nextRetryAt }`, retried three times with backoff and visible to Admin (D06, W3-04). Never returned on approve, send back, submit or Ready.
-- **Not found.** Only for an in-scope reference. Whether an out-of-scope reference answers 403 (current) or 404 is the W0-05 open item (section 8.4).
+- **Not found.** Only for an in-scope reference, as [W0-05 section 4](authorization-policy-matrix.md#4-out-of-scope-references-403-with-non-guessable-identifiers) makes evaluable: an unresolvable case or artifact id is 404 only for an actor holding an `all_cases` row for the action; an owner or BU SPOC gets 403 whether or not the case exists.
 
-### 8.4 Open item carried from ADR-0003 (for W0-05)
+### 8.4 Out-of-scope references: recorded by W0-05 (closed at W0 exit)
 
-Out-of-scope references currently answer `forbidden` (403). Because checks run authorization before existence (section 4), a caller outside the case's scope gets 403 whether or not the case exists, so existence is not disclosed by the 403/404 difference; the remaining disclosure is only that the 403 differs from 404 for a *malformed or non-existent* ID inside the caller's own scope. W0-05 records the final choice with the threat model; until then W1 implements 403 as ADR-0003 says.
+Out-of-scope references answer `forbidden` (403), conditioned on non-guessable route identifiers; ADR-0003 assigned the choice to W0-05, which recorded it in its section 4 with the threat-model reasoning, and W0-09 closed this item on 2026-09-21. Because checks run authorization before existence (section 4), a caller outside the case's scope gets 403 whether or not the case exists, so existence is not disclosed by the 403/404 difference. If the identifier rule ever changes (routes keyed on `registry_id`), W0-05 section 4 flips the answer to 404 in its own contract PR and this section follows.
 
 ### 8.5 Locale keys
 
@@ -487,6 +506,7 @@ Keys are the contract; the strings are initial values in the locale files that L
 | `error.stale_version.guidance.ready` | เคสนี้อยู่ในสถานะ Ready for launch แล้ว ไม่สามารถแก้ไขได้ | This case is Ready for launch and can no longer be changed. |
 | `error.invalid_input` | ข้อมูลบางรายการไม่ถูกต้อง กรุณาตรวจสอบแล้วลองอีกครั้ง | Some fields are invalid. Check them and try again. |
 | `error.invalid_input.idempotency_key_reused` | คำขอนี้ซ้ำกับคำขอก่อนหน้าที่มีเนื้อหาต่างกัน | This request key was already used with different content. |
+| `error.invalid_input.projected_field` | ฟิลด์สถานะนี้เขียนโดยระบบเท่านั้น | This status field is written only by the workflow. |
 | `error.unsafe_upload` | ไม่สามารถรับไฟล์นี้ได้ | This file cannot be accepted. |
 | `error.qc_unavailable` | ระบบตรวจสอบ QC ไม่พร้อมใช้งาน ผลตรวจถูกบันทึกว่า "ไม่พร้อมใช้งาน" ไม่ใช่ผ่าน | QC is unavailable. The check is recorded as unavailable, not as passed. |
 | `error.mail_delivery_failed` | ส่งอีเมลแจ้งเตือนไม่สำเร็จ การตัดสินใจถูกบันทึกแล้วและระบบจะลองส่งอีกครั้ง | The notification email could not be delivered. The decision is recorded and delivery will be retried. |
@@ -516,25 +536,25 @@ await db.transaction(async (tx) => {
 - Isolation `READ COMMITTED` (Postgres default) is sufficient because every mutating event on a case first takes `SELECT ... FOR UPDATE` on the Case row; two events on the same case therefore never interleave, and each sees the other's committed result after the lock. Events on different cases do not contend.
 - QC-finding appends (after commit of upload or submit) take the same lock for the duration of their append (section 6 last paragraph).
 - Reads never lock. Lists and searches (W3-01) see committed state only.
-- A lock wait longer than 5 s (Fastify request timeout budget, W0-09 records the number) aborts the transaction and answers `internal_error`; the client may retry with the same idempotency key.
+- A lock wait longer than 5 s (`SET LOCAL lock_timeout = '5s'`, W0-04; recorded as a target in [performance targets](performance-targets.md) by W0-09) aborts the transaction and answers `internal_error`; the client may retry with the same idempotency key.
 
 ### 9.2 Immutability of submitted versions
 
-Enforced twice: the data-access layer exposes no update for `pack_versions` (except `ready_at`, set once, and the state flip in submit), `artifact_slots` of a submitted version, `lane_decisions`, `findings`, `dispositions`, `audit_events`; and a Postgres trigger `BEFORE UPDATE OR DELETE` on those tables raises for any row whose version is submitted (`RAISE EXCEPTION 'immutable'`), so a bug or a migration cannot rewrite them (W0-04 schema-evolution rule: reshaping copies forward). W1-05's "a second write to that version's artifact ref is rejected" test hits both layers. Any application-level attempt is answered `stale_version` (`version_closed`) or `invalid_input`, never a silent no-op.
+Enforced twice: the data-access layer exposes no update for `pack_version` (except `ready_at`, set once, and the submit freeze), `artifact_slot` of a submitted version, `lane_decision`, `qc_finding`, `disposition_event`, `audit_event`; and a Postgres trigger `BEFORE UPDATE OR DELETE` on those tables raises for any row whose version is submitted (W0-04: `rai.frozen_version`), so a bug or a migration cannot rewrite them (W0-04 schema-evolution rule: reshaping copies forward). W1-05's "a second write to that version's artifact ref is rejected" test hits both layers. Any application-level attempt is answered `stale_version` (`version_closed`) or `invalid_input`, never a silent no-op.
 
-The `pack_versions` trigger is the one exception, and it is exact so that the transitions of 4.3 and 4.9 can commit: it evaluates `OLD.state`, not `NEW.state`, and permits exactly two changes — (1) when `OLD.state = 'draft'`, the submit flip to `NEW.state = 'submitted'` together with the fields 4.3(a) freezes in that same statement (`submitted_by`, `submitted_at`, `checklist_template_version`, `config_revision_id`, `stage_context`, `lane_mapping_version`; a draft row is otherwise mutable, so save draft's `revision + 1` never reaches the raise); (2) when `OLD.state = 'submitted'`, `ready_at` from `null` to a value with every other column equal to `OLD` (`NEW IS NOT DISTINCT FROM OLD` apart from `ready_at`). Every other `UPDATE` of a row whose `OLD.state = 'submitted'` raises, `DELETE` of such a row always raises, and a second write to `ready_at` raises because it is no longer null. `artifact_slots`, `lane_decisions`, `findings`, `dispositions` and `audit_events` keep the unconditional raise once their version is submitted (`audit_events` and `dispositions` are append-only in every state). The proposed risk tier that pack QC writes after submit (4.3 "After commit") is therefore not a `pack_versions` column; W0-04 stores it with the QC run, where the trigger does not fire.
+The `pack_version` trigger is the one exception, and it is exact so that the transitions of 4.3 and 4.9 can commit: it evaluates `OLD.submitted_at` (the W0-04 column that stands for this contract's `state`), not `NEW`, and permits exactly two changes — (1) when `OLD.submitted_at IS NULL`, the submit freeze that sets `submitted_at` together with the fields 4.3(a) freezes in that same statement (`submitted_by`, `submitted_role`, `checklist_template_version`, `configuration_revision_id`, `frozen_configuration`, `stage_context`, `lane_mapping_version`, `manifest_hash`; a draft row is otherwise mutable, so a save draft never reaches the raise); (2) when `OLD.submitted_at IS NOT NULL`, `ready_at` from `null` to a value with every other column equal to `OLD` (`NEW IS NOT DISTINCT FROM OLD` apart from `ready_at`). Every other `UPDATE` of a row whose `OLD.submitted_at IS NOT NULL` raises, `DELETE` of such a row always raises, and a second write to `ready_at` raises because it is no longer null. `artifact_slot`, `lane_decision`, `qc_finding`, `disposition_event` and `audit_event` keep the unconditional raise once their version is submitted (`audit_event` and `disposition_event` are append-only in every state). The proposed risk tier that pack QC writes after submit (4.3 "After commit") is therefore not a `pack_version` column in this contract's sense; W0-04 stores it on `case.risk_tier` under the same workflow-only write gate (W5).
 
 ### 9.3 Constraints that back the rules
 
 | Constraint | Backs |
 |---|---|
-| `pack_versions (case_id, version_number)` unique | one numbering per case |
-| partial unique `pack_versions (case_id) where state = 'draft'` | one draft per case; concurrent send-backs cannot create two successors (A07) |
-| `lane_decisions (version_id, lane)` unique | one decision per lane per version; second decision is `lane_already_decided` |
-| `idempotency_records (actor_id, action, key)` primary key | replay |
-| `cases.ready_version_id` references a submitted version of the same case | Ready points at a real version |
-| check `dispositions.reason is not null` when kind in (`waived`, `not_applicable`) | reason rule at the store, not only in code |
-| foreign keys from `audit_events` to case and version, no cascade delete | audit rows outlive nothing |
+| `pack_version (case_id, version_number)` unique | one numbering per case |
+| partial unique `pack_version (case_id) where submitted_at is null` | one draft per case; concurrent send-backs cannot create two successors (A07); W0-04 additionally keys the open draft through `case.draft_version_id` under the case lock |
+| `lane_decision (version_id, lane)` unique | one decision per lane per version; second decision is `lane_already_decided` |
+| `idempotency_key (actor_subject_id, key)` primary key | replay |
+| `case.current_version_id` references a submitted version of the same case; `pack_version.ready_at` set once | Ready points at a real version |
+| check `disposition_event.reason is not null` when kind in (`waived`, `not_applicable`) | reason rule at the store, not only in code |
+| foreign keys from `audit_event` to case and version, no cascade delete | audit rows outlive nothing |
 
 ### 9.4 Audit events written by this contract
 
@@ -563,7 +583,7 @@ Layer names follow the W0-02 test-layer map: **unit** (`node:test`, no database)
 | Lane mapping exact values and version string | `LANE_MAPPING_V1` equals the D02 sets; `lanesForSlot(5)` = all three; `lanesForSlot(9)` = [] | unit | W1-00 | A04 |
 | Error codes and statuses | each of the eight codes maps to its HTTP status; envelope has `code`, `messageKey`, `correlationId`; `forbidden`/`unauthenticated` carry no details | unit | W1-00 | — |
 | Submit freeze and mapping recorded | submitted version records `config_revision_id` and `lane_mapping_version`; second write to an artifact ref fails at DAL and at trigger | integration | W1-05 | A07 |
-| `pack_versions` trigger exception (section 9.2) | submit flip `draft → submitted` with the frozen fields passes; on a submitted row, `ready_at` `null → value` alone passes, any other column change raises `immutable`, `DELETE` raises, a second `ready_at` write raises | integration | W1-05 (trigger), W2-06 (Ready uses it) | A07, A09 |
+| `pack_version` trigger exception (section 9.2) | submit freeze (`submitted_at` set with the frozen fields) passes; on a submitted row, `ready_at` `null → value` alone passes, any other column change raises `rai.frozen_version`, `DELETE` raises, a second `ready_at` write raises | integration | W1-05 (trigger), W2-06 (Ready uses it) | A07, A09 |
 | Stale save draft | save with an old `revision` → 409 `stale_version` reason `revision_changed`; save on a draft that was submitted meanwhile → `version_superseded`; both carry `current` and `guidanceKey`; version, slot and audit rows unchanged after each (sections 4.2, 5.2) | integration | W1-04 (slots), W1-02 (fields) | A07 |
 | Submit stale and replay | same `Idempotency-Key` + same body → identical 200 (status and body), exactly one submitted version and exactly one `version.submitted` audit row; a different key on the already-submitted draft → 409 `stale_version` reason `version_superseded`, nothing written; same key + different body → 422 `invalid_input` (`error.invalid_input.idempotency_key_reused`) (sections 4.3, 5.3) | integration | W1-05 | A07 |
 | Three lanes atomically | submit yields exactly three `lane.opened` rows in one transaction; injected failure on the third rolls back all; High risk opens all three | integration | W2-01 | A04 |
@@ -579,7 +599,7 @@ Layer names follow the W0-02 test-layer map: **unit** (`node:test`, no database)
 | Owning lane by slot | single-lane `defect` finding carries the slot's lane; `owningLaneForSlot(5)` and `(9)` return `'refinement_pending'`; slot-5, pack-level and `unavailable` cases run only after section 7.3 is recorded | unit + integration | W2-05 | A09 |
 | Ready predicate | three current approvals + zero undispositioned → `ready_at` set in the approving transaction; open finding blocks; `unavailable` finding blocks (this case runs only after section 7.3 is recorded, since the fixture finding needs an `owning_lane`); stale (previous-version) approval blocks; concurrent new finding under the lock blocks; `case.ready_for_launch` audit row carries `triggered_by` | integration | W2-06 | A09 |
 | After Ready | any mutating event → 409 `version_closed` with guidance `ready` | integration | W2-06 | A09 |
-| Audit reconstruction | the W2 journey can be replayed from `audit_events` alone; update/delete of an audit row through the DAL throws | integration | W2-08 | A11 |
+| Audit reconstruction | the W2 journey can be replayed from `audit_event` rows alone; update/delete of an audit row through the DAL throws | integration | W2-08 | A11 |
 | No outbox on rollback | a rolled-back send-back leaves no outbox row; mail failure leaves the decision row intact | integration | W3-03, W3-04 | A05 |
 
 Substitute runs (W1-13, W2-10) must return the same envelope and codes but are never acceptance evidence.
@@ -589,10 +609,10 @@ Substitute runs (W1-13, W2-10) must return the same envelope and codes but are n
 | Item | Owner | Due | Status |
 |---|---|---|---|
 | Owning lane for slot 5, slot 9, pack-level and `unavailable` findings of every trigger (approve attempt, upload, submit); disposition carry-forward (section 7.3) | Review leads, within D05; Ta records | Before W2-05 starts | **Open** |
-| 403 vs 404 for out-of-scope references (section 8.4) | W0-05 with the threat model | W0 exit | Open; W1 implements 403 |
-| Vocabulary of the four projected status fields (section 4.10) | W0-04 | W0 exit | Open in W0-04 |
+| 403 vs 404 for out-of-scope references (section 8.4) | W0-05 with the threat model | W0 exit | **Closed 2026-09-21**: 403 with non-guessable ids (W0-05 section 4); sections 4, 8.3 and 8.4 updated by W0-09 |
+| Vocabulary of the four projected status fields (section 4.10) | W0-04 | W0 exit | **Closed 2026-09-21**: `pending` / `approved` / `sent_back`, `not_ready` / `ready` (W0-04; recorded in 4.10) |
 | Reopening a case after Ready for launch (section 4.12) | Ta, product scope | Not before W4 | Not a v1 transition; nothing chosen |
-| Lock-wait and request-timeout budgets (section 9.1) | W0-09 | W0 exit | Number recorded there |
+| Lock-wait and request-timeout budgets (section 9.1) | W0-09 | W0 exit | **Closed 2026-09-21**: lock wait 5 s, API request 30 s, upload request 120 s, QC 10 s, as targets in [performance targets](performance-targets.md) |
 | Whether a manual Ready recheck endpoint is wanted for operator recovery (section 4.9) | W3-07 / W7 | W3 | Not in slice 1 |
 
 ## References
