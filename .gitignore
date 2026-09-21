@@ -13,3 +13,10 @@ uploads/
 case-data/
 private-evidence/
 .tmp/
+# Product build (rai-web/, W0-02 section 1)
+node_modules/
+dist/
+.local/
+playwright-report/
+test-results/
+*.tsbuildinfo
