@@ -44,7 +44,7 @@ Scores: **3** meets the criterion with no structural risk, **2** meets it with a
 | 3 | **Transactional integrity** (A07, A09): freeze, lane decision, successor creation and Ready atomic and idempotent | **3.** One process, one Postgres transaction per event; idempotency keys are rows. | **3.** Same in the API. | **3.** Same. Drizzle exposes plain SQL transactions and forward-only migrations as an explicit step (W0-04 schema-evolution rule). | **2.** Achievable, but framework ORM/edge-runtime defaults (serverless handlers, connection pooling per request) push toward per-request connections where multi-statement transactions and `SELECT ... FOR UPDATE` need care. |
 | 4 | **Document handling**: private blob store, hashing, size and type limits, safe download | **3.** Multipart upload to the process; bytes hashed and stored behind an interface; downloads stream through the same authorization. | **3.** Same in the API; the SPA uploads to an authorized endpoint. | **3.** Same. Fastify streams multipart with size limits; content sniffing and hashing happen before the blob interface accepts the bytes (W0-08). | **2.** Route handlers in full-stack frameworks are often body-size limited or edge-targeted; large uploads and streamed downloads need a Node runtime route and framework-specific escape hatches. |
 | 5 | **Operational burden on the True host** (W8, D10): runtime availability, patching, backup and restore | **3.** One process plus Postgres and a disk. | **2.** Two deployables (static host and API) means two things to patch, two origins to secure and a CORS policy to keep right. | **3.** One Node process, one Postgres, one private directory. Patching is Node LTS plus `npm audit`; backup is `pg_dump` plus the blob directory (W7-00 rehearsal). | **1.** The framework's own release cadence and its preferred hosting shape (edge, serverless, vendor platform) are the upgrade burden; self-hosting a full-stack framework on a True VM is possible but goes against the framework's grain. |
-| 6 | **Team skills and maintainability** for 2-3 engineers plus agents | **1.** The design is a rich, stateful reviewer UI (three parallel lanes, dialogs, live findings, version navigation) that a server-rendered page model reproduces only with a client-side layer anyway; the team would end up building B under A's name. | **3.** Plain React + a plain API is the most widely known shape; agents produce reliable code against a typed contract. | **3.** Same as B, with the `rai-web/shared` package giving both halves one set of request/response shapes and error types. | **2.** Productive for people who know the framework; a moving target for agents and for a reviewer who must audit auth and data access through framework abstractions. |
+| 6 | **Team skills and maintainability** for 2-3 engineers plus agents | **1.** The design is a rich, stateful reviewer UI (three parallel lanes, dialogs, live findings, version navigation) that a server-rendered page model reproduces only with a client-side layer anyway; the team would end up building B under A's name. | **3.** Plain React + a plain API is the most widely known shape; agents produce reliable code against a typed contract. | **3.** Same as B, with a shared request/response package (path assigned by W0-02) giving both halves one set of request/response shapes and error types. | **2.** Productive for people who know the framework; a moving target for agents and for a reviewer who must audit auth and data access through framework abstractions. |
 | 7 | **Testability**: unit, integration and browser tests runnable locally without external services | **3.** One process, real Postgres in Docker, browser tests against it. | **2.** Two services to start for a browser test. | **3.** `node:test` for unit and for integration against the real Postgres; Playwright drives the served SPA from the same process; substitutes for identity, QC and mail are in-process. | **2.** Framework test setups (their own dev server, mocks for server components or loaders) are specific to the framework version. |
 | | **Total (of 21)** | **19** | **19** | **21** | **12** |
 
@@ -70,16 +70,16 @@ Accepted by Ta on 2026-09-21 (later session, chat answer to the W0-01 options), 
 
 - **Language and runtime.** TypeScript on Node 24.
 - **Deployable.** One repository, one deployable: a **Fastify** API process that also serves the built **React + Vite** SPA from the same origin. Authorization lives entirely in the API; the SPA holds no permission logic.
-- **Database.** **Postgres 16** in Docker (`docker-compose.yml` at the repo root) locally and in CI. **Drizzle ORM** with **forward-only SQL migrations run as an explicit operator step**, never implicitly at start (W0-04).
+- **Database.** **Postgres 16** in Docker locally and in CI. **Drizzle ORM** with **forward-only SQL migrations run as an explicit operator step**, never implicitly at start (W0-04).
 - **Identity.** **openid-client**. Modes per W0-03: `local-google` on loopback only (refuses a non-loopback bind); `network` and `production` fail closed without configured credentials; production is True AD/Entra with Google off.
 - **Artifacts.** Local filesystem blob store behind an interface, keyed by content hash, with metadata in Postgres (W0-04, W0-08).
 - **Tests.** `node:test` for unit and integration; integration tests hit the real Postgres; **Playwright** for browser journeys against the served SPA. Substitutes for identity, QC and mail are in-process (W0-03, W0-07).
-- **Layout.** `rai-web/server` (Lane A), `rai-web/web` (Lane B), `rai-web/shared` (request/response shapes, error types), `rai-web/fixtures` (Lane C synthetic data), `rai-web/tests`, `docker-compose.yml` at the repo root. The legacy `demo/` stays untouched as reference only. W0-02 assigns the exact file paths and the architecture README's "Path in repo" column.
+- **Layout.** Assigned by W0-02 (repository layout, paths, docker-compose location, the architecture README's "Path in repo" column). The D04 row records no layout; the proposal under "Proposed for W0-02" below is input to W0-02, not part of D04. The legacy `demo/` stays untouched as reference only (BUILD_PLAN, ADR-0002).
 - **Language rule.** Every user-facing string carries a locale key (D12: bilingual, Thai default) from the first screen.
 
 ### Why B1 over A
 
-A scores as well as B1 on every server-side criterion but loses on criterion 6: the reviewer UI the design requires is a stateful client application, and a server-rendered shape would force the team to add that client layer ad hoc. B1 keeps A's single process and single origin while giving the UI a proper home with a typed contract in `rai-web/shared`.
+A scores as well as B1 on every server-side criterion but loses on criterion 6: the reviewer UI the design requires is a stateful client application, and a server-rendered shape would force the team to add that client layer ad hoc. B1 keeps A's single process and single origin while giving the UI a proper home with a typed contract in a shared request/response package (path assigned by W0-02).
 
 ### Why B1 over C
 
@@ -91,7 +91,7 @@ Two deployables add a second origin, CORS rules and a second thing to patch on t
 
 ### Contract error codes (chosen here for W0-06)
 
-W0-06 lists seven error types and defers the HTTP code to this ADR. The API uses these; `rai-web/shared` holds the type definitions and every response carries a stable `code`, a locale key for the user message and the request correlation ID (W0-10).
+W0-06 lists seven error types and defers the HTTP code to this ADR. The API uses these; a shared request/response package (path assigned by W0-02) holds the type definitions and every response carries a stable `code`, a locale key for the user message and the request correlation ID (W0-10).
 
 | Error type | HTTP status | `code` | Note |
 |---|---|---|---|
@@ -103,7 +103,7 @@ W0-06 lists seven error types and defers the HTTP code to this ADR. The API uses
 | QC unavailable | 503 | `qc_unavailable` | Also recorded as an `unavailable` finding with `owning_lane` (W0-07); never presented as clean |
 | Mail delivery failed | 502 | `mail_delivery_failed` | Returned on the notification record, not to the actor's business action, which has already committed (W0-07) |
 
-Not-found for an in-scope reference is 404 `not_found`; an out-of-scope reference is 403, never 404, so scope is not leaked by probing. An idempotent replay of an already-applied action returns the original success response (A07), not an error.
+Not-found for an in-scope reference is 404 `not_found` (an eighth code beyond the seven W0-06 types, for W0-06 to confirm). An out-of-scope reference returns 403; note that distinguishing 403 from 404 discloses whether a case exists to an out-of-scope caller. Whether out-of-scope references should instead answer 404 to hide existence is decided in W0-05 (authorization matrix) with the threat model; until then W1 implements 403. An idempotent replay of an already-applied action returns the original success response (A07), not an error.
 
 ## Consequences
 
@@ -112,13 +112,13 @@ Not-found for an in-scope reference is 404 `not_found`; an out-of-scope referenc
 - One process, one origin, one database, one private directory: the smallest surface for A01 checks, for W7-00 backup/restore rehearsal and for the True host under D10.
 - Plain SQL transactions and an explicit migration step make A07/A09 atomicity and the W0-04 immutability and schema-evolution rules reviewable in one place.
 - One OIDC adapter covers Google-on-loopback now and Entra later without a second identity code path.
-- `rai-web/shared` gives Lane A and Lane B one typed contract, which is what lets the W1-13 UI substitute and parallel lane work (contract PR → lane PRs → integration ticket) function.
+- A shared request/response package (path assigned by W0-02) gives Lane A and Lane B one typed contract, which is what lets the W1-13 UI substitute and parallel lane work (contract PR → lane PRs → integration ticket) function.
 - `node:test` and Playwright need no external service; CI is Node plus a Postgres container.
 - Widely known, independently versioned libraries suit 2-3 engineers plus agents working from task briefs.
 
 ### Negative
 
-- Two build steps (Vite bundle, then server) and a client/server type boundary to maintain; a schema change touches `shared`, `server` and `web`.
+- Two build steps (Vite bundle, then server) and a client/server type boundary to maintain; a schema change touches the shared package, the server and the web app.
 - The SPA must be served with a strict content-security policy and the API must set no-store on authorized responses; a server-rendered page model would have had fewer client-side concerns.
 - A single process means QC and mail work in-process in slice 1; if W4 model calls need isolation, a worker boundary is added then (the QC interface in W0-07 already permits it).
 - Playwright browsers are a local install step (W1-12 pins the version and documents the install).
@@ -139,6 +139,14 @@ Not-found for an in-scope reference is 404 `not_found`; an out-of-scope referenc
 - [ ] Production identity details (Entra tenant, AD group-to-role mapping) — W6/W8 at D10; W0-03 fixes only the configuration shape and the fail-closed rule.
 - [ ] Whether W4 QC runs in-process or in a worker — W4 entry, ADR-0006 (D08, D09).
 - [ ] Exact pinned versions of Node, Fastify, React, Vite, Drizzle, openid-client, Playwright and Postgres image — W0-02 records them with reasons; installed under W1-00 and W1-12.
+- [ ] Repository layout (app, tests, fixtures and config paths, docker-compose location, the architecture README's "Path in repo" column) — **W0-02**; see "Proposed for W0-02" below.
+- [ ] Whether an out-of-scope reference answers 403 (current contract) or 404 to hide case existence from probing — **W0-05** with the [threat model](../docs/security/threat-model.md); W0-06 confirms `not_found` as an eighth error code. Until recorded, W1 implements 403.
+
+### Proposed for W0-02 (not part of D04)
+
+An agent proposal for the W0-02 file-level plan to accept, amend or replace; nothing here is recorded in the register or binding on a lane until W0-02 lands:
+
+- `rai-web/server` (Lane A), `rai-web/web` (Lane B), `rai-web/shared` (request/response shapes, error types), `rai-web/fixtures` (Lane C synthetic data), `rai-web/tests`; `docker-compose.yml` at the repo root.
 
 ## Stop conditions
 
