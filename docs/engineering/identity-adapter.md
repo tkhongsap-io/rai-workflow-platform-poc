@@ -89,8 +89,12 @@ export interface RoleResolver {
 
 export interface IdentityAdapter {
   readonly mode: IdentityMode;
-  /** Validates configuration and bind target; throws IdentityStartupError so the process never listens (section 5). */
-  start(bind: { host: string; port: number; publicBaseUrl: URL }): Promise<void>;
+  /**
+   * Validates configuration and bind target; throws IdentityStartupError so the process never listens (section 5).
+   * `trustProxy` is the value main.ts passes to Fastify's `trustProxy` server option (derived from the environment;
+   * W0-02 owns the variable name, proposed `RAI_TRUST_PROXY`), so the adapter sees it as an input (S5).
+   */
+  start(bind: { host: string; port: number; publicBaseUrl: URL; trustProxy: boolean }): Promise<void>;
   /** The W0 contract's core function: verified login in, Principal out. */
   resolvePrincipal(login: VerifiedLogin): Promise<Principal>;
   readonly verifier: LoginVerifier;
@@ -215,6 +219,8 @@ No provider. The verifier is a test-only route that names one of the seven fixtu
 | S14 | `fixture` and bind host not loopback | refuse | `bind_not_loopback` | W1-01 |
 | S15 | Any secret whose value is empty, whitespace or the placeholder literal `set-in-custody` | treated as absent | as S4/S7/S9 | W1-01 |
 | S16 | After `listen`, `server.address()` is not loopback in `local-google` or `fixture` | close and exit 78 | `bind_not_loopback` | W1-01 (ID-02: loopback bind host so S2/S14 pass, `server.address()` stubbed to a non-loopback address) |
+| S17 | `production` and `RAI_PUBLIC_BASE_URL` scheme not `https` | refuse | `base_url_not_https` | W1-01 (ID-01) |
+| S18 | Any provider mode (`local-google`, `network`, `production`) and OIDC discovery fails or returns an invalid document (missing `issuer` or `authorization_endpoint`; an Entra issuer that resolves but differs from the tenant is S11, not S18) | refuse | `discovery_failed` | W1-01 (ID-18, unit, injected discovery that throws or returns an invalid document) |
 
 ```ts
 export type StartupReasonCode =
@@ -229,7 +235,7 @@ export type SignInReasonCode =
   | 'no_mapped_group' | 'groups_overage';
 ```
 
-Configuration parsing is a pure function (`parseIdentityConfig(env, bind) → Ok<IdentityConfig> | Refused<reasonCode>`) so the table above is one table-driven `node:test` file with no network, no Postgres and no process spawn; S16 is the one test that starts a server (ID-02). Because S2 and S14 refuse a non-loopback bind host before `listen` with the same reason code, a `0.0.0.0` run never reaches the post-listen check and cannot prove S16; ID-02 therefore starts with a bind host that satisfies S2 (`localhost`) and stubs the address resolution the adapter reads after `listen` (`server.address()`, or the injectable resolver behind it) to return a non-loopback address, then asserts the server closes, the exit code is 78 and the reason code is `bind_not_loopback`. The manual W1-08 negative ("`local-google` refuses a non-loopback bind and an unknown mode") runs the real command with `RAI_BIND_HOST=0.0.0.0` and with `RAI_IDENTITY_MODE=nonsense` and records the exit code and reason code; that `0.0.0.0` run exercises the S2 path, which ID-01 and ID-14 cover, not S16.
+Configuration parsing is a pure function (`parseIdentityConfig(env, bind) → Ok<IdentityConfig> | Refused<reasonCode>`, where `bind` is the `start()` input above including `trustProxy`, so S5 is driven by `bind.trustProxy = true` and not by an environment variable) and rows S1-S15 and S17 are one table-driven `node:test` file with no network, no Postgres and no process spawn (ID-01). S18 runs after parsing, inside `start()`, against the injectable discovery function (the same seam the S11 stub document uses): ID-18 injects a discovery that throws and one that returns a document without `issuer` or `authorization_endpoint`, and asserts `discovery_failed` and that the process never listens. S16 is the one test that starts a server (ID-02). Because S2 and S14 refuse a non-loopback bind host before `listen` with the same reason code, a `0.0.0.0` run never reaches the post-listen check and cannot prove S16; ID-02 therefore starts with a bind host that satisfies S2 (`localhost`) and stubs the address resolution the adapter reads after `listen` (`server.address()`, or the injectable resolver behind it) to return a non-loopback address, then asserts the server closes, the exit code is 78 and the reason code is `bind_not_loopback`. The manual W1-08 negative ("`local-google` refuses a non-loopback bind and an unknown mode") runs the real command with `RAI_BIND_HOST=0.0.0.0` and with `RAI_IDENTITY_MODE=nonsense` and records the exit code and reason code; that `0.0.0.0` run exercises the S2 path, which ID-01 and ID-14 cover, not S16.
 
 ## 6. Sign-in surface, session and error contract
 
@@ -250,7 +256,7 @@ The sign-in page is Lane B's (W1-07) and reads the mode from `GET /auth/session`
 
 ### 6.2 `openid-client` usage (v6 API; W0-02 pins the version)
 
-`discovery(issuerUrl, clientId, clientSecret)` once at start (a discovery failure is a start-up refusal, `discovery_failed`); `buildAuthorizationUrl(config, { redirect_uri, scope, state, nonce, code_challenge, code_challenge_method: 'S256', prompt })` in `beginSignIn`; `authorizationCodeGrant(config, callbackUrl, { expectedState, expectedNonce, pkceCodeVerifier })` in `completeSignIn`, then `tokens.claims()` for `iss`, `sub` / `oid`, `email`, `email_verified`, `name`, `groups`. Access and refresh tokens are discarded after the exchange: the desk holds its own session and never calls the provider on behalf of the user. No token is written to the session row, the log or the audit event.
+`discovery(issuerUrl, clientId, clientSecret)` once at start (a discovery failure or an invalid discovery document is a start-up refusal, `discovery_failed`, row S18); `buildAuthorizationUrl(config, { redirect_uri, scope, state, nonce, code_challenge, code_challenge_method: 'S256', prompt })` in `beginSignIn`; `authorizationCodeGrant(config, callbackUrl, { expectedState, expectedNonce, pkceCodeVerifier })` in `completeSignIn`, then `tokens.claims()` for `iss`, `sub` / `oid`, `email`, `email_verified`, `name`, `groups`. Access and refresh tokens are discarded after the exchange: the desk holds its own session and never calls the provider on behalf of the user. No token is written to the session row, the log or the audit event.
 
 ### 6.3 Session
 
@@ -271,7 +277,7 @@ sessions: {
 }
 ```
 
-- Cookie `__Host-rai_session`: `HttpOnly`, `SameSite=Lax`, `Path=/`, `Secure` (on loopback over plain `http` the `__Host-` prefix and `Secure` are dropped and the cookie is named `rai_session`; the adapter picks the name from the public base URL scheme, and `production` refuses a non-`https` base URL, reason `base_url_not_https`). No signing secret is needed because the cookie value is random and looked up by hash.
+- Cookie `__Host-rai_session`: `HttpOnly`, `SameSite=Lax`, `Path=/`, `Secure` (on loopback over plain `http` the `__Host-` prefix and `Secure` are dropped and the cookie is named `rai_session`; the adapter picks the name from the public base URL scheme, and `production` refuses a non-`https` base URL, reason `base_url_not_https`, row S17). No signing secret is needed because the cookie value is random and looked up by hash.
 - A request is authenticated when the hash matches a row with `revokedAt IS NULL`, `expiresAt > now()` and `lastSeenAt > now() - RAI_SESSION_IDLE_MINUTES` (default 120). `lastSeenAt` is updated at most once per minute to avoid a write per request.
 - Roles are a snapshot. A change in the allow-list or the group mapping takes effect at the next sign-in; the absolute TTL bounds the staleness. Revoking all sessions of a subject on a mapping change is a W6 operator action, not slice 1.
 - Sign-in always creates a new session row (no fixation: an existing cookie is ignored and replaced).
@@ -400,7 +406,7 @@ Resolution: for each `groups` entry in the token, every matching rule contribute
 
 | ID | Test | Layer | Ticket |
 |---|---|---|---|
-| ID-01 | Every row S1-S15 of section 5 as a table-driven case over `parseIdentityConfig` | unit, `node:test` | W1-01 |
+| ID-01 | Every row S1-S15 and S17 of section 5 as a table-driven case over `parseIdentityConfig(env, bind)`; S5 is the case with `bind.trustProxy = true` in `local-google`, S17 the `production` case with an `http://` base URL | unit, `node:test` | W1-01 |
 | ID-02 | S16 post-listen check, for `local-google` and for `fixture`: start with a bind host that satisfies S2 (`localhost`), stub `server.address()` (or the address resolution behind it) to return a non-loopback address, assert the server closes with exit 78 and `bind_not_loopback`. A `0.0.0.0` bind is refused before `listen` (S2/S14, same reason code) and would pass without S16 implemented; that run is the S2 path covered by ID-01 and ID-14 | integration (real listen, stubbed address) | W1-01 |
 | ID-03 | Each of the seven fixture users resolves to exactly the pairs in section 7; the dual-role identity keeps both | unit | W1-01 |
 | ID-04 | Fixture table invariants: seven entries, unique ids and emails, only one multi-pair user | unit | W1-00 |
@@ -417,6 +423,7 @@ Resolution: for each `groups` entry in the token, every matching rule contribute
 | ID-15 | No email, token, secret or allow-list content appears in any log line or audit row for a sign-in, a refusal and a start-up refusal | integration | W3-07 |
 | ID-16 | `network` mode start-up against a stub OIDC discovery document (allow-list source) and the A01 network clause | integration | W7-00, only if the rehearsal is networked |
 | ID-17 | `production` start-up refuses Google variables, a non-Entra issuer and a missing mapping; accepts configured True AD roles | live | W8 |
+| ID-18 | S18: `start()` in each provider mode with an injected discovery that throws, and with one that returns a document missing `issuer` or `authorization_endpoint`, refuses with `discovery_failed`, reports `health().ready = false` with that code and never listens | unit, injected discovery, no network | W1-01 |
 
 No test calls Google, Entra or any network host. `openid-client` is exercised against synthetic discovery documents and claims objects in W1-01; the live provider paths are ID-14 (manual), ID-16 and ID-17.
 
@@ -456,7 +463,7 @@ Every user-facing string the adapter or the sign-in screen shows carries a key; 
 | W0-08 fixtures | The fixture BUs and users that W1-09's synthetic cases reference | [W0-08](../delivery/w0-technical-contract.md#w0-08--upload-safety-policy-and-fixtures) |
 | W0-10 observability | Readiness shape, reason codes, redaction rule (10) | [W0-10](../delivery/w0-technical-contract.md#w0-10--observability-contract-for-the-desk-runtime) |
 | W1-00 | Fixture user table, locale keys, `.gitignore` and sample env placeholders | [work breakdown](../delivery/slice-1-work-breakdown.md#w1--scoped-case-and-versioned-pack) |
-| W1-01 | Everything in sections 4.1, 4.4, 5, 6 and tests ID-01 to ID-11 | same |
+| W1-01 | Everything in sections 4.1, 4.4, 5, 6 and tests ID-01 to ID-11 and ID-18 | same |
 | W1-07, W1-13 | Sign-in screen and the substitute's sign-in shape | same |
 | W1-08 | ID-14 by hand (the `0.0.0.0` refusal is S2, not S16) | same |
 | W2-02 | ID-13 | same |
@@ -478,6 +485,6 @@ Architecture boundary: "Identity adapter" row of the [boundary table](../archite
 
 ## 15. Stop-condition check
 
-- **No unrestricted network login.** `local-google` cannot listen off loopback (S2, S3, S5, S16); `network` admits only allow-listed or AD-mapped accounts and refuses to start without the custody-held secrets (S6-S9); `production` is Entra only with Google variables treated as misconfiguration (S10, S11); `fixture` is loopback and test-only (S13, S14). There is no default mode and no default role outside `local-google`. Passed.
+- **No unrestricted network login.** `local-google` cannot listen off loopback (S2, S3, S5, S16); `network` admits only allow-listed or AD-mapped accounts and refuses to start without the custody-held secrets (S6-S9); `production` is Entra only with Google variables treated as misconfiguration (S10, S11) and refuses a non-`https` base URL (S17); every provider mode refuses to start when discovery fails (S18); `fixture` is loopback and test-only (S13, S14). There is no default mode and no default role outside `local-google`. Passed.
 - **No external-register writes.** The adapter has no client for TPM, VRO or the AI Reporting Tool; the only outbound calls are OIDC discovery and the code exchange with the configured issuer. Passed.
 - **AI never approves.** The adapter has no model, no QC and no workflow write path; its output is a `Principal` that the W0-05 policy checks. Passed.
