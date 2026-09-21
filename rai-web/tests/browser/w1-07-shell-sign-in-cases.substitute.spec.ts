@@ -12,7 +12,13 @@ import { test, expect, type Page } from '@playwright/test';
 import th from '@rai/shared/locales/th.json' with { type: 'json' };
 import en from '@rai/shared/locales/en.json' with { type: 'json' };
 import { expectAccessible, expectStatusElementsHaveText } from './support/axe.js';
-import { expectVisibleFocus, focusedElement, pressTab, tabUntil } from './support/keyboard.js';
+import {
+  expectVisibleFocus,
+  focusedElement,
+  pressTab,
+  tabUntil,
+  expectMainFocused,
+} from './support/keyboard.js';
 import { signInAsFixture, signOut } from './support/sign-in.js';
 
 const ALL_CASES = ['RAI-2000-0001', 'RAI-2000-0002', 'RAI-2000-0003', 'RAI-2000-0004', 'RAI-2000-0005'];
@@ -313,7 +319,7 @@ test.describe('W1-07 keyboard-only, dialog, locale and reflow (fx-user-spoc-cm)'
     // control that the loaded re-render replaces, and focus falls back to the body (seen as a flaky
     // "no element is focused" on every width before this wait).
     await expect(page.getByTestId('case-count')).toBeVisible();
-    expect((await focusedElement(page))?.tag).toBe('main');
+    await expectMainFocused(page);
     const openCase = await tabUntil(page, (info) => info.tag === 'a' && info.text === th['cases.open']);
     expect(openCase.text).toBe(th['cases.open']);
     await page.keyboard.press('Enter');
@@ -321,7 +327,7 @@ test.describe('W1-07 keyboard-only, dialog, locale and reflow (fx-user-spoc-cm)'
 
     // New case by keyboard: Shift+Tab from the main landmark reaches the last primary-navigation link, then every
     // field with Tab, then Enter on the submit button.
-    expect((await focusedElement(page))?.tag).toBe('main');
+    await expectMainFocused(page);
     await page.keyboard.press('Shift+Tab');
     const newCase = await expectVisibleFocus(page);
     expect(newCase.text).toBe(th['shell.nav.new_case']);
@@ -360,7 +366,7 @@ test.describe('W1-07 keyboard-only, dialog, locale and reflow (fx-user-spoc-cm)'
     // Sign-out dialog (section 9 item 3): opens on Enter, focus moves in and stays in, Escape closes and returns
     // focus to the invoking control, Enter on the confirmation signs out.
     // The header sits before the main landmark, so it is reached backwards with Shift+Tab.
-    expect((await focusedElement(page))?.tag).toBe('main');
+    await expectMainFocused(page);
     let signOutButton = await focusedElement(page);
     for (let step = 0; step < 6 && signOutButton?.text !== th['auth.sign_out']; step += 1) {
       await pressTab(page, 1, true);
