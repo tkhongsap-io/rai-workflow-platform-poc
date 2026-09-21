@@ -1,11 +1,8 @@
-// W1-13: boundary casts for three fields of the shared W1 contract whose TypeBox schemas are built with
-// `LIST.map((v) => Type.Literal(v))` — `ModelTypeSchema` (cases.ts), `StageContextSchema` (slots.ts) and
-// `AllowedMediaTypeSchema` (artifacts.ts). TypeBox infers such a mapped union as `never`, so the inferred
-// `CaseWritableFields['modelType']`, `PackDraft['stageContext']` and `ArtifactRef['mediaType']` are `never`
-// today (auth.ts notes the same trap and spells its tuple out). The runtime JSON is unaffected. Spelling the
-// tuples out is a one-line contract fix in shared/src/schemas (Lane A, contract PR); the substitute does not
-// edit the contract and instead narrows here, from the exported value lists, at the three construction sites.
-// When the contract PR lands these helpers become identity functions and can be deleted.
+// W1-13: three helpers at the substitute's construction sites for `modelType`, `stageContext` and `mediaType`.
+// They were casts while the shared TypeBox unions were built with `LIST.map((v) => Type.Literal(v))`, which the
+// emitted declarations infer as `never`. W1-02 (ModelTypeSchema), W1-03 (AllowedMediaTypeSchema) and #79
+// (StageContextSchema) spelled the tuples out, so all three are identity functions now, kept only so the
+// construction sites stay uniform; a later tidy-up may inline them.
 
 import type { AllowedMediaType, ArtifactRef } from '@rai/shared/schemas/artifacts';
 import type { CaseWritableFields, ModelType } from '@rai/shared/schemas/cases';
