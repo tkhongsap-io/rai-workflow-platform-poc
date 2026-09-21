@@ -14,7 +14,7 @@ Guidance inspected: README; handbook/philosophy.md and risk-tiers.md; playbooks/
 | Review by correctness/security/compliance lens | Change review, with limits | Self-review only |
 | Risk-appropriate controls | Threat model; production release gates | Proposed, untested |
 | Runtime tests, evals, observability and rollback | Acceptance/evaluation plans | Authorized (D03); arrive with the W0-W3 tickets, nothing built yet |
-| Toolchain, dependencies, CI and deployment | None selected or installed | Intentionally deferred |
+| Toolchain, dependencies, CI and deployment | Stack selected and recorded in [ADR-0003](../../adr/0003-stack-and-deployment-boundary.md) (D04, 2026-09-21): TypeScript on Node 24, Fastify serving a React + Vite SPA, Postgres 16 with Drizzle, openid-client, node:test and Playwright. Nothing installed yet | Selected (D04); pinned versions in W0-02, installation under W1-00/W1-12 |
 | Independent review and formal acceptance | Owner/operator and specialist gates | Pending |
 
 Only relevant document structures were adapted; no application starter was generated. There is no blanket baseline-compliance claim. The engineering risk posture is provisional and separate from each use case's business risk tier. Qualified security review is required before live data or deployment.
@@ -37,4 +37,4 @@ Compared against the sibling repository `~/github/s42/s42-ci-platform` at the ow
 | AGENTS.md carrying live runtime state | Rejected; there is no runtime | — |
 | Assemble-from-sibling-repos principle | Rejected; no sibling repos and it would pre-empt D04 | — |
 
-D03 (2026-09-21, [register](../product/decisions.md)) authorizes W0-W3 on synthetic data; toolchain, dependencies and CI are selected in W0-01/W0-02 and installed under W1-00/W1-12, so the "Intentionally deferred" row above holds until those tickets merge. Changes to the playbook pin require a reviewed adoption diff. Feature work records intent/spec/plan first, then implements and proves a bounded slice inside its ticket.
+D03 (2026-09-21, [register](../product/decisions.md)) authorizes W0-W3 on synthetic data; the stack was selected in W0-01 (ADR-0003, D04); W0-02 pins dependencies and CI checks, and W1-00/W1-12 install them, so the "Toolchain" row above stays at "Selected" until those tickets merge. Changes to the playbook pin require a reviewed adoption diff. Feature work records intent/spec/plan first, then implements and proves a bounded slice inside its ticket.
