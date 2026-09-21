@@ -33,6 +33,10 @@ No product suite exists yet (the application skeleton arrives with W1-00), so `n
 
 Finding: section 7 and test row ID-13 said the dual-role fixture is refused "approve/send-back" of its lane on a BU-RP case and attributed this to D05. D05 as recorded withholds approve only ("No one who is owner or BU SPOC on a case may approve a lane on that case"); send-back is not in the decision. Fix: both places now say "refused approve ... (D05)"; whether send-back is also withheld is listed in section 14 as a possible W0-05 refinement under D05's "review leads may refine" clause, not as D05. Checks below were rerun after the change.
 
+## Review fix round 2 (PR #62)
+
+Finding: test row ID-02, S16's "Tested by" cell and the last paragraph of section 5 described the S16 post-listen check as "a server started in `local-google` or `fixture` on `0.0.0.0` closes and exits 78". A `0.0.0.0` bind host is refused before `listen` by S2/S14 with the identical reason code `bind_not_loopback`, so that test passes even if the post-listen `server.address()` check is never implemented. Fix: ID-02 now starts with a bind host that satisfies S2 (`localhost`), stubs `server.address()` (or the address resolution behind it) to return a non-loopback address, and asserts the server closes with exit 78 and `bind_not_loopback`; the `0.0.0.0` run is named as the S2 path already covered by ID-01 and ID-14. S16's "Tested by" cell and section 5 say the same; the W1-08 row of the consumer table now lists ID-14 only, since the manual `0.0.0.0` refusal is S2, not S16. Checks below were rerun after the change.
+
 ## Done-when check (W0 contract, W0-03 section and exit checklist)
 
 - [x] Interface: verified login in; subject ID, display name, email, (role, scope) pairs out; BU scope for SPOC, owned cases for owner.

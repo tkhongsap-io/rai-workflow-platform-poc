@@ -214,7 +214,7 @@ No provider. The verifier is a test-only route that names one of the seven fixtu
 | S13 | `fixture` and `NODE_ENV` is not `test` | refuse | `fixture_outside_test` | W1-01 |
 | S14 | `fixture` and bind host not loopback | refuse | `bind_not_loopback` | W1-01 |
 | S15 | Any secret whose value is empty, whitespace or the placeholder literal `set-in-custody` | treated as absent | as S4/S7/S9 | W1-01 |
-| S16 | After `listen`, `server.address()` is not loopback in `local-google` or `fixture` | close and exit 78 | `bind_not_loopback` | W1-01 |
+| S16 | After `listen`, `server.address()` is not loopback in `local-google` or `fixture` | close and exit 78 | `bind_not_loopback` | W1-01 (ID-02: loopback bind host so S2/S14 pass, `server.address()` stubbed to a non-loopback address) |
 
 ```ts
 export type StartupReasonCode =
@@ -229,7 +229,7 @@ export type SignInReasonCode =
   | 'no_mapped_group' | 'groups_overage';
 ```
 
-Configuration parsing is a pure function (`parseIdentityConfig(env, bind) → Ok<IdentityConfig> | Refused<reasonCode>`) so the table above is one table-driven `node:test` file with no network, no Postgres and no process spawn; S16 is the one test that starts a server. The manual W1-08 negative ("`local-google` refuses a non-loopback bind and an unknown mode") runs the real command with `RAI_BIND_HOST=0.0.0.0` and with `RAI_IDENTITY_MODE=nonsense` and records the exit code and reason code.
+Configuration parsing is a pure function (`parseIdentityConfig(env, bind) → Ok<IdentityConfig> | Refused<reasonCode>`) so the table above is one table-driven `node:test` file with no network, no Postgres and no process spawn; S16 is the one test that starts a server (ID-02). Because S2 and S14 refuse a non-loopback bind host before `listen` with the same reason code, a `0.0.0.0` run never reaches the post-listen check and cannot prove S16; ID-02 therefore starts with a bind host that satisfies S2 (`localhost`) and stubs the address resolution the adapter reads after `listen` (`server.address()`, or the injectable resolver behind it) to return a non-loopback address, then asserts the server closes, the exit code is 78 and the reason code is `bind_not_loopback`. The manual W1-08 negative ("`local-google` refuses a non-loopback bind and an unknown mode") runs the real command with `RAI_BIND_HOST=0.0.0.0` and with `RAI_IDENTITY_MODE=nonsense` and records the exit code and reason code; that `0.0.0.0` run exercises the S2 path, which ID-01 and ID-14 cover, not S16.
 
 ## 6. Sign-in surface, session and error contract
 
@@ -401,7 +401,7 @@ Resolution: for each `groups` entry in the token, every matching rule contribute
 | ID | Test | Layer | Ticket |
 |---|---|---|---|
 | ID-01 | Every row S1-S15 of section 5 as a table-driven case over `parseIdentityConfig` | unit, `node:test` | W1-01 |
-| ID-02 | S16: a server started in `local-google` or `fixture` on `0.0.0.0` closes and exits 78 | integration (real listen) | W1-01; re-run by hand at W1-08 |
+| ID-02 | S16 post-listen check, for `local-google` and for `fixture`: start with a bind host that satisfies S2 (`localhost`), stub `server.address()` (or the address resolution behind it) to return a non-loopback address, assert the server closes with exit 78 and `bind_not_loopback`. A `0.0.0.0` bind is refused before `listen` (S2/S14, same reason code) and would pass without S16 implemented; that run is the S2 path covered by ID-01 and ID-14 | integration (real listen, stubbed address) | W1-01 |
 | ID-03 | Each of the seven fixture users resolves to exactly the pairs in section 7; the dual-role identity keeps both | unit | W1-01 |
 | ID-04 | Fixture table invariants: seven entries, unique ids and emails, only one multi-pair user | unit | W1-00 |
 | ID-05 | `resolvePrincipal` refuses an empty pair list with `forbidden` and writes no session | unit | W1-01 |
@@ -458,7 +458,7 @@ Every user-facing string the adapter or the sign-in screen shows carries a key; 
 | W1-00 | Fixture user table, locale keys, `.gitignore` and sample env placeholders | [work breakdown](../delivery/slice-1-work-breakdown.md#w1--scoped-case-and-versioned-pack) |
 | W1-01 | Everything in sections 4.1, 4.4, 5, 6 and tests ID-01 to ID-11 | same |
 | W1-07, W1-13 | Sign-in screen and the substitute's sign-in shape | same |
-| W1-08 | ID-02 and ID-14 by hand | same |
+| W1-08 | ID-14 by hand (the `0.0.0.0` refusal is S2, not S16) | same |
 | W2-02 | ID-13 | same |
 | W3-07 | ID-15, readiness | same |
 | W6 | Group-mapping Admin screen (9.2), session revocation on mapping change | [later packages](../delivery/later-packages-outline.md) |
