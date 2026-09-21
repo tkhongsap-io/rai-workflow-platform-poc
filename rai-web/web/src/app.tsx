@@ -1,12 +1,24 @@
-// Placeholder application root (W1-00). Every user-facing string comes from the locale catalogue (D12, W0-02
-// section 10); W1-07 replaces this with the shell, the locale provider and the router.
-import { useEffect, type JSX } from 'react';
-import { DEFAULT_LOCALE, t } from '@rai/shared/locales/keys';
+// W1-07 (Lane B): the application root: locale provider (D12, Thai default), session provider, router and shell.
+// Every user-facing string comes from the locale catalogue through t() (W0-02 section 10); the shell renders on
+// every screen so the language can be chosen before sign-in.
+
+import type { JSX } from 'react';
+import { BrowserRouter } from 'react-router-dom';
+import { LocaleProvider } from './i18n/locale-provider.js';
+import { AppRoutes } from './router.js';
+import { AppShell } from './screens/shell/app-shell.js';
+import { SessionProvider } from './session/session-provider.js';
 
 export function App(): JSX.Element {
-  useEffect(() => {
-    document.title = t(DEFAULT_LOCALE, 'app.title');
-    document.documentElement.lang = DEFAULT_LOCALE;
-  }, []);
-  return <main aria-label={t(DEFAULT_LOCALE, 'app.title')} />;
+  return (
+    <LocaleProvider>
+      <SessionProvider>
+        <BrowserRouter>
+          <AppShell>
+            <AppRoutes />
+          </AppShell>
+        </BrowserRouter>
+      </SessionProvider>
+    </LocaleProvider>
+  );
 }

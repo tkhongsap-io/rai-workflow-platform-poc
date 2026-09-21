@@ -103,7 +103,10 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       ...jsxA11y.configs.recommended.rules,
-      // Section 10 rule 2: no hard-coded user-facing string; text and the named attributes must come from t().
+      // Section 10 rule 2: no hard-coded user-facing string. Text nodes and string literals as JSX children must
+      // come from t() (jsx-no-literals with ignoreProps, since the rule cannot tell `className` from `aria-label`);
+      // the user-facing attributes the section names are covered by the no-restricted-syntax selectors below
+      // (W1-07), and web/src/i18n/no-hard-coded-strings.test.ts scans the same shapes in `npm run test:unit`.
       'react/jsx-no-literals': [
         'error',
         {
@@ -112,6 +115,8 @@ export default tseslint.config(
             '-',
             '–',
             '—',
+            '·',
+            '*',
             ':',
             '/',
             '(',
@@ -130,8 +135,21 @@ export default tseslint.config(
             '8',
             '9',
           ],
-          ignoreProps: false,
-          noAttributeStrings: true,
+          ignoreProps: true,
+          noAttributeStrings: false,
+        },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            'JSXAttribute[name.name=/^(title|alt|placeholder|aria-label|aria-description|aria-roledescription|aria-valuetext)$/] > Literal',
+          message: 'User-facing attributes take t(key), never a string literal (W0-02 section 10 rule 2)',
+        },
+        {
+          selector:
+            'JSXAttribute[name.name=/^(title|alt|placeholder|aria-label|aria-description|aria-roledescription|aria-valuetext)$/] > JSXExpressionContainer > :matches(Literal, TemplateLiteral)',
+          message: 'User-facing attributes take t(key), never a string literal (W0-02 section 10 rule 2)',
         },
       ],
     },

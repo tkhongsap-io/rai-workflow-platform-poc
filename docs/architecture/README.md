@@ -31,7 +31,7 @@ Paths were assigned by the [W0-02 file-level plan](../engineering/implementation
 | UI substitute (dev/test only) | Fixture-backed shapes for Lane B; never evidence | C | W0 interface specs | W1-13, W2-10, W3-08 | `rai-web/fixtures/src/substitutes/api/` |
 | Notification boundary (mail sink in slice 1) | Committed events, recipients, deep links, dedup | B / C | W0-07 | W1-11, W3-03, W3-04 | `rai-web/server/src/notifications/`, types `rai-web/shared/src/mail/`, sink `rai-web/fixtures/src/substitutes/mail-sink/` |
 | Desk observability | Correlation IDs, redacted logs, readiness, operator view | A | W0-10 | W3-07, W8 | `rai-web/server/src/observability/` |
-| Product UI | Screens from the design handoff | B | design handoff | W1-06, W1-07, W2-07, W2-09, W3-02 | `rai-web/web/src/` |
+| Product UI | Screens from the design handoff | B | design handoff | W1-06, W1-07, W2-07, W2-09, W3-02 | `rai-web/web/src/` (W1-07: `app.tsx`, `router.tsx`, `routes.ts`, `api/client.ts`, `i18n/`, `session/`, `components/`, `screens/shell/`, `screens/sign-in/`, `screens/cases/`, `styles.css`) |
 | External trackers | Reference only (L3, L6) | — | — | none | — |
 
 ## Documents this build executes
