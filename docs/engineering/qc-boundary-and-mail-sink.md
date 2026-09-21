@@ -302,6 +302,7 @@ Tests W1-10 must ship (all `node:test`, unit layer, no Postgres):
 | no write path, behavioural | the request object is deep-frozen before the call and unchanged after; a store spy passed nowhere records zero calls; `artifacts[i].read` is the only capability and the run for a `submit` script never invokes it | same |
 | schema conformance | every scripted finding passes the shared validator; a finding with a 301-code-unit excerpt fails | supports orchestrator step 4 |
 | provisional owning lane visible | every slot-5, pack and run finding in the scripts has `owningLaneBasis = 'provisional_pending_w0_06_refinement'`; every single-lane-slot finding has `'recorded_rule'` and its `owningLane` equals the W0-06 function's value | section 3.6 |
+| fail closed on configuration (owner W1-00 for the loader, W1-10 for the runner identity it selects, same pattern as the 4.8 "no external mail path" row) | the config loader with identity mode `production` and `QC_RUNNER=scripted` throws at startup, naming the key; `QC_RUNNER=other` (any value outside `scripted` \| `none`) throws, in every identity mode; `QC_RUNNER` unset throws; `QC_RUNNER=none` loads and every run is `unavailable:not_configured`; the readiness payload (W0-10) reports `qc.runner = { runner: 'scripted_substitute', runnerVersion }` when `scripted` is selected | 3.9 opening paragraph, section 6 |
 
 Integration tests that consume the substitute belong to W2-05 (record and disposition; `unavailable` recorded not treated as zero findings; a replayed trigger after `completed` returns the same run and appends nothing; a second run after `unavailable` starts `attempt = 2` under the same `runKey`, completes and appends its findings while the QC-unavailable finding stays `open`; an aged-out `running` row becomes `unavailable:runner_error` and the next trigger starts a new attempt), W2-07/W2-09 (rendering, disposition UI) and W3-07 (a simulated timeout appears once in the operator view and in the log with the same correlation ID).
 
@@ -387,8 +388,9 @@ export interface DeliveryReceipt {
   attempt: number;
   at: string;                            // ISO-8601 UTC
   sinkMessageId: string | null;          // set when delivered; the sink's own handle (file line number, memory index)
-  error: { code: 'sink_failure' | 'rejected_recipient' | 'unsafe_link' | 'duplicate'; message: string } | null;
-                                         // message: no address, no case content
+  error: { code: 'malformed_request' | 'sink_failure' | 'rejected_recipient' | 'unsafe_link' | 'duplicate'; message: string } | null;
+                                         // message: no address, no case content. malformed_request: the message names the offending field
+                                         // (4.3); sink_failure: forced or real sink failure, or an oversize payload with the size in the message
 }
 
 export interface MailSink {
@@ -406,10 +408,11 @@ Before accepting a request the sink checks, and on failure returns `failed` with
 - `deepLinks` is non-empty, and **every** `deepLinks[i].url` starts with the configured `APP_PUBLIC_ORIGIN` and has a path that is one of the canonical routes; no `?`, `#`, or credential-looking segment in any of them → otherwise `unsafe_link` (`error.message` names the failing index, never the URL).
 - Every link points where the mail says it does: for `lane_opened`, `sent_back` and `ready_for_launch` there is exactly one link, its `caseId` equals `event.caseId` and `digestCases` is `null`; for `sla_breach_digest` `digestCases` is non-empty, every `deepLinkIndex` is in range, the indexed link has `route = 'case'` and `caseId` equal to the entry's `caseId`, and every `route = 'case'` link is referenced by exactly one entry → otherwise `unsafe_link`.
 - `recipient.address` satisfies the synthetic-domain rule (4.6) → otherwise `rejected_recipient`.
-- `mail.textBody` contains every `deepLinks[i].url` (the links are the point of every mail; the digest lists one line per breached case with its link).
-- `event.auditEventId` is non-empty (a request without a committed audit event is malformed; the notifier never builds one).
+- `mail.textBody` contains every `deepLinks[i].url` (the links are the point of every mail; the digest lists one line per breached case with its link) → otherwise `unsafe_link` (`error.message` names the missing link's index).
+- `event.auditEventId` is a non-empty string (a request without a committed audit event is malformed; the notifier never builds one) → otherwise `malformed_request` (`error.message` names the field, `event.auditEventId`, and nothing else from the event).
+- Payload size is bounded: `mail.subject` ≤ 998 bytes after UTF-8 encoding (RFC 5322 line limit, with encoded-word folding left to a real transport), `mail.textBody` ≤ 64 KiB (65 536 bytes) after UTF-8 encoding → otherwise `sink_failure` (`error.message` names the field and its byte size, never its contents).
 
-Payload size is bounded: subject ≤ 998 bytes after UTF-8 encoding (RFC 5322 line limit, with encoded-word folding left to a real transport), body ≤ 64 KiB. Larger payloads are `failed:sink_failure` with the size in `error.message`.
+The checks run in the order listed; the first failure is the receipt's `error`. `malformed_request` is reserved for a structurally invalid request (a missing committed event); a request that is well-formed but unsafe or oversize takes the more specific code above, so the dispatcher (W3-04) can distinguish a request it must rebuild (`malformed_request`, `unsafe_link`, `rejected_recipient`) from a sink-side failure (`sink_failure`); the retry policy itself stays in 4.5.
 
 ### 4.4 Dedup key
 
@@ -477,6 +480,7 @@ Both sinks record the `correlationId` on every line they write and nothing else 
 | duplicate key | second delivery of the same `dedupKey` → `duplicate`, `sent.length` unchanged | D06 dedup |
 | unsafe link rejected | a URL on another origin, with a query string, or with a fragment → `failed:unsafe_link`; nothing recorded. A digest with five `case` links of which one is bad (another origin, a query string, or a `caseId` that differs from its `digestCases` entry) → `failed:unsafe_link` for the whole delivery, `error.message` names the index and not the URL, nothing recorded; a `lane_opened` request whose single link's `caseId` ≠ `event.caseId`, or a digest with a `case` link missing from `textBody`, → `failed:unsafe_link` | A05 |
 | non-synthetic recipient rejected | `owner@bu-a.example` and `ops@rai-desk.test` accepted; `someone@gmail.com` and an address with no domain → `failed:rejected_recipient`, nothing recorded | "no external mail" |
+| malformed or oversize request rejected | a `lane_opened` request with `event.auditEventId = ''` → `failed:malformed_request`, `error.message` contains `auditEventId`; a request whose `mail.textBody` is 64 KiB + 1 byte (65 537 bytes, links intact) → `failed:sink_failure`, `error.message` contains `65537`; a request whose `mail.subject` is 999 bytes → `failed:sink_failure`, `error.message` contains `999`; in all three cases nothing is recorded (`sent.length` unchanged, no `outbox.jsonl` line, no `.txt` file) and the same `dedupKey` delivered afterwards with a valid request → `delivered`, not `duplicate` | 4.3 (negative case of "Accepts the four inputs") |
 | Thai subject intact | subject `แจ้งเตือน: เลนเปิดแล้ว` round-trips byte-identical through memory and file sinks | D12, W3-03 |
 | file sink restart | write two receipts, construct a new `FileMailSink` on the same directory, redeliver one key → `duplicate` | 4.7 |
 | no external mail path | module-graph walk over `rai-web/` finds no `node:net`, `node:tls`, `node:http` client use in the sinks and no mail SDK anywhere; `MAIL_TRANSPORT=smtp` makes the config loader throw | "no external mail path exists in any configuration" |
@@ -493,14 +497,14 @@ Integration tests belong to W3-03 (four events, one mail each, rolled-back trans
 | `forbidden` (403) | The request builder refuses an artifact the actor may not read; W0-05 refuses the action before QC | Deep-link follower out of scope after sign-in |
 | `unauthenticated` (401) | — | Deep-link follower without a session |
 | `stale_version` (409) | W2-02 rejects the decision before `approve_attempt` QC runs | — |
-| `invalid_input` (422) | Never from QC; a malformed runner result is `unavailable:runner_error` | Never from the sink; malformed requests are `failed` receipts with a named `error.code` |
+| `invalid_input` (422) | Never from QC; a malformed runner result is `unavailable:runner_error` | Never from the sink; malformed requests are `failed` receipts with a named `error.code` from the 4.2 union (`malformed_request`, `unsafe_link`, `rejected_recipient`, `sink_failure`), per 4.3 |
 | `unsafe_upload` (422) | Never from QC; W1-03 rejects bytes before QC sees them | — |
 
 ## 6. Configuration keys (W1-00 adds them to the sample env file with placeholders)
 
 | Key | Values | Default (local) | Notes |
 |---|---|---|---|
-| `QC_RUNNER` | `scripted` \| `none` | `scripted` | `none` makes every run `unavailable:not_configured`. `production` identity mode refuses `scripted`. A real runner value is added by W4 under ADR-0006. |
+| `QC_RUNNER` | `scripted` \| `none` | `scripted` | `none` makes every run `unavailable:not_configured`. `production` identity mode refuses `scripted`; any other value, or no value, fails startup (3.9 test row "fail closed on configuration"). A real runner value is added by W4 under ADR-0006. |
 | `QC_TIMEOUT_MS` | integer | `10000` | Orchestrator timer; tests use 100 |
 | `QC_SCRIPTS_DIR` | path | `rai-web/fixtures/src/qc-substitute/scripts` | Read once at startup |
 | `MAIL_TRANSPORT` | `memory` \| `file` | `file` for `npm run dev`, `memory` for tests | Any other value fails startup |
@@ -524,10 +528,10 @@ No key holds a credential. Networked or production mail credentials, if a transp
 
 | Acceptance | Layer | Ticket | What is proven |
 |---|---|---|---|
-| A08 (feeds; real QC is W4) | unit | W1-10 | Typed findings, `unavailable`, timeout, no write path |
+| A08 (feeds; real QC is W4) | unit | W1-10 (loader check: W1-00) | Typed findings, `unavailable`, timeout, no write path, fail-closed `QC_RUNNER` configuration |
 | A09 | integration (real Postgres + scripted runner) | W2-05, W2-06 | `unavailable` recorded not zero; findings append-only; open findings block Ready; owning-lane authority on single-lane, slot-5 and pack-level findings |
 | A08 visibility | integration + browser | W2-07, W3-07, W2-INT | Findings shown before decision controls; a timeout appears once in the operator view |
-| A05 | unit | W1-11 | Status, forced failure, duplicate, unsafe link (single and one-of-many in a digest), per-case link correctness, synthetic-domain rule, Thai subject, no external path |
+| A05 | unit | W1-11 | Status, forced failure, duplicate, unsafe link (single and one-of-many in a digest), per-case link correctness, synthetic-domain rule, malformed and oversize request, Thai subject, no external path |
 | A05 | integration | W3-03, W3-04 | Outbox in the same transaction; four events; three retries with backoff; dedup; committed decision unchanged |
 | A05 | browser | W3-06 | Notification links require sign-in and scope in the end-to-end journey |
 
@@ -574,7 +578,7 @@ Product sources: [workflow](../product/workflow.md) (failure behaviour, notifica
 | QC has no approval, mail or write access to workflow state | 3.1, 3.4, 3.9 structural and behavioural tests |
 | Slice-1 substitute returns scripted synthetic findings and can simulate a timeout | 3.9 |
 | No model chosen (D08, D09) | 1, 10 |
-| Mail accepts a committed business event, authorized recipients, a safe deep link and a dedup key; returns delivery status | `DeliveryRequest` (`deepLinks`: one validated link for case-bound events, one validated `case` link per breached case plus `digestCases` for the operator digest, per the source-spec Notifications table and A05), `DeliveryReceipt` in 4.2; validation 4.3; 4.4 |
+| Mail accepts a committed business event, authorized recipients, a safe deep link and a dedup key; returns delivery status | `DeliveryRequest` (`deepLinks`: one validated link for case-bound events, one validated `case` link per breached case plus `digestCases` for the operator digest, per the source-spec Notifications table and A05), `DeliveryReceipt` in 4.2 with the five-value `error.code` union (`malformed_request`, `sink_failure`, `rejected_recipient`, `unsafe_link`, `duplicate`); validation 4.3, each check with its code; 4.4; negative cases in 4.8 |
 | Local substitute writes to a file or in-memory sink; no external mail | 4.6, 4.7, 4.8 |
 | Interface, error contract and test substitute (W0 section text) | 3.3/4.2, 3.8/4.5/5, 3.9/4.7 |
 | Cross-links to consuming tickets | 9 |

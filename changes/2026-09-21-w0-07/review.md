@@ -45,6 +45,15 @@ Two blocking findings, both resolved in `docs/engineering/qc-boundary-and-mail-s
 
 Checks rerun after the fix: table below refreshed (same commands; link audit now 21 links, 0 broken over the three touched files).
 
+## Fix round 2 (review findings on PR #60)
+
+Three blocking findings, all resolved in `docs/engineering/qc-boundary-and-mail-sink.md`:
+
+1. **Mail error contract incomplete** (two findings on 4.2/4.3/4.8, resolved together). `DeliveryReceipt.error.code` gains `'malformed_request'`; 4.3 now ends every check with its `→ otherwise <code>` clause (`textBody` links → `unsafe_link`; `auditEventId` → `malformed_request` naming the field; subject > 998 bytes or body > 64 KiB → `sink_failure` naming the field and byte size), states the check order and that `malformed_request` is reserved for a structurally invalid request; 4.8 gains the row "malformed or oversize request rejected" (empty `auditEventId`, 65 537-byte body, 999-byte subject; nothing recorded; the key is still deliverable afterwards); sections 5, 8 and 11 name the five-value union.
+2. **Fail-closed `QC_RUNNER` rule had no test row.** 3.9 gains the row "fail closed on configuration" (owner W1-00 for the loader, W1-10 for the runner identity; same pattern as the 4.8 "no external mail path" row): `production` + `QC_RUNNER=scripted` throws, `QC_RUNNER=other` throws in every mode, unset throws, `none` loads with `unavailable:not_configured`, readiness reports the runner identity. Section 6's `QC_RUNNER` row and section 8's A08 unit row point at it.
+
+Checks rerun after the fix: same commands as the table above; results recorded in the PR body.
+
 ## Done-when check (W0-07 section and W0 exit checklist row "Identity, persistence/artifacts, QC and mail interfaces with error contracts and test substitutes")
 
 - [x] QC inputs: version reference and authorized artifact references (spec 3.1, 3.3).
