@@ -19,6 +19,8 @@ Not edited, on purpose: `docs/product/source-spec.md` (frozen; hash verified bel
 - Sinks reject any recipient address outside RFC 2606 reserved domains while slice 1 runs; fixture user addresses (W1-00) and the synthetic operator address (W0-08, W1-09) must satisfy it.
 - `MAIL_TRANSPORT` has exactly two values; a third is a startup error. No transport that leaves the process exists until D10.
 - The QC-unavailable finding is one per run, scoped by trigger and lane, and never auto-closed by a later successful run.
+- QC runs carry `(runKey, attempt)`: a replay returns the existing run only when it is `completed`; after `unavailable` (or an aged-out `running` row, proposed margin `2 × QC_TIMEOUT_MS`) the next trigger starts `attempt + 1` under the same key and its findings append beside the still-open QC-unavailable finding (spec 3.7, fix round 1).
+- `DeliveryRequest.deepLinks` is a list plus `digestCases` for the operator digest, so the SLA-breach digest carries one validated `case` link per breached case (source-spec Notifications table, A05) and the sink validates every link, failing the whole delivery on one bad link (spec 4.2, 4.3, 4.8; fix round 1).
 - Proposed numbers (backoff 1 s / 5 s / 25 s, `QC_TIMEOUT_MS` 10000, excerpt 300 code units, feedback summary 500) are defaults for W3-04, W1-00 and W1-10 to confirm, not decisions of record.
 
 ## Checks
@@ -33,6 +35,15 @@ Shell: `export PATH=$HOME/.nvm/versions/node/v24.21.0/bin:$PATH` (node v24.21.0)
 | Relative-link and anchor audit over the two touched files (GitHub slug rule, one hyphen per space) | 21 links, 0 broken |
 
 No product suite exists yet (the `rai-web` skeleton arrives with W1-00), so `npm test`, `npm run lint`, `npm run typecheck` and Playwright do not apply to this ticket. No Postgres container was started.
+
+## Fix round 1 (review findings on PR #60)
+
+Two blocking findings, both resolved in `docs/engineering/qc-boundary-and-mail-sink.md`:
+
+1. **3.7 contradicted 3.6 and 3.4 step 2** (a unique `runKey` returned an `unavailable` or crashed `running` run forever). Now: `attempt` on `QcRunRequest` and the run row; unique `(runKey, attempt)` plus a partial unique index on completed `runKey`; a lookup table in 3.7 (replay only on `completed`; new attempt after `unavailable` or age-out; in-flight `running` returned); 3.4 step 2 states the age-out margin and that the age-out and the next attempt share a transaction; 3.6 ties "fixed by a later completed run" to the next attempt; the W2-05 integration list gains "a second run after `unavailable` completes and appends; the unavailable finding stays open" and the replay and age-out cases; section 7 logs `attempt`; sections 9 and 11 updated.
+2. **The SLA-breach digest could not carry validated per-case links** (one `deepLink`, scalar `templateParams`). Now: `deepLinks: SafeDeepLink[]` (at least one), `SafeDeepLink.caseId`, `DigestCaseRef { caseId, lane, deepLinkIndex }` and `digestCases` on `DeliveryRequest`; 4.3 validates every link, checks each link's `caseId` against the event or its digest entry, and requires every URL in `textBody`, failing the whole delivery on one bad link; 4.6, 4.8 (accepts-inputs and unsafe-link rows, including a digest with one bad link among several), section 7, 8, 9 and the section 11 traceability row updated.
+
+Checks rerun after the fix: table below refreshed (same commands; link audit now 21 links, 0 broken over the three touched files).
 
 ## Done-when check (W0-07 section and W0 exit checklist row "Identity, persistence/artifacts, QC and mail interfaces with error contracts and test substitutes")
 

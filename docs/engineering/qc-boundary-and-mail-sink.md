@@ -101,6 +101,7 @@ export interface SlotState {
 export interface QcRunRequest {
   correlationId: string;             // W0-10; same value on the run row, the audit event and the log line
   runKey: string;                    // idempotency key, section 3.7
+  attempt: number;                   // 1..n under the same runKey; incremented only after an `unavailable` or aged-out run (3.7)
   trigger: QcTrigger;
   lane: Lane | null;                 // set only for approve_attempt
   version: VersionRef;
@@ -184,8 +185,8 @@ Timestamps are ISO-8601 UTC strings; the UI renders them in the D06 timezone (As
 
 The orchestrator wraps the runner and is the only code that touches the store for QC. Its contract, in order:
 
-1. **Build the request** from the frozen version (or the draft for `upload`) and the actor's already-checked scope. It sets `runKey` (section 3.7), `correlationId` from the request context, and `deadlineMs` from `QC_TIMEOUT_MS`.
-2. **Insert the QC run row** with status `running` in its own short transaction, so a crash mid-run leaves a visible `running` row that the readiness/operator view (W0-10) can age out as `unavailable:runner_error`.
+1. **Build the request** from the frozen version (or the draft for `upload`) and the actor's already-checked scope. It sets `runKey` and `attempt` (section 3.7: the lookup of the latest attempt under the key decides whether this is a replay that returns the existing run or a new attempt), `correlationId` from the request context, and `deadlineMs` from `QC_TIMEOUT_MS`.
+2. **Insert the QC run row** with status `running` and this `attempt` in its own short transaction, so a crash mid-run leaves a visible `running` row. A `running` row whose `startedAt` is older than `2 × QC_TIMEOUT_MS` (proposed margin; W2-05 confirms) is **aged out**: the readiness/operator view (W0-10) and the next trigger's lookup (3.7) both treat it as `unavailable:runner_error`, the orchestrator moves the row to that status and appends the QC-unavailable finding for it (3.6; or records `alreadyRecorded` under step 6 when one is already open for that trigger and lane) in the same transaction as the next attempt's `running` row, and a late result for the aged-out row is discarded as in step 3. An aged-out row is never returned as the current run.
 3. **Call `runner.run(request, signal)`** with an `AbortController` whose timer is `deadlineMs`. On timer expiry: abort, and treat the outcome as `unavailable` with reason `timeout`, regardless of what the runner returns afterwards (a late result is discarded and logged, never persisted).
 4. **Validate the result** against the shared schema. Any violation (unknown field, `ruleRevision` ≠ `qcRulesRevision`, `owningLane` outside the lane type, `excerpt` over 300 code units, missing evidence, a `measure` whose `thresholdSource` ≠ `checklistTemplateVersion`) is treated as `unavailable:runner_error` with the violation name in `detail`. Malformed output never becomes a finding.
 5. **Stamp `owningLane`** through the W0-06 assignment function. For `recorded_rule` scopes the function's value must equal the runner's; a mismatch is a `runner_error`. For provisional scopes the orchestrator writes the runner's value and keeps `owningLaneBasis` on the row (section 3.6).
@@ -237,11 +238,21 @@ Every finding carries `owningLane` because D05 makes the owning lane the authori
 }
 ```
 
-It is dispositioned like any other finding (fixed by a later completed run recorded by the owning lane, or waived with a reason). It is never auto-closed by a later successful run; the later run's findings are appended beside it. This is what makes A08 "QC failure is visible, not clean-pass" and the threat-model row "QC/model outage presented as clean evidence" testable.
+It is dispositioned like any other finding (fixed by a later completed run, the next attempt under the same `runKey` in 3.7, recorded by the owning lane, or waived with a reason). It is never auto-closed by a later successful run; the later run's findings are appended beside it, and the QC-unavailable finding stays `open` until a person dispositions it. This is what makes A08 "QC failure is visible, not clean-pass" and the threat-model row "QC/model outage presented as clean evidence" testable.
 
-### 3.7 Idempotency and replay
+### 3.7 Idempotency, attempts and replay
 
-`runKey = sha256(versionId | trigger | lane ?? '-' | qcRulesRevision | sorted artifact contentHashes)`. The QC run table has a unique index on `runKey`. A replayed trigger (a retried submit request under the same idempotency key, a reviewer reopening the approve action) finds the existing run and returns it; it does not run QC again and appends nothing. A deliberate re-run (a future Admin "recheck under revision Y", W6) has a different `qcRulesRevision` and therefore a different key, and it is an explicit recorded recheck, never a rewrite (data contract).
+`runKey = sha256(versionId | trigger | lane ?? '-' | qcRulesRevision | sorted artifact contentHashes)`. Every run row carries `runKey` and `attempt` (1..n). The QC run table has a unique index on `(runKey, attempt)` and a partial unique index on `runKey` where `status = 'completed'`, so a key has any number of `unavailable` attempts but at most one `completed` run. On a trigger the orchestrator reads the latest attempt under the key, in the same short transaction as step 2 of 3.4, and acts on its status:
+
+| Latest attempt under `runKey` | Behaviour |
+|---|---|
+| none | Start `attempt = 1`. |
+| `completed` | **Replay.** A retried submit request under the same idempotency key, or a reviewer reopening the approve action, returns the existing run; QC does not run again and nothing is appended. |
+| `unavailable` (timeout, runner error, not configured, unreadable artifact) | **New attempt.** Start `attempt + 1` under the same `runKey`. Its findings are appended beside the still-open QC-unavailable finding of the earlier attempt (3.6); that finding is never auto-closed. A transient timeout on `approve_attempt` therefore never makes the lane's QC on that version permanently unavailable: the next approve attempt gets a real run, and the earlier failure stays visible until the owning lane dispositions it. |
+| `running`, within the age-out margin (3.4 step 2) | Return the existing run (a request in flight is not duplicated). |
+| `running`, past the age-out margin | Age the row out to `unavailable:runner_error` with its QC-unavailable finding, then start `attempt + 1` as above. |
+
+Two concurrent triggers for a key with no current attempt race on the `(runKey, attempt)` index; the loser re-reads and returns the winner's `running` row. Attempts are additions, never rewrites: a later attempt never changes an earlier attempt's row (beyond the age-out of a stale `running` row) or any finding it produced (data contract, append-only findings). A deliberate re-run (a future Admin "recheck under revision Y", W6) has a different `qcRulesRevision` and therefore a different key, and it is an explicit recorded recheck, never a rewrite.
 
 ### 3.8 Error contract
 
@@ -292,7 +303,7 @@ Tests W1-10 must ship (all `node:test`, unit layer, no Postgres):
 | schema conformance | every scripted finding passes the shared validator; a finding with a 301-code-unit excerpt fails | supports orchestrator step 4 |
 | provisional owning lane visible | every slot-5, pack and run finding in the scripts has `owningLaneBasis = 'provisional_pending_w0_06_refinement'`; every single-lane-slot finding has `'recorded_rule'` and its `owningLane` equals the W0-06 function's value | section 3.6 |
 
-Integration tests that consume the substitute belong to W2-05 (record and disposition, `unavailable` recorded not treated as zero findings), W2-07/W2-09 (rendering, disposition UI) and W3-07 (a simulated timeout appears once in the operator view and in the log with the same correlation ID).
+Integration tests that consume the substitute belong to W2-05 (record and disposition; `unavailable` recorded not treated as zero findings; a replayed trigger after `completed` returns the same run and appends nothing; a second run after `unavailable` starts `attempt = 2` under the same `runKey`, completes and appends its findings while the QC-unavailable finding stays `open`; an aged-out `running` row becomes `unavailable:runner_error` and the next trigger starts a new attempt), W2-07/W2-09 (rendering, disposition UI) and W3-07 (a simulated timeout appears once in the operator view and in the log with the same correlation ID).
 
 ## 4. Mail sink
 
@@ -338,21 +349,32 @@ export interface AuthorizedRecipient {
 export interface SafeDeepLink {
   url: string;                           // `${APP_PUBLIC_ORIGIN}${path}`; path is one of the canonical case routes; no query string, no fragment, no token
   route: 'case' | 'case_version' | 'queue_sla_breach';   // the canonical route the path was built from; the SPA owns the path strings
+  caseId: string | null;                 // the case the path opens; null only for queue_sla_breach
   requiresSignIn: true;                  // the recipient must sign in and be in scope (A05)
+}
+
+/** One breached case in the operator digest (source spec Notifications table: "the list of cases past SLA, links to each"). */
+export interface DigestCaseRef {
+  caseId: string;
+  lane: Lane;                            // the lane past its SLA (W3-05 breach query)
+  deepLinkIndex: number;                 // index into DeliveryRequest.deepLinks; that link has route 'case' and caseId === this caseId
 }
 
 export interface RenderedMail {
   subject: string;                       // rendered from the locale template for recipient.locale; UTF-8; Thai-safe
-  textBody: string;                      // plain text; contains the deep link; never document contents or finding excerpts
+  textBody: string;                      // plain text; contains every deep link; never document contents or finding excerpts
   templateKey: string;                   // e.g. 'mail.lane_opened'; the D12 locale key
-  templateParams: Record<string, string | number>;   // caseName, laneLabel, defectCount, dueDate (D06 timezone), feedback summary
+  templateParams: Record<string, string | number>;   // scalar params: caseName, laneLabel, defectCount, dueDate (D06 timezone), feedback summary
+                                         // the digest's per-case list is `digestCases`, not a param; the template renders it as one line per case with its link
 }
 
 export interface DeliveryRequest {
   dedupKey: string;                      // section 4.4; unique per (event, version, lane, recipient) under D06
   event: CommittedEvent;
   recipient: AuthorizedRecipient;
-  deepLink: SafeDeepLink;
+  deepLinks: SafeDeepLink[];             // at least one. lane_opened, sent_back, ready_for_launch: exactly one, route 'case' or 'case_version', caseId === event.caseId.
+                                         // sla_breach_digest: one route 'case' link per breached case (A05 "correct authorized case links"), optionally plus one 'queue_sla_breach' link
+  digestCases: DigestCaseRef[] | null;   // non-empty for sla_breach_digest; null for every other kind
   mail: RenderedMail;
   attempt: number;                       // 1..4 (D06: three retries)
 }
@@ -379,11 +401,12 @@ The four `MailEventKind` values are the four rows of the source-spec notificatio
 
 ### 4.3 Validation the sink performs (defensive; the notifier already guarantees them)
 
-Before accepting a request the sink checks, and on failure returns `failed` with the named `error.code` without recording a delivery:
+Before accepting a request the sink checks, and on failure returns `failed` with the named `error.code` without recording a delivery. One bad link fails the whole delivery; the sink never sends a mail with some of its links stripped:
 
-- `deepLink.url` starts with the configured `APP_PUBLIC_ORIGIN` and its path is one of the canonical routes; no `?`, `#`, or credential-looking segment → otherwise `unsafe_link`.
+- `deepLinks` is non-empty, and **every** `deepLinks[i].url` starts with the configured `APP_PUBLIC_ORIGIN` and has a path that is one of the canonical routes; no `?`, `#`, or credential-looking segment in any of them → otherwise `unsafe_link` (`error.message` names the failing index, never the URL).
+- Every link points where the mail says it does: for `lane_opened`, `sent_back` and `ready_for_launch` there is exactly one link, its `caseId` equals `event.caseId` and `digestCases` is `null`; for `sla_breach_digest` `digestCases` is non-empty, every `deepLinkIndex` is in range, the indexed link has `route = 'case'` and `caseId` equal to the entry's `caseId`, and every `route = 'case'` link is referenced by exactly one entry → otherwise `unsafe_link`.
 - `recipient.address` satisfies the synthetic-domain rule (4.6) → otherwise `rejected_recipient`.
-- `mail.textBody` contains `deepLink.url` (the link is the point of every mail).
+- `mail.textBody` contains every `deepLinks[i].url` (the links are the point of every mail; the digest lists one line per breached case with its link).
 - `event.auditEventId` is non-empty (a request without a committed audit event is malformed; the notifier never builds one).
 
 Payload size is bounded: subject ≤ 998 bytes after UTF-8 encoding (RFC 5322 line limit, with encoded-word folding left to a real transport), body ≤ 64 KiB. Larger payloads are `failed:sink_failure` with the size in `error.message`.
@@ -411,7 +434,7 @@ The dispatcher never sends a key it has already recorded as `delivered`. The sin
 
 - **Locale keys (D12).** `RenderedMail.templateKey` and `templateParams` are recorded alongside the rendered text so the mail can be re-rendered in the other language and so tests can assert on keys, not on Thai or English prose. Thai default. Subjects are UTF-8 strings in the sink; RFC 2047 encoding belongs to a real transport, not to the sinks. A Thai subject round-trips unchanged through both sinks (W3-03 "a Thai subject line is intact").
 - **Nothing sensitive in mail.** No attachment, no document contents, no finding excerpt, no evidence panel text. Lane-open carries the defect *count*; send-back carries the reviewer's feedback summary that the reviewer typed (it is the reviewer's text, not document text) truncated to 500 code units. Threat model: deep links instead of contents.
-- **Safe deep link.** The link is a location, not a capability. A recipient who follows it is sent through sign-in and the W0-05 scope check; an out-of-scope recipient gets `forbidden`. No token is ever embedded (A05 "recipient cannot gain access from link alone").
+- **Safe deep links.** A link is a location, not a capability. A recipient who follows it is sent through sign-in and the W0-05 scope check; an out-of-scope recipient gets `forbidden`. No token is ever embedded (A05 "recipient cannot gain access from link alone"). The three case-bound events carry one link to the case; the operator digest carries one `case` link per breached case, each validated by the sink (4.3), so the source-spec digest row ("the list of cases past SLA, links to each") is met without an unvalidated URL ever entering `textBody`.
 - **Synthetic-domain rule (slice 1).** Every recipient address handed to a sink must have a domain under an RFC 2606 reserved name: `*.test`, `*.example`, `*.invalid`, `example.com`, `example.net`, `example.org`. Fixture user addresses (W1-00) and the single synthetic operator address in `operator_recipients` (W0-08, W1-09) must satisfy it. Anything else is `rejected_recipient`. This is the sink-level guarantee behind "no external mail during synthetic test" and stays until a real transport is authorized under D10.
 - **No external transport.** `MAIL_TRANSPORT` accepts exactly `memory` and `file`. There is no `smtp`, no HTTP mail API, no third value; the config loader (W1-00) rejects any other string at startup. A grep-level test in W1-11 asserts that no module under `rai-web/` imports `node:net`, `node:tls`, `nodemailer` or any mail SDK ("no external mail path exists in any configuration").
 
@@ -449,15 +472,15 @@ Both sinks record the `correlationId` on every line they write and nothing else 
 
 | Test | Asserts | Done-when clause |
 |---|---|---|
-| accepts the four inputs and returns a status | a valid request returns `delivered` with `sinkMessageId`, `attempt` echoed, `dedupKey` echoed | "Accepts the four inputs and returns a status" |
+| accepts the four inputs and returns a status | a valid `lane_opened` request returns `delivered` with `sinkMessageId`, `attempt` echoed, `dedupKey` echoed; a valid `sla_breach_digest` request with three `case` links, three `digestCases` entries and all three URLs in `textBody` returns `delivered` | "Accepts the four inputs and returns a status" |
 | forced failure is reported | `failNext(1)` → `failed:sink_failure`; the same request again → `delivered`; `failAlways(true)` → four consecutive `failed` | "a forced failure is reported" |
 | duplicate key | second delivery of the same `dedupKey` → `duplicate`, `sent.length` unchanged | D06 dedup |
-| unsafe link rejected | a URL on another origin, with a query string, or with a fragment → `failed:unsafe_link`; nothing recorded | A05 |
+| unsafe link rejected | a URL on another origin, with a query string, or with a fragment → `failed:unsafe_link`; nothing recorded. A digest with five `case` links of which one is bad (another origin, a query string, or a `caseId` that differs from its `digestCases` entry) → `failed:unsafe_link` for the whole delivery, `error.message` names the index and not the URL, nothing recorded; a `lane_opened` request whose single link's `caseId` ≠ `event.caseId`, or a digest with a `case` link missing from `textBody`, → `failed:unsafe_link` | A05 |
 | non-synthetic recipient rejected | `owner@bu-a.example` and `ops@rai-desk.test` accepted; `someone@gmail.com` and an address with no domain → `failed:rejected_recipient`, nothing recorded | "no external mail" |
 | Thai subject intact | subject `แจ้งเตือน: เลนเปิดแล้ว` round-trips byte-identical through memory and file sinks | D12, W3-03 |
 | file sink restart | write two receipts, construct a new `FileMailSink` on the same directory, redeliver one key → `duplicate` | 4.7 |
 | no external mail path | module-graph walk over `rai-web/` finds no `node:net`, `node:tls`, `node:http` client use in the sinks and no mail SDK anywhere; `MAIL_TRANSPORT=smtp` makes the config loader throw | "no external mail path exists in any configuration" |
-| no secrets or contents on disk | the file sink's output contains the deep link and IDs, and does not contain the string of any `excerpt`, any password-like config value or the audit event's actor email | threat model |
+| no secrets or contents on disk | the file sink's output contains the deep links and IDs, and does not contain the string of any `excerpt`, any password-like config value or the audit event's actor email | threat model |
 
 Integration tests belong to W3-03 (four events, one mail each, rolled-back transition has no mail, deep link without session is `unauthenticated`), W3-04 (three retries with backoff, duplicate sends nothing, committed decision unchanged after permanent failure), W3-07 (a forced failure appears once in the operator view and log with the same correlation ID) and the W3-06 journey.
 
@@ -492,8 +515,8 @@ No key holds a credential. Networked or production mail credentials, if a transp
 
 | Event | Fields | Never contains |
 |---|---|---|
-| `qc.run.started` / `qc.run.finished` | `correlationId`, `runId`, `runKey`, `versionId`, `trigger`, `lane`, `status`, `reason`, `findingCount`, `alreadyRecordedCount`, `runner`, `runnerVersion`, `durationMs` | excerpt, filename, message params, artifact bytes |
-| `mail.delivery.attempted` | `correlationId`, `dedupKey`, `event.kind`, `recipientId`, `attempt`, `status`, `error.code`, `sink` | address, subject, body, deep link |
+| `qc.run.started` / `qc.run.finished` | `correlationId`, `runId`, `runKey`, `attempt`, `versionId`, `trigger`, `lane`, `status`, `reason`, `findingCount`, `alreadyRecordedCount`, `runner`, `runnerVersion`, `durationMs` | excerpt, filename, message params, artifact bytes |
+| `mail.delivery.attempted` | `correlationId`, `dedupKey`, `event.kind`, `recipientId`, `attempt`, `status`, `error.code`, `sink`, `linkCount` | address, subject, body, deep links, case IDs of the digest |
 | readiness (W0-10) | `qc.runner` identity and `mail.sink` identity; readiness fails closed when `QC_RUNNER` or `MAIL_TRANSPORT` is unset or invalid | — |
 | operator view (W3-07) | failed notification rows (`dedupKey`, kind, attempts, last error code, case link) and `unavailable` QC runs (`runId`, version, trigger, reason) | contents |
 
@@ -504,7 +527,7 @@ No key holds a credential. Networked or production mail credentials, if a transp
 | A08 (feeds; real QC is W4) | unit | W1-10 | Typed findings, `unavailable`, timeout, no write path |
 | A09 | integration (real Postgres + scripted runner) | W2-05, W2-06 | `unavailable` recorded not zero; findings append-only; open findings block Ready; owning-lane authority on single-lane, slot-5 and pack-level findings |
 | A08 visibility | integration + browser | W2-07, W3-07, W2-INT | Findings shown before decision controls; a timeout appears once in the operator view |
-| A05 | unit | W1-11 | Status, forced failure, duplicate, unsafe link, synthetic-domain rule, Thai subject, no external path |
+| A05 | unit | W1-11 | Status, forced failure, duplicate, unsafe link (single and one-of-many in a digest), per-case link correctness, synthetic-domain rule, Thai subject, no external path |
 | A05 | integration | W3-03, W3-04 | Outbox in the same transaction; four events; three retries with backoff; dedup; committed decision unchanged |
 | A05 | browser | W3-06 | Notification links require sign-in and scope in the end-to-end journey |
 
@@ -514,18 +537,18 @@ Substitute runs are never acceptance evidence for the real QC (W4) or a real tra
 
 | Ticket | Uses from this spec |
 |---|---|
-| W1-00 | Shared types in `contracts/qc.ts` and `contracts/mail.ts`; the config keys in section 6; synthetic-domain rule for fixture user addresses |
+| W1-00 | Shared types in `contracts/qc.ts` and `contracts/mail.ts`; the config keys in section 6; synthetic-domain rule for fixture user addresses; the `(runKey, attempt)` and completed-`runKey` unique indexes on the W0-04 QC run entity (3.7) |
 | W1-03 | `upload` trigger after the artifact is stored |
 | W1-05 | `submit` trigger after the version freezes; `qcRulesRevision` and `laneMappingVersion` on the request |
 | W1-09 | Fixture case IDs the scripts key on; the single synthetic operator address |
 | W1-10 | Section 3.9 in full |
 | W1-11 | Sections 4.7 and 4.8 in full |
 | W2-02 | `approve_attempt` trigger with `lane`, before the decision writes |
-| W2-05 | Finding record, `unavailable` finding, `owningLane` and `owningLaneBasis`, append-only rule |
+| W2-05 | Finding record, `unavailable` finding, `owningLane` and `owningLaneBasis`, append-only rule; `runKey`/`attempt` lookup and the new-attempt-after-`unavailable` rule (3.7) |
 | W2-07, W2-09 | Finding shape for rendering; the D12 message key; the visible provisional basis |
-| W3-03 | Outbox placement, `DeliveryRequest`, four event kinds, digest dedup mapping, locale templates |
+| W3-03 | Outbox placement, `DeliveryRequest` with `deepLinks` and `digestCases`, four event kinds, digest dedup mapping, locale templates |
 | W3-04 | Retry ownership, attempt numbering, permanent failure |
-| W3-05 | Due date parameter on lane-open mail; breach query feeding the digest |
+| W3-05 | Due date parameter on lane-open mail; breach query feeding the digest's `digestCases` and one `case` link per breached case |
 | W3-07 | Section 7 |
 | W4 | Replaces `ScriptedQcRunner` behind `QcRunner` under ADR-0006 (D08, D09) |
 
@@ -547,11 +570,11 @@ Product sources: [workflow](../product/workflow.md) (failure behaviour, notifica
 |---|---|
 | Inputs are a version reference and authorized artifact references | 3.1, `QcRunRequest` in 3.3 |
 | Typed findings: rule ID, rule revision, evidence location, metric/denominator/threshold where relevant, severity, `owning_lane` = AI/COE \| DPO \| IT/Security assigned by the W0-06 rule | `QcFinding`, `Measure`, `EvidenceLocation` in 3.3; 3.6 |
-| Explicit `unavailable` result recorded as a finding with an `owning_lane` under the same rule | 3.3 `QcRunResult`, 3.6 |
+| Explicit `unavailable` result recorded as a finding with an `owning_lane` under the same rule | 3.3 `QcRunResult`, 3.6; a later attempt under the same `runKey` appends beside it, never closes it (3.7) |
 | QC has no approval, mail or write access to workflow state | 3.1, 3.4, 3.9 structural and behavioural tests |
 | Slice-1 substitute returns scripted synthetic findings and can simulate a timeout | 3.9 |
 | No model chosen (D08, D09) | 1, 10 |
-| Mail accepts a committed business event, authorized recipients, a safe deep link and a dedup key; returns delivery status | `DeliveryRequest`, `DeliveryReceipt` in 4.2; 4.4 |
+| Mail accepts a committed business event, authorized recipients, a safe deep link and a dedup key; returns delivery status | `DeliveryRequest` (`deepLinks`: one validated link for case-bound events, one validated `case` link per breached case plus `digestCases` for the operator digest, per the source-spec Notifications table and A05), `DeliveryReceipt` in 4.2; validation 4.3; 4.4 |
 | Local substitute writes to a file or in-memory sink; no external mail | 4.6, 4.7, 4.8 |
 | Interface, error contract and test substitute (W0 section text) | 3.3/4.2, 3.8/4.5/5, 3.9/4.7 |
 | Cross-links to consuming tickets | 9 |
