@@ -206,7 +206,7 @@ Six single-role users, one per role, plus the W0-03 dual-role identity. Subjects
 |---|---|---|---|---|
 | `fx-owner` | Nattaporn S. (นัทธพร ส.) | `fx-owner@rai-desk.example` | Owner: cases it owns (all four below) | The one owner; two cases in each fixture BU so owner scope is proven to follow ownership, not BU |
 | `fx-spoc-cm` | Suchada P. | `fx-spoc-cm@rai-desk.example` | BU SPOC: `bu-cm` | Submits the second case in W1-INT's positive SPOC test |
-| `fx-coe` | Dr. Anan V. | `fx-coe@rai-desk.example` | AI/COE reviewer: all cases | |
+| `fx-coe` | Dr. Kittipat V. | `fx-coe@rai-desk.example` | AI/COE reviewer: all cases | |
 | `fx-dpo` | Pimchanok R. | `fx-dpo@rai-desk.example` | DPO reviewer: all cases | |
 | `fx-sec` | Wutthichai K. | `fx-sec@rai-desk.example` | IT/Security reviewer: all cases | |
 | `fx-admin` | Desk admin (synthetic) | `fx-admin@rai-desk.example` | Admin: configuration; read-only case view per W0-05; never a lane decision or disposition | |

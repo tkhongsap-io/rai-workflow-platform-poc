@@ -20,6 +20,10 @@ Not edited, on purpose: `docs/product/decisions.md` (D08 stays open; agents neve
 
 Reviewer finding: the 8.6 "Pack total" row uploaded four 40 MiB PDFs, but each exceeds the 25 MiB per-file limit, so every one fails at check 5 (`too_large`) and check 10 (`pack_total_exceeded`) was never reached; the per-pack limit therefore had no reachable test contract for W1-03 and no entry in the section 7 oversized-upload row. Fixed by replacing the row with two: six 26,214,400-byte PDFs accepted into slots 1-6 (150 MiB exactly, boundary accept) and a seventh smallest valid PDF into slot 7 rejected `pack_total_exceeded` at check 10, and by adding "W1-03 pack-total test at 150 MiB and 150 MiB + 1" to the section 7 "Oversized upload or decompression bomb" row. No other content changed.
 
+## Fix round 2
+
+Reviewer finding: the section 8.2 `fx-coe` display name "Dr. Anan V." reused the first name of a real person named in the frozen source spec ("Anan Sanongchitcharorn", AI Transformation Lead) for the fixture in the matching AI/COE reviewer role, against section 8.1's promise of invented names and the W0-08 rule of no Life-OS content; the W1-09 provenance check would have failed on it. Fixed by renaming the display name to "Dr. Kittipat V.", which matches none of the four named people in the source spec (Nakhun, Montri, Anan, Joao). Subject, email, role and scope are unchanged; no other rows change. The same name remains in the legacy `demo/` reference copy, which stays untouched by contract and is not a fixture source.
+
 ## Checks
 
 Shell: `export PATH=$HOME/.nvm/versions/node/v24.21.0/bin:$PATH` (node v24.21.0). No Postgres needed: document ticket.
