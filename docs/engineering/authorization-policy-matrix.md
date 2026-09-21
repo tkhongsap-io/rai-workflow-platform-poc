@@ -54,15 +54,23 @@ type Actor = {
 };
 ```
 
-Scope facts come from the Case entity only: the case's owner subject reference and its `business_unit` (W0-04 names the columns). The inherited text fields `business_owner` and `technical_owner` are registry names for display and search; they are never used to decide access.
+Scope facts come from the Case entity only: the case's owner subject reference and its `business_unit` (W0-04 names the columns). The one action with no stored case yet, `case.create`, takes the same facts from the validated request body (the case that would exist; see [Create target](#create-target-casecreate)). The inherited text fields `business_owner` and `technical_owner` are registry names for display and search; they are never used to decide access.
 
 ```ts
 type CaseScopeFacts = {
-  caseId: string;
+  caseId?: string;           // undefined only on case.create (the case does not exist yet); set for every other target
   ownerSubjectId: string;
   businessUnit: string;
 };
 ```
+
+### Create target (`case.create`)
+
+A create has no stored case to load facts from, so the facts are built from the validated body and the actor before `authorize` runs; the same `inScope` predicate then applies unchanged:
+
+- `businessUnit` = the body's `business_unit` (a required create field, data contract Case row). For `bu_spoc` it must lie in one of the actor's `bu` grants, or the request is 403 `scope`.
+- `ownerSubjectId`: for the `owner` role the server sets it to `actor.subjectId`; a body that names a different owner is 403 `scope` (the case would be outside the actor's `own` scope). For `bu_spoc`, who "acts on the owner's behalf" (PRD "Users and authority"), the body names the owner subject within the BU (the W0-02 create shape carries an optional `owner_subject_id`; absent, it defaults to the actor); the SPOC is recorded as the audit actor and the named owner as the case owner (the W1-INT SPOC-on-behalf test). A named subject that does not resolve is 422 `invalid_input` before policy evaluation, like the projected-field rule in [Section 5](#5-w0-04-fields-projection-rule).
+- The facts are evaluated before any row is written; a denied create writes no case and audits `authorization.denied` (principle 7).
 
 ### Scope predicate
 
@@ -82,7 +90,7 @@ Action identifiers are the unit of authorization. Every Fastify route declares e
 
 ```ts
 type Action =
-  // W1-00 rows
+  // W1-00 rows (case.create is authorized against facts taken from the body; case.list is a scoped query)
   | 'case.view' | 'case.list' | 'case.create' | 'case.edit_draft' | 'case.submit'
   | 'artifact.upload' | 'artifact.download' | 'version.view' | 'history.view'
   | 'config.read_effective' | 'config.read_revisions' | 'config.publish' | 'audit.read'
@@ -112,6 +120,8 @@ Cell values: **Own** = cases in the actor's `own` scope; **BU** = cases in a `bu
 
 | Action | Owner | BU SPOC | AI/COE | DPO | IT/Sec | Admin | Rule |
 |---|---|---|---|---|---|---|---|
+| Create a case (`case.create`) | Own | BU | — | — | — | — | The "create" part of the contract row, made evaluable: the target is the case the body describes ([Create target](#create-target-casecreate)). Owner: the case is owned by the actor, or 403 `scope`. BU SPOC: the body's `business_unit` is in a `bu` grant, or 403 `scope`; the SPOC may name the owner within that BU |
+| List cases (`case.list`) | Own | BU | All | All | All | All | The W1-02 list the W1-07 case list consumes; same predicate as `queue.search` (`caseScopeWhere(actor)` from the actor's `case.view` grants, [Section 6](#query-scope-w1-02-w3-01-drizzle)); an out-of-scope case is absent, never present-but-hidden. `queue.search` and `queue.count` (W3-01) extend this row with keys and counts and add nothing to its scope |
 | Search results (`queue.search`) | Own | BU | All | All | All | All | Follows case-view scope: every search key (`source_record_id`, status, owner, `use_case_group`, all) is filtered by the actor's scope predicate before matching (A06) |
 | Counts, pagination and filter options (`queue.count`) | Own | BU | All | All | All | All | Computed over the scoped set only; an out-of-scope user's counts and filter options equal those of a user with no such cases (A06) |
 | Deep link into a case, version, finding or file | Own | BU | All | All | All | All | The link carries only opaque IDs; opening it runs sign-in then `case.view` on the referenced case. No token in a link grants scope (A05) |
@@ -162,7 +172,7 @@ Error mapping used throughout, taken from ADR-0003 and confirmed by W0-06:
 |---|---|---|---|
 | No or invalid session | 401 | `unauthenticated` | — |
 | Actor's roles hold no row for the action | 403 | `forbidden` | `role` |
-| Row exists, case outside every matching scope | 403 | `forbidden` | `scope` |
+| Row exists, case outside every matching scope (for `case.create`, the case the body describes) | 403 | `forbidden` | `scope` |
 | Reviewer acts on a lane that is not theirs, or on a finding whose `owning_lane` is not theirs | 403 | `forbidden` | `lane` |
 | D05 self-exclusion (owner or BU SPOC on the case) | 403 | `forbidden` | `self_approval` |
 | Admin attempts a lane decision or a disposition | 403 | `forbidden` | `role` |
@@ -208,8 +218,10 @@ type PolicyRow = {
 };
 
 type Target =
-  | { kind: 'none' }                                            // case.create, case.list, queue.*, config.*
-  | { kind: 'case'; facts: CaseScopeFacts }                     // view, edit, submit, download, version, history
+  | { kind: 'none' }                                            // case.list, queue.*, config.*, audit.read, operator.view:
+                                                                //   role check here; scope applied by caseScopeWhere (list, queue.*)
+  | { kind: 'case'; facts: CaseScopeFacts }                     // view, edit, submit, download, version, history,
+                                                                //   and case.create with facts built from the body (no caseId)
   | { kind: 'lane'; facts: CaseScopeFacts; lane: Lane }         // lane.approve, lane.send_back
   | { kind: 'finding'; facts: CaseScopeFacts; owningLane: Lane }; // finding.*
 
@@ -221,11 +233,12 @@ function authorize(actor: Actor, action: Action, target: Target): Decision;
 ```
 
 - `authorize` is pure: no I/O, no clock. It throws on an unknown `Action` or `Role` (a programming error surfaced by tests, never a 403) and denies when the actor has no grant matching a row. Evaluation order per row: role → scope → lane → self-exclusion; the first row that allows wins; if no row allows, the denial reason is the most specific one reached (`self_approval` over `lane` over `scope` over `role`) so the UI can explain it.
+- For a `{ kind: 'none' }` target `authorize` checks the role rows only; the scope column of a list or queue row is enforced by the `caseScopeWhere(actor)` predicate (below) that the handler must use, and the W1-02 and W3-01 tests assert the resulting absence. Every other action, `case.create` included, is evaluated against `CaseScopeFacts`.
 - W1-00 ships the rows for `case.*` (view, list, create, edit_draft, submit), `artifact.*`, `version.view`, `history.view`, `config.*` and `audit.read`. **W2-02's contract PR** adds `lane.*`, `case.resubmit` and `finding.*` with the D05 rules; **W3-01/W3-03** add `queue.*`, `operator.view` and the recipient resolver. Adding a row is a contract change and its own PR (team and roles, "shared interface contract").
 
 ### Middleware (W1-01, Fastify)
 
-- Every route declares `{ action, target }` in its route config; a Fastify `onRoute` hook rejects a route without one at startup. A global `preHandler` hook resolves the session to an `Actor` (401 if none), loads the target's `CaseScopeFacts` by opaque ID (404 if absent), calls `authorize`, and replies 403 with the reason on deny. Handlers run only after allow and receive the `Decision` on the request for the audit event.
+- Every route declares `{ action, target }` in its route config; a Fastify `onRoute` hook rejects a route without one at startup. A global `preHandler` hook resolves the session to an `Actor` (401 if none), loads the target's `CaseScopeFacts` by opaque ID (404 if absent), calls `authorize`, and replies 403 with the reason on deny. For `case.create` there is no ID to load: the hook runs body validation first (422 on a projected field or an unresolvable owner), then builds the facts from the body and the actor as [Create target](#create-target-casecreate) states, and calls the same `authorize`; the handler never sees a body whose owner or BU it has not been authorized for. Handlers run only after allow and receive the `Decision` on the request for the audit event.
 - Loading `CaseScopeFacts` is the only pre-authorization read and it reads three columns; the handler's own queries run after the decision. The facts lookup and the check are one helper so the 403 and 404 paths cannot diverge.
 - The audit event of a denied write (`authorization.denied`, with the true reason and the correlation ID) is written in the same request; denied reads are logged, not audited, to keep the audit trail to state changes (W0-04).
 
@@ -258,28 +271,31 @@ Fixture identities come from W1-00 (six single-role users and the W0-03 dual-rol
 | T3 | `owner-b` (another owner, B1) | `case.view` | owner-a's case | 403 `scope`; body carries no case field | W1-02 | A01 |
 | T4 | `spoc-b1` | `case.view`, `case.edit_draft`, `case.submit` | owner-a's case (B1) | 200; submit audit event actor = spoc-b1, case owner unchanged | W1-02, W1-INT | A01, A02 |
 | T5 | `spoc-b1` | `case.view` | case in B2 | 403 `scope` | W1-02 | A01 |
-| T6 | `reviewer-dpo` | `case.view`, `version.view`, `history.view` | any case, any version | 200 | W1-02, W1-05 | A01, A07 |
-| T7 | `reviewer-dpo` | `case.edit_draft` | any case | 403 `role` | W1-02 | A01 |
-| T8 | `owner-b` | `artifact.download` | artifact on owner-a's case | 403 `scope`; no bytes | W1-03 | A01 |
-| T9 | no session | direct blob path / artifact URL | any | 401; blob directory not routable | W1-03 | A01 |
-| T10 | any actor | `case.create` / `case.edit_draft` with `privacy_status` in body | — | 422 `invalid_input` `projected_field` | W1-02 | W0-04 fields |
-| T11 | `admin` | `config.read_revisions`, `audit.read` | — | 200; every other role 403 `role` | W1-00 | A01, A11 |
-| T12 | any role | unknown action / policy row lookup for unknown role | — | `authorize` throws; no route reachable | W1-00 | A01 |
-| T13 | `reviewer-dpo` | `lane.approve` | lane `dpo` on a case where reviewer-dpo is neither owner nor SPOC | 200 | W2-02 | A09 |
-| T14 | `reviewer-dpo` | `lane.approve` | lane `itsec` | 403 `lane` | W2-02 | A09 |
-| T15 | `admin` | `lane.approve`, `lane.send_back` | any lane | 403 `role` | W2-02 | A01, A09 |
-| T16 | dual-role (lane L + SPOC B2) | `lane.approve`, `lane.send_back` | lane L on a case in B2 | 403 `self_approval` | W2-02 | A09 (D05) |
-| T17 | dual-role | `lane.approve` | lane L on a case in B1 | 200 | W2-02 | A09 |
-| T18 | `owner-a` | `finding.propose_fixed` | finding on own case | 200, state proposed | W2-05 | A09 |
-| T19 | `owner-a` | `finding.waive`, `finding.mark_na`, `finding.confirm_fixed` | finding on own case | 403 `role` | W2-05 | A09 |
-| T20 | `reviewer-dpo` | `finding.waive` | finding with `owning_lane = itsec` (single-lane, slot-5 and pack-level cases) | 403 `lane` | W2-05 | A09 |
-| T21 | `reviewer-dpo` | `finding.confirm_fixed` | proposal on a finding with `owning_lane = dpo` | 200; disposition attributed to reviewer-dpo | W2-05 | A09 |
-| T22 | dual-role | `finding.waive` | finding owned by lane L on a case in B2 | 403 `self_approval` (provisional default) | W2-05 | A09 |
-| T23 | any actor | set Ready by request | — | no route exists; predicate runs only inside W2-06 | W2-06 | A09 |
-| T24 | `owner-a`, `spoc-b1`, `owner-b` | `queue.search`, `queue.count` | each key | results, counts and filter options equal the scoped set; owner-b sees zero of owner-a's cases and identical counts to a user with no cases | W3-01 | A06 |
-| T25 | mail sink | send-back and Ready recipients | case owned by owner-a | recipient = owner-a only; link has no token | W3-03 | A05 |
-| T26 | mail sink | breach digest | — | recipients = `operator_recipients` seed; link without session yields 401 | W3-03 | A05 |
-| T27 | any denied write | audit | — | `authorization.denied` event with reason and correlation ID; denied read logged, not audited | W1-01, W3-07 | A11 |
+| T6 | `spoc-b1` | `case.create` | body `business_unit = B2` | 403 `scope`; no case row written; `authorization.denied` audited | W1-02 | A01 |
+| T7 | `owner-a` | `case.create` | body naming `owner-b` as owner | 403 `scope`; no case row written. Same body from `spoc-b1` with `business_unit = B1` naming `owner-a`: 201, case owner = owner-a, audit actor = spoc-b1 | W1-02, W1-INT | A01, A02 |
+| T8 | `owner-b`, `spoc-b1` | `case.list` | — | owner-b's list omits owner-a's case; spoc-b1's list holds B1 cases only and no B2 case; both queries go through `caseScopeWhere` | W1-02 | A01 |
+| T9 | `reviewer-dpo` | `case.view`, `version.view`, `history.view` | any case, any version | 200 | W1-02, W1-05 | A01, A07 |
+| T10 | `reviewer-dpo` | `case.edit_draft` | any case | 403 `role` | W1-02 | A01 |
+| T11 | `owner-b` | `artifact.download` | artifact on owner-a's case | 403 `scope`; no bytes | W1-03 | A01 |
+| T12 | no session | direct blob path / artifact URL | any | 401; blob directory not routable | W1-03 | A01 |
+| T13 | any actor | `case.create` / `case.edit_draft` with `privacy_status` in body | — | 422 `invalid_input` `projected_field` | W1-02 | W0-04 fields |
+| T14 | `admin` | `config.read_revisions`, `audit.read` | — | 200; every other role 403 `role` | W1-00 | A01, A11 |
+| T15 | any role | unknown action / policy row lookup for unknown role | — | `authorize` throws; no route reachable | W1-00 | A01 |
+| T16 | `reviewer-dpo` | `lane.approve` | lane `dpo` on a case where reviewer-dpo is neither owner nor SPOC | 200 | W2-02 | A09 |
+| T17 | `reviewer-dpo` | `lane.approve` | lane `itsec` | 403 `lane` | W2-02 | A09 |
+| T18 | `admin` | `lane.approve`, `lane.send_back` | any lane | 403 `role` | W2-02 | A01, A09 |
+| T19 | dual-role (lane L + SPOC B2) | `lane.approve`, `lane.send_back` | lane L on a case in B2 | 403 `self_approval` | W2-02 | A09 (D05) |
+| T20 | dual-role | `lane.approve` | lane L on a case in B1 | 200 | W2-02 | A09 |
+| T21 | `owner-a` | `finding.propose_fixed` | finding on own case | 200, state proposed | W2-05 | A09 |
+| T22 | `owner-a` | `finding.waive`, `finding.mark_na`, `finding.confirm_fixed` | finding on own case | 403 `role` | W2-05 | A09 |
+| T23 | `reviewer-dpo` | `finding.waive` | finding with `owning_lane = itsec` (single-lane, slot-5 and pack-level cases) | 403 `lane` | W2-05 | A09 |
+| T24 | `reviewer-dpo` | `finding.confirm_fixed` | proposal on a finding with `owning_lane = dpo` | 200; disposition attributed to reviewer-dpo | W2-05 | A09 |
+| T25 | dual-role | `finding.waive` | finding owned by lane L on a case in B2 | 403 `self_approval` (provisional default) | W2-05 | A09 |
+| T26 | any actor | set Ready by request | — | no route exists; predicate runs only inside W2-06 | W2-06 | A09 |
+| T27 | `owner-a`, `spoc-b1`, `owner-b` | `queue.search`, `queue.count` | each key | results, counts and filter options equal the scoped set; owner-b sees zero of owner-a's cases and identical counts to a user with no cases | W3-01 | A06 |
+| T28 | mail sink | send-back and Ready recipients | case owned by owner-a | recipient = owner-a only; link has no token | W3-03 | A05 |
+| T29 | mail sink | breach digest | — | recipients = `operator_recipients` seed; link without session yields 401 | W3-03 | A05 |
+| T30 | any denied write | audit | — | `authorization.denied` event with reason and correlation ID; denied read logged, not audited | W1-01, W3-07 | A11 |
 
 The negative tests call the API directly, never through the UI (ADR-0003 risk table); the exit tickets W1-08, W2-08 and W3-06 record their output.
 
@@ -294,6 +310,7 @@ Engineering defaults this spec had to set, each inside the recorded rules and ea
 | Dispositions by a reviewer who is owner or SPOC on the case | Denied, provisional (approval-shaped authority) | Review leads, within D05 | Before W2-05 |
 | Lane-open mail to a self-excluded reviewer | Sent (follows case-view scope as the contract says); they cannot act | Review leads / operator | Before W3-03 |
 | In-app operator audience for audit read and the operator view | Admin only in slice 1; the operator is not a role (D06). Whether the operator holds Admin or a distinct group mapping is D10 / W6 | IT/Security + Ta at D10 | Before networked test |
+| Create-case target built from the body | `case.create` is authorized against `CaseScopeFacts` taken from the validated body: `business_unit` (required) and, for a BU SPOC acting on the owner's behalf, an optional `owner_subject_id` in the W0-02 create shape; for the `owner` role the owner is the actor. W0-02 carries the field; W1-02 tests T6-T8 | W0-02 owner (shape), tech lead on this PR | Before W1-02 |
 
 Not decided here and not to be decided by implementation: the owning-lane assignment for slot 5, slot 9, pack-level and QC-unavailable findings (W0-06 refinement item for the review leads); AD group-to-role mapping (W6, W8, D10); anything in D07-D10.
 
