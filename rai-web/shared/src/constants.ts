@@ -43,3 +43,13 @@ export function lanesForSlot(slot: Slot, mapping: LaneMapping = CURRENT_LANE_MAP
 export function slotsForLane(lane: Lane, mapping: LaneMapping = CURRENT_LANE_MAPPING): Slot[] {
   return [...mapping.slotsByLane[lane]];
 }
+
+/**
+ * W0-06 section 7.1, verbatim: a `defect` finding on a single-lane slot (1, 2, 3, 4, 6, 7, 8) is owned by the one
+ * lane that reviews it under the mapping recorded on the finding's version. Slots 5 and 9 return
+ * `'refinement_pending'` until the review leads record W0-06 section 7.3; no finding is ever stored with that value.
+ */
+export function owningLaneForSlot(slot: Slot, mapping: LaneMapping): Lane | 'refinement_pending' {
+  const lanes = lanesForSlot(slot, mapping);
+  return lanes.length === 1 ? lanes[0]! : 'refinement_pending'; // slots 5 and 9: section 7.3
+}

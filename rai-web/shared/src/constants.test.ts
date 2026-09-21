@@ -10,6 +10,7 @@ import {
   LANES,
   SLOTS,
   lanesForSlot,
+  owningLaneForSlot,
   slotsForLane,
 } from './constants.js';
 
@@ -38,4 +39,13 @@ test('timezone, lanes and slots are the D06 and source-spec constants', () => {
   assert.equal(APP_TIMEZONE, 'Asia/Bangkok');
   assert.deepEqual([...LANES], ['ai_coe', 'dpo', 'it_security']);
   assert.deepEqual([...SLOTS], [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+});
+
+test('owningLaneForSlot follows W0-06 7.1: single-lane slots map, slots 5 and 9 are refinement_pending', () => {
+  assert.equal(owningLaneForSlot(1, LANE_MAPPING_V1), 'ai_coe');
+  for (const slot of [2, 3, 4] as const) assert.equal(owningLaneForSlot(slot, LANE_MAPPING_V1), 'dpo');
+  for (const slot of [6, 7, 8] as const)
+    assert.equal(owningLaneForSlot(slot, LANE_MAPPING_V1), 'it_security');
+  assert.equal(owningLaneForSlot(5, LANE_MAPPING_V1), 'refinement_pending');
+  assert.equal(owningLaneForSlot(9, LANE_MAPPING_V1), 'refinement_pending');
 });
