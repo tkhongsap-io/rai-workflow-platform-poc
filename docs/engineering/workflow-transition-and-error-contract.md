@@ -358,7 +358,7 @@ Every finding carries exactly one `owning_lane` ∈ {`ai_coe`, `dpo`, `it_securi
 
 ### 7.1 Recorded rule: single-lane slots
 
-A finding whose `slot` is 1, 2, 3, 4, 6, 7 or 8 is owned by the one lane that reviews that slot under the lane mapping **recorded on the finding's version** (section 3). With `lane-mapping/v1`: slot 1 → `ai_coe`; 2, 3, 4 → `dpo`; 6, 7, 8 → `it_security`. This follows directly from D02 and D05 ("recorded by the finding's owning lane") and is recorded here as the W0-06 rule. W2-05's single-lane test case uses it.
+A `defect` finding whose `slot` is 1, 2, 3, 4, 6, 7 or 8 is owned by the one lane that reviews that slot under the lane mapping **recorded on the finding's version** (section 3). With `lane-mapping/v1`: slot 1 → `ai_coe`; 2, 3, 4 → `dpo`; 6, 7, 8 → `it_security`. This follows directly from D02 and D05 ("recorded by the finding's owning lane") and is recorded here as the W0-06 rule. W2-05's single-lane test case uses it.
 
 ```ts
 export function owningLaneForSlot(slot: Slot, mapping: LaneMapping): Lane | 'refinement_pending' {
@@ -367,30 +367,30 @@ export function owningLaneForSlot(slot: Slot, mapping: LaneMapping): Lane | 'ref
 }
 ```
 
-The `'refinement_pending'` branch exists so that a call for slot 5 or 9 fails a type check and a test rather than silently picking a lane; it is replaced by the recorded refinement, and no finding is ever stored with that value.
+The `'refinement_pending'` branch exists so that a call for slot 5 or 9 fails a type check and a test rather than silently picking a lane; it is replaced by the recorded refinement, and no finding is ever stored with that value. The function is called for `defect` findings only; a `kind = unavailable` finding of any trigger and any slot takes its owning lane from section 7.3 (it is a refinement category of its own in the W0-06 ticket), so the slot-based rule above does not apply to it by default.
 
-### 7.2 QC-unavailable findings raised on an approve attempt
+### 7.2 QC-unavailable findings: no rule recorded
 
-An `unavailable` result from the lane-QC run of trigger `approve_attempt` for lane L is owned by L: the run was L's rules, L saw the unavailable status before deciding, and L records the disposition. An `unavailable` result on an upload to a single-lane slot follows 7.1 (that slot's lane). Upload-unavailable on slots 5 and 9 and submit-triggered (pack QC) unavailable results are in 7.3.
+The W0-06 ticket lists QC-unavailable findings, next to slot 5, slot 9 and pack-level findings, as a category whose owning lane is the review leads' D05 refinement, "not a silent default". No rule is recorded here for **any** `unavailable` finding: not for the lane-QC run of an approve attempt (the lane whose rules ran is one labelled option in 7.3, not the rule), not for an upload run on a single-lane slot (7.1 is a labelled option there, not the rule), and not for a submit-time pack-QC run. Two things are settled independently of the owning lane and stay as written: an `unavailable` finding counts as undispositioned for Ready until dispositioned (section 6, condition 3, a source rule: "never counts as clean"), and the reviewer sees the `unavailable` run before deciding (section 4.4). Who may disposition it is the open item.
 
 ### 7.3 Open: D05 refinement the review leads record before W2-05
 
-The following categories have **no owning lane until the review leads record the rule here** (D05: "review leads may refine within these rules before W2"). They are open items on this ticket, not defaults. W2-05 must not start, and W1-10 must not script findings in these categories, until the table below carries an approver and a date. Any W1-10 fixture that needs an `unavailable` submit-time result waits with it.
+The following categories have **no owning lane until the review leads record the rule here** (D05: "review leads may refine within these rules before W2"). They are open items on this ticket, not defaults. W2-05 must not start, and W1-10 must not script findings in these categories, until the table below carries an approver and a date. Any W1-10 fixture that needs an `unavailable` result, of any trigger, waits with it.
 
 | Category | Why the recorded rules do not settle it | Options for the leads (labelled proposals, none chosen) |
 |---|---|---|
 | Slot 5 (BRD), reviewed by all three lanes | D02 makes slot 5 shared; D05 says "the finding's owning lane" (singular) | (a) the lane whose rule raised it (QC rules are lane-scoped on approve attempt; on upload/submit, the rule's declared lane); (b) AI/COE, as the lane whose second document it is (D02); (c) any of the three may disposition, first recorded wins (changes `owning_lane` to a set) |
 | Slot 9 (other supporting docs, no lane gate) | No lane reviews it; a finding on it can still exist (for example unsafe or unreadable content) | (a) informational only: QC raises no `defect` on slot 9, so nothing needs disposition; (b) AI/COE; (c) the rule's declared lane |
 | Pack-level findings (`slot = null`: completeness, cross-document contradiction, pack-versus-stage mismatch) | Raised on submit for the whole pack, not a slot | (a) AI/COE as the lane that owns risk screening and pack coherence; (b) the rule's declared lane; (c) all three (set) |
-| `unavailable` on upload (slot 5 or 9) or on submit (pack QC) | Same as the slot or pack rule above, applied to the unavailable run | Follow whichever option is chosen for that category |
+| `unavailable` findings, every trigger (lane QC on approve attempt for lane L; per-upload QC on any slot; pack QC on submit) | The ticket names QC-unavailable as its own refinement category; the source says only that unavailable never counts as clean, not who dispositions it | (a) by run, trigger by trigger: approve attempt → the lane L whose rules ran and who saw the result before deciding; upload on a single-lane slot → that slot's lane as in 7.1; upload on slot 5 or 9 and submit → the option chosen for that slot or pack category; (b) by slot or pack only: every `unavailable` finding follows the rule of the slot or pack category it was raised on, regardless of trigger (an approve-attempt run on a single-lane slot → that slot's lane; on slot 5 → the slot-5 rule; a lane-wide run with no slot → the pack-level rule); (c) one lane for all `unavailable` findings, named by the leads (for example the lane that operates the QC boundary), since an outage is a QC condition rather than a document defect |
 | Carry-forward of a disposition to an identical finding on N+1 (section 4.6) | Not in the source; affects W4 QC design more than W2 | (a) never carried, re-dispositioned on N+1 (slice-1 behaviour); (b) carried when rule ID, rule revision, slot and artifact hash are identical, recorded as a new `disposition.carried` event with the original as evidence |
 
 **Recorded refinement:** _none yet_. Record here as: rule per category · approver (review leads, within D05) · date · channel; then update `owningLaneForSlot` and the W1-10 fixture set in the same PR, and note the record on the D05 row's "affected documents" via a register entry by Ta (agents never record decisions).
 
 ### 7.4 What W2-05 and W1-10 may do meanwhile
 
-- W1-10 scripts findings only on single-lane slots plus the approve-attempt `unavailable` case of 7.2.
-- W2-05's done-when names a slot-5 finding and a pack-level finding; those two test cases are written against the recorded refinement and the ticket is blocked until it exists. Its single-lane and approve-attempt-unavailable cases can proceed.
+- W1-10 scripts `defect` findings on single-lane slots only. It scripts no `unavailable` finding of any trigger (approve attempt, upload or submit) until 7.3 is recorded, because storing one needs an `owning_lane`.
+- W2-05's done-when names a slot-5 finding and a pack-level finding; those two test cases, and any case that stores an `unavailable` finding, are written against the recorded refinement and the ticket is blocked for them until it exists. Its single-lane `defect` case can proceed.
 
 ## 8. Error contract
 
@@ -522,6 +522,8 @@ await db.transaction(async (tx) => {
 
 Enforced twice: the data-access layer exposes no update for `pack_versions` (except `ready_at`, set once, and the state flip in submit), `artifact_slots` of a submitted version, `lane_decisions`, `findings`, `dispositions`, `audit_events`; and a Postgres trigger `BEFORE UPDATE OR DELETE` on those tables raises for any row whose version is submitted (`RAISE EXCEPTION 'immutable'`), so a bug or a migration cannot rewrite them (W0-04 schema-evolution rule: reshaping copies forward). W1-05's "a second write to that version's artifact ref is rejected" test hits both layers. Any application-level attempt is answered `stale_version` (`version_closed`) or `invalid_input`, never a silent no-op.
 
+The `pack_versions` trigger is the one exception, and it is exact so that the transitions of 4.3 and 4.9 can commit: it evaluates `OLD.state`, not `NEW.state`, and permits exactly two changes — (1) when `OLD.state = 'draft'`, the submit flip to `NEW.state = 'submitted'` together with the fields 4.3(a) freezes in that same statement (`submitted_by`, `submitted_at`, `checklist_template_version`, `config_revision_id`, `stage_context`, `lane_mapping_version`; a draft row is otherwise mutable, so save draft's `revision + 1` never reaches the raise); (2) when `OLD.state = 'submitted'`, `ready_at` from `null` to a value with every other column equal to `OLD` (`NEW IS NOT DISTINCT FROM OLD` apart from `ready_at`). Every other `UPDATE` of a row whose `OLD.state = 'submitted'` raises, `DELETE` of such a row always raises, and a second write to `ready_at` raises because it is no longer null. `artifact_slots`, `lane_decisions`, `findings`, `dispositions` and `audit_events` keep the unconditional raise once their version is submitted (`audit_events` and `dispositions` are append-only in every state). The proposed risk tier that pack QC writes after submit (4.3 "After commit") is therefore not a `pack_versions` column; W0-04 stores it with the QC run, where the trigger does not fire.
+
 ### 9.3 Constraints that back the rules
 
 | Constraint | Backs |
@@ -561,6 +563,7 @@ Layer names follow the W0-02 test-layer map: **unit** (`node:test`, no database)
 | Lane mapping exact values and version string | `LANE_MAPPING_V1` equals the D02 sets; `lanesForSlot(5)` = all three; `lanesForSlot(9)` = [] | unit | W1-00 | A04 |
 | Error codes and statuses | each of the eight codes maps to its HTTP status; envelope has `code`, `messageKey`, `correlationId`; `forbidden`/`unauthenticated` carry no details | unit | W1-00 | — |
 | Submit freeze and mapping recorded | submitted version records `config_revision_id` and `lane_mapping_version`; second write to an artifact ref fails at DAL and at trigger | integration | W1-05 | A07 |
+| `pack_versions` trigger exception (section 9.2) | submit flip `draft → submitted` with the frozen fields passes; on a submitted row, `ready_at` `null → value` alone passes, any other column change raises `immutable`, `DELETE` raises, a second `ready_at` write raises | integration | W1-05 (trigger), W2-06 (Ready uses it) | A07, A09 |
 | Three lanes atomically | submit yields exactly three `lane.opened` rows in one transaction; injected failure on the third rolls back all; High risk opens all three | integration | W2-01 | A04 |
 | Own lane only; Admin never | wrong-lane, Admin, owner and SPOC approvals → `forbidden`; dual-role fixture identity approving its own case → `forbidden` (D05) | integration | W2-02 | A01, A09 |
 | Stale approve | approve with an old `versionId` → 409 `version_superseded`; after another lane's send-back → `version_closed`; second decision by same lane → `lane_already_decided`; approve with old `qc_run_id` → `qc_run_superseded`; row counts unchanged after each | integration | W2-02 | A07 |
@@ -570,8 +573,8 @@ Layer names follow the W0-02 test-layer map: **unit** (`node:test`, no database)
 | Refresh guidance | stale action returns `current` reference and `guidanceKey`; UI shows the guidance and the refresh path | integration + journey | W2-03, W2-07 | A07 |
 | Resubmit reopens all | N+1 submitted → three lanes `pending`; N's approval rows still readable and not counted; projections reset | integration | W2-04 | A07 |
 | Disposition authority | non-owning lane waive → 403; owner `fixed_proposed` stays undispositioned until `fixed_confirmed`; waive without reason → 422 (also at the store constraint); second disposition appends; finding row unchanged | integration | W2-05 | A09 |
-| Owning lane by slot | single-lane finding carries the slot's lane; slot-5 and pack-level cases run only after section 7.3 is recorded | unit + integration | W2-05 | A09 |
-| Ready predicate | three current approvals + zero undispositioned → `ready_at` set in the approving transaction; open finding or `unavailable` finding blocks; stale (previous-version) approval blocks; concurrent new finding under the lock blocks; `case.ready_for_launch` audit row carries `triggered_by` | integration | W2-06 | A09 |
+| Owning lane by slot | single-lane `defect` finding carries the slot's lane; `owningLaneForSlot(5)` and `(9)` return `'refinement_pending'`; slot-5, pack-level and `unavailable` cases run only after section 7.3 is recorded | unit + integration | W2-05 | A09 |
+| Ready predicate | three current approvals + zero undispositioned → `ready_at` set in the approving transaction; open finding blocks; `unavailable` finding blocks (this case runs only after section 7.3 is recorded, since the fixture finding needs an `owning_lane`); stale (previous-version) approval blocks; concurrent new finding under the lock blocks; `case.ready_for_launch` audit row carries `triggered_by` | integration | W2-06 | A09 |
 | After Ready | any mutating event → 409 `version_closed` with guidance `ready` | integration | W2-06 | A09 |
 | Audit reconstruction | the W2 journey can be replayed from `audit_events` alone; update/delete of an audit row through the DAL throws | integration | W2-08 | A11 |
 | No outbox on rollback | a rolled-back send-back leaves no outbox row; mail failure leaves the decision row intact | integration | W3-03, W3-04 | A05 |
@@ -582,7 +585,7 @@ Substitute runs (W1-13, W2-10) must return the same envelope and codes but are n
 
 | Item | Owner | Due | Status |
 |---|---|---|---|
-| Owning lane for slot 5, slot 9, pack-level and upload/submit `unavailable` findings; disposition carry-forward (section 7.3) | Review leads, within D05; Ta records | Before W2-05 starts | **Open** |
+| Owning lane for slot 5, slot 9, pack-level and `unavailable` findings of every trigger (approve attempt, upload, submit); disposition carry-forward (section 7.3) | Review leads, within D05; Ta records | Before W2-05 starts | **Open** |
 | 403 vs 404 for out-of-scope references (section 8.4) | W0-05 with the threat model | W0 exit | Open; W1 implements 403 |
 | Vocabulary of the four projected status fields (section 4.10) | W0-04 | W0 exit | Open in W0-04 |
 | Reopening a case after Ready for launch (section 4.12) | Ta, product scope | Not before W4 | Not a v1 transition; nothing chosen |
