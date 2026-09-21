@@ -15,3 +15,10 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: next ticket in the dependency map.
 - Author: operator=ta session=build-workflow model=claude-opus-5
 - Evidence: https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/67
+
+## 2026-09-21 (time not recorded) — W1-03 merged
+- What: Artifact upload/download per 7.4: content-hash blob store behind an interface, sniffing not extension, size limits, unresolved-id rule, Thai filenames, direct URL without session refused; store:verify/cleanup operator commands; 197 unit + 53 integration. PR #78.
+- Why: Ticket W1-03 of the delivery pack; two independent reviewer agents passed before merge.
+- Next: next ticket in the dependency map.
+- Author: operator=ta session=build-workflow model=claude-opus-5
+- Evidence: https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/78

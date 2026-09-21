@@ -43,3 +43,10 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: next ticket in the dependency map.
 - Author: operator=ta session=build-workflow model=claude-opus-5
 - Evidence: https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/75
+
+## 2026-09-21 (time not recorded) — W1-13 merged
+- What: Dev/test-only in-memory API substitute serving every 7.2-7.6 shape from the fixture set with the W0-06 error envelope; absent from the production build; 61 new tests. PR #77.
+- Why: Ticket W1-13 of the delivery pack; two independent reviewer agents passed before merge.
+- Next: next ticket in the dependency map.
+- Author: operator=ta session=build-workflow model=claude-opus-5
+- Evidence: https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/77
