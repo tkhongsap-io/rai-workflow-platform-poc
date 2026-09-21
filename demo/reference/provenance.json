@@ -1,0 +1,10 @@
+{
+  "artifact": "https://claude.ai/artifact/25FPuPyj6aczLrXca3P9Mz",
+  "captured": "2026-09-21",
+  "source": "authored text/x-dc Component script read from rendered artifact DOM",
+  "componentSha256": "349ea6ce1695a7dced305835ae830eecea3325e92420b9a8b762e1194a6572e9",
+  "utf8ReplacementCharacters": 0,
+  "full_source_sha256": "1ce66733ae19f0e9e0b53bb6adfcf72d80d4da657690703939002758c6877017",
+  "adaptation": "Hosted bootstrap replaced with local runtime and viewport metadata. Declared local-adaptations.json patches add Admin configuration validation. Original exported reference files remain unchanged.",
+  "state": "In memory; refresh resets synthetic fixtures."
+}

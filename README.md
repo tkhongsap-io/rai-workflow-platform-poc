@@ -1,6 +1,6 @@
 # RAI Workflow Platform PoC
 
-**Working product name: RAI web. Status: documentation and interactive design prototype. Production application implementation is not authorized.**
+**Working product name: RAI web. Status: documentation, interactive design and runnable synthetic local demo. Production application implementation is not authorized.**
 
 A review desk for one submitted AI-use-case pack, with parallel AI/COE, DPO and IT/Security review, versioned send-back and soft document QC. This is not True's official AI register and does not operate the eight-stage AI lifecycle.
 
@@ -13,7 +13,7 @@ These are the starting points for the future app build. The plan under changes/2
 
 ## Workflow design
 
-Start with the [interactive design handoff](docs/design/DEVELOPER_HANDOFF.md), [browser test evidence](docs/design/TEST_RUNS.md), and [Claude Design artifact](https://claude.ai/artifact/25FPuPyj6aczLrXca3P9Mz) (owner-private). The [workflow and card brief](docs/design/WORKFLOW_DESIGN.md) anchors the journeys. Prototype design only; implementation remains gated.
+Start with the [interactive design handoff](docs/design/DEVELOPER_HANDOFF.md), [browser test evidence](docs/design/TEST_RUNS.md), and [Claude Design artifact](https://claude.ai/artifact/25FPuPyj6aczLrXca3P9Mz) (owner-private). The [workflow and card brief](docs/design/WORKFLOW_DESIGN.md) anchors the journeys. The matching local demonstrator is available in [demo/](demo/README.md); production implementation remains gated.
 
 ## Supporting contracts
 
@@ -35,7 +35,7 @@ Start with the [interactive design handoff](docs/design/DEVELOPER_HANDOFF.md), [
 | [adr/README.md](adr/README.md) | Architecture decisions |
 | [changes/2026-09-20-documentation-foundation/intent.md](changes/2026-09-20-documentation-foundation/intent.md) | Intent, spec, plan and verification trail |
 
-There is no install, build or run command yet. No stack, model provider, database, hosting or dependencies have been selected. The first success today is to review the contract; the first implementation success will be one synthetic case through a send-back and three approvals.
+Run the local design with `python3 demo/serve.py`, then open http://127.0.0.1:5173/. See the [demo PRD](changes/2026-09-21-local-design-demo/PRD.md), [demo plan](changes/2026-09-21-local-design-demo/plan.md) and [verification report](changes/2026-09-21-local-design-demo/review.md). Production stack, model provider, database and hosting decisions remain open.
 
 ## Before building
 

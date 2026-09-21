@@ -1,0 +1,426 @@
+{
+  "date": "2026-09-21",
+  "reference": "https://claude.ai/artifact/25FPuPyj6aczLrXca3P9Mz",
+  "local": "http://127.0.0.1:5173/",
+  "geometryToleranceCssPx": 0.001,
+  "exclusions": [
+    "SCRIPT",
+    "STYLE",
+    "OPTION",
+    "runtime sc-interp spans",
+    "zero-size elements"
+  ],
+  "notes": [
+    "DOM layout/style comparison, not raster pixel equality.",
+    "notifications labels describe the state after width controls closed the drawer; notification-drawer labels explicitly reopen it at each width.",
+    "Text assertions are separate; this fingerprint compares tags, geometry and 25 computed CSS properties."
+  ],
+  "results": [
+    {
+      "label": "queue1440",
+      "nodes": 117,
+      "referenceNodes": 117,
+      "maxGeometryDelta": 1.9073486328125e-05,
+      "differences": []
+    },
+    {
+      "label": "queue834",
+      "nodes": 97,
+      "referenceNodes": 97,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "queue390",
+      "nodes": 94,
+      "referenceNodes": 94,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "documents1440",
+      "nodes": 261,
+      "referenceNodes": 261,
+      "maxGeometryDelta": 1.9073486328125e-05,
+      "differences": []
+    },
+    {
+      "label": "documents834",
+      "nodes": 233,
+      "referenceNodes": 233,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "documents390",
+      "nodes": 230,
+      "referenceNodes": 230,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "risk-dialog1440",
+      "nodes": 314,
+      "referenceNodes": 314,
+      "maxGeometryDelta": 1.9073486328125e-05,
+      "differences": []
+    },
+    {
+      "label": "risk-dialog834",
+      "nodes": 286,
+      "referenceNodes": 286,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "risk-dialog390",
+      "nodes": 283,
+      "referenceNodes": 283,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "risk-unknown1440",
+      "nodes": 314,
+      "referenceNodes": 314,
+      "maxGeometryDelta": 1.9073486328125e-05,
+      "differences": []
+    },
+    {
+      "label": "submit-dialog1440",
+      "nodes": 325,
+      "referenceNodes": 325,
+      "maxGeometryDelta": 1.9073486328125e-05,
+      "differences": []
+    },
+    {
+      "label": "submit-dialog834",
+      "nodes": 297,
+      "referenceNodes": 297,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "submit-dialog390",
+      "nodes": 294,
+      "referenceNodes": 294,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "review-lanes1440",
+      "nodes": 271,
+      "referenceNodes": 271,
+      "maxGeometryDelta": 1.9073486328125e-05,
+      "differences": []
+    },
+    {
+      "label": "review-lanes834",
+      "nodes": 249,
+      "referenceNodes": 249,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "review-lanes390",
+      "nodes": 246,
+      "referenceNodes": 246,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "sendback-dialog1440",
+      "nodes": 296,
+      "referenceNodes": 296,
+      "maxGeometryDelta": 1.9073486328125e-05,
+      "differences": []
+    },
+    {
+      "label": "sendback-dialog834",
+      "nodes": 274,
+      "referenceNodes": 274,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "sendback-dialog390",
+      "nodes": 271,
+      "referenceNodes": 271,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "sendback-validation1440",
+      "nodes": 297,
+      "referenceNodes": 297,
+      "maxGeometryDelta": 1.9073486328125e-05,
+      "differences": []
+    },
+    {
+      "label": "sendback-validation834",
+      "nodes": 275,
+      "referenceNodes": 275,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "sendback-validation390",
+      "nodes": 272,
+      "referenceNodes": 272,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "sent-back1440",
+      "nodes": 184,
+      "referenceNodes": 184,
+      "maxGeometryDelta": 1.9073486328125e-05,
+      "differences": []
+    },
+    {
+      "label": "sent-back834",
+      "nodes": 156,
+      "referenceNodes": 156,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "sent-back390",
+      "nodes": 153,
+      "referenceNodes": 153,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "frozen-history-dialog1440",
+      "nodes": 289,
+      "referenceNodes": 289,
+      "maxGeometryDelta": 1.9073486328125e-05,
+      "differences": []
+    },
+    {
+      "label": "frozen-history-dialog834",
+      "nodes": 261,
+      "referenceNodes": 261,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "frozen-history-dialog390",
+      "nodes": 258,
+      "referenceNodes": 258,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "document-picker1440",
+      "nodes": 306,
+      "referenceNodes": 306,
+      "maxGeometryDelta": 1.9073486328125e-05,
+      "differences": []
+    },
+    {
+      "label": "document-picker834",
+      "nodes": 278,
+      "referenceNodes": 278,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "document-picker390",
+      "nodes": 275,
+      "referenceNodes": 275,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "approval-dialog1440",
+      "nodes": 303,
+      "referenceNodes": 303,
+      "maxGeometryDelta": 1.9073486328125e-05,
+      "differences": []
+    },
+    {
+      "label": "approval-dialog834",
+      "nodes": 281,
+      "referenceNodes": 281,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "approval-dialog390",
+      "nodes": 278,
+      "referenceNodes": 278,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "awaiting-disposition1440",
+      "nodes": 255,
+      "referenceNodes": 255,
+      "maxGeometryDelta": 1.9073486328125e-05,
+      "differences": []
+    },
+    {
+      "label": "awaiting-disposition834",
+      "nodes": 233,
+      "referenceNodes": 233,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "awaiting-disposition390",
+      "nodes": 230,
+      "referenceNodes": 230,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "disposition-dialog1440",
+      "nodes": 298,
+      "referenceNodes": 298,
+      "maxGeometryDelta": 1.9073486328125e-05,
+      "differences": []
+    },
+    {
+      "label": "disposition-dialog834",
+      "nodes": 276,
+      "referenceNodes": 276,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "disposition-dialog390",
+      "nodes": 273,
+      "referenceNodes": 273,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "ready1440",
+      "nodes": 255,
+      "referenceNodes": 255,
+      "maxGeometryDelta": 1.9073486328125e-05,
+      "differences": []
+    },
+    {
+      "label": "ready834",
+      "nodes": 233,
+      "referenceNodes": 233,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "ready390",
+      "nodes": 230,
+      "referenceNodes": 230,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "notifications1440",
+      "nodes": 254,
+      "referenceNodes": 254,
+      "maxGeometryDelta": 1.9073486328125e-05,
+      "differences": []
+    },
+    {
+      "label": "notifications834",
+      "nodes": 232,
+      "referenceNodes": 232,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "notifications390",
+      "nodes": 229,
+      "referenceNodes": 229,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "notification-drawer1440",
+      "nodes": 315,
+      "referenceNodes": 315,
+      "maxGeometryDelta": 1.9073486328125e-05,
+      "differences": []
+    },
+    {
+      "label": "notification-drawer834",
+      "nodes": 293,
+      "referenceNodes": 293,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "notification-drawer390",
+      "nodes": 290,
+      "referenceNodes": 290,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "admin1440",
+      "nodes": 164,
+      "referenceNodes": 164,
+      "maxGeometryDelta": 1.9073486328125e-05,
+      "differences": []
+    },
+    {
+      "label": "admin834",
+      "nodes": 141,
+      "referenceNodes": 141,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "admin390",
+      "nodes": 138,
+      "referenceNodes": 138,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "new-case1440",
+      "nodes": 132,
+      "referenceNodes": 132,
+      "maxGeometryDelta": 1.9073486328125e-05,
+      "differences": []
+    },
+    {
+      "label": "new-case834",
+      "nodes": 112,
+      "referenceNodes": 112,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "new-case390",
+      "nodes": 109,
+      "referenceNodes": 109,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "new-case-validation1440",
+      "nodes": 134,
+      "referenceNodes": 134,
+      "maxGeometryDelta": 1.9073486328125e-05,
+      "differences": []
+    },
+    {
+      "label": "new-case-validation834",
+      "nodes": 114,
+      "referenceNodes": 114,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    },
+    {
+      "label": "new-case-validation390",
+      "nodes": 111,
+      "referenceNodes": 111,
+      "maxGeometryDelta": 0.0001220703125,
+      "differences": []
+    }
+  ]
+}

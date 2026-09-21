@@ -1,0 +1,32 @@
+[
+  {
+    "reason": "Reject invalid configuration values before publishing; keep original export immutable.",
+    "before": "  /* ============ reference data ============ */",
+    "after": "  configError(cfg){\n    if (!cfg || typeof cfg.tpl !== 'string' || !cfg.tpl.trim()) return 'Enter a pack template version.';\n    if (![cfg.slaDpo, cfg.slaOther].every(function(v){ return Number.isInteger(v) && v > 0; })) return 'SLA values must be positive whole working days.';\n    if (![cfg.hi, cfg.md, cfg.lo].every(function(v){ return typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= 100; }) || !(cfg.hi < cfg.md && cfg.md < cfg.lo)) return 'Thresholds must satisfy 0 < High < Medium < Low <= 100 percent.';\n    return '';\n  }\n\n  /* ============ reference data ============ */"
+  },
+  {
+    "reason": "Keep discard available when invalid settings cannot be published.",
+    "before": "      publishDisabled:!dirtyCfg,",
+    "after": "      discardDisabled:!dirtyCfg,\n      publishDisabled:!dirtyCfg || !!this.configError(cfg),"
+  },
+  {
+    "reason": "Show actionable validation feedback.",
+    "before": "      publishHint:dirtyCfg ?",
+    "after": "      publishHint:this.configError(cfg) || (dirtyCfg ?"
+  },
+  {
+    "reason": "Close validation hint expression.",
+    "before": "'Change a value to enable publishing. Nothing is applied until you publish.',",
+    "after": "'Change a value to enable publishing. Nothing is applied until you publish.'),"
+  },
+  {
+    "reason": "Enforce validation at handler boundary, not only button state.",
+    "before": "        if (!n.cfgDraft) return;",
+    "after": "        if (n.role !== 'admin' || !n.cfgDraft || self.configError(n.cfgDraft)) return;"
+  },
+  {
+    "reason": "Separate discard from publish validation.",
+    "before": "onClick=\"{{ad.onRevert}}\" disabled=\"{{ad.publishDisabled}}\"",
+    "after": "onClick=\"{{ad.onRevert}}\" disabled=\"{{ad.discardDisabled}}\""
+  }
+]
