@@ -2,6 +2,8 @@
 
 Status: ready for team design review. Three iterations completed; core journey and targeted responsive/copy regressions browser-tested. No production implementation or operational readiness claimed.
 
+Decision note (2026-09-21): D01, D02 (AI/COE lane = slots 1 and 5, BRD), D05, D06, D11 and D12 were recorded in the [decision register](../product/decisions.md) on 2026-09-21 and are implemented as written. The walkthrough step 7, the "Decisions to take into the team discussion" list and the closing five-minute decision slot below are pre-G0 history; D07 remains open per the register.
+
 Design workspace: https://claude.ai/cowork/cse_01NS3VpYm1i4rasdCkSxmHXh?artifact=08b0fc22-a4d5-4490-b992-2e90e4e5f1d1 . Access remains Only you; team sharing has not been changed.
 
 ## Contract to carry into development
@@ -22,7 +24,7 @@ True website-derived working reference from Life-OS truecorp-brand-guidelines sk
 4. Owner revises v2; inspect immutable v1.
 5. Demonstrate approvals without readiness, then disposition and qualified completion.
 6. Show configuration and explain what is simulated.
-7. Resolve AI/COE mapping, disposition authority, re-review, SLA calendar and group/stage fields with stakeholders.
+7. State the recorded D01, D02, D05, D06 and D11 rules from the decision register and confirm the screens reflect them.
 
 ## Implementation boundaries
 
@@ -40,7 +42,7 @@ Direct artifact: https://claude.ai/artifact/25FPuPyj6aczLrXca3P9Mz . Observed de
 | New case | Name, BU, model/checklist versions, source known/Unknown, vendor/model type | External register is never written; versions are distinct |
 | Case / Documents | Nine slots, sample change, draft save, submit with QC | Submit freezes documents/config; soft QC never blocks submission |
 | Review lanes | Three equal parallel lanes, evidence, approve/send back | Actor acts only own lane; decision bound to current submission |
-| Findings | Evidence, fixed/waived/N/A disposition and rationale | Readiness requires every finding dispositioned; authority provisional |
+| Findings | Evidence, fixed/waived/N/A disposition and rationale | Readiness requires every finding dispositioned; waived and N/A recorded by the owning lane, owner proposes fixed and the owning lane confirms (D05) |
 | History | Frozen version snapshot plus appended decisions | Never rewrite prior documents, decisions or config |
 | Administration | Template/threshold/SLA draft and publish | New config applies to subsequent submissions; Admin cannot approve |
 | Notifications | Synthetic event preview and case link | No email sent; scope follows role |
@@ -57,7 +59,7 @@ Desktop target 1440, tablet 834, phone 390 CSS pixels. Live width controls must 
 
 ## Decisions to take into the team discussion
 
-Use [the decision register](../product/decisions.md) as authority. Prioritize D01 operator/scope/SLA, D02 AI/COE slot 5 versus 7, D05 re-review/disposition/self-approval, D06 calendar/notification behavior, D07 questionnaire, and D11 group/stage fields. D03 application start and D04 stack ADR remain separate. Character minima, synthetic names/timestamps and sample document content are demonstration choices, not product requirements.
+Use [the decision register](../product/decisions.md) as authority. D01, D02, D03, D05, D06, D11 and D12 are recorded (2026-09-21) and are implemented as written; only D07 (questionnaire, before W5) remains open for this UI. D04 stack ADR is decided inside W0-01. Character minima, synthetic names/timestamps and sample document content are demonstration choices, not product requirements.
 
 ## Export and access
 
@@ -75,4 +77,4 @@ Open the Main interactive artboard. Demo controls are outside the application; s
 6. Switch Admin, change pack template and publish revision; show that submitted version retains original configuration.
 7. Use scenario 3 for checklist-version isolation, scenario 4 for unavailable QC, and width controls for actual responsive behavior.
 
-Allow another five minutes for D01/D02/D05 decisions. Reviewers should challenge the workflow and content before developers choose implementation details. Keep demonstrations explicitly synthetic; a sample waiver is not a real privacy/security approval.
+Allow another five minutes to walk through the recorded D01/D02/D05 rules. Reviewers should challenge the workflow and content before developers choose implementation details. Keep demonstrations explicitly synthetic; a sample waiver is not a real privacy/security approval.

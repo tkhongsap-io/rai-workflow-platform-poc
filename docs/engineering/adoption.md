@@ -13,10 +13,28 @@ Guidance inspected: README; handbook/philosophy.md and risk-tiers.md; playbooks/
 | Source identity and evidence | sources.md hashes; acceptance mapping | Documented |
 | Review by correctness/security/compliance lens | Change review, with limits | Self-review only |
 | Risk-appropriate controls | Threat model; production release gates | Proposed, untested |
-| Runtime tests, evals, observability and rollback | Acceptance/evaluation plans | Deferred until authorized implementation |
+| Runtime tests, evals, observability and rollback | Acceptance/evaluation plans | Authorized (D03); arrive with the W0-W3 tickets, nothing built yet |
 | Toolchain, dependencies, CI and deployment | None selected or installed | Intentionally deferred |
 | Independent review and formal acceptance | Owner/operator and specialist gates | Pending |
 
 Only relevant document structures were adapted; no application starter was generated. There is no blanket baseline-compliance claim. The engineering risk posture is provisional and separate from each use case's business risk tier. Qualified security review is required before live data or deployment.
 
-The current setup request authorizes the private documentation repository, not application implementation. Changes to the playbook pin require a reviewed adoption diff. Future feature work records intent/spec/plan first, then implements and proves a bounded slice after Ta's start authorization.
+## s42-ci-platform planning conventions (2026-09-21)
+
+Compared against the sibling repository `~/github/s42/s42-ci-platform` at the owner's request. Adoption is structural only; s42 is a running product and this repository has no code.
+
+| s42 element | Decision | Where |
+|---|---|---|
+| Build principles section | Adopted | BUILD_PLAN "Build principles" |
+| Risks and mitigations table | Adopted | BUILD_PLAN "Delivery risks and mitigations" |
+| "Decisions to lock" list | Adopted, without calendar phrasing; converted to a recorded list at G0 close | BUILD_PLAN "Decisions recorded before W0" |
+| Dated "Status against this plan" with divergence section | Adopted | BUILD_PLAN |
+| Per-phase task tables with Done when and a milestone | Adopted; Size column and time estimates rejected until after D04 | docs/delivery/slice-1-work-breakdown.md |
+| Per-phase PRDs with numbered user stories and loops | Rejected; ticket IDs, lanes and changes/ records cover it | — |
+| ADR template and numbered index | Adopted with reserved, unwritten ADRs tied to D-items | adr/TEMPLATE.md, adr/README.md |
+| Architecture README mapping layers to repo paths | Adopted with paths deferred to W0-02 | docs/architecture/README.md |
+| Append-only board with lane streams and CLAIM rule | Adopted | docs/board/ |
+| AGENTS.md carrying live runtime state | Rejected; there is no runtime | — |
+| Assemble-from-sibling-repos principle | Rejected; no sibling repos and it would pre-empt D04 | — |
+
+D03 (2026-09-21, [register](../product/decisions.md)) authorizes W0-W3 on synthetic data; toolchain, dependencies and CI are selected in W0-01/W0-02 and installed under W1-00/W1-12, so the "Intentionally deferred" row above holds until those tickets merge. Changes to the playbook pin require a reviewed adoption diff. Feature work records intent/spec/plan first, then implements and proves a bounded slice inside its ticket.
