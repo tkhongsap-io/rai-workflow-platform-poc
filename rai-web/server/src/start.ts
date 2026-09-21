@@ -23,6 +23,7 @@ import { openidClientDiscovery } from './identity/oidc.js';
 import { createPgSessionStore } from './identity/session.js';
 import { IdentityStartupError } from './identity/types.js';
 import type { Emitter } from './observability/log.js';
+import { noopUploadTrigger } from './pack/qc-trigger.js';
 import { startedFields } from './observability/started.js';
 
 export interface StartOverrides {
@@ -148,6 +149,13 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
       db: db.db,
       businessUnits,
       subjects: createSubjectDirectory(db.db, { known: knownIdentities }),
+      ...(overrides.now === undefined ? {} : { now: overrides.now }),
+    },
+    // W1-04: the W0-07 `upload` hook point stays the no-op until the QC orchestrator is bound (W2-05 / W4).
+    pack: {
+      db: db.db,
+      limits: config.upload,
+      uploadTrigger: noopUploadTrigger,
       ...(overrides.now === undefined ? {} : { now: overrides.now }),
     },
   });

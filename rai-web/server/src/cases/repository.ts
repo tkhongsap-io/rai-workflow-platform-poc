@@ -8,7 +8,7 @@
 import { and, count, desc, eq, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { uuidv7 } from '@rai/shared/ids';
-import { NON_VENDOR_DEFAULT_REASON_KEY, type SlotNumber, type StageContext } from '@rai/shared/schemas/pack';
+import type { StageContext } from '@rai/shared/schemas/pack';
 import type { CaseSummary, CaseView } from '@rai/shared/schemas/cases';
 import type { Actor } from '../authz/policy.js';
 import type { Executor, Tx } from '../db/client.js';
@@ -16,6 +16,7 @@ import { artifactSlot } from '../db/schema/artifact-slot.js';
 import { cases } from '../db/schema/case.js';
 import { packVersion } from '../db/schema/pack-version.js';
 import { registryCounter } from '../db/schema/registry-counter.js';
+import { SLOT_NUMBERS, VENDOR_SLOTS, defaultSlotState, slotStateToColumns } from '../pack/slots.js';
 import { caseScopeWhere } from './scope.js';
 import { fromStoredSourceRecordId } from './source-record-id.js';
 import { deriveCaseStatus } from './status.js';
@@ -39,9 +40,8 @@ export type EditableCaseFields = Pick<
 export type ScopeColumns = Pick<CaseRow, 'ownerSubjectId' | 'businessUnitId'>;
 export type DraftEditableColumns = EditableCaseFields & ScopeColumns;
 
-export const SLOT_NUMBERS: readonly SlotNumber[] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
-/** Slots 3 (DPA) and 4 (SOW) default to not_applicable when no vendor is involved (A02, W0-04 create row). */
-export const VENDOR_SLOTS: readonly SlotNumber[] = [3, 4];
+/** The slot vocabulary and the create-time default live in pack/slots.ts (W1-04); re-exported for readers. */
+export { SLOT_NUMBERS, VENDOR_SLOTS };
 
 export const REGISTRY_ID_MAX_PER_YEAR = 9999;
 
@@ -116,19 +116,14 @@ export async function insertCase(tx: Tx, input: CreateCaseInput): Promise<Create
     })
     .returning();
   await tx.insert(artifactSlot).values(
-    SLOT_NUMBERS.map((slot) => {
-      const notApplicable = !input.fields.vendorInvolved && VENDOR_SLOTS.includes(slot);
-      return {
-        id: uuidv7(input.now.getTime()),
-        versionId: draftId,
-        slot,
-        state: notApplicable ? 'not_applicable' : 'missing',
-        reason: notApplicable ? NON_VENDOR_DEFAULT_REASON_KEY : null,
-        artifactId: null,
-        updatedBy: input.createdBy,
-        updatedAt: input.now,
-      };
-    }),
+    SLOT_NUMBERS.map((slot) => ({
+      id: uuidv7(input.now.getTime()),
+      versionId: draftId,
+      slot,
+      ...slotStateToColumns(defaultSlotState(slot, input.fields.vendorInvolved)), // slots 3/4 N/A only when no vendor (W1-04)
+      updatedBy: input.createdBy,
+      updatedAt: input.now,
+    })),
   );
   return { caseRow: caseRow!, draft: draft! };
 }

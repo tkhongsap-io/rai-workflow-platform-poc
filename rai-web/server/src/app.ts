@@ -4,7 +4,8 @@
 // and everything else to internal_error. W1-01 adds the cookie parser, the authorization middleware (authz/, the
 // only place scope is enforced) and the sign-in surface (identity/routes.ts); a schema validation failure maps to
 // 422 invalid_input with field paths (W0-06 8.2). Routes arrive with W1-02 onwards and declare `config.auth`;
-// W1-02 registers the case routes (cases/routes.ts) when `cases` deps are given.
+// W1-02 registers the case routes (cases/routes.ts) when `cases` deps are given; W1-04 the pack draft routes
+// (pack/routes.ts) when `pack` deps are given.
 
 import Fastify, { LogController, type FastifyError, type FastifyInstance } from 'fastify';
 import cookie from '@fastify/cookie';
@@ -14,6 +15,7 @@ import type { AppConfig } from './config.js';
 import { registerArtifactRoutes, type ArtifactRouteDeps } from './artifacts/routes.js';
 import { registerAuthorization, type ScopeFactsSource } from './authz/middleware.js';
 import { registerCaseRoutes, type CaseRouteDeps } from './cases/routes.js';
+import { registerPackRoutes, type PackRouteDeps } from './pack/routes.js';
 import type { FixtureIdentityProvider } from './identity/fixture.js';
 import { registerAuthRoutes } from './identity/routes.js';
 import { cookieNames, type SessionStore } from './identity/session.js';
@@ -37,6 +39,8 @@ export interface AppDeps {
   cases?: Omit<CaseRouteDeps, 'emitter'>;
   /** The blob store, database and W0-08 limits for the W1-03 artifact routes; needs `identity`. */
   artifacts?: Omit<ArtifactRouteDeps, 'emitter'>;
+  /** W1-04: the pack draft routes' dependencies (database, pack limit, the W0-07 upload hook). Needs `identity`. */
+  pack?: Omit<PackRouteDeps, 'emitter'>;
   /** Test seam: where the pino lines go instead of stdout, so a suite can assert on emitted events. */
   logStream?: NodeJS.WritableStream;
 }
@@ -158,6 +162,13 @@ export function buildApp(deps: AppDeps): App {
       });
     }
     if (deps.artifacts !== undefined) registerArtifactRoutes(fastify, { ...deps.artifacts, emitter });
+    const packDeps = deps.pack;
+    if (packDeps !== undefined) {
+      void fastify.register((instance, _opts, done) => {
+        registerPackRoutes(instance, { ...packDeps, emitter });
+        done();
+      });
+    }
   }
 
   return { fastify, emitter };

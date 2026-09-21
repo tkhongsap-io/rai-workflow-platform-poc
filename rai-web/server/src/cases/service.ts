@@ -24,6 +24,7 @@ import { auditStore } from '../audit/store.js';
 import { currentBody } from '../configuration/store.js';
 import type { Db, Executor, Tx } from '../db/client.js';
 import { lockCase, withTransaction } from '../db/transaction.js';
+import { revertVendorDefaults } from '../pack/repository.js';
 import type { BusinessUnitDirectory } from './business-units.js';
 import { findReplay, lockIdempotencyKey, requestDigest, storeIdempotencyKey } from './idempotency.js';
 import {
@@ -244,13 +245,22 @@ export async function updateCase(
     );
     const after = await updateDraftFields(tx, caseId, columns, request.expectedCaseRevision, now);
     const scopeChanged = SCOPE_KEYS.some((k) => changed.includes(k));
+    // W0-02 7.5 flip rule (W1-04): once a vendor is involved, slots 3 and 4 that still carry the non-vendor
+    // default revert to `missing`; a user-typed reason is kept. The event below lists the reverted slots.
+    const reverted =
+      changed.includes('vendorInvolved') && after.vendorInvolved && before.draftVersionId !== null
+        ? await revertVendorDefaults(tx, before.draftVersionId, ctx.actor.subjectId, now)
+        : [];
     await auditStore.append(tx, {
       actorSubjectId: ctx.actor.subjectId,
       actorRole: ctx.role,
       action: 'draft.saved',
       targetCaseId: caseId,
       targetVersionId: before.draftVersionId,
-      targetRef: { changed_fields: changed },
+      targetRef: {
+        changed_fields: changed,
+        ...(reverted.length > 0 ? { slots: reverted.map((slot) => ({ slot, state: 'missing' })) } : {}),
+      },
       beforeRef: {
         row_version: before.rowVersion,
         ...(scopeChanged
@@ -315,7 +325,8 @@ async function assertDraftOpen(
   }
 }
 
-function staleDetails(
+/** The W0-06 8.2 `stale_version` details from a version row; shared with the pack draft save (W1-04). */
+export function staleDetails(
   reason: ErrorDetails['stale_version']['reason'],
   guidanceKey: ErrorDetails['stale_version']['guidanceKey'],
   version: { id: string; versionNumber: number; submittedAt: Date | null; readyAt: Date | null },
