@@ -24,7 +24,7 @@ Paths were assigned by the [W0-02 file-level plan](../engineering/implementation
 |---|---|---|---|---|---|
 | Identity adapter | Verified subject, roles, mode (local-google / network / production) | A | W0-03 | W1-01 | `rai-web/server/src/identity/` |
 | Server authorization | Scope on every read, search, download, deep link | A | W0-05 | W1-01, W3-01 | `rai-web/server/src/authz/` |
-| Review workflow and Ready predicate | States, transitions, idempotency, audit events | A | W0-06 | W2-01 to W2-04, W2-06 | `rai-web/server/src/workflow/`, `rai-web/server/src/versions/` |
+| Review workflow and Ready predicate | States, transitions, idempotency, audit events | A | W0-06 | W1-05, W2-01 to W2-04, W2-06 | `rai-web/server/src/workflow/`, `rai-web/server/src/versions/` (submit/freeze, version navigation, the workflow transaction with idempotent replay, W1-05) |
 | Case metadata, configuration revisions and audit store | Immutable versions, append-only audit, schema evolution | A | W0-04 | W1-00, W1-02, W1-04, W1-05 | `rai-web/server/src/db/`, `rai-web/server/drizzle/` (migrations), `rai-web/server/src/cases/`, `rai-web/server/src/pack/` (nine-slot draft rules, W1-04), `rai-web/server/src/configuration/`, `rai-web/server/src/audit/` |
 | Private artifact storage | Protected bytes, hashes, upload safety | A | W0-04, W0-08 | W1-03 | `rai-web/server/src/artifacts/`; bytes in `rai-web/.local/blobs/` (gitignored, `BLOB_DIR`) |
 | QC boundary (substitute in slice 1) | Typed findings, unavailable state, no authority | B / C | W0-07 | W1-10, W2-05, W4 | port `rai-web/server/src/qc/`, types `rai-web/shared/src/qc/`, substitute `rai-web/fixtures/src/substitutes/qc/` |
