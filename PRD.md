@@ -1,6 +1,6 @@
 # Product Requirements Document: RAI Workflow Platform PoC
 
-Version: draft 1, 2026-09-20. Product owner: Ta. Proposed operator: Nakhun, confirmation pending. Status: documentation only; no application implementation authorized.
+Version: 1.0, 2026-09-21 (draft 1 was 2026-09-20). Product owner: Ta. Operator: Nakhun (confirmed under D01, 2026-09-21). Status: G0 closed; W0-W3 authorized on synthetic data under D03. Stack (D04) is decided inside W0.
 
 This is the product anchor: **what we are building and why**. The [build plan](BUILD_PLAN.md) defines delivery order. The frozen [v1 specification](docs/product/source-spec.md) remains authoritative for product rules; this PRD consolidates it without changing scope. Proposed technical semantics are explicitly separated in the supporting contracts.
 
@@ -21,7 +21,7 @@ Build a review desk that lets an owner answer: what was submitted, who must revi
 | IT/Security reviewer | All cases; decide own review lane |
 | Admin | All cases; manage templates, QC rules, SLAs and production role mapping |
 
-Admin is not implicitly a lane approver. Defect-disposition authority and multi-role/self-approval rules require D05. All search, file access and deep links must enforce the same scope as case access.
+Admin is not implicitly a lane approver. Under D05: waived and N/A dispositions are recorded by the finding's owning lane; the owner may propose "fixed", which the owning lane confirms; no one who is owner or BU SPOC on a case may approve a lane on that case. All search, file access and deep links must enforce the same scope as case access.
 
 ## Primary journey
 
@@ -29,7 +29,7 @@ Admin is not implicitly a lane approver. Defect-disposition authority and multi-
 2. Completes nine artifact slots; uploads trigger artifact QC.
 3. Submits one version. Pack QC runs, a risk tier is proposed when that capability is available, and three lanes open together. Defects do not prevent submission.
 4. Reviewers follow notification links, see current evidence and QC findings, then approve or send back with artifact-specific feedback. Approval attempts run lane QC.
-5. Send-back retains the old submission and creates the next version. Resubmission and approval carry-forward semantics require D05; full re-review is the proposed default.
+5. Send-back retains the old submission and creates the next version. Under D05, resubmission reopens all three lanes; no approval is carried forward, and concurrent send-backs merge into one successor draft.
 6. Three current-version approvals plus disposition of every open defect produces Ready for launch. This means desk completion, not Council or ITSM deployment authorization.
 
 ## Document pack
@@ -46,7 +46,7 @@ Admin is not implicitly a lane approver. Defect-disposition authority and multi-
 | 8 | RAI deployment checklist | IT/Security |
 | 9 | Supporting documents | No lane gate |
 
-AI/COE's second document is provisionally BRD (5), possibly security assessment (7); D02 must resolve it. Each slot is attached, not yet, missing, or N/A with reason. DPA/SOW default to N/A for non-vendor cases. Not yet and N/A must remain distinct.
+AI/COE's second document is BRD (5), decided under D02 on 2026-09-21; the lane mapping is a versioned constant recorded on each submitted version. Each slot is attached, not yet, missing, or N/A with reason. DPA/SOW default to N/A for non-vendor cases. Not yet and N/A must remain distinct.
 
 ## Requirements and acceptance
 
@@ -54,7 +54,7 @@ All requirements are planned, not implemented. Detailed observable tests A01-A10
 
 | ID | Required product behavior | Acceptance | Build package |
 |---|---|---|---|
-| R1 | Six scoped roles; localhost Google, network allow-list/AD, production True AD | A01 | W1, W8 |
+| R1 | Six scoped roles; localhost Google, network allow-list/AD, production True AD | A01 | W1, W7 (network mode, only if the rehearsal is networked), W8 |
 | R2 | Owner/SPOC submits nine-slot pack with meaningful dispositions | A02 | W1 |
 | R3 | Versioned seven-question risk proposal; High requires Council confirmation and never skips lanes | A03 | W5 |
 | R4 | Three parallel lanes with correct document mappings | A04 | W2 |
@@ -79,11 +79,11 @@ Queue with filters and due dates; case overview with external reference and vers
 
 ## Data, operations and quality
 
-Use the inherited fields and proposed entities in [data contract](docs/product/data-contract.md). Store files inside controlled application storage, not SharePoint or Git. Retention, model handling and live-data permission are pending.
+Use the inherited fields and proposed entities in [data contract](docs/product/data-contract.md). Store files inside controlled application storage, not SharePoint or Git. Retention, model handling and live-data permission are pending (D08). UI and notifications are bilingual with Thai default (D12).
 
-Proposed SLAs: DPO 3 working days, other lanes 5. Display and report only, no automatic escalation. Calendar, clock and retry policy require D06. Notifications are not approval records.
+SLAs: DPO 3 working days (D01), other lanes 5 as Admin configuration. Display and report only, no automatic escalation. Calendar, clock and retry policy are set by D06 (Asia/Bangkok, clock restarts on resubmit, daily breach digest, three retries). Notifications are not approval records.
 
-Required quality properties: server-side authorization; immutable evidence; attributable actions; consistent concurrent transitions; observable extraction/mail failures; reproducible config versions. Quantitative latency, volume, storage and QC-quality budgets must be agreed before their release gates; none are measured or committed today.
+Required quality properties: server-side authorization; immutable evidence; attributable actions (tested by A11, accepted 2026-09-21); consistent concurrent transitions; observable extraction/mail failures; reproducible config versions. Quantitative latency, volume, storage and QC-quality budgets must be agreed before their release gates; none are measured or committed today.
 
 ## Success and release boundaries
 
@@ -93,6 +93,6 @@ Production additionally requires True hosting/AD, approved operational controls 
 
 ## Non-goals and open decisions
 
-No official register, tracker dual-write, eight-stage lifecycle, post-deploy control tower, Council e-vote, ITSM replacement or SharePoint file integration. No application code until Ta explicitly starts it, and no stack is selected in this PRD.
+No official register, tracker dual-write, eight-stage lifecycle, post-deploy control tower, Council e-vote, ITSM replacement or SharePoint file integration. Application build is authorized for W0-W3 on synthetic data (D03, 2026-09-21); no stack is selected in this PRD (D04, inside W0).
 
-[Decisions D01-D11](docs/product/decisions.md) are the live decision register. The [source provenance](docs/sources.md) identifies supporting evidence. Changes to locked scope require explicit owner decision and a versioned PRD/source update; do not quietly resolve a conflict in implementation.
+[The decision register](docs/product/decisions.md) records D01-D03, D05, D06, D11 and D12 as decided on 2026-09-21 and keeps D04, D07-D10 open. The [source provenance](docs/sources.md) identifies supporting evidence. Changes to locked scope require explicit owner decision and a versioned PRD/source update; do not quietly resolve a conflict in implementation.

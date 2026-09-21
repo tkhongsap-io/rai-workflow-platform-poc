@@ -17,7 +17,7 @@ The [source specification](product/source-spec.md) is a byte-identical snapshot 
 
 The current spec resolves prior register/lifecycle contradictions. The operating-model rubric summary supports the proposed risk calculation, but the actual questionnaire revision is still required. CCXO says “3 days”; the v1 specification interprets the proposed DPO SLA as 3 working days. Do not attribute that extra precision to the deck alone. Checklist v1.0 thresholds must never be generalized to v2.0.
 
-The whiteboard and original voice note were not independently inspected during this setup. Their interpretation is inherited from the current spec; AI/COE document mapping remains open. The owner's GitHub screenshot establishes the intended organization, not product requirements.
+The whiteboard and original voice note were not independently inspected during this setup. Their interpretation is inherited from the current spec; the AI/COE document mapping the spec left open is resolved by D02 in the [register](product/decisions.md) (slots 1 and 5), without editing the snapshot. The owner's GitHub screenshot establishes the intended organization, not product requirements.
 
 ## Engineering authority
 

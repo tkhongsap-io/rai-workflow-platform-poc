@@ -16,6 +16,28 @@ flowchart LR
     Desk -. reference only .-> External[TPM / VRO / AI Reporting Tool]
 ```
 
+## Boundaries, owners and tickets
+
+Paths are assigned by the W0-02 file-level plan after D04, in the same PR, never before. Until then every Path cell reads as shown.
+
+| Boundary | Owns | Lane | Spec ticket | Build tickets | Path in repo |
+|---|---|---|---|---|---|
+| Identity adapter | Verified subject, roles, mode (local-google / network / production) | A | W0-03 | W1-01 | assigned by W0-02 |
+| Server authorization | Scope on every read, search, download, deep link | A | W0-05 | W1-01, W3-01 | assigned by W0-02 |
+| Review workflow and Ready predicate | States, transitions, idempotency, audit events | A | W0-06 | W2-01 to W2-04, W2-06 | assigned by W0-02 |
+| Case metadata, configuration revisions and audit store | Immutable versions, append-only audit, schema evolution | A | W0-04 | W1-00, W1-02, W1-05 | assigned by W0-02 |
+| Private artifact storage | Protected bytes, hashes, upload safety | A | W0-04, W0-08 | W1-03 | assigned by W0-02 |
+| QC boundary (substitute in slice 1) | Typed findings, unavailable state, no authority | B / C | W0-07 | W1-10, W2-05, W4 | assigned by W0-02 |
+| UI substitute (dev/test only) | Fixture-backed shapes for Lane B; never evidence | C | W0 interface specs | W1-13, W2-10, W3-08 | assigned by W0-02 |
+| Notification boundary (mail sink in slice 1) | Committed events, recipients, deep links, dedup | B / C | W0-07 | W1-11, W3-03, W3-04 | assigned by W0-02 |
+| Desk observability | Correlation IDs, redacted logs, readiness, operator view | A | W0-10 | W3-07, W8 | assigned by W0-02 |
+| Product UI | Screens from the design handoff | B | design handoff | W1-06, W1-07, W2-07, W2-09, W3-02 | assigned by W0-02 |
+| External trackers | Reference only (L3, L6) | — | — | none | — |
+
+## Documents this build executes
+
+[PRD](../../PRD.md), [BUILD_PLAN](../../BUILD_PLAN.md), the frozen [source spec](../product/source-spec.md) (hash in [sources](../sources.md)), [workflow](../product/workflow.md), [data contract](../product/data-contract.md), the [design handoff](../design/DEVELOPER_HANDOFF.md) and the [delivery pack](../delivery/README.md).
+
 ## Boundaries
 
 Identity adapter normalizes verified subject and roles; server authorization checks scope for every action. Google localhost and production AD are separate configurations. Review workflow owns state, human decisions, idempotency and the final readiness predicate. Model output never authorizes a transition.

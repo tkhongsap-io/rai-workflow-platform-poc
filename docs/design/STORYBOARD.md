@@ -26,7 +26,7 @@ Above Submit pack: “You can submit with these findings. Reviewers will see the
 
 AI/COE reviewer view: the three lane cards remain visible as context. AI/COE card identifies the active lane. Findings appear before evidence rows and decision actions. The cross-lane privacy finding is context, not authorization for AI/COE to decide DPO's lane. Approve lane applies only to the active lane. Send back opens artifact selection and written feedback.
 
-Example feedback: “Please attach evidence with the hallucination metric, denominator and threshold; extraction accuracy alone does not answer this check.” The mockup must not imply a confirmed artifact routing choice while D02 remains open; annotate provisional mapping outside the proposed product chrome.
+Example feedback: “Please attach evidence with the hallucination metric, denominator and threshold; extraction accuracy alone does not answer this check.” D02 was recorded on 2026-09-21 (AI/COE lane = slots 1 and 5, BRD); the mockup's provisional-mapping annotation is now history and the product implements the recorded mapping.
 
 ### D: Respond and preserve history
 

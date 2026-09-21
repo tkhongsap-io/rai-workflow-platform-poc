@@ -49,6 +49,10 @@ Screenshot captures supplied by the current browser tool are lossy JPEG even whe
 
 Run git diff --check, inspect git status and relative Markdown links, verify frozen source SHA-256 against docs/sources.md, and inspect the change review for unresolved scope/acceptance gaps. Product sources remain immutable. Only synthetic fixtures belong in demo/ and tests/; no credentials or real case material.
 
+## Product build (W0-W3)
+
+Authorized on 2026-09-21 (D03). W0-02 adds the exact install, run, test, lint and reset commands here before the first W1 ticket starts; until then no product command exists. The demo suite above stays separate from the product suite.
+
 ## Production gates
 
 No production stack, identity, persistence, model service or deployment is implemented by the demo. Before real-data rehearsal, approve handling/access/retention. Before production, enforce transitions and permissions server-side, evaluate QC, test concurrency, notifications, backup/restore and rollback, and obtain operator acceptance. Synthetic UI success is not production acceptance.
