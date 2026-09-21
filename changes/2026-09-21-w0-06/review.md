@@ -36,7 +36,7 @@ No product suite exists yet (the application skeleton arrives with W1-00 under t
 - [x] States and events: create, save draft, submit, approve, send back, resubmit, disposition, Ready, each with preconditions, postconditions and audit event (sections 4, 9.4).
 - [x] Lane mapping as a versioned constant in code, recorded on each submitted version, AI/COE 1 and 5 (D02), DPO 2-5, IT/Security 5-8, not an Admin configuration revision (section 3).
 - [x] D05 transition rules: resubmission reopens all lanes (4.6), concurrent send-backs merge into one successor draft (4.5, 5.2, 9.3), disposition authority and no self-approval as in W0-05 (4.4, 4.7, 6).
-- [x] Owning-lane rule for single-lane slots recorded for `defect` findings (7.1); slot 5, slot 9, pack-level and QC-unavailable findings of every trigger (approve attempt, upload, submit) left to the review-leads refinement with labelled options and no silent default (7.2, 7.3); W1-10 and W2-05 may not build on any `unavailable` case until it is recorded (7.4); Admin never dispositions, no seventh role (7).
+- [x] Owning-lane rule for single-lane slots recorded for `defect` findings (7.1); slot 5, slot 9, pack-level and QC-unavailable findings of every trigger (approve attempt, upload, submit) left to the review-leads refinement with labelled options and no silent default (7.2, 7.3); W2-05 and W2-06 may not store an `unavailable` finding until it is recorded, while W1-10 keeps returning an explicit `unavailable` result without an `owning_lane` (7.4); Admin never dispositions, no seventh role (7).
 - [x] Expected-version checks: stale action returns `stale_version` with refresh guidance and changes nothing (5, 8.2, 8.3).
 - [x] Seven error types with a user message (locale key) and an HTTP code each; `not_found` confirmed as the eighth code from ADR-0003 (8.1, 8.5).
 - [x] Stack-concrete (Fastify, Drizzle, Postgres, node:test, Playwright) with stack-neutral rules (4, 9, 10).
@@ -45,7 +45,7 @@ No product suite exists yet (the application skeleton arrives with W1-00 under t
 
 ## Limitations
 
-- W2-05 stays blocked for its slot-5, pack-level and `unavailable` test cases until the section 7.3 refinement is recorded; the document says so and lists what W1-10 and W2-05 may do meanwhile (single-lane `defect` findings only).
+- W2-05 stays blocked for its slot-5, pack-level and `unavailable` test cases until the section 7.3 refinement is recorded; the document says so and lists what W2-05 may do meanwhile (single-lane `defect` findings only) and that W1-10 is not blocked (its `unavailable` result carries no `owning_lane`).
 - The lock-wait/request-timeout budget (5 s) and the idempotency-record expiry (24 h) are stated as proposals for W0-09 and W0-04 to confirm.
 
 ## Fix round 1 (review findings on PR #63)
@@ -64,3 +64,20 @@ No decision recorded, no spec edited. Checks rerun after the fixes (same shell):
 | `shasum -a 256 docs/product/source-spec.md` | `92c4f7123058b8fec3c2ba7abdf10538fad034778624b0675975b39de440b354`, matches docs/sources.md |
 | Relative-link audit over the document | 15 links, 0 broken |
 | `grep -n "owned by L\|7\.2" docs/engineering/workflow-transition-and-error-contract.md` | no recorded `unavailable` rule remains; 7.2 references point at the pointer section only |
+
+## Fix round 2 (review findings on PR #63)
+
+Two blocking findings.
+
+1. **Sections 7.3 and 7.4 blocked W1-10's own done-when.** "Any W1-10 fixture that needs an `unavailable` result, of any trigger, waits" and "It scripts no `unavailable` finding of any trigger" contradicted the W1-10 row in `docs/delivery/slice-1-work-breakdown.md` ("returns `unavailable` on demand; simulates a timeout"). Per W0-07 the substitute returns an explicit `unavailable` result; only the workflow's recording of it as a finding with an `owning_lane` depends on the 7.3 refinement. Fixed: 7.3 now states that W1-10 is not blocked, that what waits for the record is the workflow storing the result as a finding with an `owning_lane` (the W2-05 and W2-06 `unavailable` cases), and that no W1-10 fixture may pre-assign an `owning_lane` to an `unavailable` result; the 7.4 first bullet restates W1-10's full done-when (scripted `defect` findings, `unavailable` on demand for any trigger, simulated timeout, no write path) with the same no-pre-assignment rule; the "Recorded refinement" follow-up names what W1-10 adds after the record (slot-5, slot-9 and pack-level `defect` fixtures) and that its `unavailable` results are unchanged. The done-when line and the limitations paragraph above were corrected to match. Section 7.2 and the 7.3 table are unchanged: still no recorded rule for any `unavailable` finding.
+2. **Section 10 owed no tests for save-draft and submit staleness, submit replay, or disposition staleness.** Added three rows: "Stale save draft" (W1-04 and W1-02, integration: old revision → 409 `revision_changed`; draft submitted meanwhile → `version_superseded`; rows unchanged), "Submit stale and replay" (W1-05, integration: same key + same body → identical 200, one submitted version, one `version.submitted` audit row; different key on an already-submitted draft → 409 `version_superseded`; same key + different body → 422 `idempotency_key_reused`) and "Stale disposition" (W2-05, integration: disposition on N after N+1 is submitted → 409 `version_superseded`, no event row, finding unchanged). Each cites the sections (4.2, 4.3, 4.7, 5.2, 5.3) that state the behaviour; no behaviour was changed.
+
+No decision recorded, no spec edited. Checks rerun after the fixes (same shell):
+
+| Command | Result |
+|---|---|
+| `node --test tests/*.test.mjs` | 22 pass, 0 fail, 0 skipped |
+| `git diff --check` | clean |
+| `shasum -a 256 docs/product/source-spec.md` | `92c4f7123058b8fec3c2ba7abdf10538fad034778624b0675975b39de440b354`, matches docs/sources.md |
+| Relative-link audit over the document | 15 links, 0 broken |
+| `grep -n "W1-10" docs/engineering/workflow-transition-and-error-contract.md` | no sentence forbids an `unavailable` result from W1-10; every W1-10 sentence forbids only a pre-assigned `owning_lane` |
