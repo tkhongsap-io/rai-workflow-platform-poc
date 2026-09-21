@@ -5,7 +5,9 @@
 // `server/dist/main.js` that `npm start` runs, which W1-INT's journey restarts) in test mode on a free loopback
 // port (or the `port` the caller names, so a restarted process keeps its origin) with the fixture identity
 // provider, the in-memory mail sink and the QC substitute, captures every JSON line the process writes to stdout
-// and stderr, waits for `process.started`, and stops it with SIGTERM. Nothing here reaches an external service:
+// and stderr, waits for `process.started`, and stops it with SIGTERM — escalating to SIGKILL and rejecting with the
+// captured lines when the process has not exited within the grace period, so a shutdown hang fails the test with
+// the server's last log lines instead of the runner's timeout. Nothing here reaches an external service:
 // the database is the local Postgres that `.env` or the shell names, and the identity mode is `fixture`, which
 // config.ts accepts only under NODE_ENV=test on a loopback bind (W0-03 S13, S14).
 
@@ -35,9 +37,19 @@ export interface TestServerProcess {
   waitForEvent(event: string, timeoutMs?: number): Promise<CapturedLine>;
   /** Lines whose `event` matches, for assertions after the fact. */
   linesFor(event: string): CapturedLine[];
-  /** SIGTERM and wait for exit; resolves with the exit code and signal. Idempotent. */
-  stop(): Promise<{ code: number | null; signal: NodeJS.Signals | null }>;
+  /**
+   * SIGTERM and wait for exit; resolves with the exit code and signal. Idempotent. When the process is still
+   * running after `graceMs` (default STOP_GRACE_MS) it is SIGKILLed and the promise rejects with the captured
+   * lines: a graceful shutdown that does not complete is a failure, never a wait.
+   */
+  stop(graceMs?: number): Promise<{ code: number | null; signal: NodeJS.Signals | null }>;
 }
+
+/**
+ * How long stop() waits for the SIGTERM path before SIGKILL: the W0-04 drain budget (10 s, shutdown.ts
+ * SHUTDOWN_DRAIN_MS) plus main.ts's hard-exit grace (5 s), plus a margin; a healthy stop takes milliseconds.
+ */
+export const STOP_GRACE_MS = 20_000;
 
 /** The variables every spawned test server carries; the caller's `env` overrides only what it names. */
 export function testServerEnv(port: number, overrides: Record<string, string> = {}): Record<string, string> {
@@ -145,7 +157,7 @@ export async function startTestServer(options: StartOptions = {}): Promise<TestS
       }
     });
   } catch (err) {
-    await capture.stop();
+    await capture.stop().catch(() => undefined); // the start failure is the error to report, not a stop hang
     throw err;
   }
   return server;
@@ -206,10 +218,26 @@ function attachCapture(child: ChildProcess) {
     });
   };
   let stopping: Promise<{ code: number | null; signal: NodeJS.Signals | null }> | undefined;
-  const stop = () => {
+  const stop = (graceMs = STOP_GRACE_MS) => {
     if (stopping === undefined) {
       if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
-      stopping = exited;
+      stopping = new Promise((resolve, reject) => {
+        let killed = false;
+        const timer = setTimeout(() => {
+          killed = true;
+          child.kill('SIGKILL');
+        }, graceMs);
+        void exited.then((exit) => {
+          clearTimeout(timer);
+          if (killed)
+            reject(
+              new Error(
+                `test server (pid ${child.pid}) did not exit within ${graceMs} ms of SIGTERM; killed. Captured lines: ${JSON.stringify(lines)}`,
+              ),
+            );
+          else resolve(exit);
+        });
+      });
     }
     return stopping;
   };

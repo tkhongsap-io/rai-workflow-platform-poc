@@ -40,6 +40,8 @@ export interface StartOverrides {
   now?: () => Date;
   /** The built SPA directory to serve (W1-INT static.ts); defaults to rai-web/web/dist. */
   webDistDir?: string;
+  /** W0-04 graceful shutdown: how long in-flight requests get after close() before their sockets are destroyed. */
+  drainMs?: number;
 }
 
 export interface StartedServer {
@@ -47,6 +49,11 @@ export interface StartedServer {
   emitter: Emitter;
   /** The configured BU keys the case routes accept (W0-04 `case.business_unit_id`), observable by tests. */
   businessUnits: BusinessUnitDirectory;
+  /**
+   * W0-04 graceful shutdown (shutdown.ts): no new connections, in-flight requests answered within `drainMs`
+   * (SHUTDOWN_DRAIN_MS, 10 s), every remaining socket destroyed, then the database pool closed. Bounded: a socket
+   * that never sent a byte (a browser's speculative pre-connect) cannot hold the process open.
+   */
   close(): Promise<void>;
 }
 
@@ -145,7 +152,7 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
   ]);
   const store = createFilesystemBlobStore(path.resolve(config.blobDir));
   await store.init(); // root 0700, tmp/ emptied at process start (W0-08 section 6)
-  const { fastify, emitter } = buildApp({
+  const { fastify, emitter, drain } = buildApp({
     config,
     artifacts: { store, db: db.db, limits: config.upload },
     identity: {
@@ -176,7 +183,7 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
     ...(serveWeb ? { static: { root: webDistDir } } : {}),
   });
   const close = async () => {
-    await fastify.close();
+    await drain.close(overrides.drainMs);
     await db.close();
   };
   await fastify.listen({ host: config.host, port: config.port });

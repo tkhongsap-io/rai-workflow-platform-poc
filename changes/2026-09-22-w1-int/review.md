@@ -62,3 +62,29 @@ Manual confirmation before the suites: `node server/dist/main.js` in fixture mod
 - **`base_url_not_loopback`**: the negatives include a non-loopback `PUBLIC_BASE_URL` for `local-google`; the adapter answers with the W0-03 S3 code, not `bind_not_loopback`, and the test asserts that code.
 - **Scan scope of "no test imports the substitute"**: the W1-13 API substitute (`fixtures/src/substitutes/api/`), its marker and its test server. The in-process QC and mail-sink substitutes (W1-10, W1-11) are what the integration layer binds by design (W0-02 8.1) and are not flagged.
 - **Board**: no CLAIM appended by this run; the harness records board and log entries at the merge step.
+
+## Fix round 1 (review finding: the built server never exits after SIGTERM with a browser tab open)
+
+**Finding.** The PR's CI browser job was red (run 35665750923): `w1-int-evidence-config.spec.ts` (two widths) and `w1-int-journey.spec.ts` (one) hit the Playwright timeout in `await server.stop()`; every assertion had passed. On Linux, with any Chromium page open, Chromium holds a speculative pre-connect socket that has sent 0 bytes; `http.Server.close()`'s idle sweep only covers sockets its parser has seen a request on, so `fastify.close()` never resolved, and `main.ts`'s SIGTERM path had no deadline and no `.catch`. A W0-04 graceful-shutdown defect in the deployable, never seen on macOS (where the previous 108/108 runs were made). Reproduced here with a plain `net.connect` that writes nothing, on macOS and on Linux (`mcr.microsoft.com/playwright:v1.63.0-noble`, node 24.20.0): `fastify.close()` alone waits on the socket indefinitely (the control assertion in `shutdown.test.ts`).
+
+**Fix.**
+
+- **`rai-web/server/src/shutdown.ts`** (new): `createDrain(fastify)` installs the first `onRequest` hook, counting every accepted request and releasing it on the raw response's `close` event (fires both on completion and on a client cut). `close(drainMs = SHUTDOWN_DRAIN_MS)` initiates `fastify.close()` (no new connections; Node's sweep; the onClose hooks), waits until the count is zero or `drainMs` (10 s, the performance-targets budget) has elapsed, then `server.closeAllConnections()` destroys whatever is left (the 0-byte sockets, keep-alive sockets that went idle after the sweep, requests past the deadline — whose transaction Postgres rolls back, W0-04), and awaits the close. `app.ts` creates it (returned as `App.drain`); `start.ts` `close()` runs `drain.close(overrides.drainMs)` before `db.close()`. Fastify's own `forceCloseConnections: true` was not used: it destroys every socket at close time, in-flight requests included, which the 10 s budget forbids.
+- **`rai-web/server/src/main.ts`**: the SIGTERM/SIGINT path is bounded twice and caught: `server.close()` → exit 0, rejection → exit 1, a hard deadline of `SHUTDOWN_DRAIN_MS + 5 s` (unref'd) → exit 1; a second signal during the drain is ignored.
+- **`rai-web/tests/support/process.ts`** `stop(graceMs = STOP_GRACE_MS)` (20 s): SIGTERM, then SIGKILL when the process is still running after the grace period, and the promise rejects with the captured lines, so a shutdown hang fails a test with the server's last log lines instead of the runner's timeout. A start failure still reports the start error, not a stop hang.
+- **Tests.** `rai-web/server/src/shutdown.test.ts` (4): the control (plain `fastify.close()` hangs on a 0-byte socket) and the fix (the drain closes in under a second, the socket is destroyed, the port is free); an in-flight request is answered before its socket is destroyed and `close()` waits for it; a request unanswered at the deadline is cut and `close()` completes; a keep-alive socket idle after the sweep does not block. `rai-web/tests/integration/w1-int-shutdown.test.ts` (3, the real deployable through `main.ts`): SIGTERM exits 0 within the budget while a 0-byte socket is held open; a request whose headers arrived before SIGTERM (body withheld until after `process.stopping`) is answered 200 and the process exits 0; a SIGSTOPped process (a hung shutdown as the harness sees it) makes `stop(500)` SIGKILL it and reject with the captured lines, idempotently.
+- **Docs.** `docs/engineering/performance-targets.md` (the graceful-shutdown row names `shutdown.ts` and the hard deadline), `docs/engineering/implementation-plan-w1-w3.md` (layout tree), `TESTING.md`.
+
+**Commands run (fix round 1), from `rai-web/` unless noted.** Postgres `rai-w1-int` on 54399, `npm run migrate` (`0 applied, 4 already applied`).
+
+| Command | Result |
+| --- | --- |
+| `npm run lint` | eslint clean; Prettier clean; `check-css` clean |
+| `npm run typecheck` | `tsc -b` clean |
+| `npm run test:unit` | `tests 347, pass 347, fail 0` (343 + 4 `shutdown.test.ts`) |
+| `npm run test:integration` | `tests 135, pass 135, fail 0` (132 + 3 `w1-int-shutdown.test.ts`) |
+| `npm run build && npm run check:substitute-absent` | `scanned 391 files, 0 with the marker` |
+| `npm run test:browser:server` | `108 passed (1.3m)` |
+| `docker run mcr.microsoft.com/playwright:v1.63.0-noble` (node v24.20.0, `npm ci`, `node --test server/src/shutdown.test.ts`) | `pass 4, fail 0` on Linux, including the control that reproduces the hang without the drain |
+| `node --test tests/*.test.mjs`, `node scripts/check-links.mjs`, `node scripts/check-frozen-source.mjs`, `node --test scripts/*.test.mjs` (repository root) | see the PR body |
+| CI browser job | re-run until green three times (PR checks) |

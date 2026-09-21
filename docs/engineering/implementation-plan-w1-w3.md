@@ -85,6 +85,7 @@ rai-workflow-platform-poc/
     │       ├── audit/                     # append-only audit store; no update/delete function exists (W1-00)
     │       ├── observability/             # correlation id, redacted pino logger, /healthz, /readyz, operator view (W3-07)
     │       ├── static.ts                  # serves ../web/dist with CSP and history fallback for non-/api paths
+    │       ├── shutdown.ts                # W0-04 graceful shutdown: bounded drain, then every remaining socket destroyed
     │       └── **/*.test.ts               # unit tests colocated with the module
     │
     ├── web/                               # @rai/web — React + Vite SPA (Lane B)

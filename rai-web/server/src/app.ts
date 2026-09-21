@@ -11,6 +11,7 @@
 
 import Fastify, { LogController, type FastifyError, type FastifyInstance } from 'fastify';
 import cookie from '@fastify/cookie';
+import { createDrain, type Drain } from './shutdown.js';
 import { InvalidInputError, isContractError, internalErrorResponse } from '@rai/shared/errors';
 import type { CorrelationId } from '@rai/shared/ids';
 import type { AppConfig } from './config.js';
@@ -56,6 +57,8 @@ export interface AppDeps {
 export interface App {
   fastify: FastifyInstance;
   emitter: Emitter;
+  /** W0-04 graceful shutdown (shutdown.ts): the bounded close start.ts and main.ts run instead of `fastify.close()`. */
+  drain: Drain;
 }
 
 /**
@@ -95,6 +98,7 @@ export function buildApp(deps: AppDeps): App {
     ajv: { customOptions: { removeAdditional: false } }, // a key an `additionalProperties: false` shape does not list is 422, never stripped
   });
   const emitter = createEmitter(fastify.log, { strict: deps.config.nodeEnv === 'test' });
+  const drain = createDrain(fastify); // first hook: every accepted request is counted (shutdown.ts)
 
   fastify.addHook('onRequest', (request, reply, done) => {
     void reply.header('X-Correlation-Id', request.id);
@@ -191,5 +195,5 @@ export function buildApp(deps: AppDeps): App {
     }
   }
 
-  return { fastify, emitter };
+  return { fastify, emitter, drain };
 }
