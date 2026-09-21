@@ -10,6 +10,9 @@ const port = Number(new URL(baseURL).port || '8788');
 export default defineConfig({
   testDir: '.',
   testMatch: /.*\.spec\.ts$/,
+  // Lane B specs against the W1-13 substitute run through playwright.substitute.config.ts (W1-07) until W1-INT
+  // wires the SPA to the real server; they are named `*.substitute.spec.ts` and skipped here.
+  testIgnore: /.*\.substitute\.spec\.ts$/,
   fullyParallel: false,
   forbidOnly: true, // no test.only merges to main (section 6)
   retries: 0,
