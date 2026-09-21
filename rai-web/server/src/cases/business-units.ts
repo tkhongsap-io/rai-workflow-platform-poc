@@ -1,8 +1,9 @@
 // The configured BU keys `businessUnitId` must match (W0-02 7.3: "must be a configured BU key (fixture BUs 'CM',
 // 'HR'; W0-03 section 7) or 422 invalid_input"; W0-04 `case.business_unit_id`: "a key from the fixture BU list in
-// slice 1; the AD-group mapping arrives at W6/W8"). Slice 1 derives the list from the `business_unit` grants the
-// identity adapter can issue (the fixture identities in fixture mode; the local role map in local-google), so the
-// keys a SPOC can be granted and the keys a case can be filed under are the same set. Never a free-text value.
+// slice 1; the AD-group mapping arrives at W6/W8"). Slice 1 takes the list from `FIXTURE_BUSINESS_UNITS` in every
+// identity mode (start.ts loads only the keys; the identities stay fixture-mode only) plus the `business_unit`
+// grants of the fixture identities, so the keys a fixture SPOC can be granted are always in the set. Never a
+// free-text value.
 
 import type { RoleScope } from '@rai/shared/schemas/auth';
 

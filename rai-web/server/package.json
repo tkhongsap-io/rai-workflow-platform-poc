@@ -2,7 +2,7 @@
   "name": "@rai/server",
   "version": "0.0.0",
   "private": true,
-  "description": "Fastify API that also serves the built SPA: the one deployable (ADR-0003 B1). Lane A. Never imports @rai/fixtures statically: the fixture identities are injected by the test bootstrap, or loaded by a dynamic import in start.ts only when RAI_IDENTITY_MODE=fixture (NODE_ENV=test, loopback), so the production build cannot contain them.",
+  "description": "Fastify API that also serves the built SPA: the one deployable (ADR-0003 B1). Lane A. Never imports @rai/fixtures statically: the fixture identities are injected by the test bootstrap, or loaded by a dynamic import in start.ts only when RAI_IDENTITY_MODE=fixture (NODE_ENV=test, loopback), so the production build cannot contain them. The same dynamic import supplies the slice-1 BU key list (FIXTURE_BUSINESS_UNITS, W0-04 case.business_unit_id) in every mode; keys only, no identities.",
   "type": "module",
   "exports": {
     "./*": {

@@ -123,6 +123,48 @@ test('ID-02 control: with the real address resolution on localhost the server st
   }
 });
 
+// W1-02: the configured BU keys are the slice-1 fixture list in every identity mode (W0-04 `case.business_unit_id`),
+// not the grants of the identity table: the injected table above holds an Admin only, and local-google has no table
+// at all, yet both directories list `CM` and `HR`, so a local-google account can file a case (W0-03 4.1).
+for (const mode of ['fixture', 'local-google'] as const) {
+  test(`W1-02 ${mode}: the started app's BU directory lists the slice-1 fixture BU keys CM and HR`, async () => {
+    const port = await freePort();
+    const server = await startServer(envFor(port, mode), { exit, discovery, fixtureUsers });
+    try {
+      assert.deepEqual([...server.businessUnits.list()], ['CM', 'HR']);
+      assert.equal(server.businessUnits.has('CM'), true);
+      assert.equal(server.businessUnits.has('HR'), true);
+      assert.equal(server.businessUnits.has('Consumer Mobile'), false);
+    } finally {
+      await server.close();
+    }
+  });
+}
+
+test('W1-02: an injected BU key list replaces the fixture list and is unioned with the identity table grants', async () => {
+  const port = await freePort();
+  const server = await startServer(envFor(port, 'fixture'), {
+    exit,
+    discovery,
+    fixtureUsers: [
+      ...fixtureUsers,
+      {
+        fixtureUserId: 'fx-user-spoc-cm',
+        subjectId: 'fixture:fx-user-spoc-cm',
+        displayName: 'Suchada P.',
+        email: 'spoc.cm@rai-desk.example',
+        roles: [{ role: 'bu_spoc' as const, scope: { kind: 'business_unit' as const, businessUnit: 'CM' } }],
+      },
+    ],
+    fixtureBusinessUnits: ['XX'],
+  });
+  try {
+    assert.deepEqual([...server.businessUnits.list()], ['XX', 'CM']);
+  } finally {
+    await server.close();
+  }
+});
+
 test('S2 / S1 through startServer: a 0.0.0.0 bind in local-google and an unknown mode exit 78 before any listen', async () => {
   const port = await freePort();
   for (const [env, reason] of [
