@@ -45,7 +45,7 @@ export type ConfigReasonCode =
   | `invalid:${string}`
   | 'mode_unknown' // W0-03 S1
   | 'fixture_outside_test' // W0-03 S13
-  | 'bind_not_loopback' // W0-03 S14 (fixture); S2 for local-google is W1-01a's
+  | 'bind_not_loopback' // W0-03 S2 (local-google) and S14 (fixture); W0-02 section 5 HOST row
   | 'log_pretty_in_production'; // W0-10 section 3.1
 
 export class ConfigError extends Error {
@@ -159,6 +159,9 @@ export function parseConfig(env: Env): AppConfig {
     if (!isLoopbackHost(host) || !isLoopbackHost(publicBaseUrl.hostname))
       throw new ConfigError('bind_not_loopback'); // S14
   }
+  // W0-02 section 5 HOST row: non-loopback is refused unless the mode is network or production. S3 (base URL)
+  // and S5 (trustProxy) for local-google carry finer codes and are W1-01a's, inside the identity adapter parse.
+  if (mode === 'local-google' && !isLoopbackHost(host)) throw new ConfigError('bind_not_loopback'); // S2
   const identityEnv: Record<string, string> = {};
   for (const [name, value] of Object.entries(env)) {
     if (value !== undefined && IDENTITY_ENV_PREFIXES.some((p) => name.startsWith(p)))

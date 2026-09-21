@@ -63,6 +63,15 @@ test('fixture identity is refused outside NODE_ENV=test and off loopback (W0-03 
   assert.equal(reasonOf(withEnv({ PUBLIC_BASE_URL: 'http://desk.example.test' })), 'bind_not_loopback');
 });
 
+test('local-google refuses a non-loopback bind host before listen (W0-03 S2, W0-02 section 5 HOST row)', () => {
+  const localGoogle = { NODE_ENV: 'development', RAI_IDENTITY_MODE: 'local-google' };
+  assert.equal(parseConfig(withEnv(localGoogle)).identity.mode, 'local-google');
+  assert.equal(parseConfig(withEnv({ ...localGoogle, HOST: 'localhost' })).host, 'localhost');
+  for (const HOST of ['0.0.0.0', '::', '172.26.0.2']) {
+    assert.equal(reasonOf(withEnv({ ...localGoogle, HOST })), 'bind_not_loopback', HOST);
+  }
+});
+
 test('an unknown or missing identity mode refuses to start (S1) without distinguishing the two', () => {
   assert.equal(reasonOf(withEnv({ RAI_IDENTITY_MODE: 'nonsense' })), 'mode_unknown');
   assert.equal(reasonOf(withEnv({ RAI_IDENTITY_MODE: undefined })), 'mode_unknown');

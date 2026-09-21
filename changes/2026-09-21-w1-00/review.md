@@ -27,13 +27,14 @@ Shell: `export PATH=$HOME/.nvm/versions/node/v24.21.0/bin:$PATH` (node v24.21.0,
 | `npx drizzle-kit generate --config server/drizzle.config.ts` | `No schema changes, nothing to migrate` (the committed snapshot matches the schema) |
 | `npm run lint` | `eslint .` clean; `All matched files use Prettier code style!`; `check-css: no outline removal outside :focus-visible` |
 | `npm run typecheck` | `tsc -b` clean over the five workspaces |
-| `npm run test:unit` | `tests 56, pass 56, fail 0` |
+| `npm run test:unit` | `tests 58, pass 58, fail 0` (fix round 1 added the `process.started` loopback builder test and the local-google S2 row) |
 | `npm run test:integration` | `tests 14, pass 14, fail 0` (files run serially, `--test-concurrency=1`, because each file resets the shared database) |
 | `npm run verify` | lint, typecheck, unit and integration green (the two counts above) |
 | `npm run build && npm run check:substitute-absent` | shared → web (`vite build`, 18 modules) → server; `check-substitute-absent: scanned 130 files, 0 with the marker` |
 | `npm start` (smoke, port 8797) | `process.started` line with `identityMode: local-google, loopback: true`; `GET /api/anything` → `404 {"error":{"code":"not_found","messageKey":"error.not_found","correlationId":"…"}}` with `x-correlation-id` and `cache-control: no-store`; `SIGTERM` → `process.stopping`, exit 0 |
 | `NODE_ENV=production LOG_PRETTY=true node server/dist/main.js` | `{"event":"process.refused","reason":"log_pretty_in_production"}`, exit 78 |
 | `NODE_ENV=test RAI_IDENTITY_MODE=fixture HOST=0.0.0.0 node server/dist/main.js` | `{"event":"process.refused","reason":"bind_not_loopback"}`, exit 78 |
+| `RAI_IDENTITY_MODE=local-google HOST=0.0.0.0 node server/dist/main.js` (fix round 1; W0-03 S2, W0-02 section 5 HOST row, OBS-02) | `{"event":"process.refused","reason":"bind_not_loopback"}`, exit 78, never listens (port stays closed). Before the fix this run listened on an interface address and `process.started` reported `loopback: true`; the field now comes from `startedFields(config)` (`isLoopbackHost(config.host)`), asserted by `server/src/observability/started.test.ts` for loopback and non-loopback hosts |
 | `COMPOSE_PROJECT_NAME=rai-w1-00 POSTGRES_PORT=54320 npm run reset` | `db:down`, `db:up` (healthy), `migrate: applied 1 migration(s)`, `fixtures:load: fixture set slice1-synthetic@1 (manifest hash arrives with W1-09)`, `published configuration revisions: checklist_templates, sla, calendar, operator_recipients, use_case_groups`, `reset: removed rai-web/.local` |
 | `npm run db:cleanup` / `-- --report` | `expired 0 idempotency key(s) older than 72 h`; report: `unsubmitted drafts untouched for 180 days: 0 (dry run; deletion waits for D08)` |
 | `npm run fixtures:generate`, `store:verify`, `store:cleanup` | each prints which ticket brings it (W1-09, W1-03a) and exits 1 |
