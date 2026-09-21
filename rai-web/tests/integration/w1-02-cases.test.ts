@@ -414,6 +414,24 @@ describe(`W1-02 create and read (A02) — ${SET}, fx-user-owner-cm`, () => {
     assert.equal(name.statusCode, 422);
     assert.equal(await caseCount(), FIXTURE_CASES.length);
   });
+
+  it('7.3: a key outside CaseWritableFields on edit (a client typo) is 422 validation.unknown_field at body.fields.<key>, never stripped; nothing saved, caseRevision unchanged, zero draft.saved rows', async () => {
+    const owner = await signIn(OWNER_A);
+    const original = findFixtureCase('fx-case-nonvendor')!.useCaseName;
+    for (const fields of [{ useCaseNmae: 'x' }, { useCaseName: 'renamed', useCaseNmae: 'x' }]) {
+      const res = await patchCase(owner, CASE_CM, { expectedCaseRevision: 1, fields });
+      assert.equal(res.statusCode, 422, res.body);
+      assert.equal(errorOf(res).code, 'invalid_input');
+      assert.deepEqual(invalidFields(res), [
+        { path: 'body.fields.useCaseNmae', messageKey: 'validation.unknown_field' },
+      ]);
+      const row = (await caseRow(CASE_CM))!;
+      assert.equal(row.row_version, 1);
+      assert.equal(row.use_case_name, original);
+    }
+    assert.equal((await audit('draft.saved')).length, 0);
+    assert.equal(denied.length, 0);
+  });
 });
 
 // ---------------------------------------------------------------------------------------------------------------

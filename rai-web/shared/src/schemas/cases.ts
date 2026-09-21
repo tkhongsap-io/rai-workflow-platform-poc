@@ -83,7 +83,9 @@ export interface CaseSummary {
 export const CaseCreateRequestSchema = CaseWritableFieldsSchema;
 export type CaseCreateRequest = CaseWritableFields;
 
-// Any key outside CaseWritableFields (for example privacyStatus) → 422 invalid_input (additionalProperties: false).
+// Any key outside CaseWritableFields → 422 invalid_input at body.fields.<key>: a projected name (privacyStatus) as
+// error.invalid_input.projected_field from the route hook, any other name as validation.unknown_field from this
+// additionalProperties: false (the server turns Ajv's removeAdditional off so the key is rejected, not stripped).
 export const CaseUpdateRequestSchema = Type.Object({
   expectedCaseRevision: Type.Integer({ minimum: 1 }),
   fields: Type.Partial(CaseWritableFieldsSchema, { additionalProperties: false }),

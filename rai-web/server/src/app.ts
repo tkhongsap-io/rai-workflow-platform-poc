@@ -41,16 +41,26 @@ export interface App {
   emitter: Emitter;
 }
 
-/** Fastify's ajv failure → the W0-06 8.2 invalid_input envelope: field paths only, never values. */
+/**
+ * Fastify's ajv failure → the W0-06 8.2 invalid_input envelope: field paths only, never values. `required` names
+ * the missing key; `additionalProperties` names the unknown key (W0-02 7.3: any key outside CaseWritableFields on
+ * PATCH is 422, so the Ajv default `removeAdditional: true`, which would strip it silently, is turned off below).
+ */
 function validationToInvalidInput(error: FastifyError): InvalidInputError {
   const fields = (error.validation ?? []).map((v) => {
     const path = `${error.validationContext ?? 'body'}${v.instancePath.replaceAll('/', '.')}`;
-    const missing =
-      v.keyword === 'required' ? (v.params as { missingProperty?: string }).missingProperty : undefined;
-    return {
-      path: missing === undefined ? path : `${path}.${missing}`,
-      messageKey: v.keyword === 'required' ? 'validation.required' : 'validation.not_in_configured_list',
-    };
+    const params = v.params as { missingProperty?: string; additionalProperty?: string };
+    switch (v.keyword) {
+      case 'required':
+        return { path: `${path}.${params.missingProperty}`, messageKey: 'validation.required' as const };
+      case 'additionalProperties':
+        return {
+          path: `${path}.${params.additionalProperty}`,
+          messageKey: 'validation.unknown_field' as const,
+        };
+      default:
+        return { path, messageKey: 'validation.not_in_configured_list' as const };
+    }
   });
   return new InvalidInputError(fields);
 }
@@ -62,6 +72,7 @@ export function buildApp(deps: AppDeps): App {
     requestIdHeader: false,
     trustProxy: deps.config.trustProxy,
     logController: new LogController({ disableRequestLogging: true }), // one request.completed line per request (W0-10 3.4), emitted by W3-07's hook
+    ajv: { customOptions: { removeAdditional: false } }, // a key an `additionalProperties: false` shape does not list is 422, never stripped
   });
   const emitter = createEmitter(fastify.log, { strict: deps.config.nodeEnv === 'test' });
 

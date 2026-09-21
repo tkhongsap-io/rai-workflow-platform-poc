@@ -65,5 +65,6 @@
   "validation.reason_required": "A reason is required when a slot is marked not applicable.",
   "validation.required": "This field is required.",
   "validation.source_record_id_prefix": "The source record id must start with TPM- or VRO-, or be marked Unknown.",
+  "validation.unknown_field": "This field is not recognised.",
   "validation.subject_unresolvable": "The named owner is not a known user."
 }
