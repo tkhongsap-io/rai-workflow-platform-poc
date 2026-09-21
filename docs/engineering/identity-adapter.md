@@ -1,28 +1,29 @@
 # Identity adapter (W0-03)
 
-Status: **W0 interface spec, human review required.** Ticket W0-03 (issue #8), lane Lead. Proves A01 and R1 through the tickets that consume it (W1-01, W1-07, W1-08, W2-02, W3-07, W7-00, W8). Recorded decisions carried as written: D04 (stack, [ADR-0003](../../adr/0003-stack-and-deployment-boundary.md)), D05 (no self-approval; the dual-role fixture exists to exercise it), D12 (locale keys). D07-D10 stay open; this spec records the configuration shape only where the [W0 contract](../delivery/w0-technical-contract.md#w0-03--identity-adapter-spec) says so and never a value that D10 owns.
+Status: **W0 interface spec, human review required; reconciled with W0-02 at the W0 exit review** ([W0-09](../../changes/2026-09-21-w0-exit/review.md), 2026-09-21; each applied change is marked "W0-09:"). Ticket W0-03 (issue #8), lane Lead. Proves A01 and R1 through the tickets that consume it (W1-01, W1-07, W1-08, W2-02, W3-07, W7-00, W8). Recorded decisions carried as written: D04 (stack, [ADR-0003](../../adr/0003-stack-and-deployment-boundary.md)), D05 (no self-approval; the dual-role fixture exists to exercise it), D12 (locale keys). D07-D10 stay open; this spec records the configuration shape only where the [W0 contract](../delivery/w0-technical-contract.md#w0-03--identity-adapter-spec) says so and never a value that D10 owns.
 
 Source rules this spec implements, unchanged: [source spec](../product/source-spec.md) L4 (production identity is True AD), L11 (any Google account on localhost only; networked URL needs allow-list or AD; production is AD), the six roles in "Roles and access", and the non-goal "Google/social login on a True URL". Acceptance: [A01](../acceptance.md). Threat-model row: "Networked test exposed with arbitrary Google login" ([threat model](../security/threat-model.md)).
 
-The boundaries in sections 1-4 are stack-neutral in intent; sections 5-11 make them concrete for the D04 stack (Fastify, Drizzle on Postgres 16, `openid-client`, `node:test`, Playwright). Paths are proposed under the layout ADR-0003 offered to W0-02; the [W0-02 file-level plan](../delivery/w0-technical-contract.md#w0-02--file-level-implementation-plan) fixes the layout, and on any conflict W0-02's paths win. The W0-09 exit review reconciles variable names between this spec and W0-02's environment list; for `RAI_IDENTITY_*` and the secret names in section 8 this spec is the source, for bind, port and base URL W0-02 is.
+The boundaries in sections 1-4 are stack-neutral in intent; sections 5-11 make them concrete for the D04 stack (Fastify, Drizzle on Postgres 16, `openid-client`, `node:test`, Playwright). Paths follow the [W0-02 file-level plan](implementation-plan-w1-w3.md#1-repository-layout); on any conflict W0-02's paths win. W0-09 reconciled the variable names: `RAI_IDENTITY_*`, `RAI_SECRET_*` and `RAI_SESSION_*` (sections 8 and 9.1) are this spec's and W0-02 section 5 now carries them; `HOST`, `PORT`, `PUBLIC_BASE_URL`, `TRUST_PROXY`, `NODE_ENV` and `DATABASE_URL` are W0-02's names and this spec uses them.
 
 ## 1. What the adapter is and is not
 
 The identity adapter answers one question for the server: **who is making this request and in which roles, over which scope.** It takes a verified login from an identity provider and returns a `Principal`: subject ID, display name, email and a non-empty list of (role, scope) pairs. Nothing else in the server talks to an identity provider.
 
-The adapter is not authorization. Scope enforcement lives in the server authorization middleware and the [W0-05 policy matrix](../delivery/w0-technical-contract.md#w0-05--authorization-policy-matrix), which consume the `Principal` on every request (case read, list, search, download, deep link, lane decision). The adapter never decides whether a principal may do something; it only says who the principal is. The SPA receives the `Principal` for display and navigation only; no client-side check decides access ([design-to-build map](../delivery/design-to-build-map.md), ADR-0003 risk table).
+The adapter is not authorization. Scope enforcement lives in the server authorization middleware and the [W0-05 policy matrix](authorization-policy-matrix.md), which consume the `Principal` on every request (case read, list, search, download, deep link, lane decision). The adapter never decides whether a principal may do something; it only says who the principal is. The SPA receives the `Principal` for display and navigation only; no client-side check decides access ([design-to-build map](../delivery/design-to-build-map.md), ADR-0003 risk table).
 
 Identity provider output (ID-token claims, group lists, allow-list files) is data, never instructions. The adapter reads named claims, validates their types and discards the rest.
 
 ## 2. Interface
 
-Type notation is TypeScript because the stack is (D04); the shapes are the contract for any implementation. The shared types live in `rai-web/shared` so the server, the W1-13 substitute and the SPA see one definition.
+Type notation is TypeScript because the stack is (D04); the shapes are the contract for any implementation. The shared types live in `rai-web/shared` so the server, the W1-13 substitute and the SPA see one definition. W0-09: the shared shape is the one [W0-02 section 7.2](implementation-plan-w1-w3.md#72-sign-in-w0-03-served-by-w1-01a-consumed-by-w1-07) records in `rai-web/shared/src/schemas/auth.ts` (`Role`, `Lane`, `RoleScope`, `Principal`, `IdentityMode`, `SessionInfo`); it is reproduced below with this spec's comments, and W0-02's spelling is authoritative (the earlier `owned_cases` / `identity.ts` draft is withdrawn, section 14 d).
 
 ```ts
-// rai-web/shared/src/identity.ts  (proposed path; W0-02 fixes it)
+// rai-web/shared/src/schemas/auth.ts  (W0-02 section 7.2; reproduced)
 
 /** The six source-spec roles. No seventh role (D05, D06). */
 export type Role = 'owner' | 'bu_spoc' | 'ai_coe' | 'dpo' | 'it_security' | 'admin';
+export type Lane = 'ai_coe' | 'dpo' | 'it_security';
 
 /** Fixture and production BU identifiers are opaque strings; the value list is configuration (W6). */
 export type BusinessUnitId = string;
@@ -32,38 +33,34 @@ export type SubjectId = string;
 
 /**
  * Scope per role, as the W0 contract states it: the BU for BU SPOC,
- * owned cases for owner, all cases for the three reviewer roles and Admin.
+ * owned cases for owner (the subject is the principal's own, so no field), all cases for the three reviewer roles and Admin.
  */
-export type Scope =
-  | { kind: 'owned_cases'; ownerSubjectId: SubjectId }   // owner
-  | { kind: 'business_unit'; businessUnit: BusinessUnitId } // bu_spoc
-  | { kind: 'all_cases' };                                // ai_coe, dpo, it_security, admin
-
 export type RoleScope =
-  | { role: 'owner';       scope: Extract<Scope, { kind: 'owned_cases' }> }
-  | { role: 'bu_spoc';     scope: Extract<Scope, { kind: 'business_unit' }> }
-  | { role: 'ai_coe';      scope: Extract<Scope, { kind: 'all_cases' }> }
-  | { role: 'dpo';         scope: Extract<Scope, { kind: 'all_cases' }> }
-  | { role: 'it_security'; scope: Extract<Scope, { kind: 'all_cases' }> }
-  | { role: 'admin';       scope: Extract<Scope, { kind: 'all_cases' }> };
+  | { role: 'owner';       scope: { kind: 'own_cases' } }
+  | { role: 'bu_spoc';     scope: { kind: 'business_unit'; businessUnit: BusinessUnitId } }
+  | { role: 'ai_coe';      scope: { kind: 'all_cases'; lane: 'ai_coe' } }
+  | { role: 'dpo';         scope: { kind: 'all_cases'; lane: 'dpo' } }
+  | { role: 'it_security'; scope: { kind: 'all_cases'; lane: 'it_security' } }
+  | { role: 'admin';       scope: { kind: 'all_cases' } };
 
-export type IdentityMode = 'local-google' | 'network' | 'production' | 'fixture';
+export type IdentityMode = 'fixture' | 'local-google' | 'network' | 'production';
 
 /** What the adapter returns. Snapshotted into the session at sign-in (section 6.3). */
 export interface Principal {
   subjectId: SubjectId;
   displayName: string;
   email: string;                 // lower-cased; for display and notification addressing only
-  roles: readonly RoleScope[];   // non-empty; at most one pair per (role, scope)
-  identityMode: IdentityMode;    // recorded on the session and the sign-in audit event
-  signedInAt: string;            // ISO-8601, UTC
+  roles: RoleScope[];            // non-empty; at most one pair per (role, scope)
 }
+
+/** GET /api/session body (W0-02 7.2). identityMode and the sign-in instant are session-row columns (6.3), not Principal fields. */
+export interface SessionInfo { principal: Principal; identityMode: IdentityMode; expiresAt: string; locale: 'th' | 'en' }
 ```
 
 ```ts
-// rai-web/server/src/identity/adapter.ts  (proposed path)
+// rai-web/server/src/identity/adapter.ts  (W0-02 section 1: rai-web/server/src/identity/)
 
-import type { Principal, IdentityMode, RoleScope } from '@rai/shared/identity';
+import type { Principal, IdentityMode, RoleScope } from '@rai/shared/schemas/auth';
 
 /** Output of a mode's login verifier, before roles are known. */
 export interface VerifiedLogin {
@@ -91,8 +88,8 @@ export interface IdentityAdapter {
   readonly mode: IdentityMode;
   /**
    * Validates configuration and bind target; throws IdentityStartupError so the process never listens (section 5).
-   * `trustProxy` is the value main.ts passes to Fastify's `trustProxy` server option (derived from the environment;
-   * W0-02 owns the variable name, proposed `RAI_TRUST_PROXY`), so the adapter sees it as an input (S5).
+   * `trustProxy` is the value main.ts passes to Fastify's `trustProxy` server option (W0-02 section 5 `TRUST_PROXY`,
+   * default false), so the adapter sees it as an input (S5).
    */
   start(bind: { host: string; port: number; publicBaseUrl: URL; trustProxy: boolean }): Promise<void>;
   /** The W0 contract's core function: verified login in, Principal out. */
@@ -133,7 +130,7 @@ export class SignInRefused extends Error {
 
 ### 2.1 Scope representation
 
-The W0 contract says the owner's scope is "owned cases". The adapter expresses this as the rule `{ kind: 'owned_cases', ownerSubjectId }` rather than a list of case IDs, because a list taken at sign-in is stale after the first case is created and would make identity depend on the case store. The W0-05 policy resolves the rule against the case store at each check (`case.owner_subject_id = principal.subjectId`). BU SPOC scope is the BU identifier itself; W0-05 compares it with `case.business_unit`. The three reviewer roles and Admin carry `all_cases`; which lane a reviewer may act in follows from the role under the W0-06 lane mapping, not from the scope.
+The W0 contract says the owner's scope is "owned cases". The adapter expresses this as the rule `{ kind: 'own_cases' }` rather than a list of case IDs, because a list taken at sign-in is stale after the first case is created and would make identity depend on the case store. The W0-05 policy resolves the rule against the case store at each check (`case.owner_subject_id = principal.subjectId`). BU SPOC scope is the BU identifier itself; W0-05 compares it with the W0-04 `case.business_unit_id` key column (never the descriptive `business_unit` text). The three reviewer roles and Admin carry `all_cases`; the reviewer scopes also carry their `lane` (W0-02 7.2) so that W0-05 can compare it with a decision's lane or a finding's `owning_lane` directly; which lane a reviewer may act in follows from that value under the W0-06 lane mapping, not from the scope kind.
 
 An owner has no BU in the identity model. A case's `business_unit` is a case field set at creation; the SPOC of that BU gains scope over the case through the case, not through the owner.
 
@@ -165,7 +162,7 @@ Cases, lane decisions, dispositions and audit events reference `subjectId`, neve
 | `local-google` | Any Google account, loopback only | Google OIDC via `openid-client` | Local role map (untracked file); unmapped account gets `owner` (section 4.1) | Loopback only; refuses otherwise | On |
 | `network` | Allow-listed accounts or AD members, on a closed network only (W7 entry) | Configured OIDC issuer (`allow-list` source) or Entra (`ad` source) | Allow-list entries, or AD group-to-role mapping (shape in section 9; values W6/W8) | Any; the operator confirms the closed environment at W7-00 | Off when source is `ad`; when source is `allow-list` the issuer is configuration and a Google issuer is permitted only on a non-True URL (source-spec non-goal), which W7-00 checks by hand |
 | `production` | True AD (Entra) members with a mapped group only (L4) | Entra OIDC, tenant fixed by configuration | AD group-to-role mapping, an Admin configuration revision (L12, W6) with group values from D10/W8 | Any | Off; any Google variable present is a start-up refusal |
-| `fixture` | The seven synthetic users, test environment only | None (no provider; a test-only route names the user) | The fixture table (section 7) | Loopback only and `NODE_ENV=test` only | Off |
+| `fixture` | The eight synthetic users of section 7, test environment only | None (no provider; a test-only route names the user) | The fixture table (section 7) | Loopback only and `NODE_ENV=test` only | Off |
 
 The mode is configuration (`RAI_IDENTITY_MODE`). An unknown value, a missing value or a value whose prerequisites are absent refuses to start (section 5). There is no default mode.
 
@@ -175,8 +172,8 @@ Slice 1 implements `local-google` and `fixture` (W1-01). `network` is implemente
 
 ### 4.1 `local-google`
 
-- **Verifier.** `openid-client` discovery against `https://accounts.google.com`, authorization-code flow with PKCE (S256), `state`, `nonce`, scopes `openid email profile`, `prompt=select_account`. The redirect URI is `${RAI_PUBLIC_BASE_URL}/auth/callback` and must be a loopback URL (section 5). The developer's own OAuth client ID and secret come from the environment (`RAI_IDENTITY_GOOGLE_CLIENT_ID`, `RAI_IDENTITY_GOOGLE_CLIENT_SECRET`), held locally and never committed (W1-08 wording). The client verifies `iss`, `aud`, `exp`, `nonce` and requires `email_verified: true`.
-- **Role resolver.** Reads the optional local role map at `RAI_IDENTITY_LOCAL_ROLE_MAP` (an untracked JSON file in the allow-list format of section 4.2, matched on lower-cased email). An account absent from the map receives exactly `[{ role: 'owner', scope: { kind: 'owned_cases', ownerSubjectId } }]`, the least-privileged role, so that the W1-08 manual sign-in works with no local set-up and the account sees nothing until it creates a case. This default exists only in `local-google`; every other mode refuses an unmapped account. **Reviewer check:** the lead confirms this default at review; it is a W0-03 rule for the loopback developer mode, not a product decision.
+- **Verifier.** `openid-client` discovery against `https://accounts.google.com`, authorization-code flow with PKCE (S256), `state`, `nonce`, scopes `openid email profile`, `prompt=select_account`. The redirect URI is `${PUBLIC_BASE_URL}/auth/callback` (derived; not a variable) and must be a loopback URL (section 5). The developer's own OAuth client ID and secret come from the environment (`RAI_IDENTITY_GOOGLE_CLIENT_ID`, `RAI_IDENTITY_GOOGLE_CLIENT_SECRET`), held locally and never committed (W1-08 wording). The client verifies `iss`, `aud`, `exp`, `nonce` and requires `email_verified: true`.
+- **Role resolver.** Reads the optional local role map at `RAI_IDENTITY_LOCAL_ROLE_MAP` (an untracked JSON file in the allow-list format of section 4.2, matched on lower-cased email). An account absent from the map receives exactly `[{ role: 'owner', scope: { kind: 'own_cases' } }]`, the least-privileged role, so that the W1-08 manual sign-in works with no local set-up and the account sees nothing until it creates a case. This default exists only in `local-google`; every other mode refuses an unmapped account. **Reviewer check:** the lead confirms this default at review; it is a W0-03 rule for the loopback developer mode, not a product decision.
 
 ### 4.2 `network`, source `allow-list`
 
@@ -188,13 +185,13 @@ export interface AllowList {
   version: 1;
   entries: Array<{
     email: string;                  // compared lower-cased, exact match; no wildcards or domains
-    roles: RoleScope[];             // non-empty; ownerSubjectId is filled in by the resolver at sign-in
+    roles: RoleScope[];             // non-empty; an `owner` entry is `{ kind: 'own_cases' }` (the subject is the signed-in principal)
     displayNameOverride?: string;
   }>;
 }
 ```
 
-A verified login whose email is not an entry is refused with `forbidden` and no session. The allow-list contains real staff addresses when used at W7, so it is a secret under D10 custody, never a file in the repository, and the fixture allow-lists used in tests contain only `@rai-desk.example` addresses (W0-02 section 8.3).
+A verified login whose email is not an entry is refused with `forbidden` and no session. The allow-list contains real staff addresses when used at W7, so it is a secret under D10 custody, never a file in the repository, and the fixture allow-lists used in tests contain only `@rai-desk.example` addresses (section 7; W0-02 section 8.3).
 
 ### 4.3 `network`, source `ad`, and `production`
 
@@ -204,19 +201,19 @@ A verified login whose email is not an entry is refused with `forbidden` and no 
 
 ### 4.4 `fixture`
 
-No provider. The verifier is a test-only route that names one of the seven fixture users (section 7); the resolver returns that user's pairs from the fixture table. The composition root mounts the fixture verifier only when `RAI_IDENTITY_MODE=fixture`, and start-up refuses that mode unless `NODE_ENV=test` and the bind is loopback.
+No provider. The verifier is a test-only route that names one of the eight fixture users (section 7); the resolver returns that user's pairs from the fixture table. The composition root mounts the fixture verifier only when `RAI_IDENTITY_MODE=fixture`, and start-up refuses that mode unless `NODE_ENV=test` and the bind is loopback.
 
 ## 5. Start-up validation: fail closed
 
 `IdentityAdapter.start()` runs before Fastify listens. Any failure throws `IdentityStartupError` with a reason code; the process logs the code (never a value) and exits with code **78** (`EX_CONFIG`). It never listens in a degraded state, and the W0-10 readiness probe reports `identity.ready = false` with the same reason code for any process that is up but whose adapter reports not-ready.
 
-**Loopback** means the bind host is the literal `127.0.0.1`, `::1` or `localhost`, and `RAI_PUBLIC_BASE_URL` has one of those hosts. `0.0.0.0`, `::`, an interface address, a hostname other than `localhost`, or a base URL with any other host is not loopback. After `listen`, the adapter reads `server.address()` and closes the server with the same exit code if the bound address is not loopback (a second check, in case a reverse proxy or a platform rewrote the bind).
+**Loopback** means the bind host (W0-02 `HOST`) is the literal `127.0.0.1`, `::1` or `localhost`, and `PUBLIC_BASE_URL` has one of those hosts. `0.0.0.0`, `::`, an interface address, a hostname other than `localhost`, or a base URL with any other host is not loopback. After `listen`, the adapter reads `server.address()` and closes the server with the same exit code if the bound address is not loopback (a second check, in case a reverse proxy or a platform rewrote the bind).
 
 | # | Condition | Result | Reason code | Tested by |
 |---|---|---|---|---|
 | S1 | `RAI_IDENTITY_MODE` missing or not one of the four values | refuse | `mode_unknown` | W1-01 |
 | S2 | `local-google` and bind host not loopback | refuse | `bind_not_loopback` | W1-01, W1-08 (negative) |
-| S3 | `local-google` and `RAI_PUBLIC_BASE_URL` host not loopback | refuse | `base_url_not_loopback` | W1-01 |
+| S3 | `local-google` and `PUBLIC_BASE_URL` host not loopback | refuse | `base_url_not_loopback` | W1-01 |
 | S4 | `local-google` and Google client ID or secret absent | refuse | `secret_missing:RAI_IDENTITY_GOOGLE_CLIENT_SECRET` (or `_ID`) | W1-01 |
 | S5 | `local-google` and `trustProxy` enabled | refuse | `proxy_forbidden_in_mode` | W1-01 |
 | S6 | `network` and `RAI_IDENTITY_NETWORK_SOURCE` not `allow-list` or `ad` | refuse | `network_source_unknown` | W1-01 |
@@ -230,7 +227,7 @@ No provider. The verifier is a test-only route that names one of the seven fixtu
 | S14 | `fixture` and bind host not loopback | refuse | `bind_not_loopback` | W1-01 |
 | S15 | Any secret whose value is empty, whitespace or the placeholder literal `set-in-custody` | treated as absent | as S4/S7/S9 | W1-01 |
 | S16 | After `listen`, `server.address()` is not loopback in `local-google` or `fixture` | close and exit 78 | `bind_not_loopback` | W1-01 (ID-02: loopback bind host so S2/S14 pass, `server.address()` stubbed to a non-loopback address) |
-| S17 | `production` and `RAI_PUBLIC_BASE_URL` scheme not `https` | refuse | `base_url_not_https` | W1-01 (ID-01) |
+| S17 | `production` and `PUBLIC_BASE_URL` scheme not `https` | refuse | `base_url_not_https` | W1-01 (ID-01) |
 | S18 | Any provider mode (`local-google`, `network`, `production`) and OIDC discovery fails or returns an invalid document (missing `issuer` or `authorization_endpoint`; an Entra issuer that resolves but differs from the tenant is S11, not S18) | refuse | `discovery_failed` | W1-01 (ID-18, unit, injected discovery that throws or returns an invalid document) |
 
 ```ts
@@ -252,24 +249,25 @@ export type SignInReasonCode =
 - The one function readiness calls is `IdentityAdapter.health()` (section 2), which **replaces** `validateIdentityConfig(config)`. `health()` returns the recorded outcome of `start()`, not a recomputation: `parseIdentityConfig` is the pure part, but S11, S12, S16 and S18 depend on discovery, the revision store and the bound address, which a pure function of the configuration cannot see. W0-10's two-level fail-closed rule holds unchanged: `main()` awaits `start()` before `listen()` (level 1) and `computeReadiness` reads `health()` (level 2); because the configuration is immutable after start, the two cannot disagree. `IdentityConfigView` in W0-10's `computeReadiness` signature is therefore `{ identity: IdentityAdapter['health'] }` or the adapter itself, W0-10's choice at W3-07.
 - `IdentityMode` has **four** values (section 2: `local-google`, `network`, `production`, `fixture`), not three; W0-10's `'unset'` stays as the report's value when S1 refuses.
 
-Configuration parsing is a pure function (`parseIdentityConfig(env, bind) → Ok<IdentityConfig> | Refused<reasonCode>`, where `bind` is the `start()` input above including `trustProxy`, so S5 is driven by `bind.trustProxy = true` and not by an environment variable) and the rows that a parse of the environment and the bind can decide, S1-S10, S13-S15 and S17, are one table-driven `node:test` file with no network, no Postgres and no process spawn (ID-01). Two rows cannot fail inside the pure parse and are not in ID-01: S11 needs the discovered issuer and S12 needs the configuration revision store. Both run after parsing, inside `start()`, against seams the adapter factory takes as inputs (`createIdentityAdapter({ env, discovery, groupMappingSource })`; the composition root passes the real `openid-client` discovery and the W1-00 revision-store reader, tests pass functions). ID-18 injects a discovery that throws, one that returns a document without `issuer` or `authorization_endpoint` (S18, `discovery_failed`) and, for `production` and `network` / `ad`, one that returns a valid document whose `issuer` is not the tenant URL (S11, `issuer_not_entra`), and asserts the code and that the process never listens. ID-19 injects a `groupMappingSource` that returns no published `identity.group_role_mapping` revision in `production` (S12, `group_mapping_missing`) and one that returns a revision whose `tenantId` differs from `RAI_IDENTITY_ENTRA_TENANT_ID` (section 9.2; also `group_mapping_missing`, since a mapping for another tenant is no mapping for this one), with no Postgres: the reader is a function, not a store. S16 is the one test that starts a server (ID-02). Because S2 and S14 refuse a non-loopback bind host before `listen` with the same reason code, a `0.0.0.0` run never reaches the post-listen check and cannot prove S16; ID-02 therefore starts with a bind host that satisfies S2 (`localhost`) and stubs the address resolution the adapter reads after `listen` (`server.address()`, or the injectable resolver behind it) to return a non-loopback address, then asserts the server closes, the exit code is 78 and the reason code is `bind_not_loopback`. The manual W1-08 negative ("`local-google` refuses a non-loopback bind and an unknown mode") runs the real command with `RAI_BIND_HOST=0.0.0.0` and with `RAI_IDENTITY_MODE=nonsense` and records the exit code and reason code; that `0.0.0.0` run exercises the S2 path, which ID-01 and ID-14 cover, not S16.
+Configuration parsing is a pure function (`parseIdentityConfig(env, bind) → Ok<IdentityConfig> | Refused<reasonCode>`, where `bind` is the `start()` input above including `trustProxy`, so S5 is driven by `bind.trustProxy = true` and not by an environment variable) and the rows that a parse of the environment and the bind can decide, S1-S10, S13-S15 and S17, are one table-driven `node:test` file with no network, no Postgres and no process spawn (ID-01). Two rows cannot fail inside the pure parse and are not in ID-01: S11 needs the discovered issuer and S12 needs the configuration revision store. Both run after parsing, inside `start()`, against seams the adapter factory takes as inputs (`createIdentityAdapter({ env, discovery, groupMappingSource })`; the composition root passes the real `openid-client` discovery and the W1-00 revision-store reader, tests pass functions). ID-18 injects a discovery that throws, one that returns a document without `issuer` or `authorization_endpoint` (S18, `discovery_failed`) and, for `production` and `network` / `ad`, one that returns a valid document whose `issuer` is not the tenant URL (S11, `issuer_not_entra`), and asserts the code and that the process never listens. ID-19 injects a `groupMappingSource` that returns no published `identity.group_role_mapping` revision in `production` (S12, `group_mapping_missing`) and one that returns a revision whose `tenantId` differs from `RAI_IDENTITY_ENTRA_TENANT_ID` (section 9.2; also `group_mapping_missing`, since a mapping for another tenant is no mapping for this one), with no Postgres: the reader is a function, not a store. S16 is the one test that starts a server (ID-02). Because S2 and S14 refuse a non-loopback bind host before `listen` with the same reason code, a `0.0.0.0` run never reaches the post-listen check and cannot prove S16; ID-02 therefore starts with a bind host that satisfies S2 (`localhost`) and stubs the address resolution the adapter reads after `listen` (`server.address()`, or the injectable resolver behind it) to return a non-loopback address, then asserts the server closes, the exit code is 78 and the reason code is `bind_not_loopback`. The manual W1-08 negative ("`local-google` refuses a non-loopback bind and an unknown mode") runs the real command with `HOST=0.0.0.0` and with `RAI_IDENTITY_MODE=nonsense` and records the exit code and reason code; that `0.0.0.0` run exercises the S2 path, which ID-01 and ID-14 cover, not S16.
 
 ## 6. Sign-in surface, session and error contract
 
-The adapter's HTTP surface is a Fastify plugin registered under `/auth`. The [W0-02 "W1 interface shapes" section](../delivery/w0-technical-contract.md#w0-02--file-level-implementation-plan) records the request/response shapes for W1-13 and Lane B; the routes, status codes and error cases below are what those shapes must agree with, and W0-09 reconciles any drift before W1-01 starts.
+The adapter's HTTP surface is a Fastify plugin registered under `/auth`, plus the session routes under `/api`. The routes, methods, bodies and status codes are the ones [W0-02 section 7.2](implementation-plan-w1-w3.md#72-sign-in-w0-03-served-by-w1-01a-consumed-by-w1-07) records (W0-02 owns routes and shapes); W0-09 reconciled this section to them and the earlier draft (`GET /auth/session`, `GET /auth/sign-in` with 302, `{ userId }` with 204/422) is withdrawn (section 14 d).
 
 ### 6.1 Routes
 
 | Route | Mode | Behaviour |
 |---|---|---|
-| `GET /auth/session` | all | Returns the current `Principal` (200) or `unauthenticated` (401). `Cache-Control: no-store`. The SPA calls it on load; it never derives permissions from the response beyond choosing what to render. |
-| `GET /auth/sign-in?returnTo=<path>` | `local-google`, `network`, `production` | Stores a `SignInTransaction` in a short-lived, HttpOnly transaction cookie (`__Host-rai_signin`, 10-minute expiry, `SameSite=Lax`) and 302-redirects to the provider. `returnTo` is kept only if it is a same-origin absolute path. |
-| `GET /auth/callback` | same | Completes the code exchange, calls `resolvePrincipal`, creates the session (6.3), clears the transaction cookie, 302-redirects to `returnTo` or `/`. Any failure renders the sign-in page with the error's locale key; no partial session exists. |
-| `POST /auth/sign-out` | all | Revokes the session row, clears the cookie, 204. Idempotent: without a session it is still 204. Requires `Sec-Fetch-Site: same-origin` or `none`, else 403 `forbidden`. |
-| `GET /auth/fixture/users` | `fixture` only | The seven fixture users as `{ id, displayName, roles }` for the test sign-in picker. Not mounted in any other mode (404). |
-| `POST /auth/fixture/sign-in` `{ userId }` | `fixture` only | Creates a session for that fixture user (204 + cookie). Unknown `userId` is 422 `invalid_input`. Not mounted in any other mode (404). |
+| `GET /api/session` | all | Returns `SessionInfo` (200) or `unauthenticated` (401, the plain W0-06 envelope, no details). `Cache-Control: no-store`. The SPA calls it on load; it never derives permissions from the response beyond choosing what to render. |
+| `POST /api/session/locale` `{ locale }` | all | Stores the viewer's locale on the session row (204); D12. |
+| `POST /auth/sign-in` `{ returnTo? }` | `local-google`, `network`, `production` | Stores a `SignInTransaction` in a short-lived, HttpOnly transaction cookie (`__Host-rai_signin`, 10-minute expiry, `SameSite=Lax`) and answers `200 { redirectUrl }` for the SPA to navigate to the provider. `returnTo` is kept only if it is a same-origin absolute path, else 422 `invalid_input`. Not mounted in `fixture` mode (404). |
+| `GET /auth/callback` | same | Completes the code exchange, calls `resolvePrincipal`, creates the session (6.3), clears the transaction cookie, 303-redirects to `returnTo` or `/`. Any failure answers the 6.4 error (401 or 403) and no partial session exists; the SPA's sign-in screen renders the locale key. |
+| `POST /auth/sign-out` | all | Revokes the session row, clears the cookie, 204. Without a session: 401 (W0-02). Requires `Sec-Fetch-Site: same-origin` or `none`, else 403 `forbidden`. |
+| `GET /auth/fixture/users` | `fixture` only | The eight fixture users as `{ users: [{ fixtureUserId, displayName, roles }] }` for the test sign-in picker. Not mounted in any other mode (404 `not_found`). |
+| `POST /auth/fixture/sign-in` `{ fixtureUserId }` | `fixture` only | Creates a session for that fixture user (`200 SessionInfo` + cookie). Unknown `fixtureUserId` is 404 `not_found`. Not mounted in any other mode (404). |
 
-The sign-in page is Lane B's (W1-07) and reads the mode from `GET /auth/session`'s 401 body (`{ code: 'unauthenticated', identityMode }`) to show either the Google button or, in fixture mode, the user picker. The identity mode is not secret; the presence of the fixture routes is what is guarded.
+The sign-in page is Lane B's (W1-07). It learns the mode without an error detail (W0-06 8.2: `unauthenticated` carries none): it calls `GET /auth/fixture/users`, and a 200 shows the fixture user picker while a 404 shows the Google (or True account) button. The identity mode is not secret; the presence of the fixture routes is what is guarded.
 
 ### 6.2 `openid-client` usage (v6 API; W0-02 pins the version)
 
@@ -291,10 +289,13 @@ sessions: {
   lastSeenAt: timestamptz,
   expiresAt: timestamptz,          // createdAt + RAI_SESSION_ABSOLUTE_HOURS (default 12)
   revokedAt: timestamptz | null,
+  locale: text,                    // 'th' | 'en', default 'th' (D12); written by POST /api/session/locale (W0-02 7.2)
 }
 ```
 
-- Cookie `__Host-rai_session`: `HttpOnly`, `SameSite=Lax`, `Path=/`, `Secure` (on loopback over plain `http` the `__Host-` prefix and `Secure` are dropped and the cookie is named `rai_session`; the adapter picks the name from the public base URL scheme, and `production` refuses a non-`https` base URL, reason `base_url_not_https`, row S17). No signing secret is needed because the cookie value is random and looked up by hash.
+W0-09 confirmed this mechanism (section 14 b): the cookie is an opaque random value looked up by hash; there is no signing key, so W0-02 section 5 carries no `SESSION_SECRET`, and `RAI_SESSION_ABSOLUTE_HOURS` and `RAI_SESSION_IDLE_MINUTES` (section 9.1) replace W0-02's earlier `SESSION_TTL_MINUTES`. W1-01 implements this section.
+
+- Cookie `__Host-rai_session`: `HttpOnly`, `SameSite=Lax`, `Path=/`, `Secure` (on loopback over plain `http` the `__Host-` prefix and `Secure` are dropped and the cookie is named `rai_session`; the adapter picks the name from the public base URL scheme, and `production` refuses a non-`https` base URL, reason `base_url_not_https`, row S17). No signing secret is needed because the cookie value is random and looked up by hash; `@fastify/cookie` (W0-02 section 4.1) only parses and sets it.
 - A request is authenticated when the hash matches a row with `revokedAt IS NULL`, `expiresAt > now()` and `lastSeenAt > now() - RAI_SESSION_IDLE_MINUTES` (default 120). `lastSeenAt` is updated at most once per minute to avoid a write per request.
 - Roles are a snapshot. A change in the allow-list or the group mapping takes effect at the next sign-in; the absolute TTL bounds the staleness. Revoking all sessions of a subject on a mapping change is a W6 operator action, not slice 1.
 - Sign-in always creates a new session row (no fixation: an existing cookie is ignored and replaced).
@@ -310,17 +311,17 @@ Codes and statuses are the ADR-0003 table that W0-06 confirms. Every response ca
 | Callback with missing or mismatched `state`, `nonce` or transaction cookie; code exchange failed; `iss`/`aud` mismatch; email not verified | 401 `unauthenticated` | `auth.sign_in_failed` | none created | log reason code; audit `identity.sign_in_refused` with subject hash, no email |
 | Verified login with no (role, scope) pair: unlisted (allow-list), no mapped group or groups overage (AD), unmapped in production | 403 `forbidden` | `auth.not_permitted` | none created | audit `identity.sign_in_refused` (reason code, issuer key, sha256 of subject; never the email) |
 | Sign-out without matching `Sec-Fetch-Site` | 403 `forbidden` | `auth.not_permitted` | unchanged | log only |
-| Fixture route in a non-fixture mode | 404 `not_found` | `common.not_found` | — | — |
-| `POST /auth/fixture/sign-in` with an unknown `userId` | 422 `invalid_input` | `auth.fixture_user_unknown` | none | — |
+| Fixture route in a non-fixture mode | 404 `not_found` | `error.not_found` | — | — |
+| `POST /auth/fixture/sign-in` with an unknown `fixtureUserId` | 404 `not_found` (W0-02 7.2) | `error.not_found`; the picker never offers an unknown id, so `auth.fixture_user_unknown` (section 12) is the SPA's message when a stale picker entry is refused | none | — |
 | Start-up misconfiguration (section 5) | process exits 78 before listening | — | — | log reason code; readiness `identity.ready=false` |
 
 Refused sign-ins are never 404 and never reveal whether the account exists at the provider; the body is the same for every `forbidden` reason. Nothing about a refused login is rendered beyond the locale message.
 
 ## 7. Test substitute: the fixture identity provider
 
-Seven synthetic users: six single-role users, one per source-spec role, plus one dual-role identity. The dual-role identity is a lane reviewer who is also BU SPOC of one fixture BU, so the W0-05 no-self-approval row (D05) can be exercised: it is a fixture user, not a seventh role. Names are invented; none is a person named in the source spec or a real True account, and `rai-desk.example` is a reserved domain that never resolves.
+Eight synthetic users: six single-role users, one per source-spec role, plus one dual-role identity (the W0 contract's set), plus, added at W0 exit on the W0-05 section 8 request, a second single-role `owner` in the same BU as the first so that the scope-boundary negatives (W0-05 T3, T7, T8, T11, T27, T31, T32, T33: "another owner in B1") have an actor; it owns no fixture case. The dual-role identity is a lane reviewer who is also BU SPOC of one fixture BU, so the W0-05 no-self-approval row (D05) can be exercised: it is a fixture user, not a seventh role. Names are invented; none is a person named in the source spec or a real True account, and `rai-desk.example` is a reserved domain that never resolves.
 
-**Convention owner.** The W0 contract assigns the fixture identity convention to W0-02, and the merged [W0-02 section 8.3](implementation-plan-w1-w3.md#83-fixture-identity-convention) fixes the user ids (`fx-user-<role>[-<qualifier>]`), the dual-role pairing (`fx-user-dpo-spoc-hr`: a DPO reviewer who is also BU SPOC of fixture BU `HR`), the case that depends on it (`fx-case-hr-dualrole`) and the email domain (`rai-desk.example`). This section follows W0-02 for all of those and adds only what W0-02 leaves open: the display names, the `subjectId` form and the exact (role, scope) pairs. A change to an id, the pairing or the domain is a W0-02 change first, mirrored here, never the other way round. (An earlier draft of this section used `fx-<role>` ids, a dual-role AI/COE + `BU-RP` identity and the domain `fixture.example.test`; that draft is withdrawn, see section 14.)
+**Convention owner.** The W0 contract assigns the fixture identity convention to W0-02, and the merged [W0-02 section 8.3](implementation-plan-w1-w3.md#83-fixture-identity-convention) fixes the user ids (`fx-user-<role>[-<qualifier>]`), the dual-role pairing (`fx-user-dpo-spoc-hr`: a DPO reviewer who is also BU SPOC of fixture BU `HR`), the case that depends on it (`fx-case-hr-dualrole`) and the email domain (`rai-desk.example`). This section follows W0-02 for all of those and owns the identities themselves: the display names, the `subjectId` form and the exact (role, scope) pairs. W0-08 section 8.2 (fixture content) reproduces this table, reconciled at W0 exit. A change to an id, the pairing or the domain is a W0-02 change first, mirrored here and in W0-08, never the other way round. (An earlier draft of this section used `fx-<role>` ids, a dual-role AI/COE + `BU-RP` identity and the domain `fixture.example.test`; that draft is withdrawn, see section 14.)
 
 Fixture business units (W1-09 reuses these identifiers for its cases; `HR` is the BU that W0-02 names for the dual-role case, `CM` is the BU of the `-cm` qualified users):
 
@@ -333,7 +334,8 @@ Fixture users (W1-00 implements the table from this section and W0-02 section 8.
 
 | Fixture user id | `subjectId` | Display name | Email | (role, scope) pairs |
 |---|---|---|---|---|
-| `fx-user-owner-cm` | `fixture:fx-user-owner-cm` | ณัฐพร ส. (Nattaporn S.) | `owner.cm@rai-desk.example` | `owner` / owned cases |
+| `fx-user-owner-cm` | `fixture:fx-user-owner-cm` | ณัฐพร ส. (Nattaporn S.) | `owner.cm@rai-desk.example` | `owner` / own cases (owns every W0-08 fixture case) |
+| `fx-user-owner-cm-2` | `fixture:fx-user-owner-cm-2` | Prasit W. | `owner.cm2@rai-desk.example` | `owner` / own cases (owns no fixture case; the W0-05 "owner-b") |
 | `fx-user-spoc-cm` | `fixture:fx-user-spoc-cm` | Suchada P. | `spoc.cm@rai-desk.example` | `bu_spoc` / `CM` |
 | `fx-user-ai-coe` | `fixture:fx-user-ai-coe` | Kritsada T. | `ai-coe@rai-desk.example` | `ai_coe` / all cases |
 | `fx-user-dpo` | `fixture:fx-user-dpo` | Pimchanok R. | `dpo@rai-desk.example` | `dpo` / all cases |
@@ -345,7 +347,7 @@ The owner's display name carries Thai script on purpose so that the sign-in scre
 
 Rules:
 
-- The table is a TypeScript constant in `rai-web/fixtures/` (W0-02 section 8.3 places the fixture set under `rai-web/fixtures/src/data/`; that path wins), exported read-only, with a unit test asserting exactly seven entries, unique ids, unique emails, and that only `fx-user-dpo-spoc-hr` has more than one pair. Adding, removing or re-roling a fixture user is a change to W0-02 section 8.3 and to this section, in its own PR, never a fixture tweak inside a feature ticket.
+- The table is a TypeScript constant in `rai-web/fixtures/src/data/users.ts` (W0-02 sections 1 and 8.3), exported read-only, with a unit test asserting exactly eight entries, unique ids, unique emails, exactly two `owner` entries, and that only `fx-user-dpo-spoc-hr` has more than one pair. Adding, removing or re-roling a fixture user is a change to W0-02 section 8.3, to this section and to W0-08 section 8.2, in its own PR, never a fixture tweak inside a feature ticket.
 - The fixture verifier is mounted only in `fixture` mode (section 4.4, S13, S14). `rai-web/server/src/main.ts` imports `identity/fixture.ts` behind the mode switch, and a test asserts that a `production` or `network` configuration cannot reach the fixture routes (404) and that `fixture` mode outside `NODE_ENV=test` exits 78.
 - The fixture sign-in has no password or secret: it is loopback-only and test-only by construction, and its presence in a deployed configuration is a defect, not a hardening question.
 - The Playwright journeys (W1-INT, W2-INT, W3-INT) sign in through `POST /auth/fixture/sign-in` against the real server; substitute runs with W1-13 are never acceptance evidence, but the fixture identity provider inside the real server is the intended evidence path for every automated A01 test. The Google path is proved by hand once, at W1-08.
@@ -376,11 +378,11 @@ Rules: no secret is logged, echoed in an error, written to the audit store, retu
 
 ### 9.1 Environment variables owned by this spec
 
-W0-02's environment list carries these names with the placeholders below; W1-00 creates the sample file. Non-identity variables (`RAI_BIND_HOST`, `RAI_PORT`, `RAI_PUBLIC_BASE_URL`, `NODE_ENV`, `DATABASE_URL`) are named here only so the rules in section 5 are readable; W0-02 owns their final names.
+W0-02 section 5 carries these names with the placeholders below (W0-09 applied them there); W1-00 creates the sample file. Non-identity variables (`HOST`, `PORT`, `PUBLIC_BASE_URL`, `TRUST_PROXY`, `NODE_ENV`, `DATABASE_URL`) are W0-02's names and are used as such in section 5.
 
 | Variable | Modes | Secret | Sample placeholder | Rule |
 |---|---|---|---|---|
-| `RAI_IDENTITY_MODE` | all | no | `fixture` | one of `local-google`, `network`, `production`, `fixture`; no default (S1) |
+| `RAI_IDENTITY_MODE` | all | no | `local-google` (W0-02's `.env.example` default: the L11 development login; the test commands set `fixture` themselves) | one of `local-google`, `network`, `production`, `fixture`; no default in code (S1) |
 | `RAI_IDENTITY_GOOGLE_CLIENT_ID` | `local-google` | no | `set-locally` | required in `local-google` (S4); forbidden in `production` and `network`/`ad` (S10) |
 | `RAI_IDENTITY_GOOGLE_CLIENT_SECRET` | `local-google` | yes (local only) | `set-in-custody` | as above |
 | `RAI_IDENTITY_LOCAL_ROLE_MAP` | `local-google` | no (untracked file path) | empty | optional path to an allow-list-format JSON; absent means every account is `owner` (4.1) |
@@ -405,7 +407,7 @@ export interface GroupRoleMapping {
   version: 1;
   tenantId: string;                     // must equal RAI_IDENTITY_ENTRA_TENANT_ID or start-up refuses (`group_mapping_missing`, S12; ID-19)
   rules: Array<
-    | { groupObjectId: string; role: 'owner' }                                       // scope: owned cases (subject filled at sign-in)
+    | { groupObjectId: string; role: 'owner' }                                       // scope: own_cases (the signed-in subject)
     | { groupObjectId: string; role: 'bu_spoc'; businessUnit: BusinessUnitId }       // one group per BU
     | { groupObjectId: string; role: 'ai_coe' | 'dpo' | 'it_security' | 'admin' }   // scope: all cases
   >;
@@ -427,8 +429,8 @@ Resolution: for each `groups` entry in the token, every matching rule contribute
 |---|---|---|---|
 | ID-01 | Rows S1-S10, S13-S15 and S17 of section 5 as a table-driven case over the pure `parseIdentityConfig(env, bind)`; S5 is the case with `bind.trustProxy = true` in `local-google`, S17 the `production` case with an `http://` base URL. S11 and S12 are not in this file (they need the discovery result and the revision store: ID-18, ID-19); S16 is ID-02 | unit, `node:test` | W1-01 |
 | ID-02 | S16 post-listen check, for `local-google` and for `fixture`: start with a bind host that satisfies S2 (`localhost`), stub `server.address()` (or the address resolution behind it) to return a non-loopback address, assert the server closes with exit 78 and `bind_not_loopback`. A `0.0.0.0` bind is refused before `listen` (S2/S14, same reason code) and would pass without S16 implemented; that run is the S2 path covered by ID-01 and ID-14 | integration (real listen, stubbed address) | W1-01 |
-| ID-03 | Each of the seven fixture users (W0-02 section 8.3 ids) resolves to exactly the pairs in section 7; `fx-user-dpo-spoc-hr` keeps both | unit | W1-01 |
-| ID-04 | Fixture table invariants: seven entries, unique ids and emails, only one multi-pair user | unit | W1-00 |
+| ID-03 | Each of the eight fixture users (W0-02 section 8.3 ids) resolves to exactly the pairs in section 7; `fx-user-dpo-spoc-hr` keeps both; `fx-user-owner-cm-2` resolves to `own_cases` and sees no fixture case | unit | W1-01 |
+| ID-04 | Fixture table invariants: eight entries, unique ids and emails, two `owner` entries, only one multi-pair user | unit | W1-00 |
 | ID-05 | `resolvePrincipal` refuses an empty pair list with `forbidden` and writes no session | unit | W1-01 |
 | ID-06 | Allow-list resolver: listed email resolves, unlisted is `forbidden`, matching is case-insensitive and exact, schema rejection is S8; fixtures use `@rai-desk.example` only | unit | W1-01 |
 | ID-07 | Group mapping resolver with synthetic group IDs: mapped groups produce pairs, unmatched produce `forbidden`, overage indicator produces `forbidden`, `tenantId` mismatch refuses | unit | W1-01 (logic), W8 (live) |
@@ -475,12 +477,12 @@ Every user-facing string the adapter or the sign-in screen shows carries a key; 
 
 | Consumer | Uses | Where |
 |---|---|---|
-| W0-02 file-level plan | Section 9 variable names in its env list (section 5 there); section 6 routes in its "W1 interface shapes" 7.2; section 11 rows in its test-layer map; section 7 follows its 8.3 fixture identity convention; paths in `rai-web/server/src/identity/` and `rai-web/fixtures/` | [W0-02 spec](implementation-plan-w1-w3.md), [contract](../delivery/w0-technical-contract.md#w0-02--file-level-implementation-plan) |
-| W0-04 persistence | `sessions` table (6.3), subject profile row (2.2), audit event names (10), `SecretSource` for store credentials (8) | [W0-04](../delivery/w0-technical-contract.md#w0-04--persistence-and-artifact-store-spec) |
-| W0-05 authorization matrix | `Principal` and `RoleScope` as the input to every row; `owned_cases` and `business_unit` resolution (2.1); the dual-role fixture for the D05 no-self-approval row | [W0-05](../delivery/w0-technical-contract.md#w0-05--authorization-policy-matrix) |
-| W0-06 workflow and errors | `unauthenticated`, `forbidden`, `invalid_input`, `not_found` codes as used in 6.4 (codes from ADR-0003) | [W0-06](../delivery/w0-technical-contract.md#w0-06--workflow-transition-and-error-contract) |
-| W0-07 mail sink | `SecretSource` for mail credentials; `Principal.email` as the recipient address source under case-view scope | [W0-07](../delivery/w0-technical-contract.md#w0-07--qc-boundary-and-mail-sink) |
-| W0-08 fixtures | The fixture BUs and users that W1-09's synthetic cases reference | [W0-08](../delivery/w0-technical-contract.md#w0-08--upload-safety-policy-and-fixtures) |
+| W0-02 file-level plan | Section 9 variable names in its env list (section 5 there); its 7.2 routes and shapes, which section 6 follows; section 11 rows in its test-layer map; section 7 follows its 8.3 fixture identity convention; paths in `rai-web/server/src/identity/` and `rai-web/fixtures/src/data/users.ts` | [W0-02 spec](implementation-plan-w1-w3.md), [contract](../delivery/w0-technical-contract.md#w0-02--file-level-implementation-plan) |
+| W0-04 persistence | `sessions` table (6.3), subject profile row (2.2), audit event names (10; listed in the W0-04 `audit_event.action` catalogue), `SecretSource` for store credentials (8) | [W0-04](persistence-and-artifact-store.md) |
+| W0-05 authorization matrix | `Principal` and `RoleScope` as the input to every row; `own_cases` and `business_unit` resolution (2.1); the dual-role fixture for the D05 no-self-approval row and the second owner for its scope negatives | [W0-05](authorization-policy-matrix.md) |
+| W0-06 workflow and errors | `unauthenticated`, `forbidden`, `invalid_input`, `not_found` codes as used in 6.4 (codes from ADR-0003) | [W0-06](workflow-transition-and-error-contract.md) |
+| W0-07 mail sink | `SecretSource` for mail credentials; `Principal.email` as the recipient address source under case-view scope | [W0-07](qc-boundary-and-mail-sink.md) |
+| W0-08 fixtures | Reproduces the section 7 identities in its 8.2 table; the fixture BUs and users that W1-09's synthetic cases reference | [W0-08](upload-safety-and-fixtures.md#82-identities-owned-by-w1-00-shape-from-w0-03) |
 | W0-10 observability | Readiness shape, reason codes, redaction rule (10); section 5 amends its section 5.4 (codes, `health()` instead of `validateIdentityConfig`, four-value `IdentityMode`) | [W0-10 spec](observability-contract.md#54-identity-misconfiguration-reasons), [contract](../delivery/w0-technical-contract.md#w0-10--observability-contract-for-the-desk-runtime) |
 | W1-00 | Fixture user table, locale keys, `.gitignore` and sample env placeholders | [work breakdown](../delivery/slice-1-work-breakdown.md#w1--scoped-case-and-versioned-pack) |
 | W1-01 | Everything in sections 4.1, 4.4, 5, 6 and tests ID-01 to ID-11, ID-18 and ID-19 | same |
@@ -501,14 +503,14 @@ Architecture boundary: "Identity adapter" row of the [boundary table](../archite
 - [ ] Whether the W7 rehearsal is networked; if so which `network` source and, for `allow-list`, which non-True issuer — W7 entry.
 - [ ] The `local-google` default-to-`owner` rule for unmapped accounts (4.1) — lead confirms at this ticket's review.
 - [ ] Whether a dual-role reviewer (also owner or BU SPOC on the case) is withheld send-back as well as approve. D05 as recorded withholds approve only; extending it to send-back is a W0-05 refinement under D05's "review leads may refine" clause, recorded there if adopted, not in this spec.
-- [ ] Any drift between this spec's route and variable names and the W0-02 sections that mirror them — W0-09 exit review.
+- [x] Any drift between this spec's route and variable names and the W0-02 sections that mirror them — reconciled at the W0-09 exit review (2026-09-21): routes and shapes follow W0-02 7.2 (section 6), identity variable names follow this spec (W0-02 section 5), the session mechanism of 6.3 is confirmed.
 
 **Divergence from W0 specs merged after this branch's base** (W0-02 #65, W0-10 #59). Recorded so W1-00 and W1-01 never hold two contradictory contracts; nothing here decides a D-item.
 
 - (a) **Fixture identity table — W0-02 wins, applied.** Section 7 now follows [W0-02 section 8.3](implementation-plan-w1-w3.md#83-fixture-identity-convention) (`fx-user-*` ids, dual-role `fx-user-dpo-spoc-hr` = DPO + BU SPOC of `HR`, case `fx-case-hr-dualrole`, domain `rai-desk.example`); the earlier draft (`fx-*`, `fx-dual-coe-spoc-rp` = AI/COE + `BU-RP`, `BU-CM`/`BU-RP`, `fixture.example.test`) is withdrawn. W0-06 section 8 and W0-04's actor rule refer to "the W0-03 dual-role fixture identity" without an id, so they need no change. The fixture BU ids `CM` and `HR` are this spec's addition (W0-02 names `HR` and the `-cm` qualifier only); W1-09 uses them.
-- (b) **Session mechanism — this spec proposes 6.3 wins; W0-09 decides before W1-00 writes `.env.example`.** W0-02 section 5 lists `SESSION_SECRET` (signed cookie, ≥ 32 bytes, placeholder accepted only under `NODE_ENV=test`) and `SESSION_TTL_MINUTES=480` (idle). Section 6.3 here specifies a server-side session row looked up by the sha256 of a 256-bit random cookie value, so there is no signing key to hold or rotate, with `RAI_SESSION_ABSOLUTE_HOURS=12` and `RAI_SESSION_IDLE_MINUTES=120`. The mechanism is the identity adapter's (this spec); the variable names and the sample file are W0-02's. If W0-09 confirms 6.3, W0-02's `SESSION_SECRET` row is removed and `SESSION_TTL_MINUTES` becomes the idle value under W0-02's naming; if W0-09 keeps W0-02, section 6.3's cookie gains a signature over the random value and the absolute TTL is added to W0-02's list. W1-01 implements whichever W0-09 records, not both.
+- (b) **Session mechanism — 6.3 confirmed by W0-09 (2026-09-21).** W0-02 section 5 listed `SESSION_SECRET` (signed cookie) and `SESSION_TTL_MINUTES=480` (idle). Section 6.3 specifies a server-side session row looked up by the sha256 of a 256-bit random cookie value, so there is no signing key to hold or rotate, with `RAI_SESSION_ABSOLUTE_HOURS=12` and `RAI_SESSION_IDLE_MINUTES=120`. W0-09 applied the consequence to W0-02: the `SESSION_SECRET` row and the install-time `openssl rand` line are removed, the two `RAI_SESSION_*` rows are carried under this spec's names, and the `@fastify/cookie` reason no longer says "signed". W1-01 implements 6.3.
 - (c) **Readiness seam and reason codes — this spec amends W0-10 section 5.4, applied.** Section 5's "Amendment to W0-10 section 5.4" paragraph replaces `IdentityMisconfigurationReason` with `StartupReasonCode` (eight codes mapped, five added), replaces `validateIdentityConfig(config)` with `IdentityAdapter.health()` as the one function readiness calls, and makes `IdentityMode` four-valued. W0-10 invited the amendment ("W0-03 owns the identity adapter and confirms or amends the list"); W3-07 implements the amended shape and W0-09 notes it at exit.
-- (d) **Names and route surface — existing drift clause, W0-09.** W0-02 section 5 uses `IDENTITY_MODE`, `HOST`, `PORT`, `PUBLIC_BASE_URL`, `OIDC_*`; this spec uses `RAI_IDENTITY_*`, `RAI_BIND_HOST`, `RAI_PORT`, `RAI_PUBLIC_BASE_URL` (W0-02 owns the final names, section 9.1). W0-02 section 7.2 uses `own_cases` where 2.1 here uses `owned_cases`, carries `lane` in reviewer scopes, and routes sign-in as `POST /auth/sign-in → { redirectUrl }`, `GET /api/session` and `POST /auth/fixture/sign-in { fixtureUserId } → 200 SessionInfo` (404 for an unknown user) where section 6.1 here has `GET /auth/sign-in` (302), `GET /auth/session` and `{ userId } → 204` (422). These are the route and variable drift the bullet above already assigns to W0-09; Lane B builds against W0-02's 7.2 shapes until W0-09 records the reconciliation, and W1-01 serves those shapes. W0-02's section 13 question ("may `fixture` also serve `NODE_ENV=development`?") is answered here: no (S13).
+- (d) **Names and route surface — reconciled by W0-09 (2026-09-21).** Variables: W0-02 section 5 now carries this spec's `RAI_IDENTITY_*`, `RAI_SECRET_*` and `RAI_SESSION_*` names (its earlier `IDENTITY_MODE`, `OIDC_*`, `SESSION_*` rows are withdrawn), and this spec uses W0-02's `HOST`, `PORT`, `PUBLIC_BASE_URL`, `TRUST_PROXY` in place of its earlier `RAI_BIND_HOST`, `RAI_PORT`, `RAI_PUBLIC_BASE_URL`, `RAI_TRUST_PROXY`. Routes and shapes: W0-02 7.2 wins; section 2 reproduces its `Principal`, `RoleScope` (`own_cases`, `lane` on reviewer scopes) and `SessionInfo`, and section 6.1 now lists `GET /api/session`, `POST /api/session/locale`, `POST /auth/sign-in → 200 { redirectUrl }`, `GET /auth/callback → 303`, `POST /auth/fixture/sign-in { fixtureUserId } → 200 SessionInfo` (404 unknown), `POST /auth/sign-out` (401 without a session); `GET /auth/fixture/users` is carried into W0-02 7.2 from this spec. The mode-discovery rule for the sign-in page (probe `GET /auth/fixture/users`) replaces the earlier 401-body `identityMode`, which W0-06 8.2 forbids. W0-02's section 13 question ("may `fixture` also serve `NODE_ENV=development`?") is answered here: no (S13).
 
 ## 15. Stop-condition check
 

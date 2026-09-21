@@ -1,10 +1,10 @@
 # Upload safety policy and synthetic fixture strategy (W0-08)
 
-**Status:** Proposed for Ta's acceptance at the W0 exit review ([W0-09](../delivery/w0-technical-contract.md#w0-09--verification-commands-budgets-and-exit-review)), for **synthetic data only**. IT/Security is "to be named" in [team and roles](../delivery/team-and-roles.md) as of 2026-09-21, so under the W0-08 dependency rule Ta accepts the list and limits for synthetic data; **D08** (DPO + IT/Security) revisits every limit, the malware-scanning question and the retention of rejected-upload records before any real data enters the desk. Nothing here is a real-data acceptance.
+**Status:** Presented for Ta's acceptance in the W0 exit record of 2026-09-21 ([W0-09 review](../../changes/2026-09-21-w0-exit/review.md), sections 5 and 10; D03 amendment: Ta reviews it), for **synthetic data only**; **pending until Ta records acceptance.** The ticket flow defined the policy (section 9 below lists the items) and did not accept it: an agent proposes, never approves. IT/Security is "to be named" in [team and roles](../delivery/team-and-roles.md) as of 2026-09-21, so under the W0-08 dependency rule the acceptance Ta records is for synthetic data; **D08** (DPO + IT/Security) revisits every limit, the malware-scanning question and the retention of rejected-upload records before any real data enters the desk. Nothing here is a real-data acceptance. Reconciled with the sibling specs at the same review; each applied change is marked "W0-09:".
 **Ticket:** W0-08 ([issue #13](https://github.com/tkhongsap-io/rai-workflow-platform-poc/issues/13)), lane Lead, owner type Human review required. Proves A01 (direct-file negative) and the [threat model](../security/threat-model.md) rows "malicious archive/PDF, oversized upload or decompression bomb" and "owner reads another BU's case via download".
 **Stack:** concrete for [ADR-0003](../../adr/0003-stack-and-deployment-boundary.md) (D04: Fastify, Drizzle, Postgres 16, node:test, Playwright). The boundary (bytes are untrusted until sniffed, hashed and authorized) is stack-neutral; only the "How it maps to the stack" subsections name libraries.
 **Consumed by:** W1-00 (fixture users, `operator_recipients` seed), W1-01 (identity substitute), W1-03 (upload and download), W1-04 (slot defaults), W1-09 (fixture generator and loader), W1-10 (finding scripts keyed by fixture artifact ID), W1-11 (operator address in the mail sink), W1-13 (UI substitute data), W1-INT and W1-08 (negative tests), W3-01 (Thai search), W3-03 (Thai subject), W7-00 (backup of the blob root). Ticket rows are in the [slice 1 work breakdown](../delivery/slice-1-work-breakdown.md).
-**Related W0 specs:** [W0-02](../delivery/w0-technical-contract.md#w0-02--file-level-implementation-plan) (paths, commands, env names, pinned dependencies, fixture identity convention in the test-layer map), [W0-03](../delivery/w0-technical-contract.md#w0-03--identity-adapter-spec) (identity shape, dual-role identity), [W0-04](../delivery/w0-technical-contract.md#w0-04--persistence-and-artifact-store-spec) (blob interface, metadata, staging cleanup, deletion options), [W0-05](../delivery/w0-technical-contract.md#w0-05--authorization-policy-matrix) (download follows case-view scope), [W0-06](../delivery/w0-technical-contract.md#w0-06--workflow-transition-and-error-contract) (error types; draft-only uploads), [W0-07](../delivery/w0-technical-contract.md#w0-07--qc-boundary-and-mail-sink) (on-upload QC trigger, mail sink), [W0-10](../delivery/w0-technical-contract.md#w0-10--observability-contract-for-the-desk-runtime) (redacted log event on rejection). Those specs are written in parallel; where this document proposes a name that one of them owns (an env variable, a command, a shared type field), the owning spec's name wins and this document is corrected at W0-09.
+**Related W0 specs, all merged:** [W0-02](implementation-plan-w1-w3.md) (paths, commands, env names, pinned dependencies, fixture identity convention in the test-layer map), [W0-03](identity-adapter.md) (identity shape, fixture identities including the dual-role identity), [W0-04](persistence-and-artifact-store.md) (blob interface, metadata, staging cleanup, deletion options), [W0-05](authorization-policy-matrix.md) (download follows case-view scope), [W0-06](workflow-transition-and-error-contract.md) (error types; draft-only uploads), [W0-07](qc-boundary-and-mail-sink.md) (on-upload QC trigger, mail sink), [W0-10](observability-contract.md) (redacted log event on rejection). W0-09 corrected every name here that one of them owns (env variables and commands: W0-02; blob layout: W0-04; error envelope: W0-06; log fields: W0-10; identities: W0-03); this document owns the upload policy and the fixture content (cases, documents, hostile set, generator).
 
 ## 1. What this document decides and what it does not
 
@@ -14,7 +14,7 @@ Decides, for synthetic data:
 2. the per-file, per-pack and structural limits (section 3);
 3. the order of checks, the safe error and what is recorded on rejection (sections 4 and 5);
 4. how admitted bytes are stored and served so that a download is never a second, unauthorized path to a document (section 6);
-5. the synthetic fixture set: seven identities, four cases, their documents, the hostile negative set, how they are generated inside the repository and how evidence cites them (section 8).
+5. the synthetic fixture set: the eight W0-03 identities, five cases, their documents, the hostile negative set, how they are generated inside the repository and how evidence cites them (section 8).
 
 Does not decide: real-data limits, malware scanning, retention of rejected uploads or blob deletion (**D08**); the production host's disk and backup (**D10**); slot cardinality and the pack data model (W1-04 under W0-04); the authorization rows themselves (W0-05); the request/response field names of the shared package (W0-02). D07-D10 are not resolved here.
 
@@ -80,44 +80,44 @@ The sniff is a pure module: `(bytes: Buffer, declaredFilename: string) → { ok:
 
 | Limit | Value | Where enforced | Reason |
 |---|---|---|---|
-| Per file | 25 MiB (26,214,400 bytes) | `@fastify/multipart` `limits.fileSize`; the stream is aborted at the first byte over the limit and the staging file removed | A nine-document pack of checklists, a BRD and an architecture PDF fits comfortably; large enough that a scanned signed DPA passes, small enough to hold in a temp file and hash in one pass |
+| Per file | 25 MiB (26,214,400 bytes) | `@fastify/multipart` `limits.fileSize`; the stream is aborted at the first byte over the limit and the temp file removed | A nine-document pack of checklists, a BRD and an architecture PDF fits comfortably; large enough that a scanned signed DPA passes, small enough to hold in a temp file and hash in one pass |
 | Per pack version | 150 MiB total over every artifact the version references, including artifacts carried forward into a successor draft (D05 merge) and every artifact in slot 9, whatever cardinality W1-04 records for slot 9 | Server, after the sniff and before the blob write, in the same transaction that records the artifact | Bounds a version's download and backup size (W7-00) and the reviewer's own machine |
 | Files per request | 1 | `limits.files: 1` | One slot, one artifact, one audit event; the pack total is checked without races |
-| Non-file multipart fields | ≤ 4 fields, ≤ 1 KiB each (`slot`, `expected_version`, `idempotency_key`, `filename` if the client sends it separately) | `limits.fields`, `limits.fieldSize` | Keeps the multipart parser from being used as a JSON channel |
+| Non-file multipart fields | None are read (W0-09: the W0-02 7.4 upload route takes one part named `file` and nothing else; the slot, the expected version and the idempotency key belong to the separate attach, `PUT /api/cases/{caseId}/draft`); `limits.fields: 0` | `limits.fields` | Keeps the multipart parser from being used as a JSON channel |
 | Empty file | 0 bytes rejected | Server | `empty_file`; no zero-byte blob is ever stored |
 | Image pixels | width × height ≤ 40,000,000 | Sniff (PNG `IHDR`, JPEG `SOF`) | Decompression-bomb guard for any later viewer or parser; a 25 MiB PNG can declare a 100,000 × 100,000 canvas |
 | ZIP container | ≤ 2,000 entries; ≤ 100 MiB per entry; ≤ 500 MiB total declared uncompressed | Sniff (central directory) | Decompression-bomb guard; nothing inflates in W1 |
 | Filename | ≤ 200 Unicode code points after NFC normalisation; no `/`, `\`, NUL, U+0000-U+001F, U+007F; no leading or trailing whitespace; not `.` or `..`; must end with an allowed extension and have at least one code point before the extension (the stem is non-empty, so `.pdf` alone is refused) | Server, before the bytes are read | Thai filenames (up to 3 bytes per code point in UTF-8) fit inside Postgres and the `filename*` download header; path characters are refused rather than stripped so the uploader sees what was wrong |
-| Request body time | 120 s per upload request | Fastify `connectionTimeout` / route config, confirmed as a W0-09 budget | A stalled client does not hold a staging file open indefinitely |
-| In-flight uploads per session | Not set here; W0-09 performance budgets | — | Recorded as a target with the workload numbers, not a policy value |
+| Request body time | 120 s per upload request | Fastify route `requestTimeout`; recorded as a target in [performance targets](performance-targets.md) (W0-09) | A stalled client does not hold a staging file open indefinitely |
+| In-flight uploads per session | Target 2, recorded in [performance targets](performance-targets.md) (W0-09), not a policy value | — | Recorded as a target with the workload numbers |
 
-Values are configuration read at start (proposed env names, W0-02 owns the list: `UPLOAD_MAX_FILE_BYTES`, `UPLOAD_MAX_PACK_BYTES`, `UPLOAD_MAX_IMAGE_PIXELS`). The defaults are the values above; a configured value larger than the default is refused at start in `local-google` and test modes so that a local override cannot quietly widen the policy. Raising them for real data is a D08 change, not a config edit.
+Values are configuration read at start (`UPLOAD_MAX_FILE_BYTES`, `UPLOAD_MAX_PACK_BYTES`, `UPLOAD_MAX_IMAGE_PIXELS`; W0-02 section 5 carries them with these defaults since W0-09). The defaults are the values above; a configured value larger than the default is refused at start in `local-google` and test modes so that a local override cannot quietly widen the policy. Raising them for real data is a D08 change, not a config edit.
 
 ## 4. Order of checks
 
-An upload is a `multipart/form-data` POST to the draft version's slot (route shape and field names in the W0-02 "W1 interface shapes" section). The server runs these in order and stops at the first failure. Numbers 1-4 fail before any file byte is read.
+An upload is a `multipart/form-data` POST to the case, `POST /api/cases/{caseId}/artifacts` with one part named `file` (W0-02 7.4; W0-09 replaced the earlier "to the draft version's slot" wording). It stores bytes and metadata; attaching the artifact to a slot is the separate save-draft `PUT /api/cases/{caseId}/draft` (W0-02 7.5, W1-04), which carries the slot, the `expectedVersion` and the pack-total re-check and fires the on-upload QC trigger after it commits (W0-07 3.2). The server runs these in order and stops at the first failure. Numbers 1-4 fail before any file byte is read.
 
 | # | Check | On failure (code from ADR-0003) |
 |---|---|---|
 | 1 | Session present | 401 `unauthenticated` |
 | 2 | Actor may create/edit/submit on this case (owner or BU SPOC in scope, W0-05) | 403 `forbidden` |
-| 3 | Target version is the case's current draft and equals `expected_version` (W0-06); a submitted version is immutable and never accepts bytes | 409 `stale_version` (mismatch) or 422 `invalid_input` (not a draft); W0-06 confirms which applies when the client names a submitted version explicitly |
-| 4 | `slot` is 1-9; declared filename passes the section 3 filename rule and its extension is allowed | 422 `invalid_input` for slot; 422 `unsafe_upload` `filename_invalid` / `extension_not_allowed` |
-| 5 | Bytes stream to `<BLOB_ROOT>/staging/<uuid>` while SHA-256 is computed on the stream; the per-file limit aborts at limit + 1 | 422 `unsafe_upload` `too_large`; staging file unlinked |
+| 3 | The case has an open draft (W0-02 7.4); a submitted version is immutable and never accepts bytes, and attaching to one is refused by the save-draft with 409 `stale_version` `version_superseded` (W0-06 4.2; W0-09 closed the earlier open question) | 422 `invalid_input` (`validation.no_open_draft`) |
+| 4 | Declared filename passes the section 3 filename rule and its extension is allowed | 422 `unsafe_upload` `filename_invalid` / `extension_not_allowed` |
+| 5 | Bytes stream to `BLOB_DIR/tmp/<uuid>` (W0-04 layout) while SHA-256 is computed on the stream; the per-file limit aborts at limit + 1 | 422 `unsafe_upload` `too_large`; temp file unlinked |
 | 6 | Byte count > 0 | 422 `unsafe_upload` `empty_file` |
 | 7 | Magic sniff on the first 8 KiB (section 2 table, section 2.3 magics) | 422 `unsafe_upload` `type_not_allowed` |
 | 8 | Sniffed kind matches the declared extension's row | 422 `unsafe_upload` `type_mismatch` |
-| 9 | Structural check on the full staging file (2.1 PDF scan, 2.2 ZIP rules, PNG/JPEG rules) | 422 `unsafe_upload` with the specific reason (`container_invalid`, `macro_enabled`, `nested_archive`, `encrypted_entry`, `active_content`, `image_too_large`) |
-| 10 | Per-pack total after adding this file ≤ 150 MiB, computed inside the transaction with the version row locked (`SELECT ... FOR UPDATE`) | 422 `unsafe_upload` `pack_total_exceeded` |
-| 11 | Blob store `put(hash, stagingPath)` (W0-04 interface): atomic rename into the object directory, or discard the staging file when the hash already exists and the existing object's size matches | 500 internal (not an upload reason); staging file unlinked; audit not written because the transaction rolls back |
-| 12 | Same transaction: artifact row (filename, media type from the row, size, SHA-256, uploader subject, time, slot, version) and the audit event with the request correlation ID; slot disposition becomes `attached` | Transaction rollback; the object written in 11 is orphan-safe (content-addressed, unreferenced; cleaned by the W0-04 failed-upload rule) |
-| 13 | After commit: the on-upload QC trigger (W0-07; scripted substitute in slice 1) receives the version and artifact references | QC failure is an `unavailable` finding, never an upload failure |
+| 9 | Structural check on the full temp file (2.1 PDF scan, 2.2 ZIP rules, PNG/JPEG rules) | 422 `unsafe_upload` with the specific reason (`container_invalid`, `macro_enabled`, `nested_archive`, `encrypted_entry`, `active_content`, `image_too_large`) |
+| 10 | Per-pack total ≤ 150 MiB: the open draft's attached artifacts plus this file, computed inside the transaction with the case row locked (W0-04); the save-draft that attaches the artifact re-checks the same total and rejects with the same code | 422 `unsafe_upload` `pack_total_exceeded` |
+| 11 | Blob store `put` (W0-04 interface): atomic rename into `sha256/<h[0:2]>/<h[2:4]>/<h>`, or discard the temp file when the hash already exists and the existing object's size matches | 500 internal (not an upload reason); temp file unlinked; audit not written because the transaction rolls back |
+| 12 | Same transaction: artifact row (filename, media type from the row, size, SHA-256, uploader subject, time, `case_id`) and the audit event `artifact.uploaded` with the request correlation ID; the response is the `ArtifactRef` (W0-02 7.4). The slot becomes `attached` only through the later save-draft | Transaction rollback; the object written in 11 is orphan-safe (content-addressed, unreferenced; cleaned by the W0-04 failed-upload rule) |
+| 13 | After the attaching save-draft commits: the on-upload QC trigger (W0-07 3.2; scripted substitute in slice 1) receives the draft and artifact references | QC failure is an `unavailable` run, never an upload failure |
 
 The multipart parser's own limit error (`FST_REQ_FILE_TOO_LARGE`, HTTP 413 by default) is mapped to 422 `unsafe_upload` `too_large` so that every unsafe-byte outcome has one code, as ADR-0003 records. `invalid_input` and `unsafe_upload` share HTTP 422 and are told apart by `code`.
 
 ## 5. The safe error
 
-Response body for every `unsafe_upload` (field names are the W0-02 shared error shape; this document owns the `reason` list):
+Response body for every `unsafe_upload` is the W0-06 8.2 envelope (W0-09: W0-06 owns the envelope; this document owns the `reason` vocabulary, which W0-06 8.2 and W0-02 7.1 reference):
 
 ```ts
 type UnsafeUploadReason =
@@ -127,16 +127,20 @@ type UnsafeUploadReason =
   | 'container_invalid' | 'macro_enabled' | 'nested_archive' | 'encrypted_entry'
   | 'active_content' | 'image_too_large';
 
-type UnsafeUploadError = {
-  code: 'unsafe_upload';
-  reason: UnsafeUploadReason;
-  message_key: `error.unsafe_upload.${UnsafeUploadReason}`;
-  correlation_id: string;
-  limits?: { max_file_bytes: number; max_pack_bytes: number; max_image_pixels: number };
+type UnsafeUploadResponse = {
+  error: {
+    code: 'unsafe_upload';
+    messageKey: 'error.unsafe_upload';                                    // W0-06 8.5
+    correlationId: string;
+    details: {
+      reasonKey: `error.unsafe_upload.${UnsafeUploadReason}`;             // the key of the table below
+      params?: { max_file_mb?: number; max_pack_mb?: number; max_megapixels?: number };   // only for too_large, pack_total_exceeded, image_too_large
+    };
+  };
 };
 ```
 
-Safe means: no stack trace, no library error text, no internal path, no echo of the bytes or of the magic found, no hint of which other case exists. The declared filename is not echoed either; the client already has it. `limits` is included only for `too_large`, `pack_total_exceeded` and `image_too_large` so the message can state the number.
+Safe means: no stack trace, no library error text, no internal path, no echo of the bytes or of the magic found, no hint of which other case exists. The declared filename is not echoed either; the client already has it. `params` is included only for `too_large`, `pack_total_exceeded` and `image_too_large` so the message can state the number.
 
 Initial locale strings (D12, Thai default; Lane B keeps them in the locale files, this table is the source for W1-03 and W1-06):
 
@@ -155,20 +159,21 @@ Initial locale strings (D12, Thai default; Lane B keeps them in the locale files
 | `error.unsafe_upload.encrypted_entry` | ไม่รับเอกสารที่เข้ารหัส | Encrypted documents are not accepted. |
 | `error.unsafe_upload.active_content` | ไม่รับไฟล์ PDF ที่มีสคริปต์ การเรียกใช้โปรแกรม หรือไฟล์ฝังตัว | PDF files with scripts, launch actions or embedded files are not accepted. |
 | `error.unsafe_upload.image_too_large` | ภาพมีขนาดเกิน {max_megapixels} ล้านพิกเซล | The image exceeds {max_megapixels} megapixels. |
-| `error.unsafe_upload.generic` | ไม่สามารถรับไฟล์ได้ ไม่มีการจัดเก็บข้อมูลใด ๆ | The file was not accepted. Nothing was stored. |
+
+The generic message is W0-06 8.5's `error.unsafe_upload` (the envelope's `messageKey`); the earlier `error.unsafe_upload.generic` row is withdrawn (W0-09).
 
 ### 5.1 What a rejection records
 
-A rejection changes no state, so it writes **no audit event** (audit events describe state changes, W0-04). It writes one structured log event under the W0-10 contract: `event: upload_rejected`, `correlation_id`, `case_id`, `version_id`, `slot`, `reason`, `sniffed_kind` (or `none`), `declared_extension`, `size_bytes`, `actor_subject`. It never logs the filename (it may carry personal data), the bytes, the hash of rejected bytes or any token found. The staging file is unlinked before the response is sent. Whether rejected uploads should be counted per actor or retained for IT/Security review is a D08 question.
+A rejection changes no state, so it writes **no audit event** (audit events describe state changes, W0-04). It writes one structured log event under the W0-10 contract, with W0-10 3.3's registered fields for `upload.rejected` (W0-09: W0-10 owns the field list): `caseId`, `reason` (an `UnsafeUploadReason`), `sniffedMediaType?` (the section 2 row's media type for the sniffed kind; absent when nothing matched), `declaredMediaType?` (the row's media type for the declared extension; absent when the extension is not allowed) and `sizeBytes`; the correlation ID is the line's envelope key, and the actor's opaque subject is on the `request.completed` line. It never logs the filename (it may carry personal data), the bytes, the hash of rejected bytes or any token found. The temp file is unlinked before the response is sent. Whether rejected uploads should be counted per actor or retained for IT/Security review is a D08 question.
 
 ## 6. Storage and download safety
 
 The blob interface and metadata are W0-04's; this section fixes the safety properties an upload relies on.
 
-- **Key.** SHA-256 of the bytes, lower-case hex, computed on the upload stream. Path `<BLOB_ROOT>/objects/<h[0:2]>/<h[2:4]>/<h>` with **no extension**, so nothing on disk is executable or double-clickable by type. `<BLOB_ROOT>` is outside the repository and outside every directory Fastify serves statically (the SPA is served from the built `web` output only, W0-02); the directory is created with mode `0700`, objects `0400`.
-- **Write.** Staging file → `fsync` → atomic `rename` into `objects/`. A second upload of identical bytes finds the object and discards its staging copy; the artifact row is still written, so two slots or two versions may reference one object. Objects are never overwritten and, in slice 1, never deleted (deletion design is W0-04's D08 options: tombstone, redaction event or key destruction, none chosen here).
-- **Staging cleanup.** `<BLOB_ROOT>/staging/` is emptied at process start and by the W0-04 failed-upload cleanup rule; an object in `objects/` referenced by no artifact row is reported by the W7-00 integrity check, not deleted automatically.
-- **Download** is one authorized route, `GET /api/.../artifacts/<artifact_id>/content` (exact path in W0-02): session (401), case-view scope (403, W0-05 "file download follows case-view scope"), artifact belongs to a version of that case (404 in scope, 403 out of scope until W0-05 records the 403-or-404 choice from ADR-0003). Response headers: `Content-Type` = the stored media type from the section 2 row; `Content-Length` from the artifact row; `Content-Disposition: attachment; filename="<ASCII fallback>"; filename*=UTF-8''<RFC 8187 percent-encoded NFC filename>` so a Thai filename round-trips (W1-03 done-when); `X-Content-Type-Options: nosniff`; `Content-Security-Policy: sandbox`; `Cache-Control: no-store`; `Referrer-Policy: no-referrer`. No inline rendering, no preview endpoint, no Range support in slice 1. The ASCII fallback is the filename with every non-ASCII code point replaced by `_`, never empty (falls back to `artifact-<slot>.<ext>`).
+- **Key.** SHA-256 of the bytes, lower-case hex, computed on the upload stream. Path `BLOB_DIR/sha256/<h[0:2]>/<h[2:4]>/<h>` (the W0-04 layout; W0-09 replaced this document's earlier `objects/` proposal) with **no extension**, so nothing on disk is executable or double-clickable by type. `BLOB_DIR` (`./.local/blobs` locally, gitignored, W0-02 section 5) is outside every directory Fastify serves statically (the SPA is served from the built `web` output only, W0-02); the directory is created with mode `0700`, objects `0600` (W0-04).
+- **Write.** Temp file under `BLOB_DIR/tmp/` → `fsync` → atomic `rename` into `sha256/`. A second upload of identical bytes finds the object and discards its temp copy; the artifact row is still written, so two slots or two versions may reference one object. Objects are never overwritten and, in slice 1, never deleted (deletion design is W0-04's D08 options: tombstone, redaction event or key destruction, none chosen here).
+- **Temp cleanup.** `BLOB_DIR/tmp/` is emptied at process start and by the W0-04 failed-upload cleanup rule (`store:cleanup`); an object under `sha256/` referenced by no artifact row is reported by `store:verify` and the W7-00 integrity check, not deleted automatically.
+- **Download** is one authorized route, `GET /api/artifacts/{artifactId}` (W0-02 7.4; `/meta` for the metadata): session (401), case-view scope of the artifact's case (403, W0-05 "file download follows case-view scope"); an unresolvable artifact id is 403 for an owner or BU SPOC and 404 `not_found` only for an `all_cases` holder (W0-05 section 4, recorded at W0 exit). Response headers: `Content-Type` = the stored media type from the section 2 row; `Content-Length` from the artifact row; `Content-Disposition: attachment; filename="<ASCII fallback>"; filename*=UTF-8''<RFC 8187 percent-encoded NFC filename>` so a Thai filename round-trips (W1-03 done-when); `X-Content-Type-Options: nosniff`; `Content-Security-Policy: sandbox`; `Cache-Control: no-store`; `Referrer-Policy: no-referrer`. No inline rendering, no preview endpoint, no Range support in slice 1. The ASCII fallback is the filename with every non-ASCII code point replaced by `_`, never empty (falls back to `artifact-<slot>.<ext>`).
 - **Integrity.** The hash is verified on write (the stream hash is the key). A download streams the object as stored; the W1-03 test "downloaded bytes match the stored hash" proves the path end to end, and the W7-00 backup rehearsal re-hashes every object. Verifying the hash on every download is not required in slice 1 (cost) and can be enabled by configuration for audits.
 - **Thai filenames.** Stored NFC-normalised as the artifact's `filename`; search (W3-01) and mail subjects (W3-03) read that field. The object key never depends on the filename.
 
@@ -191,28 +196,29 @@ The blob interface and metadata are W0-04's; this section fixes the safety prope
 
 ### 8.1 Principles
 
-1. **Synthetic only, generated inside the repository.** Every fixture user, case, document and address is produced by a generator script from a manifest committed in the fixtures package (proposed `rai-web/fixtures`, path assigned by W0-02). No content is copied from real cases, from Life-OS evidence (the sources in [docs/sources.md](../sources.md) are referenced, never copied) or from any real document. Names are invented; business units are synthetic labels; addresses use the reserved domain `rai-desk.example` (RFC 2606) so nothing can ever route to a real mailbox.
-2. **No committed binaries.** The fixtures package contains only source (`.ts`), the manifest (`.json`) and this strategy's README. Documents are generated deterministically into a git-ignored output directory by `npm run fixtures:generate` (command name proposed to W0-02). This keeps real documents out of Git by construction and keeps virus scanners away from the repository.
+1. **Synthetic only, generated inside the repository.** Every fixture user, case, document and address is produced by a generator script from a manifest committed in the fixtures package (`rai-web/fixtures/src/data/manifest.json`, W0-02 section 1). No content is copied from real cases, from Life-OS evidence (the sources in [docs/sources.md](../sources.md) are referenced, never copied) or from any real document. Names are invented; business units are synthetic labels; addresses use the reserved domain `rai-desk.example` (RFC 2606) so nothing can ever route to a real mailbox.
+2. **No committed binaries.** The fixtures package contains only source (`.ts`), the manifest (`.json`) and this strategy's README. Documents are generated deterministically into a git-ignored output directory by `npm run fixtures:generate` (W0-02 section 3.3). This keeps real documents out of Git by construction and keeps virus scanners away from the repository.
 3. **Deterministic and identifiable.** The generator uses fixed timestamps, stored (uncompressed) ZIP entries and level-0 zlib streams, so the same manifest yields the same bytes on every Node 24 run; each document's SHA-256 is recorded in the manifest and checked by a test. Every generated document contains the sentinel string `RAI-DESK-SYNTHETIC-FIXTURE` and its own fixture ID in plain bytes (PDF text stream, uncompressed OOXML part, PNG `tEXt` chunk, JPEG `COM` segment), so provenance is greppable and a document's fixture identity survives download.
 4. **Fixtures never fake a transition.** The loader (`npm run fixtures:load`, W1-09) inserts identities, configuration seed, cases, draft versions, slot dispositions, objects and artifact rows. It never inserts a submitted version, a lane decision, a finding or a disposition: any such state is produced through the real transition by the test that needs it (W1-05 onward), so no fixture ever contains a fabricated audit trail (A11).
-5. **Test and development only.** The loader refuses to run unless the runtime environment is `development` or `test` (env name from W0-02) and the identity mode is `local-google` or the fixture provider; it refuses a non-empty database unless `--reset` is passed. Fixture identities exist only in the W0-03 fixture identity provider, never in `network` or `production` mode.
-6. **Evidence cites the fixture identity.** `fixture_set_id` is `rai-fx-1`; the manifest's SHA-256 is printed by `fixtures:generate` and recorded in every `changes/<date>-<slug>/review.md` that uses the set. Any change to the manifest or generator bumps the ID (`rai-fx-2`); old evidence keeps citing the old ID. This is the fixture identity convention the W0-02 test-layer map references.
+5. **Test and development only.** The loader refuses to run unless `NODE_ENV` is `development` or `test` (W0-02 section 5) and `RAI_IDENTITY_MODE` is `local-google` or `fixture` (W0-03); it refuses a non-empty database unless `--reset` is passed. Fixture identities exist only in the W0-03 fixture identity provider, never in `network` or `production` mode.
+6. **Evidence cites the fixture identity.** The set is named by the W0-02 section 8.3 convention (W0-09: it replaces this document's earlier `rai-fx-1`): `manifest.json` carries `{ "name": "slice1-synthetic", "version": "1", "sha256": "<hash of the sorted data files>" }`, `fixtures:generate` and `fixtures:load` print `fixture set slice1-synthetic@1 <sha256[0:12]>`, and every `changes/<date>-<slug>/review.md` that uses the set cites that string next to the command output. Any change to the manifest or generator bumps `version` and the hash in the same PR; old evidence keeps citing the old version.
 
 ### 8.2 Identities (owned by W1-00; shape from W0-03)
 
-Six single-role users, one per role, plus the W0-03 dual-role identity. Subjects are stable strings; `email` is the address the fixture identity provider returns and the mail sink addresses; all are at `rai-desk.example`.
+W0-09: the identities are [W0-03 section 7](identity-adapter.md#7-test-substitute-the-fixture-identity-provider)'s (W0-03 owns them; W0-02 section 8.3 owns the naming convention), reproduced here so the fixture content reads in one place; this document's earlier `fx-owner` / `fx-dual-coe-spoc-rpc` / `bu-cm` / `bu-rpc` table is withdrawn. Six single-role users, one per role, plus the dual-role identity, plus the second owner W0-05 asked for. Fixture user ids are the W0-02 `fx-user-*` ids, subjects are `fixture:<id>`, `email` is the address the fixture identity provider returns and the mail sink addresses; all are at `rai-desk.example`.
 
-| Subject | Display name | Email | Role(s) and scope | Notes |
+| Fixture user id | Display name | Email | Role(s) and scope | Notes |
 |---|---|---|---|---|
-| `fx-owner` | Nattaporn S. (นัทธพร ส.) | `fx-owner@rai-desk.example` | Owner: cases it owns (all four below) | The one owner; two cases in each fixture BU so owner scope is proven to follow ownership, not BU |
-| `fx-spoc-cm` | Suchada P. | `fx-spoc-cm@rai-desk.example` | BU SPOC: `bu-cm` | Submits the second case in W1-INT's positive SPOC test |
-| `fx-coe` | Dr. Kittipat V. | `fx-coe@rai-desk.example` | AI/COE reviewer: all cases | |
-| `fx-dpo` | Pimchanok R. | `fx-dpo@rai-desk.example` | DPO reviewer: all cases | |
-| `fx-sec` | Wutthichai K. | `fx-sec@rai-desk.example` | IT/Security reviewer: all cases | |
-| `fx-admin` | Desk admin (synthetic) | `fx-admin@rai-desk.example` | Admin: configuration; read-only case view per W0-05; never a lane decision or disposition | |
-| `fx-dual-coe-spoc-rpc` | Thanwa R. | `fx-dual-coe-spoc-rpc@rai-desk.example` | AI/COE reviewer: all cases **and** BU SPOC: `bu-rpc` | The W0-03 dual-role identity. It is BU SPOC on `RAI-FX-0002` and `RAI-FX-0004`, so under D05 it may never approve the AI/COE lane on those two cases and may approve it on `RAI-FX-0001` and `RAI-FX-0003`. Whether "BU SPOC on a case" means scope alone or a recorded action on the case is W0-05's to state; both readings are exercisable because the identity both holds the scope and, in the W2 journey, submits `RAI-FX-0004` |
+| `fx-user-owner-cm` | ณัฐพร ส. (Nattaporn S.) | `owner.cm@rai-desk.example` | Owner: cases it owns (all five below) | The owner of every fixture case; cases in both fixture BUs so owner scope is proven to follow ownership, not BU |
+| `fx-user-owner-cm-2` | Prasit W. | `owner.cm2@rai-desk.example` | Owner: own cases (none in the fixture set) | The W0-05 "owner-b" for the scope-boundary negatives |
+| `fx-user-spoc-cm` | Suchada P. | `spoc.cm@rai-desk.example` | BU SPOC: `CM` | Submits the missing-slot case in W1-INT's positive SPOC test |
+| `fx-user-ai-coe` | Kritsada T. | `ai-coe@rai-desk.example` | AI/COE reviewer: all cases | |
+| `fx-user-dpo` | Pimchanok R. | `dpo@rai-desk.example` | DPO reviewer: all cases | |
+| `fx-user-it-security` | Wutthichai K. | `it-security@rai-desk.example` | IT/Security reviewer: all cases | |
+| `fx-user-admin` | Desk Admin (fixture) | `admin@rai-desk.example` | Admin: configuration; read-only case view per W0-05; never a lane decision or disposition | |
+| `fx-user-dpo-spoc-hr` | Rattanaporn C. | `dpo.spoc.hr@rai-desk.example` | DPO reviewer: all cases **and** BU SPOC: `HR` | The W0-03 dual-role identity. It is BU SPOC on the three `HR` cases (`fx-case-vendor`, `fx-case-na-reasons`, `fx-case-hr-dualrole`), so under D05 it may never approve the DPO lane on them (W0-05 T19, T25; W0-03 ID-13) and may approve it on the `CM` cases. W0-05 states the rule: "BU SPOC on a case" is scope (`isOwnerOrSpocOnCase` against the case's `business_unit_id`), not a recorded action; both readings are exercisable because the identity both holds the scope and, in the W2 journey, submits `fx-case-na-reasons` |
 
-Business units: `bu-cm` "Consumer Mobile" and `bu-rpc` "Retail & Partner Channels", the labels the synthetic demo already uses. They are fixture labels; if either turns out to match a real unit's name in a way Ta considers misleading, W1-09 renames them (its done-when already includes a reviewer's provenance check) without changing the subjects above.
+Business units (W0-03 section 7): `CM` "Consumer Mobile" and `HR` "Human Resources". They are fixture labels; if either turns out to match a real unit's name in a way Ta considers misleading, W1-09 renames them (its done-when already includes a reviewer's provenance check) without changing the user ids above.
 
 Operator recipient (D06 `operator_recipients` seed, W1-00): exactly one address, `operator-digest@rai-desk.example`. It is used only by the local mail sink (W1-11, W3-03) and appears in no other fixture. No real operator address is ever seeded.
 
@@ -220,20 +226,21 @@ Display names: one carries Thai script so the UI, audit trail and mail templates
 
 ### 8.3 Cases (owned by W1-09)
 
-All four are owned by `fx-owner`. `checklist_template_version` is `v1.0 Sheet3` unless stated. `source_record_id` is either a synthetic `AIR-FX-nnnn` string or `Unknown` (L10; never an invented official record). `use_case_group` values must exist in the W1-00 configuration seed: `customer-analytics`, `customer-service`, `field-operations`.
+All five are owned by `fx-user-owner-cm`. Fixture case ids follow the W0-02 section 8.3 convention (`fx-case-<kind>`; W0-09 replaced this document's earlier `RAI-FX-nnnn` labels, which are not a valid W0-04 `registry_id`); the loader assigns the reserved-year registry ids `RAI-2000-0001` to `RAI-2000-0005` in the order below, so they can never collide with a server-generated `RAI-<yyyy>-<nnnn>`. `checklist_template_version` is `v1.0 Sheet3` unless stated. `source_record_id` is either a synthetic `AIR-FX-nnnn` string or `Unknown` (L10; never an invented official record). `use_case_group` values must exist in the W1-00 configuration seed: `customer-analytics`, `customer-service`, `field-operations`. The BU column is the W0-04 `business_unit_id` key (the descriptive `business_unit` text is the BU's display name).
 
-| Case | `use_case_name` | BU (SPOC) | `vendor_involved` | `model_type` | `stage_context` | `source_record_id` | `use_case_group` | Purpose |
+| Fixture case id (registry id) | `use_case_name` | BU (SPOC) | `vendor_involved` | `model_type` | `stage_context` | `source_record_id` | `use_case_group` | Purpose |
 |---|---|---|---|---|---|---|---|---|
-| `RAI-FX-0001` | Churn Propensity Scoring | `bu-cm` (`fx-spoc-cm`) | false | classic-ML | pre-launch | `AIR-FX-2291` | `customer-analytics` | **Non-vendor case.** Slots 3 and 4 N/A by the non-vendor default (W1-04) with the default reason text; every other slot attached; slot 9 holds a PNG. The W1-INT journey case |
-| `RAI-FX-0002` | Retail Store Assistant | `bu-rpc` (`fx-dual-coe-spoc-rpc`) | true | LLM | pre-launch | `Unknown` | `customer-service` | **Vendor case.** All nine slots attached including DPA and SOW; `checklist_template_version` `v2.0` (so the v1.0 bands never apply, A08 later); slot 9 holds the **Thai-named file** |
-| `RAI-FX-0003` | Field Technician Dispatch Optimiser | `bu-cm` (`fx-spoc-cm`) | false | classic-ML | pre-build | `AIR-FX-2304` | `field-operations` | **Missing slot.** Slot 7 (security assessment) **missing**; slot 8 **not yet**; 3 and 4 N/A by default; the rest attached. Submitted by `fx-spoc-cm` in W1-INT's SPOC test; submit succeeds and the missing slot raises a finding (A02) |
-| `RAI-FX-0004` | ผู้ช่วยตอบคำถามพนักงาน (Employee FAQ Assistant) | `bu-rpc` (`fx-dual-coe-spoc-rpc`) | true | LLM | idea | `Unknown` | `customer-service` | **N/A with reasons.** Slot 4 (SOW) N/A with reason "Vendor engaged under synthetic master agreement MSA-FX-0042; no separate statement of work"; slot 9 N/A with reason "No supporting documents beyond the eight gated artefacts"; slot 8 **not yet** (idea stage); slots 1, 2, 3, 5, 6, 7 attached; Thai `use_case_name` exercises W3-01 search and W3-03 subjects |
+| `fx-case-nonvendor` (`RAI-2000-0001`) | Churn Propensity Scoring | `CM` (`fx-user-spoc-cm`) | false | classic-ML | pre-launch | `AIR-FX-2291` | `customer-analytics` | **Non-vendor case.** Slots 3 and 4 N/A by the non-vendor default (W1-04) with the default reason key; every other slot attached; slot 9 holds a PNG. The W1-INT journey case |
+| `fx-case-vendor` (`RAI-2000-0002`) | Retail Store Assistant | `HR` (`fx-user-dpo-spoc-hr`) | true | LLM | pre-launch | `Unknown` | `customer-service` | **Vendor case.** All nine slots attached including DPA and SOW; `checklist_template_version` `v2.0` (so the v1.0 bands never apply, A08 later); slot 9 holds the **Thai-named file** |
+| `fx-case-missing-slot` (`RAI-2000-0003`) | Field Technician Dispatch Optimiser | `CM` (`fx-user-spoc-cm`) | false | classic-ML | pre-build | `AIR-FX-2304` | `field-operations` | **Missing slot.** Slot 7 (security assessment) **missing**; slot 8 **not yet**; 3 and 4 N/A by default; the rest attached. Submitted by `fx-user-spoc-cm` in W1-INT's SPOC test; submit succeeds and the missing slot raises a finding (A02) |
+| `fx-case-na-reasons` (`RAI-2000-0004`) | ผู้ช่วยตอบคำถามพนักงาน (Employee FAQ Assistant) | `HR` (`fx-user-dpo-spoc-hr`) | true | LLM | idea | `Unknown` | `customer-service` | **N/A with reasons.** Slot 4 (SOW) N/A with reason "Vendor engaged under synthetic master agreement MSA-FX-0042; no separate statement of work"; slot 9 N/A with reason "No supporting documents beyond the eight gated artefacts"; slot 8 **not yet** (idea stage); slots 1, 2, 3, 5, 6, 7 attached; Thai `use_case_name` exercises W3-01 search and W3-03 subjects; submitted by the dual-role identity as SPOC in the W2 journey |
+| `fx-case-hr-dualrole` (`RAI-2000-0005`) | Recruitment Screening Assistant | `HR` (`fx-user-dpo-spoc-hr`) | false | classic-ML | pre-launch | `AIR-FX-2317` | `field-operations` | **D05 self-approval case** (W0-09: added so the `fx-case-hr-dualrole` that W0-02 section 8.3, W0-03 ID-13 and W0-05 T19, T25, T32 name exists as its own case). Slots 3 and 4 N/A by the non-vendor default; slots 1, 2, 5, 6, 7, 8 attached; slot 9 **not yet**. Submitted by `fx-user-owner-cm` in W2-02; the dual-role identity is refused the DPO lane on it and permitted on a `CM` case |
 
-The four purposes required by the W0 contract (non-vendor, vendor, missing slot, N/A reasons) map one to one; the explicit N/A on `RAI-FX-0004` slot 4 is distinct from the default N/A on `RAI-FX-0001` slots 3 and 4 so that W1-04 can prove the default only fires when `vendor_involved` is false.
+The four purposes required by the W0 contract (non-vendor, vendor, missing slot, N/A reasons) map one to one onto the first four cases; the fifth exists for D05. The explicit N/A on `fx-case-na-reasons` slot 4 is distinct from the default N/A on `fx-case-nonvendor` slots 3 and 4 so that W1-04 can prove the default only fires when `vendor_involved` is false.
 
 ### 8.4 Documents (owned by W1-09)
 
-Every kind in the section 2 table appears at least once. Filenames are the `filename` metadata; the object key is the content hash. Content of every document: the sentinel, the fixture ID, the case ID, the slot number and name, one Thai line ("เอกสารสังเคราะห์สำหรับการทดสอบ ไม่ใช่เอกสารจริง"), and the sentence "Generated by rai-web/fixtures. Not a real document. Contains no real data." Nothing else; document-quality defects (a BRD "with no metric") are not encoded in the bytes in slice 1 but scripted by the W1-10 QC substitute against the fixture artifact ID.
+Every kind in the section 2 table appears at least once. Fixture document ids are `fx-doc-<case number>-<slot>` (the W0-02 `fx-doc-` prefix; W0-09 aligned W0-02 section 8.3's example to this table); the "Case" column is the registry-id number of the 8.3 case. Filenames are the `filename` metadata; the object key is the content hash. Content of every document: the sentinel, the fixture ID, the case ID, the slot number and name, one Thai line ("เอกสารสังเคราะห์สำหรับการทดสอบ ไม่ใช่เอกสารจริง"), and the sentence "Generated by rai-web/fixtures. Not a real document. Contains no real data." Nothing else; document-quality defects (a BRD "with no metric") are not encoded in the bytes in slice 1 but scripted by the W1-10 QC substitute against the fixture artifact ID.
 
 | Fixture ID | Case | Slot | Filename | Kind | Size class |
 |---|---|---|---|---|---|
@@ -264,12 +271,18 @@ Every kind in the section 2 table appears at least once. Filenames are the `file
 | `fx-doc-0004-05` | 0004 | 5 | `BRD_FAQAssistant_idea.docx` | DOCX | small |
 | `fx-doc-0004-06` | 0004 | 6 | `Architecture_FAQAssistant_sketch.png` | PNG 64 × 64 | small |
 | `fx-doc-0004-07` | 0004 | 7 | `SecurityAssessment_FAQAssistant_pre.pdf` | PDF | small |
+| `fx-doc-0005-01` | 0005 | 1 | `RiskScreening_RecruitmentScreening.pdf` | PDF | small |
+| `fx-doc-0005-02` | 0005 | 2 | `PrivacyChecklist_Recruitment.xlsx` | XLSX | small |
+| `fx-doc-0005-05` | 0005 | 5 | `BRD_RecruitmentScreening_v1.0.docx` | DOCX | small |
+| `fx-doc-0005-06` | 0005 | 6 | `Architecture_Recruitment.pdf` | PDF | small |
+| `fx-doc-0005-07` | 0005 | 7 | `SecurityAssessment_Recruitment.pdf` | PDF | small |
+| `fx-doc-0005-08` | 0005 | 8 | `DeploymentChecklist_Recruitment.xlsx` | XLSX | small |
 
-Slot dispositions not listed above are N/A with reason (0001: 3, 4 default; 0004: 4, 9 explicit), not yet (0003: 8; 0004: 8) or missing (0003: 7), exactly as section 8.3 states. The correction documents the W2 send-back journey attaches (for example `BRD_ChurnScoring_v1.1.docx`) are generated by the same generator under IDs `fx-doc-0001-05b` and so on and listed in the manifest; W2-10's contract PR adds their rows here.
+Slot dispositions not listed above are N/A with reason (0001 and 0005: 3, 4 default; 0004: 4, 9 explicit), not yet (0003: 8; 0004: 8; 0005: 9) or missing (0003: 7), exactly as section 8.3 states. The correction documents the W2 send-back journey attaches (for example `BRD_ChurnScoring_v1.1.docx`) are generated by the same generator under IDs `fx-doc-0001-05b` and so on and listed in the manifest; W2-10's contract PR adds their rows here.
 
 ### 8.5 Generator (owned by W1-09; no dependencies beyond Node)
 
-`npm run fixtures:generate` (name proposed to W0-02) runs a TypeScript script that reads `manifest.json` and writes the documents to the git-ignored fixtures output directory, printing the manifest SHA-256 and the fixture set ID. Built with Node built-ins only:
+`npm run fixtures:generate` (W0-02 section 3.3) runs `rai-web/fixtures/src/generate.ts`, which reads `manifest.json` and writes the documents to the git-ignored fixtures output directory, printing the fixture set name, version and manifest SHA-256. Built with Node built-ins only:
 
 - **PDF**: a hand-written single-page PDF (header `%PDF-1.4`, catalog, pages, one page, one uncompressed content stream with Helvetica text, the Thai line embedded as UTF-8 bytes in a `%` comment line and in the Info dictionary `/Subject` string (UTF-16BE with BOM) so the bytes are present without a Thai font, xref table, `%%EOF`); rendering Thai glyphs is not a fixture goal. The medium file appends a comment stream of deterministic filler. No `/JavaScript`, `/Launch`, `/EmbeddedFile` tokens, by construction.
 - **DOCX / XLSX**: a minimal OOXML package written by a 60-line stored-method ZIP writer (CRC-32 from `node:zlib` `crc32()`, available since Node 22), fixed DOS timestamps, entries `[Content_Types].xml`, `_rels/.rels`, `word/document.xml` (or `xl/workbook.xml`, `xl/worksheets/sheet1.xml`, `xl/_rels/workbook.xml.rels`) with the sentinel text inline so it is greppable in the uncompressed bytes.
@@ -321,29 +334,29 @@ No EICAR test string and no real malware sample is ever used; hostile files are 
 
 ### 8.7 Loading and reset
 
-`npm run fixtures:load` (W1-09; name proposed to W0-02) runs `fixtures:generate` if the output is absent, then inside one transaction inserts: identities into the fixture identity provider's table (W1-00), the configuration seed (`checklist_template_version` list, SLA values and calendar, `use_case_group` list, `operator_recipients` = the single address above; W1-00), the four cases, one draft version each, slot dispositions and reasons, the objects into `<BLOB_ROOT>/objects/` through the same blob interface uploads use, and the artifact rows. It prints the fixture set ID and manifest hash. `npm run db:reset` (W0-02) drops and recreates the schema and empties `<BLOB_ROOT>`; `fixtures:load --reset` calls it first. Both refuse outside `development`/`test`.
+`npm run fixtures:load` (W1-09; W0-02 section 3.3) runs `fixtures:generate` if the output is absent, then inside one transaction inserts: the fixture identities (the `users.ts` constant, W1-00), the configuration seed (`checklist_template_version` list, SLA values and calendar, `use_case_group` list, `operator_recipients` = the single address above; W1-00), the five cases, one draft version each, slot dispositions and reasons, the objects into `BLOB_DIR/sha256/` through the same blob interface uploads use, and the artifact rows. It prints the fixture set name, version and manifest hash and writes them to the `fixture_set` row (W0-02 section 8.3). `npm run reset` (W0-02 section 3.3) recreates the database, migrates, loads the fixtures and empties `rai-web/.local`; `fixtures:load --reset` calls it first. Both refuse outside `development`/`test`.
 
 The W1-13 UI substitute reads the same manifest to serve shapes; it never loads the loader or touches a database.
 
 ## 9. Acceptance items for Ta at W0-09
 
-Ta accepts, for synthetic data only:
+**Presented for Ta's acceptance in the W0 exit record of 2026-09-21 ([W0-09 review](../../changes/2026-09-21-w0-exit/review.md), sections 5 and 10; D03 amendment: Ta reviews it); pending until Ta records acceptance. Synthetic data only.** The six items:
 
 1. the allowed list: PDF, DOCX, XLSX, PNG, JPEG (section 2), with archives, executables, macro-enabled and legacy Office, browser-active text and all other types refused;
 2. the limits in section 3 (25 MiB per file, 150 MiB per pack version, 40 MP images, ZIP bounds, 200-code-point filenames);
 3. the PDF active-content scan (2.1) as a slice-1 rule, accepting that it can reject a benign PDF with an attachment;
 4. that no malware scanning exists in slice 1 (2.4);
-5. the fixture identities, business-unit labels, cases and the operator address in section 8;
+5. the fixture identities (W0-03 section 7, reproduced in 8.2), business-unit labels, cases and the operator address in section 8;
 6. that IT/Security was not named by W0 exit, so this acceptance is Ta's alone and is re-examined at D08.
 
 ## 10. Open items and D08 revisit list
 
 - [ ] **D08** (DPO + IT/Security, before real data): per-file and per-pack limits for real packs; whether embedded files in PDFs are ever legitimate; OLE `.bin` embeddings in OOXML; a host malware scanner or parsing worker; retention and per-actor counting of rejected uploads; blob deletion and key custody (W0-04 options); whether a library detector replaces the hand-written sniff.
-- [ ] **D10**: `<BLOB_ROOT>` location, permissions and backup on the True host.
-- [ ] **W0-02**: confirm the env names (`UPLOAD_MAX_FILE_BYTES`, `UPLOAD_MAX_PACK_BYTES`, `UPLOAD_MAX_IMAGE_PIXELS`, `BLOB_ROOT`), the command names (`fixtures:generate`, `fixtures:load`, `db:reset`), the fixtures path, `@fastify/multipart` in the pinned list, and the shared `UnsafeUploadError` field names.
-- [ ] **W0-05**: whether "BU SPOC on a case" is scope or action for the dual-role identity; 403 versus 404 for out-of-scope artifact references.
-- [ ] **W0-06**: the error for an upload aimed at a submitted version (409 `stale_version` versus 422 `invalid_input`).
-- [ ] **W0-09**: request time budget and in-flight uploads per session.
+- [ ] **D10**: `BLOB_DIR` location, permissions and backup on the True host.
+- [x] **W0-02**: confirmed at W0-09 (2026-09-21): env names `UPLOAD_MAX_FILE_BYTES`, `UPLOAD_MAX_PACK_BYTES`, `UPLOAD_MAX_IMAGE_PIXELS` and `BLOB_DIR` (W0-02's name; `BLOB_ROOT` withdrawn), commands `fixtures:generate`, `fixtures:load`, `reset` (W0-02's name; `db:reset` withdrawn), the fixtures path `rai-web/fixtures/src/data/`, `@fastify/multipart` pinned, and the error body as the W0-06 8.2 envelope with `details.reasonKey` (section 5).
+- [x] **W0-05**: "BU SPOC on a case" is scope, evaluated against `business_unit_id` (W0-05 `isOwnerOrSpocOnCase`); an unresolvable artifact id is 403 for an owner or SPOC and 404 only for an `all_cases` holder (W0-05 section 4). Recorded at W0 exit.
+- [x] **W0-06**: an upload cannot name a version (W0-02 7.4 route); a case with no open draft answers 422 `invalid_input` `validation.no_open_draft`, and attaching to a version that was submitted meanwhile is 409 `stale_version` `version_superseded` on the save-draft (W0-06 4.2). Recorded at W0 exit.
+- [x] **W0-09**: request time budget (120 s per upload) and in-flight uploads per session (target 2) recorded in [performance targets](performance-targets.md).
 - [ ] **W1-04**: slot 9 cardinality; the per-pack total in section 3 is defined independently of it.
 - [ ] **W2-10**: rows for the correction documents in section 8.4.
 

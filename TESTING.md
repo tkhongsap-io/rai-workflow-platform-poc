@@ -51,15 +51,14 @@ Run git diff --check, inspect git status and relative Markdown links, verify fro
 
 ## Product build (W0-W3)
 
-Authorized on 2026-09-21 (D03). The commands below are specified by the [W0-02 file-level plan](docs/engineering/implementation-plan-w1-w3.md#3-commands) and become runnable when W1-00 creates `rai-web/` and W1-12 wires CI; until those tickets merge, none of them runs and no runtime success is claimed (W0-09 verifies only that this section matches the plan). The demo suite above stays separate from the product suite; no command is shared.
+Authorized on 2026-09-21 (D03). The commands below are specified by the [W0-02 file-level plan](docs/engineering/implementation-plan-w1-w3.md#3-commands) and become runnable when W1-00 creates `rai-web/` and W1-12 wires CI; until those tickets merge, none of them runs and no runtime success is claimed. W0-09 verified on 2026-09-21 that this section matches the plan after the W0 exit reconciliation ([exit review](changes/2026-09-21-w0-exit/review.md)); the [performance targets](docs/engineering/performance-targets.md) are targets, not measurements. The demo suite above stays separate from the product suite; no command is shared.
 
 All `npm` commands run from `rai-web/` with Node 24 (`export PATH=$HOME/.nvm/versions/node/v24.21.0/bin:$PATH` or `nvm use`). Docker must be running for anything that touches Postgres.
 
-Install (once per checkout; `npx playwright install chromium` once per machine). The second line generates `SESSION_SECRET`: the sample placeholder is accepted only under `NODE_ENV=test`, so `npm run dev` refuses to start without it. `npm run dev` also needs a local Google OAuth client (`OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` in `.env`, never committed; plan section 3.1); the test commands need neither, because they run with `NODE_ENV=test` and the fixture identity provider.
+Install (once per checkout; `npx playwright install chromium` once per machine). `npm run dev` needs a local Google OAuth client (`RAI_IDENTITY_GOOGLE_CLIENT_ID`, `RAI_IDENTITY_GOOGLE_CLIENT_SECRET` in `.env`, never committed; plan section 3.1); the test commands do not, because they run with `NODE_ENV=test` and `RAI_IDENTITY_MODE=fixture`. There is no session secret to generate: the session cookie is a random value looked up by hash in Postgres (W0-03 section 6.3).
 
 ```sh
 cd rai-web && cp .env.example .env
-sed -i.bak "s/^SESSION_SECRET=.*/SESSION_SECRET=$(openssl rand -hex 32)/" .env && rm .env.bak
 npm ci && npx playwright install chromium
 ```
 
@@ -73,9 +72,13 @@ POSTGRES_PORT=54320 docker compose -p rai-dev down -v
 Migrate, seed, reset (migrations are forward-only SQL under `rai-web/server/drizzle/`, applied only by this explicit step, never on start):
 
 ```sh
-npm run migrate            # apply pending migrations to DATABASE_URL
+npm run migrate            # apply pending migrations as rai_owner (DATABASE_MIGRATE_URL)
+npm run fixtures:generate  # write the W0-08 synthetic documents; prints the fixture set name, version and manifest hash
 npm run fixtures:load      # synthetic fixture set into an empty database (W1-09); refuses a non-empty one
-npm run reset              # db:down, db:up, migrate, fixtures:load, remove rai-web/.local (blobs, mail sink)
+npm run reset              # db:down, db:up, migrate, fixtures:load, remove rai-web/.local (blobs, mail sink); development and test only
+npm run db:cleanup         # operator command: expire idempotency keys; --report lists stale drafts and orphan blobs (dry run until D08)
+npm run store:verify       # operator command: re-hash every referenced blob; non-zero exit on any mismatch
+npm run store:cleanup      # operator command: remove stale temp files under BLOB_DIR/tmp
 ```
 
 Run:
@@ -88,7 +91,7 @@ npm run build && npm start # the one deployable: server/dist serving web/dist
 Test, lint, typecheck:
 
 ```sh
-npm run test:unit          # node:test, no database
+npm run test:unit          # node:test over server, shared, web and fixtures sources; no database
 npm run test:integration   # node:test against the real Postgres + in-process substitutes (identity, QC, mail sink)
 npm test                   # unit then integration
 npm run test:browser       # Playwright journeys with the axe-core accessibility audit, against the served SPA
@@ -107,7 +110,7 @@ node scripts/check-frozen-source.mjs
 git diff --check
 ```
 
-Every PR runs the eleven CI checks in the plan's [section 6](docs/engineering/implementation-plan-w1-w3.md#6-ci-checks-on-every-pr); all block merge. Evidence records cite the fixture set identity from the plan's [section 8.3](docs/engineering/implementation-plan-w1-w3.md#83-fixture-identity-convention) next to each command's output. Substitute runs (`VITE_API_SUBSTITUTE=true`) are never evidence.
+Every PR runs the eleven CI checks in the plan's [section 6](docs/engineering/implementation-plan-w1-w3.md#6-ci-checks-on-every-pr); all block merge. Evidence records cite the fixture set identity (`fixture set slice1-synthetic@1 <sha256[0:12]>`) from the plan's [section 8.3](docs/engineering/implementation-plan-w1-w3.md#83-fixture-identity-convention) next to each command's output. Substitute runs (`VITE_API_SUBSTITUTE=true`) are never evidence.
 
 ## Production gates
 

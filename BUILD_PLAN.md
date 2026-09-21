@@ -166,8 +166,8 @@ A dated read, not a rewrite. Packages above stay as written. DEVLOG.md is the li
 | Documentation anchor | Prepared | changes/2026-09-20-build-anchor | — (used to close G0) |
 | Delivery pack | Prepared, reviewed by two workflows, A11 accepted | changes/2026-09-21-delivery-planning | Team kickoff |
 | G0 | **Closed 2026-09-21** | decisions.md recorded table; changes/2026-09-21-g0-close | — |
-| W0 | **Ready**; not started | — | W0-01 stack ADR (D04) |
-| M1 (W1), M2 (W2), M3 (W3, slice 1) | Authorized (D03); blocked by W0 exit | — | W0 exit |
+| W0 | **Exit recorded 2026-09-21** | changes/2026-09-21-w0-exit/review.md; docs/delivery/w0-technical-contract.md exit checklist | W1-00 skeleton PR |
+| M1 (W1), M2 (W2), M3 (W3, slice 1) | M1: **Ready (W1 issues status:ready)**; M2, M3: authorized (D03), blocked by the preceding package exit | changes/2026-09-21-w0-exit/review.md | W1-00 contract PR, then W1 exit (W1-08) |
 | W4-W8 | Not authorized | — | D07-D10 and package gate entries |
 
 ### Where the build diverged from the plan

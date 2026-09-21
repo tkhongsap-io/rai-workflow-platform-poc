@@ -1,6 +1,6 @@
 # W0: technical contract and reproducible development plan
 
-Status: **Ready. G0 closed 2026-09-21; W0 is authorized (D03).** Entry, work and exit come from [BUILD_PLAN](../../BUILD_PLAN.md) W0. This file breaks that into tickets. W0 produces documents and decisions, not application code. The frontend and backend engineering documents are written here.
+Status: **W0 exit recorded 2026-09-21** ([exit review](../../changes/2026-09-21-w0-exit/review.md), ticket W0-09); all ten tickets merged. Entry, work and exit come from [BUILD_PLAN](../../BUILD_PLAN.md) W0. This file breaks that into tickets. W0 produces documents and decisions, not application code. The frontend and backend engineering documents are written here.
 
 Accountable: Ta. Responsible: tech lead. Output location: `adr/` for decisions, `docs/engineering/` for interface specs and the file-level plan. The W0 file-level plan defines the exact paths.
 
@@ -125,7 +125,7 @@ Based on the [workflow contract](../product/workflow.md).
 
 - Confirm the W0-02 commands are present in the TESTING.md "Product build (W0-W3)" section; W0-02 owns that edit, W0-09 only verifies it and does not run the commands (no claim of runtime success).
 - **Performance budgets.** Agree the expected local workload with Ta and the operator, such as cases per month and pack size. Record the numbers as targets, not measurements.
-- **Exit review.** Record it in `changes/<date>-w0-technical-contract/review.md`.
+- **Exit review.** Recorded in [`changes/2026-09-21-w0-exit/review.md`](../../changes/2026-09-21-w0-exit/review.md) (the slug the ticket flow assigned to the W0 exit; the `<date>-w0-technical-contract` slug in the earlier draft of this line was the template, not a record). Performance targets: [docs/engineering/performance-targets.md](../engineering/performance-targets.md).
 
 ## W0-10 — observability contract for the desk runtime
 
@@ -140,12 +140,14 @@ This is health of the review-desk process itself. It is not monitoring of any AI
 
 ## W0 exit checklist (from BUILD_PLAN)
 
-- [ ] Stack ADR reviewed and accepted by Ta (W0-01).
-- [ ] File-level plan with paths, commands, pinned deps, fixtures and CI checks (W0-02).
-- [ ] Identity, persistence/artifacts, QC and mail interfaces with error contracts and test substitutes (W0-03, W0-04, W0-07).
-- [ ] Recorded D05, D06 and D11 rules carried as written into the interface specs (W0-02, W0-04, W0-05, W0-06); D04 recorded by W0-01; D07-D10 left open and assigned to the gates named in the [register](../product/decisions.md).
-- [ ] `vendor_involved`, `model_type` and the meaning of the four inherited status fields confirmed by Ta and recorded (W0-04).
-- [ ] Upload types and safety limits defined (W0-08).
-- [ ] Repeatable verification commands specified. No claim of runtime success (W0-09).
-- [ ] Observability contract, audit-log rules, schema-evolution rules, UI quality bar and language rule written (W0-02, W0-04, W0-10).
-- [ ] Stop condition checked: no unrestricted network login, no external-register writes.
+Ticked at the W0 exit review on 2026-09-21 (W0-09, [review](../../changes/2026-09-21-w0-exit/review.md)); each line names its evidence.
+
+- [x] Stack ADR reviewed and accepted by Ta (W0-01). Evidence: [ADR-0003](../../adr/0003-stack-and-deployment-boundary.md) status Accepted, register row D04 (Ta, 2026-09-21); PR #57.
+- [x] File-level plan with paths, commands, pinned deps, fixtures and CI checks (W0-02). Evidence: [implementation plan](../engineering/implementation-plan-w1-w3.md) sections 1-6 and 8.3; [architecture](../architecture/README.md) "Path in repo" filled; PR #65.
+- [x] Identity, persistence/artifacts, QC and mail interfaces with error contracts and test substitutes (W0-03, W0-04, W0-07). Evidence: [identity adapter](../engineering/identity-adapter.md) sections 2, 6.4, 7; [persistence](../engineering/persistence-and-artifact-store.md) "Interfaces", "Error contract", "Test substitutes"; [QC and mail](../engineering/qc-boundary-and-mail-sink.md) 3.3, 3.8, 3.9, 4.2, 4.7, 5; PRs #62, #61, #60.
+- [x] Recorded D05, D06 and D11 rules carried as written into the interface specs (W0-02, W0-04, W0-05, W0-06); D04 recorded by W0-01; D07-D10 left open and assigned to the gates named in the [register](../product/decisions.md). Evidence: the exit review's "Recorded decisions carried" table cites the section of each spec that carries each rule; D07-D10 appear only as open items with their gates.
+- [x] `vendor_involved`, `model_type` and the meaning of the four inherited status fields confirmed by Ta and recorded (W0-04). Evidence: register row "W0-04 fields" (Ta, 2026-09-21); [persistence](../engineering/persistence-and-artifact-store.md) "Desk-local Case fields and the four status projections"; [W0-05 section 5](../engineering/authorization-policy-matrix.md#5-w0-04-fields-projection-rule); [W0-06 4.10](../engineering/workflow-transition-and-error-contract.md#410-status-projections-w0-04-fields-rule).
+- [x] Upload types and safety limits defined (W0-08). Evidence: [upload safety](../engineering/upload-safety-and-fixtures.md) sections 2, 3 and 9 (defined, which is all this line requires; the policy is presented for Ta's acceptance in the exit record, sections 5 and 10, pending until Ta records acceptance; D08 revisits before real data); PR #64.
+- [x] Repeatable verification commands specified. No claim of runtime success (W0-09). Evidence: [TESTING](../../TESTING.md) "Product build (W0-W3)" mirrors [W0-02 section 3](../engineering/implementation-plan-w1-w3.md#3-commands); no product command was run; [performance targets](../engineering/performance-targets.md) are marked targets, not measurements (the workload numbers are a ticket-flow proposal pending Ta's and the operator's confirmation, exit record section 10).
+- [x] Observability contract, audit-log rules, schema-evolution rules, UI quality bar and language rule written (W0-02, W0-04, W0-10). Evidence: [observability](../engineering/observability-contract.md); [persistence](../engineering/persistence-and-artifact-store.md) "Audit log" and "Schema evolution"; [W0-02 sections 9 and 10](../engineering/implementation-plan-w1-w3.md#9-ui-quality-bar) (the UI quality bar is written; Ta's confirmation of it as a Done-when standard is still open for W1-06).
+- [x] Stop condition checked: no unrestricted network login, no external-register writes. Evidence: ADR-0003 "Stop conditions"; [W0-03 section 15](../engineering/identity-adapter.md#15-stop-condition-check) (loopback-only `local-google` and `fixture`, allow-list or AD on a network, Entra only in production, fail closed without custody secrets); no spec names a TPM, VRO or AI Reporting Tool client, credential or write (W0-02 section 5 "No TPM, VRO or AI Reporting Tool endpoint or credential exists in any configuration"; W0-04 `source_record_id` "never validated against an external system").
