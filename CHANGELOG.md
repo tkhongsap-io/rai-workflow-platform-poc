@@ -2,6 +2,8 @@
 
 ## 2026-09-21
 
+- W0-01 (PR #57): ADR-0003 stack and deployment boundary (D04): Fastify API serving React SPA, Postgres, Drizzle, openid-client; scored against seven criteria.
+
 - Opened GitHub issues for W0-W3: four epics, 45 tickets, labels, milestones and dependency links; documented the tracker in the delivery README.
 
 - Closed G0: recorded D01 (Nakhun), D02, D03 (W0-W3 authorized, synthetic data), D05, D06, D11 and D12; propagated the answers through PRD, workflow, data contract, acceptance, BUILD_PLAN, AGENTS, README, TESTING and the delivery pack. D04, D07-D10 remain open.
