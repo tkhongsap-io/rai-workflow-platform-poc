@@ -97,8 +97,15 @@ test.describe('W1-12 browser harness', () => {
     await expect(expectStatusElementsHaveText(page)).rejects.toThrow(/data-status="ready"/);
   });
 
-  test('the fixture sign-in helper fails loudly while the W1-01a route is absent', async ({ page }) => {
-    await expect(signInAsFixture(page, 'fx-user-owner-cm')).rejects.toThrow(BrowserFixtureSignInError);
-    await expect(signInAsFixture(page, 'fx-user-owner-cm')).rejects.toThrow(/answered 404/);
+  test('the fixture sign-in helper signs a known user in and fails loudly for an unknown one', async ({
+    page,
+  }) => {
+    // W1-01 serves POST /auth/fixture/sign-in in fixture mode (W0-02 section 7.2): 200 SessionInfo for a
+    // known fixture user, 404 not_found for an unknown id. The helper must surface the 404, never swallow it.
+    const session = await signInAsFixture(page, 'fx-user-owner-cm');
+    expect(session.identityMode).toBe('fixture');
+    expect(session.principal.subjectId).toBe('fixture:fx-user-owner-cm');
+    await expect(signInAsFixture(page, 'fx-user-does-not-exist')).rejects.toThrow(BrowserFixtureSignInError);
+    await expect(signInAsFixture(page, 'fx-user-does-not-exist')).rejects.toThrow(/answered 404/);
   });
 });
