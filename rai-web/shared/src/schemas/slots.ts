@@ -9,7 +9,13 @@ export type SlotNumber = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 
 export const STAGE_CONTEXTS = ['idea', 'pre_build', 'pre_launch'] as const; // D11; stored, never a lifecycle state
 export type StageContext = (typeof STAGE_CONTEXTS)[number];
-export const StageContextSchema = Type.Union(STAGE_CONTEXTS.map((v) => Type.Literal(v)));
+// A literal tuple, not a mapped array: TypeBox infers `never` from a Union over `TLiteral<union>[]` in the
+// emitted declarations (same fix as AllowedMediaTypeSchema in artifacts.ts).
+export const StageContextSchema = Type.Union([
+  Type.Literal(STAGE_CONTEXTS[0]),
+  Type.Literal(STAGE_CONTEXTS[1]),
+  Type.Literal(STAGE_CONTEXTS[2]),
+]);
 
 export const NotApplicableReasonSchema = Type.Union([
   Type.Object({ kind: Type.Literal('default_non_vendor') }), // server-set for slots 3 and 4 when vendorInvolved is false
