@@ -3,7 +3,8 @@
 // context), the allow-list logger, and the one error handler that maps a ContractError to the W0-06 8.2 envelope
 // and everything else to internal_error. W1-01 adds the cookie parser, the authorization middleware (authz/, the
 // only place scope is enforced) and the sign-in surface (identity/routes.ts); a schema validation failure maps to
-// 422 invalid_input with field paths (W0-06 8.2). Routes arrive with W1-02 onwards and declare `config.auth`.
+// 422 invalid_input with field paths (W0-06 8.2). Routes arrive with W1-02 onwards and declare `config.auth`;
+// W1-02 registers the case routes (cases/routes.ts) when `cases` deps are given.
 
 import Fastify, { LogController, type FastifyError, type FastifyInstance } from 'fastify';
 import cookie from '@fastify/cookie';
@@ -11,6 +12,7 @@ import { InvalidInputError, isContractError, internalErrorResponse } from '@rai/
 import type { CorrelationId } from '@rai/shared/ids';
 import type { AppConfig } from './config.js';
 import { registerAuthorization, type ScopeFactsSource } from './authz/middleware.js';
+import { registerCaseRoutes, type CaseRouteDeps } from './cases/routes.js';
 import type { FixtureIdentityProvider } from './identity/fixture.js';
 import { registerAuthRoutes } from './identity/routes.js';
 import { cookieNames, type SessionStore } from './identity/session.js';
@@ -30,6 +32,8 @@ export interface AppDeps {
   config: Pick<AppConfig, 'nodeEnv' | 'log' | 'trustProxy' | 'publicBaseUrl'>;
   /** Absent only in substrate-level tests that register no route; main.ts always passes it. */
   identity?: IdentityDeps;
+  /** W1-02: the case routes' dependencies (database, configured BUs, subject directory). Needs `identity`. */
+  cases?: Omit<CaseRouteDeps, 'emitter'>;
 }
 
 export interface App {
@@ -119,6 +123,13 @@ export function buildApp(deps: AppDeps): App {
       });
       done();
     });
+    const caseDeps = deps.cases;
+    if (caseDeps !== undefined) {
+      void fastify.register((instance, _opts, done) => {
+        registerCaseRoutes(instance, { ...caseDeps, emitter });
+        done();
+      });
+    }
   }
 
   return { fastify, emitter };

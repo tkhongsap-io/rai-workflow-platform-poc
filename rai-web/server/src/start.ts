@@ -6,6 +6,8 @@ import type { AddressInfo } from 'node:net';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from './app.js';
 import { createScopeFactsSource } from './authz/facts.js';
+import { businessUnitsFromGrants, createBusinessUnitDirectory } from './cases/business-units.js';
+import { createSubjectDirectory } from './cases/subject-directory.js';
 import { ConfigError, EXIT_CONFIG, parseConfig, type Env } from './config.js';
 import { createDb, type DbHandle } from './db/client.js';
 import { currentRevision } from './configuration/store.js';
@@ -90,6 +92,10 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
     throw err;
   }
 
+  // W1-02: the configured BU keys are the `business_unit` grants the adapter can issue (slice 1: the fixture BU
+  // list, W0-04 `case.business_unit_id`; the AD-group mapping arrives at W6/W8), and the subject directory knows the
+  // fixture identities plus every subject that has signed in.
+  const knownIdentities = fixtureUsers ?? [];
   const { fastify, emitter } = buildApp({
     config,
     identity: {
@@ -97,6 +103,14 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
       sessionStore: createPgSessionStore(db.db),
       facts: createScopeFactsSource(db.db),
       ...(fixtureUsers === undefined ? {} : { fixtureProvider: createFixtureIdentityProvider(fixtureUsers) }),
+      ...(overrides.now === undefined ? {} : { now: overrides.now }),
+    },
+    cases: {
+      db: db.db,
+      businessUnits: createBusinessUnitDirectory(
+        businessUnitsFromGrants(knownIdentities.flatMap((u) => [...u.roles])),
+      ),
+      subjects: createSubjectDirectory(db.db, { known: knownIdentities }),
       ...(overrides.now === undefined ? {} : { now: overrides.now }),
     },
   });

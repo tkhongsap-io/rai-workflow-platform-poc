@@ -14,7 +14,11 @@ export type SourceRecordId = Static<typeof SourceRecordIdSchema>;
 
 export const MODEL_TYPES = ['llm', 'classic_ml', 'other'] as const; // desk-local (W0-04 fields)
 export type ModelType = (typeof MODEL_TYPES)[number];
-export const ModelTypeSchema = Type.Union(MODEL_TYPES.map((v) => Type.Literal(v)));
+export const ModelTypeSchema = Type.Union([
+  Type.Literal('llm'),
+  Type.Literal('classic_ml'),
+  Type.Literal('other'),
+]); // a tuple, not MODEL_TYPES.map(): a mapped array widens the inferred type to never (W1-02, as W1-01 did for IdentityMode)
 
 export type RiskTier = string; // opaque placeholder: D07 records the labels before W5; null throughout slice 1
 

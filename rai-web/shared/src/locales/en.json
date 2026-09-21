@@ -63,5 +63,7 @@
   "validation.no_open_draft": "This case has no open draft.",
   "validation.not_in_configured_list": "This value is not in the configured list.",
   "validation.reason_required": "A reason is required when a slot is marked not applicable.",
-  "validation.required": "This field is required."
+  "validation.required": "This field is required.",
+  "validation.source_record_id_prefix": "The source record id must start with TPM- or VRO-, or be marked Unknown.",
+  "validation.subject_unresolvable": "The named owner is not a known user."
 }
