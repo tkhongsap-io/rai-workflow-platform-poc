@@ -1,0 +1,21 @@
+{
+  "fixtureCaseId": "fx-case-missing-slot",
+  "laneMappingVersion": "lane-mapping/v1",
+  "checklistTemplateVersion": "v1.0 Sheet3",
+  "entries": [
+    {
+      "trigger": "submit",
+      "findings": [
+        {
+          "ruleId": "PACK-SLOT-MISSING",
+          "scope": { "kind": "slot", "slot": 7 },
+          "severity": "medium",
+          "owningLane": "it_security",
+          "evidence": [{ "slot": 7, "locator": { "kind": "absent" } }],
+          "measure": null,
+          "message": { "key": "qc.finding.pack_slot_missing", "params": { "slot": 7 } }
+        }
+      ]
+    }
+  ]
+}
