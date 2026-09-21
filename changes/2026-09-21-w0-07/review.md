@@ -105,6 +105,22 @@ Checks rerun after the fix: table below.
 | `shasum -a 256 docs/product/source-spec.md` | `92c4f7123058b8fec3c2ba7abdf10538fad034778624b0675975b39de440b354`, matches docs/sources.md |
 | Relative-link and anchor audit over the two touched files (GitHub slug rule) | 30 links, 0 broken |
 
+## Fix round 7 (review findings on PR #60; the review workflow numbers this pass "round 4")
+
+Two blocking findings, both resolved in `docs/engineering/qc-boundary-and-mail-sink.md`:
+
+1. **Section 7 supplied `qc.run.*` fields the W0-10 emitter drops.** `lane` and `runKey` on `qc.run.started`, `alreadyRecordedCount`, `runner` and `runnerVersion` on `qc.run.completed` and `runner` on `qc.run.unavailable` are not in the merged W0-10 3.3 allow-list, and W0-10 3.2 drops unregistered keys (and throws `OBS_UNREGISTERED_FIELD` in test and CI). Section 7 now separates each row into the W0-10 3.3 fields (adding `qcRunId` to `qc.run.started`, which W0-10 lists and 3.4 step 1 mints, and noting `correlationId` is the line's top-level key) and the fields marked **proposed, not logged until W0-10 3.3 lists them**; its intro states that W1-10 and W2-05 emit only the W0-10 3.3 fields and W3-07 asserts only on them. The section 10 W0-10 amendment bullet (owner W0-10, gate W3-07) now carries the five fields with their purpose and a note that none is personal data or document text under W0-10 4.1. 3.7 no longer says `runKey` is "on every log line of the run".
+2. **Dedup key disagreed with the W0-04 `notification` unique index.** The first component was `event.kind` (`lane_opened`) where W0-04 stores `lane_open`, and the fourth was `recipientId` where W0-04's `recipient` column is the email address, so the sink's `duplicate` answer and the database constraint could name two identities. 4.4 now builds the key as `${NOTIFICATION_EVENT_BY_KIND[event.kind]}:${versionId ?? digestDay}:${lane ?? '-'}:${recipient.address}` from `shared/src/mail/dedup.ts` (`buildDedupKey`, W1-00 creates, W3-03 uses); `NOTIFICATION_EVENT_BY_KIND` is added to the 4.2 types as the explicit 1:1 map (`lane_opened` → `lane_open`, `sent_back` → `send_back`, `ready_for_launch` → `ready`, `sla_breach_digest` → `sla_breach_digest`); `recipientId` stays on `AuthorizedRecipient` as metadata and is stated not to be part of the identity; because the key holds an address, 4.4 notes it is never logged and is hashed before it becomes a file name (4.7, unchanged). 4.4 also records that W0-04 stores `version_id` NULL for the digest, which does not collide under the unique index, so the per-day identity rests on the key until W3-03 confirms the mapping. 4.8 gains the row "dedup key is the W0-04 identity" (W0-04 `event` value, same address through two `recipientId`s → one key, `ready:V:-:<address>`, digest day); sections 8 and 9 (W1-00, W3-03 rows) follow.
+
+Checks rerun after the fix: table below.
+
+| Command | Result |
+|---|---|
+| `node --test tests/*.test.mjs` | 22 pass, 0 fail, 0 skipped |
+| `git diff --check` | clean |
+| `shasum -a 256 docs/product/source-spec.md` | `92c4f7123058b8fec3c2ba7abdf10538fad034778624b0675975b39de440b354`, matches docs/sources.md |
+| Relative-link and anchor audit over the two touched files (GitHub slug rule) | 30 links, 0 broken |
+
 ## Done-when check (W0-07 section and W0 exit checklist row "Identity, persistence/artifacts, QC and mail interfaces with error contracts and test substitutes")
 
 - [x] QC inputs: version reference and authorized artifact references (spec 3.1, 3.3).

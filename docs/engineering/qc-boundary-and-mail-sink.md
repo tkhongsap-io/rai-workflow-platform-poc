@@ -243,7 +243,7 @@ Stored as a `qc_finding` row with `kind = 'unavailable'` (W0-04). It is disposit
 runKey = sha256(versionId | trigger | (lane ?? '-') | qcRulesRevision | sorted(`${slot}:${contentHash}` for each request.artifacts[i]))
 ```
 
-`runKey` is the identity of a QC input. The `slot:contentHash` pair, not the bare hash, is what identifies it: the same bytes attached to two slots are two placements with two sets of completeness rules (source spec, QC triggers: "On each upload: that artefact's own completeness rules"), so on the `upload` trigger, where `versionId` is the draft ID, uploading the same file to a second slot on the same draft yields a different key. `artifactId` is not part of the key: it is a row identity, and two rows with the same `(slot, contentHash)` are the same QC input. The key is carried on the request and on every log line of the run (section 7). W0-04's `qc_run` has no `run_key` column; section 10 proposes one. Until it exists the orchestrator finds "the latest recorded run for the same input" through the W0-04 columns, which is exact for the two triggers where a replay can occur:
+`runKey` is the identity of a QC input. The `slot:contentHash` pair, not the bare hash, is what identifies it: the same bytes attached to two slots are two placements with two sets of completeness rules (source spec, QC triggers: "On each upload: that artefact's own completeness rules"), so on the `upload` trigger, where `versionId` is the draft ID, uploading the same file to a second slot on the same draft yields a different key. `artifactId` is not part of the key: it is a row identity, and two rows with the same `(slot, contentHash)` are the same QC input. The key is carried on the request and in the run result; section 10 proposes it as a `qc.run.started` field to W0-10, whose 3.3 catalogue does not list it yet, so it is not on the log line until then (section 7). W0-04's `qc_run` has no `run_key` column; section 10 proposes one. Until it exists the orchestrator finds "the latest recorded run for the same input" through the W0-04 columns, which is exact for the two triggers where a replay can occur:
 
 | Trigger | How a repeat is recognised | Behaviour |
 |---|---|---|
@@ -331,6 +331,15 @@ import type { Lane } from '../constants.js';
 export type MailEventKind = 'lane_opened' | 'sent_back' | 'ready_for_launch' | 'sla_breach_digest';
 export type Locale = 'th' | 'en';                 // D12; 'th' is the default
 
+/** The W0-04 `notification.event` column value for each kind, 1:1; the first component of the dedup key (4.4). */
+export const NOTIFICATION_EVENT_BY_KIND = {
+  lane_opened: 'lane_open',
+  sent_back: 'send_back',
+  ready_for_launch: 'ready',
+  sla_breach_digest: 'sla_breach_digest',
+} as const satisfies Record<MailEventKind, string>;
+export type NotificationEvent = (typeof NOTIFICATION_EVENT_BY_KIND)[MailEventKind];
+
 /** A business event that has already committed. The sink cannot be handed an uncommitted one. */
 export interface CommittedEvent {
   kind: MailEventKind;
@@ -344,8 +353,8 @@ export interface CommittedEvent {
 }
 
 export interface AuthorizedRecipient {
-  recipientId: string;                   // subject ID for a person; `operator_recipients:<n>` for a configured address
-  address: string;                       // must satisfy the synthetic-domain rule in 4.6 while slice 1 runs
+  recipientId: string;                   // subject ID for a person; `operator_recipients:<n>` for a configured address. Metadata only: not part of the dedup key (4.4)
+  address: string;                       // the W0-04 `notification.recipient` value and the fourth dedup-key component (4.4); must satisfy the synthetic-domain rule in 4.6 while slice 1 runs
   displayName: string | null;
   locale: Locale;
   basis: 'case_view_scope' | 'operator_recipients';   // W0-05 recipient rows: lane-open/send-back/Ready follow case-view scope; the digest follows configuration
@@ -375,7 +384,7 @@ export interface RenderedMail {
 }
 
 export interface DeliveryRequest {
-  dedupKey: string;                      // section 4.4; unique per (event, version, lane, recipient) under D06
+  dedupKey: string;                      // section 4.4; the W0-04 `notification` unique index (event, version_id, lane, recipient) as one string, D06
   event: CommittedEvent;
   recipient: AuthorizedRecipient;
   deepLinks: SafeDeepLink[];             // at least one. lane_opened, sent_back, ready_for_launch: exactly one, route 'case' or 'case_version', caseId === event.caseId.
@@ -404,7 +413,7 @@ export interface MailSink {
 }
 ```
 
-The four `MailEventKind` values are the four rows of the source-spec notification table and map 1:1 onto the W0-04 `notification.event` values (`lane_open`, `send_back`, `ready`, `sla_breach_digest`); the recipients, contents and the due date come from W3-03 and W3-05.
+The four `MailEventKind` values are the four rows of the source-spec notification table and map 1:1 onto the W0-04 `notification.event` values through `NOTIFICATION_EVENT_BY_KIND` (`lane_opened` → `lane_open`, `sent_back` → `send_back`, `ready_for_launch` → `ready`, `sla_breach_digest` → `sla_breach_digest`); the stored column and the dedup key use the W0-04 value, the TypeScript union names the business event. The recipients, contents and the due date come from W3-03 and W3-05.
 
 ### 4.3 Validation the sink performs (defensive; the notifier already guarantees them)
 
@@ -421,14 +430,18 @@ The checks run in the order listed; the first failure is the receipt's `error`. 
 
 ### 4.4 Dedup key
 
-D06: deduplicated by (event, version, lane, recipient). The key is a string the notifier builds from the same four values the W0-04 `notification` unique index holds:
+D06: deduplicated by (event, version, lane, recipient). The key is a string the notifier builds from the same four values, in the same spelling, that the W0-04 `notification` unique index `UNIQUE (event, version_id, lane, recipient)` holds, so the sink's `duplicate` answer and the database constraint name one identity:
 
-```
-dedupKey = `${event.kind}:${versionId ?? digestDay}:${lane ?? '-'}:${recipientId}`
+```ts
+// rai-web/shared/src/mail/dedup.ts  (W1-00 creates; W3-03 builds the key with it, W1-11 tests assert on it)
+dedupKey = `${NOTIFICATION_EVENT_BY_KIND[event.kind]}:${event.versionId ?? digestDay}:${event.lane ?? '-'}:${recipient.address}`
 ```
 
-- `versionId` for lane-open, send-back and Ready. Resubmission produces a new version and therefore new keys, so lanes reopened on v2 are notified again (D05 full re-review). `lane` is the opened lane for `lane_opened` and the deciding lane for `sent_back` (W0-04), so two lanes sending back the same version to the same owner are two keys.
-- For `sla_breach_digest` the version position holds the digest day as `YYYY-MM-DD` in Asia/Bangkok (D06 calendar) and lane is `-`, keeping the D06 tuple shape with one digest per recipient per day. W3-03's contract PR confirms this mapping.
+- **First component: the W0-04 `event` column value**, never the TypeScript `MailEventKind` name: `lane_open`, `send_back`, `ready`, `sla_breach_digest` (the 1:1 table in 4.2). A key that read `lane_opened:…` would be unique in the sink while the row it belongs to reads `lane_open`, and the two would disagree on what is a duplicate.
+- **Second: `versionId`** for lane-open, send-back and Ready (the W0-04 `version_id` column). Resubmission produces a new version and therefore new keys, so lanes reopened on v2 are notified again (D05 full re-review).
+- **Third: `lane`**, the W0-04 `lane` column: the opened lane for `lane_opened` and the deciding lane for `sent_back`, so two lanes sending back the same version to the same owner are two keys; `'-'` for `ready_for_launch` and the digest, the value W0-04 stores for the two events without a lane.
+- **Fourth: `recipient.address`**, the W0-04 `recipient` column (an email address). `recipientId` is metadata on `AuthorizedRecipient` for the audit and scope trail and is **not** part of the identity: the same address reached through two subject IDs (a person who is both a case owner and a configured operator recipient) is one recipient under D06, as it is one row in W0-04. Because the key contains an address, it is personal data under the W0-10 redaction rule: it is never logged (the `mail.*` lines carry `notificationId`), and the file sink hashes it before it becomes a file name (4.7).
+- For `sla_breach_digest` the version position holds the digest day as `YYYY-MM-DD` in Asia/Bangkok (D06 calendar) and lane is `-`, keeping the D06 tuple shape with one digest per recipient per day. W0-04 stores `version_id` NULL for the digest, and a NULL does not collide under the unique index, so the per-day identity is enforced by this key in the dispatcher and the sinks until W3-03's contract PR confirms the mapping (or records the day on the row).
 
 The dispatcher never sends a key it has already recorded as `sent`. The sinks keep their own index of accepted keys and answer `duplicate` for a repeat, which the dispatcher treats as success without a second delivery (A05 "retry avoids duplicate events").
 
@@ -483,6 +496,7 @@ Both sinks record the `correlationId` on every file they write and nothing else 
 | accepts the four inputs and returns a status | a valid `lane_opened` request returns `delivered` with `sinkMessageId`, `attempt` echoed, `dedupKey` echoed; a valid `sla_breach_digest` request with three `case` links, three `digestCases` entries and all three URLs in `textBody` returns `delivered` | "Accepts the four inputs and returns a status" |
 | forced failure is reported | `failNext(1)` → `failed:sink_failure`; the same request again → `delivered`; `failAlways(true)` → four consecutive `failed` | "a forced failure is reported" |
 | duplicate key | second delivery of the same `dedupKey` → `duplicate`, `sent.length` unchanged | D06 dedup |
+| dedup key is the W0-04 identity | `buildDedupKey(event, recipient)` (`shared/src/mail/dedup.ts`) for a `lane_opened` event on version `V` opening `ai_coe` to `owner@rai-desk.example` returns `lane_open:V:ai_coe:owner@rai-desk.example` (the W0-04 `event` value, not `lane_opened`); the same event to two `AuthorizedRecipient`s with different `recipientId` and the same `address` returns one key, and to two different addresses two keys; `ready_for_launch` returns `ready:V:-:<address>`; a digest for 2026-09-21 returns `sla_breach_digest:2026-09-21:-:<address>` | 4.4, W0-04 `UNIQUE (event, version_id, lane, recipient)` |
 | unsafe link rejected | a URL on another origin than `PUBLIC_BASE_URL`, with a query string, or with a fragment → `failed:unsafe_link`; nothing recorded. A digest with five `case` links of which one is bad (another origin, a query string, or a `caseId` that differs from its `digestCases` entry) → `failed:unsafe_link` for the whole delivery, `error.message` names the index and not the URL, nothing recorded; a `lane_opened` request whose single link's `caseId` ≠ `event.caseId`, or a digest with a `case` link missing from `textBody`, → `failed:unsafe_link` | A05 |
 | non-synthetic recipient rejected | `owner@rai-desk.example`, `operator@rai-desk.example`, `reviewer.dpo@fixture.invalid` and `ops@rai-desk.test` accepted; `someone@gmail.com` and an address with no domain → `failed:rejected_recipient`, nothing recorded | "no external mail" |
 | malformed or oversize request rejected | a `lane_opened` request with `event.auditEventId = ''` → `failed:malformed_request`, `error.message` contains `auditEventId`; a request whose `mail.textBody` is 64 KiB + 1 byte (65 537 bytes, links intact) → `failed:sink_failure`, `error.message` contains `65537`; a request whose `mail.subject` is 999 bytes → `failed:sink_failure`, `error.message` contains `999`; in all three cases nothing is recorded (`sent.length` unchanged, no file in `MAIL_SINK_DIR`) and the same `dedupKey` delivered afterwards with a valid request → `delivered`, not `duplicate` | 4.3 (negative case of "Accepts the four inputs") |
@@ -520,13 +534,13 @@ Values this spec would like to be configurable but that W0-02 does not define ar
 
 ## 7. Observability hooks (W0-10 contract)
 
-The event names, readiness fields and operator-view rows are [W0-10](observability-contract.md)'s; this section states which of this spec's values fill them.
+The event names, readiness fields and operator-view rows are [W0-10](observability-contract.md)'s; this section states which of this spec's values fill them. W0-10 3.2 makes the emitter an allow-list: a field that W0-10 3.3 does not register is dropped (and throws `OBS_UNREGISTERED_FIELD` in test and CI). So W1-10 and W2-05 emit **only** the fields W0-10 3.3 lists for each event; the fields marked *proposed* below are carried in the run result and on the `qc_run` row where a column exists, are listed in section 10 as a W0-10 amendment, and are not emitted, and W3-07 does not assert on them, until W0-10 accepts them.
 
 | W0-10 event or field | Fields this spec supplies | Never contains |
 |---|---|---|
-| `qc.run.started` | `correlationId`, `caseId`, `versionId`, `trigger` (this spec's `upload` \| `submit` \| `approve_attempt`, the W0-04 column values; W0-10's labels artifact/pack/lane map 1:1 and W3-07 renders whichever W0-10 settles on), `lane`, `runKey`, `qcKind = 'substitute'` in slice 1 | filename, document text, message params, artifact bytes |
-| `qc.run.completed` | `qcRunId`, `findingCount`, `alreadyRecordedCount`, `durationMs`, `runner`, `runnerVersion` | same |
-| `qc.run.unavailable` | `qcRunId`, `caseId`, `versionId`, `reason` (`timeout` \| `runner_error` \| `not_configured` \| `artifact_unreadable`; W0-10's `error`/`disabled` labels map onto `runner_error`/`not_configured`), `runner`; `owningLane` is absent until W0-06 7.3 is recorded (3.6), and W0-10's field is filled from the finding once it exists | same |
+| `qc.run.started` | W0-10 3.3 fields: `qcRunId`, `caseId`, `versionId`, `trigger` (this spec's `upload` \| `submit` \| `approve_attempt`, the W0-04 column values; W0-10's labels artifact/pack/lane map 1:1 and W3-07 renders whichever W0-10 settles on), `qcKind = 'substitute'` in slice 1; `correlationId` is the line's top-level key (W0-10 3.2). **Proposed, not logged until W0-10 3.3 lists them** (section 10): `lane`, `runKey` | filename, document text, message params, artifact bytes |
+| `qc.run.completed` | W0-10 3.3 fields: `qcRunId`, `findingCount`, `durationMs`. **Proposed, not logged until W0-10 3.3 lists them** (section 10): `alreadyRecordedCount`, `runner`, `runnerVersion` | same |
+| `qc.run.unavailable` | W0-10 3.3 fields: `qcRunId`, `caseId`, `versionId`, `reason` (`timeout` \| `runner_error` \| `not_configured` \| `artifact_unreadable`; W0-10's `error`/`disabled` labels map onto `runner_error`/`not_configured`); `owningLane` is absent until W0-06 7.3 is recorded (3.6), and W0-10's field is filled from the finding once it exists. **Proposed, not logged until W0-10 3.3 lists it** (section 10): `runner` | same |
 | `qc.run.late` (**proposed**, section 10; not in W0-10 3.3 yet) | level `warn`; `correlationId` of the trigger, `caseId`, `versionId`, `qcRunId`, `trigger`, `lane` when set, `status` (the runner's `completed` \| `unavailable`), `refusedFindingCount`; emitted once per refused run (3.4 step 6), in place of `qc.run.completed` / `qc.run.unavailable` | same |
 | `mail.sent`, `mail.attempt_failed`, `mail.failed` (dispatcher, W3-04) | `notificationId`, `attempt`, `sinkKind` (`memory` \| `file`), `errorCode` = the receipt's `error.code`; the sink itself logs nothing | address, subject, body, deep links, case IDs of the digest |
 | readiness `qc` | `kind = 'substitute'`, `status` = the substitute's `health()` answer; QC does not gate readiness (W0-10 5.3) | — |
@@ -540,7 +554,7 @@ The event names, readiness fields and operator-view rows are [W0-10](observabili
 | A08 (feeds; real QC is W4) | unit | W1-10 (loader check: W1-00) | Typed findings, `unavailable` without a lane, timeout, no write path, single-lane owning lane per W0-06 7.1, fail-closed `QC_MODE` configuration |
 | A09 | integration (real Postgres + scripted runner) | W2-05, W2-06 | `unavailable` run recorded, never zero findings; findings append-only and `qc_run` immutable; open findings block Ready; findings arriving after Ready refused and logged as `qc.run.late`, never appended; owning-lane authority on single-lane findings now, on slot-5, pack-level and `unavailable` findings after W0-06 7.3 |
 | A08 visibility | integration + browser | W2-07, W3-07, W2-INT | Findings and the `unavailable` run shown before decision controls; a timeout appears once in the operator view |
-| A05 | unit | W1-11 | Status, forced failure, duplicate, unsafe link (single and one-of-many in a digest), per-case link correctness, synthetic-domain rule, malformed and oversize request, Thai subject, no external path, fail-closed `MAIL_MODE` |
+| A05 | unit | W1-11 | Status, forced failure, duplicate, dedup key equal to the W0-04 identity, unsafe link (single and one-of-many in a digest), per-case link correctness, synthetic-domain rule, malformed and oversize request, Thai subject, no external path, fail-closed `MAIL_MODE` |
 | A05 | integration | W3-03, W3-04 | Outbox in the same transaction; four events; three retries with backoff; dedup; committed decision unchanged |
 | A05 | browser | W3-06 | Notification links require sign-in and scope in the end-to-end journey |
 
@@ -550,7 +564,7 @@ Substitute runs are never acceptance evidence for the real QC (W4) or a real tra
 
 | Ticket | Uses from this spec |
 |---|---|
-| W1-00 | Shared types in `shared/src/qc/types.ts` and `shared/src/mail/types.ts`; the fail-closed rules for `QC_MODE` and `MAIL_MODE` in section 6 (the keys themselves are W0-02's); synthetic-domain rule for fixture user addresses |
+| W1-00 | Shared types in `shared/src/qc/types.ts` and `shared/src/mail/types.ts`, `NOTIFICATION_EVENT_BY_KIND` and `buildDedupKey` in `shared/src/mail/dedup.ts` (4.4); the fail-closed rules for `QC_MODE` and `MAIL_MODE` in section 6 (the keys themselves are W0-02's); synthetic-domain rule for fixture user addresses |
 | W1-03 | `upload` trigger after the artifact is stored; fires only when the slot reference changed (3.2, 3.7) |
 | W1-05 | `submit` trigger after the version freezes; `qcRulesRevision` and `laneMappingVersion` on the request |
 | W1-09 | Fixture case IDs the scripts key on; the single synthetic operator address |
@@ -559,7 +573,7 @@ Substitute runs are never acceptance evidence for the real QC (W4) or a real tra
 | W2-02 | `approve_attempt` trigger with `lane` through the lane-QC run endpoint its contract PR adds (W0-06 4.4); replay of a `completed` run keeps the run ID (3.7) |
 | W2-05 | Finding record, column mapping (3.4 step 6), append-only rule; replay and new-run-after-`unavailable` rule (3.7); the QC-unavailable finding template (3.6), stored only once W0-06 7.3 is recorded |
 | W2-07, W2-09 | Finding shape for rendering; the D12 message key; the `unavailable` run shown before decision controls |
-| W3-03 | Outbox placement, `DeliveryRequest` with `deepLinks` and `digestCases`, four event kinds, digest dedup mapping, locale templates, `PUBLIC_BASE_URL` origin |
+| W3-03 | Outbox placement, `DeliveryRequest` with `deepLinks` and `digestCases`, four event kinds, `buildDedupKey` (4.4: W0-04 `event` value and `recipient` address as components), digest dedup mapping, locale templates, `PUBLIC_BASE_URL` origin |
 | W3-04 | Retry ownership, attempt numbering, permanent failure, the four W0-04 delivery columns |
 | W3-05 | Due date parameter on lane-open mail; breach query feeding the digest's `digestCases` and one `case` link per breached case |
 | W3-07 | Section 7 |
@@ -582,7 +596,7 @@ Proposed amendments to merged sibling specs, for the lead to accept or refuse (n
 - [ ] **W0-10 section 3.3, `qc.run.late`:** add the event this spec's section 7 describes (`warn`; `qcRunId`, `caseId`, `versionId`, `trigger`, `lane?`, `status`, `refusedFindingCount`), emitted when 3.4 step 6 refuses an append because the version is already Ready (W0-06 section 6, last paragraph, which names an "operator-visible QC-late event (W0-10)" that W0-10's catalogue does not yet contain). W0-06 also asks for it to be operator-visible: since a late run writes no row, the proposal includes a `lateQc` list on `DeskHealthReport` (7.2) backed by a durable desk-local record in the style of W0-10 7.3 (`operator_job_run`), which W0-10 or W3-07 chooses. Owner: W0-10 (Lead); gate: before W2-06 lands, because the race exists only once Ready exists; until then the log line is the only record, and that gap is stated, not hidden.
 - [ ] **W0-02 section 5, configuration keys:** `QC_TIMEOUT_MS` (integer, default `10000`; the orchestrator timer, 3.4 step 1), `MAIL_RETRY_BACKOFF_MS` (three integers, default `1000,5000,25000`; W3-04), `MAIL_SINK_FAIL_NEXT` (integer, default `0`; local rehearsal of W3-04 with the file sink), and a second `QC_MODE` value that disables the runner (every run `unavailable:not_configured`; readiness `qc.status = 'disabled'`, which W0-10 already models). Owner: W0-02 (Lead); gate: W1-00 before it writes `.env.example`, otherwise the constants in section 6 stand.
 - [ ] **W0-02 section 3.5, `test:unit` glob:** include `fixtures/src` so the colocated W1-10 and W1-11 unit tests run under `npm run test:unit` (section 8.1 there lists `server/`, `shared/`, `web/` only). Owner: W0-02 (Lead); gate: W1-00.
-- [ ] **W0-10 section 3, `qc.run.*` labels:** `trigger` and `reason` values to be the W0-04 column values this spec uses (`upload`/`submit`/`approve_attempt`; `timeout`/`runner_error`/`not_configured`/`artifact_unreadable`) or a stated mapping (section 7). Owner: W0-10 (Lead); gate: W3-07.
+- [ ] **W0-10 section 3.3, `qc.run.*` labels and fields:** (a) `trigger` and `reason` values to be the W0-04 column values this spec uses (`upload`/`submit`/`approve_attempt`; `timeout`/`runner_error`/`not_configured`/`artifact_unreadable`) or a stated mapping (section 7); (b) five additional allow-listed fields, none of which is personal data or document text under W0-10 4.1: on `qc.run.started` `lane` (the `approve_attempt` lane, absent otherwise; the same value `workflow.transition` already carries as `lane?`) and `runKey` (the 3.7 input identity, a hex digest, so a replayed run can be matched to its earlier line); on `qc.run.completed` `alreadyRecordedCount` (findings the run produced that 3.4 step 6 did not append again, so `findingCount` can be read against it), `runner` and `runnerVersion` (the `qc_run.engine_id` identity, so a W4 runner's lines are distinguishable from the substitute's); on `qc.run.unavailable` `runner`. Until W0-10 records them the emitter drops them (W0-10 3.2), section 7 marks them proposed, W1-10 and W2-05 do not pass them to `log()`, and W3-07's tests assert only on the W0-10 3.3 fields. Owner: W0-10 (Lead); gate: W3-07.
 
 Other:
 
