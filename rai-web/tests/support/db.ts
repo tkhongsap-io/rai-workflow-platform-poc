@@ -24,8 +24,9 @@ export interface TestDatabase {
   close(): Promise<void>;
 }
 
-/** Every table the substrate creates, in truncation order (TRUNCATE ... CASCADE handles the FKs). */
+/** Every business table (W1-00 substrate plus W1-09's fixture_set), in truncation order (TRUNCATE ... CASCADE handles the FKs). */
 export const BUSINESS_TABLES = [
+  'fixture_set',
   'audit_event',
   'idempotency_key',
   'artifact_slot',

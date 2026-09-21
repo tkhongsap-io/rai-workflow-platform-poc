@@ -5,6 +5,9 @@
 import { after, before, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import * as configurationStore from '@rai/server/configuration/store';
 import {
   ConfigurationBodyInvalid,
@@ -207,13 +210,21 @@ test('effectiveConfiguration is the W0-02 7.3 ConfigurationView built from the r
 });
 
 test('fixtures:load seeds an empty database in test/development and refuses otherwise', async () => {
-  await assert.rejects(loadFixtures(db.operator, { nodeEnv: 'production' }), FixturesRefused);
-  const result = await loadFixtures(db.operator, { nodeEnv: 'test', now: new Date(T0.getTime() + 1000) });
+  // W1-09 extended the loader with cases and objects; it now also needs the identity mode and a BLOB_DIR.
+  const blobDir = await mkdtemp(path.join(tmpdir(), 'rai-w1-00-blobs-'));
+  const outputDir = await mkdtemp(path.join(tmpdir(), 'rai-w1-00-fixtures-'));
+  const base = { identityMode: 'fixture', blobDir, outputDir };
+  await assert.rejects(loadFixtures(db.operator, { ...base, nodeEnv: 'production' }), FixturesRefused);
+  const result = await loadFixtures(db.operator, {
+    ...base,
+    nodeEnv: 'test',
+    now: new Date(T0.getTime() + 1000),
+  });
   assert.deepEqual([...result.publishedKinds].sort(), [...SEED_KINDS].sort());
   assert.equal(
     (await currentRevision(db.app, 'sla', new Date(T0.getTime() + 1000)))?.revisionNumber,
     1,
     'published one second in the past',
   );
-  await assert.rejects(loadFixtures(db.operator, { nodeEnv: 'test' }), /not empty/);
+  await assert.rejects(loadFixtures(db.operator, { ...base, nodeEnv: 'test' }), /not empty/);
 });

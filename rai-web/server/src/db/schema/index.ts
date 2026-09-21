@@ -9,3 +9,4 @@ export * from './configuration-revision.js';
 export * from './audit-event.js';
 export * from './idempotency-key.js';
 export * from './session.js';
+export * from './fixture-set.js';

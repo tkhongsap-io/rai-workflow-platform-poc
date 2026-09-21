@@ -1,0 +1,172 @@
+{
+  "name": "slice1-synthetic",
+  "version": "1",
+  "sha256": "7c80ccd43663b2d17b96bcfb3db87c5e65860cf851dd6e2930fc064536544f80",
+  "documents": {
+    "fx-doc-0001-01": {
+      "filename": "RiskScreening_ChurnScoring.pdf",
+      "sha256": "fa91035b9cdefba02f2880fa55dbaaadd7b16f66d6e140fad47f71b8123ee9d7",
+      "sizeBytes": 1266
+    },
+    "fx-doc-0001-02": {
+      "filename": "PrivacyChecklist_v1.0.xlsx",
+      "sha256": "f4e85ca6b4944b9f32724b0df1ef99eb5facbf6f616c99149122034eb44b4f10",
+      "sizeBytes": 2871
+    },
+    "fx-doc-0001-05": {
+      "filename": "BRD_ChurnScoring_v1.0.docx",
+      "sha256": "7c54f221d7588a0d2b4482f3944ac45c4620b6598140c710ec5fe8cbb67ed422",
+      "sizeBytes": 1871
+    },
+    "fx-doc-0001-06": {
+      "filename": "Architecture_Overview.pdf",
+      "sha256": "64035434f23f680ed9e360b19bcc74c39be1708c5ef6016fe1ae81210a793ed3",
+      "sizeBytes": 1267
+    },
+    "fx-doc-0001-07": {
+      "filename": "SecurityAssessment_signed.pdf",
+      "sha256": "b36dddb7fa6d75ad9865599f282f5574f3c5ba46f10c3a02edf7cdf13e4d86b5",
+      "sizeBytes": 1271
+    },
+    "fx-doc-0001-08": {
+      "filename": "DeploymentChecklist_v1.0.xlsx",
+      "sha256": "b84b3b5962f1698b059b1a01cb7a76a9b214843bcfdf3dba0a7168adf503c53f",
+      "sizeBytes": 2878
+    },
+    "fx-doc-0001-09": {
+      "filename": "DataFlow_Diagram.png",
+      "sha256": "c71f48b2b5c9084aa2a26d31d012740a8264d39da818fd449ef16b7fe381822c",
+      "sizeBytes": 12782
+    },
+    "fx-doc-0002-01": {
+      "filename": "RiskScreening_StoreAssistant.pdf",
+      "sha256": "8b15758eafb161360921176c42c9d9d3f3938f41854c1a19634121fce84943aa",
+      "sizeBytes": 1266
+    },
+    "fx-doc-0002-02": {
+      "filename": "PrivacyChecklist_v1.1.xlsx",
+      "sha256": "19e60c1a11ba2e1037172186d6dccffd1f87f3fe1e2f47bcaa3f20bc59b5f682",
+      "sizeBytes": 2871
+    },
+    "fx-doc-0002-03": {
+      "filename": "DPA_PartnerVendor_signed.pdf",
+      "sha256": "a6b359cd1f2d1e5d41f3dabb5edcff8f51ab1339f42eefb755aab54292e15691",
+      "sizeBytes": 2096925
+    },
+    "fx-doc-0002-04": {
+      "filename": "SOW_PartnerVendor_2026.pdf",
+      "sha256": "58ce5284805155357a87abe398780cd4a768aabe711d705762c9196d66ef1cf1",
+      "sizeBytes": 1255
+    },
+    "fx-doc-0002-05": {
+      "filename": "BRD_StoreAssistant_v2.0.docx",
+      "sha256": "c03db82cdad2dbcf4134e37c8b5044015fd32986da8c31dd8cbbc6737d9ff7c3",
+      "sizeBytes": 1871
+    },
+    "fx-doc-0002-06": {
+      "filename": "Architecture_StoreAssistant.pdf",
+      "sha256": "35548416a674b060340899e1b7355b8b76b9953ceeeb09bb7f633688fff21d8e",
+      "sizeBytes": 1267
+    },
+    "fx-doc-0002-07": {
+      "filename": "SecurityAssessment_StoreAssistant.pdf",
+      "sha256": "3a8883158851090ee17b867c8aa1f13165edc8bee79cc07bbfaf08e7b4cfee87",
+      "sizeBytes": 1271
+    },
+    "fx-doc-0002-08": {
+      "filename": "DeploymentChecklist_v2.0.xlsx",
+      "sha256": "26c4bae148344c59ed12c91a9f8d867ccb8ca4f3dffe1b3de71f32cbf442efbd",
+      "sizeBytes": 2878
+    },
+    "fx-doc-0002-09": {
+      "filename": "เอกสารประกอบ_ผู้ให้บริการ_2569.pdf",
+      "sha256": "2819512fa03ede93b4d62e602bac7df3ebffb7c9f2f9b57308a845f310488377",
+      "sizeBytes": 1268
+    },
+    "fx-doc-0003-01": {
+      "filename": "RiskScreening_DispatchOptimiser.pdf",
+      "sha256": "0b6e1cf878cd85b27efb0a8c120698ae476ff9bcd6c90573cdb5db3ff53ec7c5",
+      "sizeBytes": 1266
+    },
+    "fx-doc-0003-02": {
+      "filename": "PrivacyChecklist_Dispatch.xlsx",
+      "sha256": "71fccd30ec8540e363539de23beb776bc15b309e646b6f50e8c980ff8dbc2d76",
+      "sizeBytes": 2871
+    },
+    "fx-doc-0003-05": {
+      "filename": "BRD_DispatchOptimiser_v0.9.docx",
+      "sha256": "3e875e7a1a5b647b257d221d82ce6b7d622b22d4d21f278eeb3da9f650a91c54",
+      "sizeBytes": 1871
+    },
+    "fx-doc-0003-06": {
+      "filename": "Architecture_Dispatch.pdf",
+      "sha256": "177284462173ce699f4a9df42aa8f552037adf0c9e86dbca947722ca11bcb5a6",
+      "sizeBytes": 1267
+    },
+    "fx-doc-0003-09": {
+      "filename": "Whiteboard_Photo.jpg",
+      "sha256": "a5bf8c117768316080af0992ba8e5460c3eb920a16f656820e8c8a3d0ad3d352",
+      "sizeBytes": 458
+    },
+    "fx-doc-0004-01": {
+      "filename": "RiskScreening_FAQAssistant.pdf",
+      "sha256": "a4412a15fda6a7dc13d58f1b0ebc996f67c55a6593b595872950109f5bc0a64a",
+      "sizeBytes": 1266
+    },
+    "fx-doc-0004-02": {
+      "filename": "PrivacyChecklist_FAQAssistant.xlsx",
+      "sha256": "88ee35a335af7698ecf76f148d1bca4ce90e21c7928c7fc710bd850795ccaaea",
+      "sizeBytes": 2871
+    },
+    "fx-doc-0004-03": {
+      "filename": "DPA_FAQVendor_draft.pdf",
+      "sha256": "4dde16ed11dccc7ca1c8d81808175d4fecb907384338028e194467d6a3cbad9d",
+      "sizeBytes": 1255
+    },
+    "fx-doc-0004-05": {
+      "filename": "BRD_FAQAssistant_idea.docx",
+      "sha256": "c1fe3bbb1e0177ec9a594f39f7334f14eb755b46bc932a102627397605ed491d",
+      "sizeBytes": 1871
+    },
+    "fx-doc-0004-06": {
+      "filename": "Architecture_FAQAssistant_sketch.png",
+      "sha256": "1fe8c01beb69aa812cc0071f399b8e406cf4aa946f17f73c40d39e30e36ec6c8",
+      "sizeBytes": 12781
+    },
+    "fx-doc-0004-07": {
+      "filename": "SecurityAssessment_FAQAssistant_pre.pdf",
+      "sha256": "15ec4581d282ad14b5a64ace390a6643043443da8c74498739115d2ccf815794",
+      "sizeBytes": 1271
+    },
+    "fx-doc-0005-01": {
+      "filename": "RiskScreening_RecruitmentScreening.pdf",
+      "sha256": "0931ab277150580ea7730b73989a20ced650ab774c2d17827e4e1ac3c6c5222c",
+      "sizeBytes": 1266
+    },
+    "fx-doc-0005-02": {
+      "filename": "PrivacyChecklist_Recruitment.xlsx",
+      "sha256": "431002f88e79571d8c887f1e158bfb0f2d105bad538be034ae648edddeef34c1",
+      "sizeBytes": 2871
+    },
+    "fx-doc-0005-05": {
+      "filename": "BRD_RecruitmentScreening_v1.0.docx",
+      "sha256": "0308bd94d597809f686a822313365f84b8ed3e3c626a6fcff760e2d96d2d9a92",
+      "sizeBytes": 1871
+    },
+    "fx-doc-0005-06": {
+      "filename": "Architecture_Recruitment.pdf",
+      "sha256": "1a099399590174e7db13bfbae73ceceeab4d492ac38b2a7fb970e0e8b5d5b692",
+      "sizeBytes": 1267
+    },
+    "fx-doc-0005-07": {
+      "filename": "SecurityAssessment_Recruitment.pdf",
+      "sha256": "d1669a634a3954b9dfada7161451c572ee3016589ba00d88eb04f53df09d13b7",
+      "sizeBytes": 1271
+    },
+    "fx-doc-0005-08": {
+      "filename": "DeploymentChecklist_Recruitment.xlsx",
+      "sha256": "2d6ea7d2e75118ac68d2aeb77d5288dd79ce921bf794e7060f536bae3fc6662c",
+      "sizeBytes": 2878
+    }
+  }
+}
