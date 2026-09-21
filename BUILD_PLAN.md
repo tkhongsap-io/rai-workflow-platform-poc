@@ -4,6 +4,10 @@ Version: draft 1, 2026-09-20. **Canonical implementation anchor. All work packag
 
 Read [PRD](PRD.md) for product scope, [acceptance](docs/acceptance.md) for expected behavior and [decisions](docs/product/decisions.md) for pending approvals. The older repository-foundation plan describes documentation setup only. This document governs the future product build.
 
+## Authorized design demonstrator
+
+Ta authorized a local synthetic implementation on 2026-09-21. Its [PRD](changes/2026-09-21-local-design-demo/PRD.md), [plan](changes/2026-09-21-local-design-demo/plan.md) and [ADR](adr/0002-local-design-demo.md) govern demo/ and tests/. This exception does not start or approve production packages W0–W8 below.
+
 ## Delivery strategy and dependencies
 
 Prove one synthetic case through a complete review cycle before expanding AI features or exposing real data. Preserve the source's six slices: W1-W3 deliver slice 1, W4 slice 2, W5 slice 3, W6 slice 4, W7 slice 5 and W8 slice 6. W0 prepares authorized implementation.

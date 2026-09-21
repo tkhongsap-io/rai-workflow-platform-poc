@@ -1,0 +1,1395 @@
+
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.state = this.build('s1');
+  }
+
+  /* ============ reference data ============ */
+  ROLES(){
+    return [
+      {key:'owner', label:'Owner', name:'Case owner', person:'Nattaporn S. · Consumer Mobile', scope:'Sees own cases only', lane:null, bu:'Consumer Mobile', packs:true, laneLine:'Prepares and submits the pack. No lane decision.'},
+      {key:'spoc',  label:'BU SPOC', name:'BU SPOC', person:'Suchada P. · Consumer Mobile', scope:'Sees Consumer Mobile cases', lane:null, bu:'Consumer Mobile', packs:true, laneLine:'Same pack actions as an owner, inside Consumer Mobile only. No lane decision, no waiver.'},
+      {key:'coe',   label:'AI/COE', name:'AI/COE reviewer', person:'Dr. Anan V. · AI Centre of Excellence', scope:'Sees all cases', lane:'coe', laneLine:'Acts in the AI/COE lane only.'},
+      {key:'dpo',   label:'DPO', name:'DPO reviewer', person:'Pimchanok R. · Data Protection Office', scope:'Sees all cases', lane:'dpo', laneLine:'Acts in the Privacy (DPO) lane only.'},
+      {key:'sec',   label:'IT/Security', name:'IT/Security reviewer', person:'Wutthichai K. · IT Security', scope:'Sees all cases', lane:'sec', laneLine:'Acts in the IT/Security lane only.'},
+      {key:'admin', label:'Admin', name:'Desk administrator', person:'Desk configuration', scope:'Sees all cases, read-only', lane:null, laneLine:'Configuration only. No lane approval, no disposition.'}
+    ];
+  }
+  SLOTS(){
+    return [
+      {n:1, k:'risk',    name:'Risk screening',       lanes:['coe']},
+      {n:2, k:'privacy', name:'Privacy checklist',    lanes:['dpo']},
+      {n:3, k:'dpa',     name:'DPA',                  lanes:['dpo']},
+      {n:4, k:'sow',     name:'SOW',                  lanes:['dpo']},
+      {n:5, k:'brd',     name:'BRD',                  lanes:['coe','dpo','sec']},
+      {n:6, k:'arch',    name:'Architecture',         lanes:['sec']},
+      {n:7, k:'secass',  name:'Security assessment',  lanes:['sec']},
+      {n:8, k:'deploy',  name:'Deployment checklist', lanes:['sec']},
+      {n:9, k:'support', name:'Supporting documents', lanes:[]}
+    ];
+  }
+  LANES(){
+    return [
+      {k:'coe', name:'AI/COE',         gates:['risk','brd'],                 reviewer:'Dr. Anan V.',      role:'coe'},
+      {k:'dpo', name:'Privacy (DPO)',  gates:['privacy','dpa','sow','brd'],  reviewer:'Pimchanok R.',     role:'dpo'},
+      {k:'sec', name:'IT/Security',    gates:['brd','arch','secass','deploy'], reviewer:'Wutthichai K.',  role:'sec'}
+    ];
+  }
+  SAMPLES(){
+    return {
+      risk:[
+        {id:'RS-A', name:'RiskScreening_ChurnScoring.pdf', note:'Complete — tier stated with the evidence behind it.', flags:[], ev:'EV-RS-A', tag:'Clean'},
+        {id:'RS-B', name:'RiskScreening_ChurnScoring_draft.pdf', note:'Defective — asserts a tier with nothing behind it.', flags:['no_evidence'], ev:'EV-RS-B', tag:'Has defects'}
+      ],
+      privacy:[
+        {id:'PC-A', name:'PrivacyChecklist_v1.0.xlsx', note:'Defective — retention answered as "as long as needed".', flags:['no_denominator'], ev:'EV-PC-A', tag:'Has defects'},
+        {id:'PC-B', name:'PrivacyChecklist_v1.1.xlsx', note:'Complete — retention period, record count and basis stated.', flags:[], ev:'EV-PC-B', tag:'Clean'}
+      ],
+      dpa:[{id:'DPA-A', name:'DPA_PartnerVendor_signed.pdf', note:'Signed processor agreement (synthetic).', flags:[], ev:'EV-DPA-A', tag:'Clean'}],
+      sow:[{id:'SOW-A', name:'SOW_PartnerVendor_2026.pdf', note:'Statement of work with an AI scope annex (synthetic).', flags:[], ev:'EV-SOW-A', tag:'Clean'}],
+      brd:[
+        {id:'BRD-A', name:'BRD_ChurnScoring_v1.0.docx', note:'Defective — claims accuracy with no metric, denominator or threshold.', flags:['no_metric'], ev:'EV-BRD-A', tag:'Has defects'},
+        {id:'BRD-B', name:'BRD_ChurnScoring_v1.1.docx', note:'Complete — AUC and precision–recall with denominator and operating threshold.', flags:[], ev:'EV-BRD-B', tag:'Clean'},
+        {id:'BRD-C', name:'BRD_StoreAssistant_v2.0.docx', note:'Defective — carries v1.0 SL2.1 thresholds and calls extraction accuracy a hallucination rate.', flags:['sl21_misapplied','extraction_conflation'], ev:'EV-BRD-C', tag:'Has defects'}
+      ],
+      arch:[{id:'ARCH-A', name:'Architecture_Overview.pdf', note:'Data flow, hosting boundary and interfaces (synthetic).', flags:[], ev:'EV-ARCH-A', tag:'Clean'}],
+      secass:[
+        {id:'SEC-A', name:'SecurityAssessment_signed.pdf', note:'Complete — scan results and sign-off attached.', flags:[], ev:'EV-SEC-A', tag:'Clean'},
+        {id:'SEC-B', name:'SecurityAssessment_pending.pdf', note:'Defective — references a scan that is not attached.', flags:['sec_no_evidence'], ev:'EV-SEC-B', tag:'Has defects'}
+      ],
+      deploy:[
+        {id:'DEP-A', name:'DeploymentChecklist_v1.0.xlsx', note:'Defective — rollback trigger with no threshold or window.', flags:['no_threshold'], ev:'EV-DEP-A', tag:'Has defects'},
+        {id:'DEP-B', name:'DeploymentChecklist_v1.1.xlsx', note:'Complete — rollback threshold, window and owner stated.', flags:[], ev:'EV-DEP-B', tag:'Clean'}
+      ],
+      support:[{id:'SUP-A', name:'ModelCard_synthetic.md', note:'Optional context. This slot gates no lane.', flags:[], ev:'EV-SUP-A', tag:'Clean'}]
+    };
+  }
+  RULES(){
+    return {
+      no_metric:{lane:'coe', sev:'High', title:'Classic ML case has no matching performance metric',
+        detail:'The BRD asserts the model "performs well in testing" and gives no metric, no denominator and no decision threshold. A classic ML case needs a metric that matches what it does — AUC or precision–recall at a stated operating point — or a justified N/A.'},
+      no_denominator:{lane:'dpo', sev:'Medium', title:'Retention answer carries no denominator or legal basis',
+        detail:'The privacy checklist answers retention as "kept as long as needed". There is no period, no record count and no stated basis, so nothing here can be checked.'},
+      no_threshold:{lane:'sec', sev:'Medium', title:'Rollback trigger states no threshold',
+        detail:'The deployment checklist says to roll back "if the error rate is high". No threshold, no measurement window and no owner, so the trigger cannot be operated.'},
+      no_evidence:{lane:'coe', sev:'Medium', title:'Risk screening asserts a tier with no evidence',
+        detail:'The screening records a tier but attaches nothing behind it — no data inventory, no affected-population estimate, no decision-impact statement.'},
+      sec_no_evidence:{lane:'sec', sev:'Medium', title:'Security assessment cites a scan that is not attached',
+        detail:'The assessment refers to a vulnerability scan and a penetration test summary. Neither is in the pack, so the conclusion rests on something the desk cannot see.'},
+      sl21_misapplied:{lane:'coe', sev:'High', title:'SL2.1 numeric thresholds applied under the wrong checklist template version',
+        detail:'High <1%, Medium <2% and Low <3% are defined only in the exact v1.0 Sheet3 SL2.1 table. This case runs on checklist template v2.0, which defines no numeric hallucination threshold in this desk, so those figures do not carry over. Model version has no bearing on it: only checklist_template_version selects the threshold source. State the v2.0 source, or mark the slot N/A with a reason.'},
+      extraction_conflation:{lane:'coe', sev:'High', title:'Extraction accuracy reported as a hallucination rate',
+        detail:'The cited panel measures extraction accuracy over a labelled field set. Extraction accuracy is not a hallucination rate — they measure different things and one cannot stand in for the other.'},
+      missing_doc:{lane:'coe', sev:'Medium', title:'Required document is not in the pack',
+        detail:'A lane gates on this slot and the slot holds no document and no stated reason.'},
+      qc_down:{lane:'coe', sev:'High', title:'Quality checks unavailable — no clean pass recorded',
+        detail:'The simulated check service did not respond for this submission. The desk records the gap explicitly in each lane instead of letting the pack through as clean.'}
+    };
+  }
+  EV(){
+    return {
+      'EV-RS-A':{source:'Risk screening §2 — evidence index (synthetic)', quote:'', rows:[['Proposed tier','Medium'],['Affected population','118,402 post-paid subscribers (synthetic)'],['Decision impact','Retention offer ranking; no service denial'],['Human review','Campaign manager reviews the ranked list before use'],['Evidence attached','Data inventory, impact note, sign-off']], note:'Synthetic panel. No True Corp document, system or customer record is represented here.'},
+      'EV-RS-B':{source:'Risk screening §2 — evidence index (synthetic)', quote:'"Assessed as Medium risk."', rows:[['Proposed tier','Medium'],['Affected population','— not stated —'],['Decision impact','— not stated —'],['Evidence attached','— none —']], note:'Synthetic panel. The tier is asserted without anything behind it.'},
+      'EV-PC-A':{source:'Privacy checklist Q7 — retention (synthetic)', quote:'"Personal data will be kept as long as needed for the purpose."', rows:[['Retention period','— not stated —'],['Record count in scope','— not stated —'],['Lawful basis','— not stated —'],['Deletion owner','— not stated —']], note:'Synthetic panel. Nothing in this answer can be measured or audited.'},
+      'EV-PC-B':{source:'Privacy checklist Q7 — retention (synthetic)', quote:'"Scoring features are retained 24 months from collection, then deleted."', rows:[['Retention period','24 months from collection'],['Record count in scope','118,402 subscriber records (synthetic)'],['Lawful basis','Legitimate interest, balancing test attached'],['Deletion owner','Data engineering — quarterly job']], note:'Synthetic panel used by the simulated checks.'},
+      'EV-DPA-A':{source:'DPA §4 — processing scope (synthetic)', quote:'', rows:[['Processor','Partner Vendor Co. (synthetic)'],['Processing scope','Model hosting and inference only'],['Sub-processors','Listed in Annex B, 2 named'],['Signed','14 Aug 2026 (synthetic)']], note:'Synthetic panel. Not a real agreement.'},
+      'EV-SOW-A':{source:'SOW Annex A — AI scope (synthetic)', quote:'', rows:[['Deliverable','Hosted assistant with retrieval over product content'],['Term','12 months from go-live'],['Exit provision','Model and index export on termination'],['Acceptance','Joint UAT on a 200-item labelled set']], note:'Synthetic panel. Not a real statement of work.'},
+      'EV-BRD-A':{source:'BRD §4.2 — model performance (synthetic)', quote:'"The churn propensity model performs well in testing and is ready for production use."', rows:[['Metric','— not stated —'],['Denominator','— not stated —'],['Decision threshold','— not stated —'],['Evaluation date','— not stated —'],['Comparator','— not stated —']], note:'Synthetic panel. This is the evidence behind the AI/COE metric finding.'},
+      'EV-BRD-B':{source:'BRD §4.2 — model performance (synthetic)', quote:'"Held-out AUC 0.81; precision 0.42 at recall 0.55 on the operating threshold 0.75."', rows:[['Metric','AUC 0.81 · precision 0.42 at recall 0.55'],['Denominator','118,402 subscribers, 9,120 positives (synthetic)'],['Decision threshold','Score ≥ 0.75 enters the retention campaign'],['Evaluation date','02 Sep 2026 (synthetic)'],['Comparator','Rules baseline, AUC 0.63']], note:'Synthetic panel. Figures are invented for the prototype.'},
+      'EV-BRD-C':{source:'BRD §5.1 — quality targets (synthetic)', quote:'"Hallucination rate is within the SL2.1 High band (<1%), measured as extraction accuracy 99.2% on the field set."', rows:[['Stated target','Hallucination rate < 1%'],['Threshold source cited','v1.0 Sheet3 SL2.1'],['Checklist template on this case','v2.0 — defines no numeric threshold here'],['What was measured','Extraction accuracy over 640 labelled fields (synthetic)'],['Hallucination measurement','— none performed —'],['Denominator','640 fields; open-ended generations not sampled']], note:'Synthetic panel. Two separate defects sit in this one paragraph.'},
+      'EV-ARCH-A':{source:'Architecture overview §3 — data flow (synthetic)', quote:'', rows:[['Hosting','Private cloud tenancy, Bangkok region (synthetic)'],['Data at rest','Encrypted, customer identifiers pseudonymised'],['External calls','None outside the tenancy boundary'],['Interfaces','Batch feature job, scoring API, campaign export']], note:'Synthetic panel used by the IT/Security lane.'},
+      'EV-SEC-A':{source:'Security assessment §6 — results (synthetic)', quote:'', rows:[['Vulnerability scan','Attached, 0 critical, 2 medium, remediation dated'],['Penetration test','Attached, summary and retest note'],['Secrets handling','Vault-managed, rotation 90 days'],['Sign-off','IT Security, 05 Sep 2026 (synthetic)']], note:'Synthetic panel. Not a real assessment.'},
+      'EV-SEC-B':{source:'Security assessment §6 — results (synthetic)', quote:'"Scanning and testing were completed with acceptable results."', rows:[['Vulnerability scan','Referenced, not attached'],['Penetration test','Referenced, not attached'],['Findings count','— not stated —'],['Sign-off','— not stated —']], note:'Synthetic panel. The conclusion rests on documents the desk cannot see.'},
+      'EV-DEP-A':{source:'Deployment checklist §3 — rollback (synthetic)', quote:'"Roll back if the error rate is high after release."', rows:[['Threshold','— not stated —'],['Measurement window','— not stated —'],['Who decides','— not stated —'],['Rollback rehearsal','— not recorded —']], note:'Synthetic panel behind the IT/Security rollback finding.'},
+      'EV-DEP-B':{source:'Deployment checklist §3 — rollback (synthetic)', quote:'"Roll back when scoring error rate exceeds 2.0% over any 30-minute window."', rows:[['Threshold','Error rate > 2.0%'],['Measurement window','Rolling 30 minutes'],['Who decides','On-call platform engineer, notify case owner'],['Rollback rehearsal','Recorded 08 Sep 2026 (synthetic)']], note:'Synthetic panel. Figures are invented for the prototype.'},
+      'EV-SUP-A':{source:'Model card (synthetic)', quote:'', rows:[['Intended use','Retention campaign ranking'],['Out of scope','Credit, employment or service-denial decisions'],['Known limitation','Under-represents sub-3-month tenure subscribers']], note:'Synthetic panel. Supporting documents gate no lane.'},
+      'EV-QCDOWN':{source:'Check service response (synthetic)', quote:'', rows:[['Service','rai-desk-qc (simulated)'],['Response','no response within the demo timeout'],['Checks completed','0 of 9'],['Recorded as','Explicit finding in each lane — not a pass']], note:'Synthetic panel. The desk never records an unavailable check as a clean pass.'}
+    };
+  }
+
+  /* ============ helpers ============ */
+  clone(o){ return JSON.parse(JSON.stringify(o)); }
+  S(){ return (this.state && this.state.cases) ? this.state : this.build('s1'); }
+  pad(n){ return (n < 10 ? '0' : '') + n; }
+  fmt(ts){
+    var d = new Date(ts + 25200000);
+    var mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getUTCMonth()];
+    return this.pad(d.getUTCDate()) + ' ' + mo + ' ' + d.getUTCFullYear() + ' · ' + this.pad(d.getUTCHours()) + ':' + this.pad(d.getUTCMinutes());
+  }
+  fmtDay(ts){
+    var d = new Date(ts + 25200000);
+    var mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getUTCMonth()];
+    return this.pad(d.getUTCDate()) + ' ' + mo + ' ' + d.getUTCFullYear();
+  }
+  slotOf(k){ var a = this.SLOTS(); for (var i = 0; i < a.length; i++) { if (a[i].k === k) return a[i]; } return null; }
+  laneOf(k){ var a = this.LANES(); for (var i = 0; i < a.length; i++) { if (a[i].k === k) return a[i]; } return null; }
+  roleOf(k){ var a = this.ROLES(); for (var i = 0; i < a.length; i++) { if (a[i].key === k) return a[i]; } return a[0]; }
+  sampleOf(slotKey, id){ var a = this.SAMPLES()[slotKey] || []; for (var i = 0; i < a.length; i++) { if (a[i].id === id) return a[i]; } return null; }
+  caseOf(st, id){ for (var i = 0; i < st.cases.length; i++) { if (st.cases[i].id === id) return st.cases[i]; } return null; }
+  tick(st){ st.clock += 420000; return st.clock; }
+
+  /* ============ case construction ============ */
+  blankLane(){ return {state:'idle', by:'', at:0, ver:0, note:'', artifact:'', due:0}; }
+  emptyDocs(){
+    var d = {}, S = this.SLOTS();
+    for (var i = 0; i < S.length; i++) { d[S[i].k] = {state:'not_yet', doc:null, reason:'', at:0}; }
+    return d;
+  }
+  attach(k, slotKey, sampleId, ts){
+    var s = this.sampleOf(slotKey, sampleId);
+    k.docs[slotKey] = {state:'attached', doc:{id:s.id, name:s.name, flags:s.flags.slice(), ev:s.ev}, reason:'', at:ts};
+  }
+  markNA(k, slotKey, reason, ts){ k.docs[slotKey] = {state:'na', doc:null, reason:reason, at:ts}; }
+  markMissing(k, slotKey, ts){ k.docs[slotKey] = {state:'missing', doc:null, reason:'', at:ts}; }
+
+  newCase(o){
+    return {
+      id:o.id, name:o.name, bu:o.bu, owner:o.owner, ownerRole:o.ownerRole,
+      modelVer:o.modelVer, checklistVer:o.checklistVer, kind:o.kind, vendor:o.vendor, src:o.src,
+      state:'draft', ver:1, fseq:0, dirty:false, decisions:[],
+      riskScenario:o.riskScenario || 'incomplete',
+      docs:this.emptyDocs(), savedDocs:null,
+      lanes:{coe:this.blankLane(), dpo:this.blankLane(), sec:this.blankLane()},
+      findings:[], snaps:[], history:[], cfg:null
+    };
+  }
+
+  build(scen){
+    var st = {
+      scenario:scen, role:'owner', view:'queue', caseId:null, tab:'docs',
+      drawer:null, modal:null, toast:null,
+      clock:Date.UTC(2026, 8, 14, 2, 0, 0), notifSeq:0,
+      search:'', fStatus:'all', fOwner:'all', fBu:'all', fSrc:'all', vw:1440,
+      qcUp:(scen !== 's4'),
+      config:{tpl:'1.4', rev:3, hi:1, md:2, lo:3, slaDpo:3, slaOther:5, publishedAt:Date.UTC(2026, 8, 1, 2, 0, 0)},
+      cfgDraft:null,
+      notifs:[],
+      nc:{name:'', srcKnown:'known', src:'', vendor:'no', kind:'classic', modelVer:'1.0', checklistVer:'v1.0 Sheet3', showErr:false},
+      form:{},
+      cases:[]
+    };
+    var t0 = st.clock;
+
+    var a = this.newCase({id:'RAI-2026-0147', name:'Churn Propensity Scoring', bu:'Consumer Mobile', owner:'Nattaporn S.', ownerRole:'owner', modelVer:'1.0', checklistVer:'v1.0 Sheet3', kind:'classic', vendor:false, src:'AIR-2291', riskScenario:'medium'});
+    this.attach(a, 'risk', 'RS-A', t0);
+    this.attach(a, 'privacy', 'PC-A', t0);
+    this.markNA(a, 'dpa', 'No external vendor or processor is in scope — the model is built and hosted in house, so no DPA exists for this case.', t0);
+    this.markNA(a, 'sow', 'No external vendor or processor is in scope — no statement of work exists for this case.', t0);
+    this.attach(a, 'brd', 'BRD-A', t0);
+    this.attach(a, 'arch', 'ARCH-A', t0);
+    this.attach(a, 'secass', 'SEC-A', t0);
+    this.attach(a, 'deploy', 'DEP-A', t0);
+    a.savedDocs = this.clone(a.docs);
+    a.history.push({ts:t0, actor:'Nattaporn S.', role:'Owner', action:'Case created', detail:'Draft opened · source record ID AIR-2291 · no external vendor in scope', ver:1});
+
+    var b = this.newCase({id:'RAI-2026-0163', name:'Retail Store Assistant', bu:'Retail & Partner Channels', owner:'Krit A.', ownerRole:'owner2', modelVer:'2.0', checklistVer:'v2.0', kind:'genai', vendor:true, src:'Unknown', riskScenario:'high'});
+    this.attach(b, 'risk', 'RS-A', t0);
+    this.attach(b, 'privacy', 'PC-B', t0);
+    this.attach(b, 'dpa', 'DPA-A', t0);
+    this.attach(b, 'sow', 'SOW-A', t0);
+    this.attach(b, 'brd', 'BRD-C', t0);
+    this.attach(b, 'arch', 'ARCH-A', t0);
+    this.attach(b, 'secass', 'SEC-A', t0);
+    this.attach(b, 'deploy', 'DEP-B', t0);
+    this.attach(b, 'support', 'SUP-A', t0);
+    b.savedDocs = this.clone(b.docs);
+    b.history.push({ts:t0, actor:'Krit A.', role:'Owner', action:'Case created', detail:'Draft opened · source record ID Unknown · external vendor in scope', ver:1});
+
+    st.cases = [a, b];
+    this.submitCase(st, b, 'Krit A.', 'Owner');
+
+    if (scen === 's2') {
+      this.submitCase(st, a, 'Nattaporn S.', 'Owner');
+      var L = this.LANES();
+      for (var i = 0; i < L.length; i++) { this.approveLane(st, a, L[i].k); }
+      this.disposeFinding(st, a, this.findByRule(a, 'no_metric'), 'waived', 'Campaign ranking only, no customer-facing decision. Metric to be added at the next model refresh; accepted for this release.', '');
+      this.disposeFinding(st, a, this.findByRule(a, 'no_threshold'), 'fixed', 'Rollback threshold added and rehearsed.', 'EV-DEP-B');
+      st.caseId = a.id; st.view = 'case'; st.tab = 'find'; st.role = 'dpo';
+    }
+    if (scen === 's3') { st.caseId = b.id; st.view = 'case'; st.tab = 'find'; st.role = 'coe'; }
+    if (scen === 's4') { st.caseId = a.id; st.view = 'case'; st.tab = 'docs'; st.role = 'owner'; }
+
+    this.notify(st, 'sla', 'Illustrative due date passed', 'RAI-2026-0163 · the Privacy (DPO) lane is past its illustrative due date. Nothing escalates automatically in this desk.', 'RAI-2026-0163');
+    return st;
+  }
+
+  findByRule(k, rule){
+    for (var i = k.findings.length - 1; i >= 0; i--) { if (k.findings[i].rule === rule && k.findings[i].ver === k.ver) return k.findings[i].id; }
+    return null;
+  }
+
+  /* ============ simulated QC ============ */
+  runQC(st, k, trigger, laneKey){
+    var checks = [], created = [], i, j;
+    var rules = this.RULES(), slots = this.SLOTS();
+    var lanesInScope = laneKey ? [laneKey] : ['coe','dpo','sec'];
+
+    if (!st.qcUp) {
+      checks.push({label:'Check service reachable', result:'fail', note:'The simulated check service did not respond. No document check could run.'});
+      for (i = 0; i < lanesInScope.length; i++) {
+        var f1 = this.raise(st, k, 'qc_down', '', lanesInScope[i], trigger, 'EV-QCDOWN');
+        if (f1) created.push(f1);
+      }
+      return {checks:checks, created:created, down:true};
+    }
+
+    var gatedSlots = {};
+    for (i = 0; i < lanesInScope.length; i++) {
+      var ln = this.laneOf(lanesInScope[i]);
+      for (j = 0; j < ln.gates.length; j++) { gatedSlots[ln.gates[j]] = ln.k; }
+    }
+
+    for (i = 0; i < slots.length; i++) {
+      var sl = slots[i];
+      if (!gatedSlots[sl.k]) continue;
+      var d = k.docs[sl.k];
+      if (d.state === 'attached') {
+        if (d.doc.flags.length === 0) {
+          checks.push({label:sl.name + ' — content check', result:'pass', note:d.doc.name + ' · nothing flagged.'});
+        } else {
+          for (j = 0; j < d.doc.flags.length; j++) {
+            var flag = d.doc.flags[j];
+            if (flag === 'sl21_misapplied' && k.checklistVer === 'v1.0 Sheet3') {
+              checks.push({label:sl.name + ' — threshold provenance', result:'pass', note:'Checklist template is v1.0 Sheet3, so the SL2.1 numeric thresholds are the right source for this case. Model version is not what decides this.'});
+              continue;
+            }
+            var r = rules[flag];
+            var chk = {label:sl.name + ' — ' + r.title.toLowerCase(), result:'flag', note:d.doc.name, lane:r.lane};
+            checks.push(chk);
+            var f2 = this.raise(st, k, flag, sl.k, r.lane, trigger, d.doc.ev);
+            if (f2) { created.push(f2); chk.isNew = true; chk.note = chk.note + ' · raises a new finding'; }
+            else { chk.isNew = false; chk.note = chk.note + ' · already recorded as a finding on this submission'; }
+          }
+        }
+      } else if (d.state === 'na') {
+        if (d.reason && d.reason.length > 8) {
+          checks.push({label:sl.name + ' — not applicable', result:'pass', note:'Marked N/A with a stated reason.'});
+        } else {
+          var chk3 = {label:sl.name + ' — not applicable', result:'flag', note:'Marked N/A without a usable reason.', lane:gatedSlots[sl.k]};
+          checks.push(chk3);
+          var f3 = this.raise(st, k, 'missing_doc', sl.k, gatedSlots[sl.k], trigger, '');
+          if (f3) { created.push(f3); chk3.isNew = true; chk3.note = chk3.note + ' · raises a new finding'; }
+          else { chk3.isNew = false; chk3.note = chk3.note + ' · already recorded as a finding on this submission'; }
+        }
+      } else {
+        var chk4 = {label:sl.name + ' — present in pack', result:'flag', note:(d.state === 'missing' ? 'Recorded as missing.' : 'Not yet provided.'), lane:gatedSlots[sl.k]};
+        checks.push(chk4);
+        var f4 = this.raise(st, k, 'missing_doc', sl.k, gatedSlots[sl.k], trigger, '');
+        if (f4) { created.push(f4); chk4.isNew = true; chk4.note = chk4.note + ' · raises a new finding'; }
+        else { chk4.isNew = false; chk4.note = chk4.note + ' · already recorded as a finding on this submission'; }
+      }
+    }
+
+    if (k.kind === 'classic' && k.docs.brd.state === 'attached' && k.docs.brd.doc.flags.indexOf('no_metric') < 0) {
+      checks.push({label:'Classic ML — matching metric', result:'pass', note:'A metric, its denominator and its threshold are all stated.'});
+    }
+    if (k.checklistVer !== 'v1.0 Sheet3') {
+      checks.push({label:'SL2.1 threshold isolation', result:(this.hasOpen(k, 'sl21_misapplied') ? 'flag' : 'pass'), note:'Checklist template ' + k.checklistVer + ' defines no numeric hallucination threshold in this desk, so the v1.0 Sheet3 SL2.1 figures are not applied. Model version ' + k.modelVer + ' is recorded separately and does not affect this check.'});
+    } else {
+      checks.push({label:'SL2.1 threshold provenance', result:'pass', note:'Checklist template v1.0 Sheet3 — SL2.1 numeric thresholds apply to this case, independently of model version ' + k.modelVer + '.'});
+    }
+    return {checks:checks, created:created, down:false};
+  }
+
+  hasOpen(k, rule){
+    for (var i = 0; i < k.findings.length; i++) { if (k.findings[i].rule === rule && k.findings[i].ver === k.ver && !k.findings[i].disp) return true; }
+    return false;
+  }
+  raise(st, k, rule, slotKey, lane, trigger, ev){
+    var i;
+    for (i = 0; i < k.findings.length; i++) {
+      var x = k.findings[i];
+      if (x.rule === rule && x.slot === slotKey && x.lane === lane && x.ver === k.ver) return null;
+    }
+    var r = this.RULES()[rule];
+    var sl = slotKey ? this.slotOf(slotKey) : null;
+    k.fseq = k.fseq + 1;
+    var f = {
+      id:'F-' + this.pad(k.fseq), rule:rule, slot:slotKey, lane:lane, sev:r.sev,
+      title:(rule === 'missing_doc' ? ('Required document not in the pack: ' + sl.name) : r.title),
+      detail:r.detail, ev:ev, ver:k.ver, at:this.tick(st), trigger:trigger, disp:null
+    };
+    k.findings.push(f);
+    return f;
+  }
+
+  /* ============ actions on a case ============ */
+  log(st, k, actor, role, action, detail){
+    k.history.push({ts:this.tick(st), actor:actor, role:role, action:action, detail:detail, ver:k.ver});
+  }
+  notify(st, kind, title, body, caseId){
+    st.notifSeq = st.notifSeq + 1;
+    st.notifs.unshift({id:'N-' + st.notifSeq, kind:kind, title:title, body:body, caseId:caseId, at:st.clock, read:false});
+  }
+
+  submitCase(st, k, actor, role){
+    k.savedDocs = this.clone(k.docs);
+    k.dirty = false;
+    var res = this.runQC(st, k, 'submit', null);
+    var ts = this.tick(st);
+    k.cfg = {tpl:st.config.tpl, rev:st.config.rev, hi:st.config.hi, md:st.config.md, lo:st.config.lo, slaDpo:st.config.slaDpo, slaOther:st.config.slaOther, modelVer:k.modelVer, checklistVer:k.checklistVer};
+    var L = this.LANES(), ids = [];
+    for (var i = 0; i < res.created.length; i++) { ids.push(res.created[i].id); }
+    for (var j = 0; j < L.length; j++) {
+      var days = (L[j].k === 'dpo') ? st.config.slaDpo : st.config.slaOther;
+      k.lanes[L[j].k] = {state:'open', by:'', at:ts, ver:k.ver, note:'', artifact:'', due:ts + days * 86400000};
+    }
+    k.snaps.push({ver:k.ver, at:ts, docs:this.clone(k.docs), findingIds:ids, cfgRev:k.cfg.rev, cfgTpl:k.cfg.tpl, modelVer:k.modelVer, checklistVer:k.checklistVer, by:actor});
+    k.state = 'in_review';
+    k.history.push({ts:ts, actor:actor, role:role, action:'Submitted for review', detail:'Submission v' + k.ver + ' snapshotted read-only · ' + res.created.length + ' finding(s) raised by simulated checks · three lanes opened in parallel · model version ' + k.modelVer + ' · checklist template ' + k.checklistVer + ' · pack template ' + k.cfg.tpl + ' configuration revision ' + k.cfg.rev, ver:k.ver});
+    this.notify(st, 'lane', 'Three review lanes opened', k.id + ' · Submission v' + k.ver + ' — AI/COE, Privacy (DPO) and IT/Security are open in parallel.', k.id);
+    return res;
+  }
+
+  approveLane(st, k, laneKey){
+    var ln = this.laneOf(laneKey);
+    var ts = this.tick(st);
+    k.lanes[laneKey] = {state:'approved', by:ln.reviewer, at:ts, ver:k.ver, note:'', artifact:'', due:k.lanes[laneKey].due};
+    k.decisions.push({ver:k.ver, lane:laneKey, kind:'approved', by:ln.reviewer, at:ts, note:'', artifact:''});
+    k.history.push({ts:ts, actor:ln.reviewer, role:ln.name, action:'Lane approved', detail:ln.name + ' approved Submission v' + k.ver + '. Quality findings do not block a lane decision.', ver:k.ver});
+    this.refresh(st, k);
+  }
+
+  sendBack(st, k, laneKey, slotKey, text){
+    var ln = this.laneOf(laneKey), sl = this.slotOf(slotKey);
+    var ts = this.tick(st);
+    k.lanes[laneKey] = {state:'sent_back', by:ln.reviewer, at:ts, ver:k.ver, note:text, artifact:slotKey, due:k.lanes[laneKey].due};
+    k.decisions.push({ver:k.ver, lane:laneKey, kind:'sent_back', by:ln.reviewer, at:ts, note:text, artifact:slotKey});
+    k.history.push({ts:ts, actor:ln.reviewer, role:ln.name, action:'Sent back to owner', detail:'Artifact: ' + sl.name + ' — ' + text, ver:k.ver});
+    var oldVer = k.ver;
+    k.ver = k.ver + 1;
+    k.state = 'changes_requested';
+    k.savedDocs = this.clone(k.docs);
+    k.lanes = {coe:this.blankLane(), dpo:this.blankLane(), sec:this.blankLane()};
+    k.dirty = false;
+    k.history.push({ts:this.tick(st), actor:'RAI Review Desk', role:'System', action:'Submission v' + k.ver + ' draft opened', detail:'Submission v' + oldVer + ' is preserved read-only. A single v' + k.ver + ' draft carries the documents forward for correction. Approvals on v' + oldVer + ' are superseded and cannot carry to v' + k.ver + '.', ver:k.ver});
+    this.notify(st, 'sendback', 'Case sent back to the owner', k.id + ' · ' + ln.name + ' asked for a correction to ' + sl.name + '. Submission v' + k.ver + ' draft is open.', k.id);
+  }
+
+  disposeFinding(st, k, findingId, kind, reason, evidence){
+    var f = null, i;
+    for (i = 0; i < k.findings.length; i++) { if (k.findings[i].id === findingId) f = k.findings[i]; }
+    if (!f) return;
+    var ln = this.laneOf(f.lane);
+    var ts = this.tick(st);
+    f.disp = {kind:kind, reason:reason, evidence:evidence, by:ln.reviewer, at:ts};
+    var label = (kind === 'fixed') ? 'Fixed with evidence' : (kind === 'waived' ? 'Waived with reason' : 'Not applicable with reason');
+    k.history.push({ts:ts, actor:ln.reviewer, role:ln.name, action:'Finding disposed', detail:f.id + ' · ' + label + ' — ' + reason, ver:k.ver});
+    this.refresh(st, k);
+  }
+
+  refresh(st, k){
+    if (k.state === 'draft' || k.state === 'changes_requested') return;
+    var L = this.LANES(), all = true, i;
+    for (i = 0; i < L.length; i++) {
+      var l = k.lanes[L[i].k];
+      if (!(l.state === 'approved' && l.ver === k.ver)) all = false;
+    }
+    var open = 0;
+    for (i = 0; i < k.findings.length; i++) { if (k.findings[i].ver === k.ver && !k.findings[i].disp) open = open + 1; }
+    var next = 'in_review';
+    if (all && open === 0) next = 'ready';
+    else if (all) next = 'awaiting_disposition';
+    if (next !== k.state) {
+      k.state = next;
+      if (next === 'ready') {
+        k.history.push({ts:this.tick(st), actor:'RAI Review Desk', role:'System', action:'Review desk complete', detail:'Three current-version lane approvals and no undispositioned finding on Submission v' + k.ver + '. Council and ITSM authorization remain outside this desk.', ver:k.ver});
+        this.notify(st, 'done', 'Review desk complete', k.id + ' · all three lanes approved on Submission v' + k.ver + ' and every finding is disposed. Council and ITSM authorization remain outside this desk.', k.id);
+      } else if (next === 'awaiting_disposition') {
+        k.history.push({ts:this.tick(st), actor:'RAI Review Desk', role:'System', action:'Awaiting disposition', detail:'All three lanes approved Submission v' + k.ver + ', but ' + open + ' finding(s) still have no disposition.', ver:k.ver});
+      }
+    }
+  }
+
+  /* ============ event plumbing ============ */
+  act(mut){
+    var self = this;
+    return function(e){
+      if (e && e.preventDefault) e.preventDefault();
+      var n = self.clone(self.S());
+      mut(n, e);
+      self.setState(n);
+    };
+  }
+  toast(st, text, kind){ st.toast = {text:text, kind:kind || 'ok'}; }
+
+  /* ============ style helpers ============ */
+  tone(t){
+    if (t === 'blue')  return {bg:'#E9F2FB', fg:'#00639F', bd:'#BBD9F2'};
+    if (t === 'green') return {bg:'#E6F4EC', fg:'#0B6B45', bd:'#BFE3D0'};
+    if (t === 'amber') return {bg:'#FEF6E7', fg:'#7A5200', bd:'#F0DCB4'};
+    if (t === 'red')   return {bg:'#FDECEC', fg:'#B80000', bd:'#F3C9C9'};
+    return {bg:'#F3F3F6', fg:'#5B6878', bd:'#E2E8F0'};
+  }
+  chip(t){
+    var c = this.tone(t);
+    return 'display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 11px;font-size:11.5px;font-weight:700;line-height:1.35;white-space:nowrap;background:' + c.bg + ';color:' + c.fg + ';border:1px solid ' + c.bd + ';';
+  }
+  tag(t){
+    var c = this.tone(t);
+    return 'display:inline-block;border-radius:5px;padding:2px 7px;font-size:10.5px;font-weight:700;letter-spacing:0.03em;white-space:nowrap;background:' + c.bg + ';color:' + c.fg + ';border:1px solid ' + c.bd + ';';
+  }
+  sevTone(s){ return s === 'High' ? 'red' : (s === 'Medium' ? 'amber' : 'grey'); }
+  stateTone(s){
+    if (s === 'draft') return 'grey';
+    if (s === 'in_review') return 'blue';
+    if (s === 'changes_requested') return 'red';
+    if (s === 'awaiting_disposition') return 'amber';
+    return 'green';
+  }
+  stateLabel(k){
+    if (k.state === 'draft') return 'Draft';
+    if (k.state === 'in_review') return 'In review · 3 lanes open';
+    if (k.state === 'changes_requested') return 'Changes requested · v' + k.ver + ' draft';
+    if (k.state === 'awaiting_disposition') return 'All lanes approved · awaiting disposition';
+    return 'Ready for launch';
+  }
+  docTone(s){ return s === 'attached' ? 'green' : (s === 'missing' ? 'red' : (s === 'na' ? 'grey' : 'amber')); }
+  docLabel(s){ return s === 'attached' ? 'Attached' : (s === 'missing' ? 'Missing' : (s === 'na' ? 'N/A' : 'Not yet provided')); }
+  laneTone(l, ver){
+    if (l.state === 'approved') return (l.ver === ver) ? 'green' : 'grey';
+    if (l.state === 'sent_back') return (l.ver === ver) ? 'red' : 'grey';
+    if (l.state === 'open') return 'blue';
+    return 'grey';
+  }
+  laneText(l, ver){
+    if (l.state === 'approved') return (l.ver === ver) ? 'Approved' : 'Approved (v' + l.ver + ', superseded)';
+    if (l.state === 'sent_back') return (l.ver === ver) ? 'Sent back' : 'Sent back (v' + l.ver + ')';
+    if (l.state === 'open') return 'In review';
+    return 'Not started';
+  }
+  openFindings(k){
+    var n = 0;
+    for (var i = 0; i < k.findings.length; i++) { if (k.findings[i].ver === k.ver && !k.findings[i].disp) n = n + 1; }
+    return n;
+  }
+  curFindings(k){
+    var a = [];
+    for (var i = 0; i < k.findings.length; i++) { if (k.findings[i].ver === k.ver) a.push(k.findings[i]); }
+    return a;
+  }
+  packRole(st, k){
+    var r = this.roleOf(st.role);
+    if (!r.packs) return false;
+    if (st.role === 'owner') return k.ownerRole === 'owner';
+    if (st.role === 'spoc') return k.bu === r.bu;
+    return false;
+  }
+  canEdit(st, k){ return this.packRole(st, k) && (k.state === 'draft' || k.state === 'changes_requested'); }
+  actorName(st){ return this.roleOf(st.role).person.split(' · ')[0]; }
+  actorRole(st){ return this.roleOf(st.role).name; }
+  visible(st){
+    var out = [], i;
+    for (i = 0; i < st.cases.length; i++) {
+      var k = st.cases[i];
+      if (st.role === 'owner') { if (k.ownerRole === 'owner') out.push(k); }
+      else if (st.role === 'spoc') { if (k.bu === 'Consumer Mobile') out.push(k); }
+      else out.push(k);
+    }
+    return out;
+  }
+  nextAction(st, k){
+    if (k.state === 'draft') return 'Owner completes the pack, then runs checks and submits.';
+    if (k.state === 'changes_requested') return 'Owner corrects the named artifact and resubmits as Submission v' + k.ver + '.';
+    if (k.state === 'awaiting_disposition') return this.openFindings(k) + ' finding(s) need a disposition from the owning lane.';
+    if (k.state === 'ready') return 'Review desk complete. Council and ITSM authorization remain outside this desk.';
+    var L = this.LANES(), pend = [];
+    for (var i = 0; i < L.length; i++) { if (k.lanes[L[i].k].state !== 'approved' || k.lanes[L[i].k].ver !== k.ver) pend.push(L[i].name); }
+    return 'Awaiting ' + pend.join(', ') + '.';
+  }
+
+  /* ============ render ============ */
+  renderVals(){
+    var self = this, i, j;
+    var st = this.S();
+    var accent = this.props.accent || '#E00000';
+    var R = {};
+    var btnBase = 'border-radius:6px;font-weight:600;cursor:pointer;line-height:1.3;white-space:nowrap;';
+    R.btnP = btnBase + 'background:' + accent + ';color:#FFFFFF;border:1px solid ' + accent + ';padding:9px 16px;font-size:13.5px;';
+    R.btnPD = R.btnP;
+    R.btnS = btnBase + 'background:#FFFFFF;color:#303C46;border:1px solid #E2E8F0;padding:9px 16px;font-size:13.5px;';
+    R.btnSD = R.btnS;
+    R.btnXs = btnBase + 'background:#FFFFFF;color:#303C46;border:1px solid #E2E8F0;padding:6px 11px;font-size:12px;';
+    R.btnGhost = 'background:none;border:none;padding:0;font-size:13px;font-weight:600;color:#00639F;cursor:pointer;';
+    R.btnLink = 'background:none;border:none;padding:0;font-size:11.5px;font-weight:600;color:#00639F;cursor:pointer;text-decoration:underline;';
+    R.btnIcon = 'background:#FFFFFF;border:1px solid #E2E8F0;border-radius:6px;width:30px;height:30px;font-size:13px;cursor:pointer;flex-shrink:0;line-height:1;';
+    R.accent = accent;
+    R.showBar = this.props.showDemoBar !== false;
+
+    /* ---- viewport / responsive ---- */
+    var vw = st.vw || 1440;
+    var wide = vw >= 1000, mid = vw >= 700, narrow = vw < 700;
+    var stack = vw < 1000;
+    var frameH = narrow ? 844 : 1024;
+    R.frameStyle = 'width:' + vw + 'px;height:' + frameH + 'px;position:relative;overflow:hidden;background:#F9F9FC;display:flex;flex-direction:column;border:1px solid #D2D8DF;border-radius:' + (wide ? '10px' : '16px') + ';box-shadow:0 10px 30px rgba(48,60,70,.12);';
+    R.vwTabs = [{v:1440, t:'1440'}, {v:834, t:'834'}, {v:390, t:'390'}].map(function(x){
+      var sel = vw === x.v;
+      return {label:x.t, sel:sel,
+        style:'border:none;border-radius:6px;padding:7px 11px;font-size:12.5px;font-weight:600;cursor:pointer;' + (sel ? ('background:' + accent + ';color:#FFFFFF;') : 'background:transparent;color:#5B6878;'),
+        on:self.act(function(n){ n.vw = x.v; n.drawer = null; })};
+    });
+    R.navShow = wide; R.navCompact = !wide; R.topWide = wide;
+    R.topBarStyle = 'height:' + (narrow ? '56px' : '60px') + ';flex-shrink:0;background:#FFFFFF;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;padding:0 ' + (narrow ? '14px' : (wide ? '28px' : '18px')) + ';gap:' + (narrow ? '10px' : '18px') + ';';
+    R.topDividerStyle = wide ? 'width:1px;height:26px;background:#E2E8F0;' : 'display:none;';
+    R.topBtnTextStyle = narrow ? 'display:none;' : 'font-size:13px;font-weight:600;';
+    R.protoBadgeStyle = narrow ? 'display:none;' : 'display:inline-flex;align-items:center;gap:6px;background:#FDECEC;color:#B80000;border:1px solid #F3C9C9;border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600;white-space:nowrap;';
+    R.protoBadgeText = 'Prototype · synthetic data';
+    R.protoBarShow = narrow;
+    R.mainStyle = 'flex-grow:1;min-width:0;padding:' + (wide ? '24px 28px 40px' : (mid ? '18px 18px 32px' : '14px 14px 28px')) + ';';
+    R.queueGridStyle = 'display:grid;grid-template-columns:repeat(' + (vw >= 1200 ? 2 : 1) + ', minmax(0, 1fr));gap:18px;';
+    R.laneGridStyle = 'display:grid;grid-template-columns:repeat(' + (vw >= 1100 ? 3 : 1) + ', minmax(0, 1fr));gap:16px;align-items:start;';
+    R.searchWrapStyle = narrow ? 'width:100%;' : 'flex-grow:1;min-width:240px;';
+    R.filterWrapStyle = narrow ? 'width:100%;' : 'min-width:165px;';
+    R.grid2Style = 'display:grid;grid-template-columns:repeat(' + (narrow ? 1 : 2) + ', minmax(0, 1fr));gap:16px;';
+    R.grid3Style = 'display:grid;grid-template-columns:repeat(' + (narrow ? 1 : 3) + ', minmax(0, 1fr));gap:12px;';
+    R.drawerStyle = 'position:absolute;top:0;bottom:0;right:0;width:' + (vw < 500 ? vw : (vw < 900 ? 440 : 470)) + 'px;max-width:100%;background:#FFFFFF;border-left:1px solid #E2E8F0;box-shadow:-12px 0 34px rgba(48,60,70,.14);display:flex;flex-direction:column;z-index:40;';
+    R.tableHeadStyle = stack ? 'display:none;' : 'display:flex;background:#F3F3F6;border-bottom:1px solid #E2E8F0;padding:9px 14px;gap:14px;font-size:10.5px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#5B6878;';
+    R.modalOverlayStyle = 'position:absolute;inset:0;background:rgba(48,60,70,.46);display:flex;align-items:center;justify-content:center;padding:' + (narrow ? '12px' : '40px') + ';z-index:60;';
+    var cellStyle = function(w){ return stack ? 'width:auto;min-width:0;margin-top:5px;' : ('width:' + w + 'px;flex-shrink:0;min-width:0;'); };
+    var rowShell = function(bg){ return stack ? ('display:block;padding:12px 14px;border-top:1px solid #E2E8F0;background:' + bg + ';') : ('display:flex;gap:14px;padding:12px 14px;border-top:1px solid #E2E8F0;align-items:flex-start;background:' + bg + ';'); };
+    var growCell = function(){ return stack ? 'width:auto;min-width:0;margin-top:5px;' : 'flex-grow:1;min-width:0;'; };
+    var actionCell = function(w){ return stack ? 'width:auto;margin-top:10px;display:flex;gap:7px;flex-wrap:wrap;' : ('width:' + w + 'px;flex-shrink:0;display:flex;gap:7px;justify-content:flex-end;flex-wrap:wrap;'); };
+    /* case header: one column below 1000 so the identity never collapses */
+    R.headerWide = !stack;
+    R.headerStack = stack;
+    R.factsGridStyle = stack
+      ? ('display:grid;grid-template-columns:repeat(' + (narrow ? 1 : 2) + ', minmax(0, 1fr));gap:' + (narrow ? '10px' : '12px 18px') + ';margin-top:12px;')
+      : 'display:flex;gap:22px;margin-top:10px;flex-wrap:wrap;';
+    R.tabsStyle = 'display:flex;gap:2px;margin-top:18px;' + (stack ? 'overflow-x:auto;padding-bottom:2px;' : '');
+    R.brandWrapStyle = narrow ? 'display:flex;flex-direction:column;align-items:flex-start;gap:0;min-width:0;' : 'display:flex;align-items:center;gap:18px;min-width:0;';
+    R.brandMarkStyle = 'font-size:' + (narrow ? '15px' : '20px') + ';font-weight:700;letter-spacing:-0.01em;';
+    R.deskTitleStyle = 'font-size:' + (narrow ? '12.5px' : '15px') + ';font-weight:600;line-height:1.2;white-space:nowrap;';
+    R.topBtnStyle = 'display:inline-flex;align-items:center;gap:8px;background:#FFFFFF;border-radius:8px;padding:7px ' + (narrow ? '9px' : '12px') + ';cursor:pointer;flex-shrink:0;';
+    R.navStripStyle = 'flex-shrink:0;background:#FFFFFF;border-bottom:1px solid #E2E8F0;padding:8px 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;';
+    R.navStripRoleStyle = narrow ? 'display:none;' : 'font-size:11px;color:#5B6878;white-space:nowrap;';
+    /* dialog and admin tables: stack inside a narrow dialog */
+    var dCell = function(w, extra){ return (narrow ? 'width:auto;min-width:0;margin-top:4px;' : ('width:' + w + 'px;flex-shrink:0;min-width:0;')) + (extra || ''); };
+    R.snRowStyle = narrow ? 'display:block;padding:9px 0;border-top:1px solid #E2E8F0;' : 'display:flex;gap:14px;padding:9px 0;border-top:1px solid #E2E8F0;align-items:flex-start;';
+    R.snC1 = dCell(22, 'font-size:12px;color:#5B6878;font-weight:600;');
+    R.snC2 = dCell(176, 'font-size:12.5px;font-weight:600;line-height:1.4;');
+    R.snC3 = dCell(116);
+    R.snC4 = (narrow ? 'width:auto;min-width:0;margin-top:4px;' : 'flex-grow:1;min-width:0;') + 'font-size:12.5px;color:#5B6878;line-height:1.5;overflow-wrap:anywhere;';
+    R.snLaneRowStyle = narrow ? 'display:block;padding:8px 0;' : 'display:flex;gap:12px;padding:7px 0;align-items:flex-start;';
+    R.snLaneC1 = dCell(176, 'font-size:12.5px;font-weight:600;');
+    R.snLaneC2 = (narrow ? 'width:auto;min-width:0;margin-top:4px;' : 'flex-grow:1;min-width:0;') + 'font-size:12px;color:#5B6878;line-height:1.5;';
+    R.dispRowStyle = narrow ? 'display:block;padding:9px 0;border-top:1px solid #E2E8F0;' : 'display:flex;gap:12px;padding:8px 0;align-items:flex-start;border-top:1px solid #E2E8F0;';
+    R.dispC1 = dCell(52, 'font-size:12px;font-weight:700;color:#5B6878;');
+    R.dispC2 = (narrow ? 'width:auto;min-width:0;margin-top:4px;' : 'flex-grow:1;min-width:0;');
+    R.evRowStyle = narrow ? 'display:block;padding:10px 16px;border-bottom:1px solid #E2E8F0;' : 'display:flex;gap:16px;padding:10px 16px;border-bottom:1px solid #E2E8F0;';
+    R.evC1 = dCell(206, 'font-size:12.5px;color:#5B6878;');
+    R.evC2 = (narrow ? 'width:auto;min-width:0;margin-top:3px;' : 'flex-grow:1;min-width:0;') + 'font-size:13px;line-height:1.5;overflow-wrap:anywhere;';
+    R.adMapRowStyle = stack ? 'display:block;padding:11px 14px;border-top:1px solid #E2E8F0;' : 'display:flex;gap:14px;padding:10px 14px;border-top:1px solid #E2E8F0;align-items:flex-start;';
+    R.adMapC1 = (stack ? 'width:auto;min-width:0;' : 'width:320px;flex-shrink:0;min-width:0;') + 'font-size:12.5px;font-family:ui-monospace, Consolas, monospace;color:#303C46;overflow-wrap:anywhere;';
+    R.adMapC2 = (stack ? 'width:auto;min-width:0;margin-top:4px;' : 'width:200px;flex-shrink:0;min-width:0;') + 'font-size:13px;font-weight:600;';
+    R.adMapC3 = (stack ? 'width:auto;min-width:0;margin-top:4px;' : 'flex-grow:1;min-width:0;') + 'font-size:12.5px;color:#5B6878;line-height:1.5;';
+
+
+    /* ---- shell ---- */
+    var role = this.roleOf(st.role);
+    R.roleName = role.name;
+    R.rolePerson = role.person;
+    R.roleScope = role.scope;
+    R.roleLane = role.laneLine;
+    R.roleTabs = this.ROLES().map(function(r){
+      var sel = r.key === st.role;
+      return {
+        key:r.key, label:r.label, sel:sel,
+        style:'border:none;border-radius:6px;padding:7px 12px;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;' + (sel ? ('background:' + accent + ';color:#FFFFFF;') : 'background:transparent;color:#5B6878;'),
+        on:self.act(function(n){ n.role = r.key; n.drawer = null; n.modal = null; n.toast = null; if (n.view === 'admin' && r.key !== 'admin') n.view = 'queue'; if (n.view === 'new' && !self.roleOf(r.key).packs) n.view = 'queue';
+          if (n.view === 'case') { var vis = self.visible(n), ok = false; for (var q = 0; q < vis.length; q++) { if (vis[q].id === n.caseId) ok = true; } if (!ok) { n.view = 'queue'; n.caseId = null; self.toast(n, 'That case is outside the ' + r.name + ' scope, so the queue is shown instead.', 'warn'); } }
+        })
+      };
+    });
+    R.scenario = st.scenario;
+    R.scenarioOpts = [
+      {key:'s1', label:'1 · Full journey — draft, submit with defects, send-back, v2, approvals, disposition'},
+      {key:'s2', label:'2 · All lanes approved with one finding still open'},
+      {key:'s3', label:'3 · Checklist template v2.0 isolation (SL2.1 must not carry over)'},
+      {key:'s4', label:'4 · Quality checks unavailable'}
+    ];
+    R.onScenario = this.act(function(n, e){ var v = e.target.value; var fresh = self.build(v); for (var kk in fresh) { n[kk] = fresh[kk]; } self.toast(n, 'Scenario reloaded from its fixed starting point.', 'ok'); });
+    R.onReset = this.act(function(n){ var fresh = self.build(n.scenario); for (var kk in fresh) { n[kk] = fresh[kk]; } self.toast(n, 'Scenario reset. Every case, finding and event is back to its starting point.', 'ok'); });
+
+    var scopeIds = {}, visPre = this.visible(st);
+    for (i = 0; i < visPre.length; i++) { scopeIds[visPre[i].id] = true; }
+    var notifScoped = (st.role === 'owner' || st.role === 'spoc');
+    var myNotifs = st.notifs.filter(function(nf){ return !notifScoped || scopeIds[nf.caseId]; });
+    var unread = 0;
+    for (i = 0; i < myNotifs.length; i++) { if (!myNotifs[i].read) unread = unread + 1; }
+    R.notifCount = unread;
+    R.hasNotif = unread > 0;
+    R.notifAria = 'Notifications, ' + unread + ' unread';
+    R.notifBtnStyle = R.topBtnStyle + 'border:1px solid ' + (st.drawer === 'notif' ? '#303C46' : '#E2E8F0') + ';';
+    R.notesBtnStyle = R.topBtnStyle + 'border:1px solid ' + (st.drawer === 'notes' ? '#303C46' : '#E2E8F0') + ';';
+    R.onNotif = this.act(function(n){ if (n.drawer === 'notif') { n.drawer = null; } else { n.drawer = 'notif'; var vv = self.visible(n), sc = {}; for (var y = 0; y < vv.length; y++) { sc[vv[y].id] = true; } var scopedN = (n.role === 'owner' || n.role === 'spoc'); for (var q = 0; q < n.notifs.length; q++) { if (!scopedN || sc[n.notifs[q].caseId]) n.notifs[q].read = true; } } });
+    R.onNotes = this.act(function(n){ n.drawer = (n.drawer === 'notes') ? null : 'notes'; });
+    R.onCloseDrawer = this.act(function(n){ n.drawer = null; });
+
+    var vis = this.visible(st);
+    R.visCount = vis.length;
+    R.isQueue = st.view === 'queue';
+    R.isNew = st.view === 'new';
+    R.isCase = st.view === 'case';
+    R.isAdmin = st.view === 'admin';
+    R.adminDisabled = st.role !== 'admin';
+    var navBase = 'display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:none;border-radius:8px;padding:10px 11px;font-size:13.5px;font-weight:600;cursor:pointer;';
+    R.navQueueStyle = navBase + (R.isQueue || R.isCase || R.isNew ? 'background:#FDECEC;color:#B80000;' : 'background:transparent;color:#303C46;');
+    R.navAdminStyle = navBase + (R.isAdmin ? 'background:#FDECEC;color:#B80000;' : 'background:transparent;color:#303C46;');
+    R.navQueueCountStyle = 'margin-left:auto;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:999px;padding:1px 8px;font-size:11px;color:#5B6878;';
+    var navCompactBase = 'display:inline-flex;align-items:center;gap:8px;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid #E2E8F0;white-space:nowrap;';
+    R.navQueueCompactStyle = navCompactBase + ((R.isQueue || R.isCase || R.isNew) ? 'background:#FDECEC;color:#B80000;border-color:#F3C9C9;' : 'background:#FFFFFF;color:#303C46;');
+    R.navAdminCompactStyle = navCompactBase + (R.isAdmin ? 'background:#FDECEC;color:#B80000;border-color:#F3C9C9;' : 'background:#FFFFFF;color:#303C46;');
+    R.onNavQueue = this.act(function(n){ n.view = 'queue'; n.modal = null; });
+    R.onNavAdmin = this.act(function(n){ if (n.role === 'admin') { n.view = 'admin'; n.modal = null; n.cfgDraft = null; } });
+
+    /* ---- queue ---- */
+    R.queueScopeLine = (st.role === 'owner') ? 'You see only the cases you own. Cases owned by other business units are not listed here at all.'
+      : (st.role === 'spoc') ? 'You see cases in Consumer Mobile. Cases in other business units are not listed here at all.'
+      : (st.role === 'admin') ? 'You can read every case for configuration purposes. You cannot approve a lane or dispose of a finding.'
+      : 'You see every case, and you act only in your own lane.';
+    R.canCreate = !!role.packs;
+    R.newDisabled = !role.packs;
+    R.onNew = this.act(function(n){ if (self.roleOf(n.role).packs) { n.view = 'new'; n.nc = {name:'', srcKnown:'known', src:'', vendor:'no', kind:'classic', modelVer:'1.0', checklistVer:'v1.0 Sheet3', showErr:false}; } });
+
+    var q = vis.slice();
+    var term = st.search.trim().toLowerCase();
+    if (term) { q = q.filter(function(k){ return (k.name + ' ' + k.id + ' ' + k.owner + ' ' + k.src + ' ' + k.bu).toLowerCase().indexOf(term) >= 0; }); }
+    if (st.fStatus !== 'all') { q = q.filter(function(k){ return k.state === st.fStatus; }); }
+    if (st.fOwner !== 'all') { q = q.filter(function(k){ return k.owner === st.fOwner; }); }
+    if (st.fBu !== 'all') { q = q.filter(function(k){ return k.bu === st.fBu; }); }
+    if (st.fSrc !== 'all') { q = q.filter(function(k){ return (st.fSrc === 'unknown') ? (k.src === 'Unknown') : (k.src !== 'Unknown'); }); }
+
+    var scopedOwners = [], scopedBus = [];
+    for (i = 0; i < vis.length; i++) {
+      if (scopedOwners.indexOf(vis[i].owner) < 0) scopedOwners.push(vis[i].owner);
+      if (scopedBus.indexOf(vis[i].bu) < 0) scopedBus.push(vis[i].bu);
+    }
+    R.search = st.search;
+    R.onSearch = this.act(function(n, e){ n.search = e.target.value; });
+    R.filters = [
+      {id:'f-status', label:'Status', value:st.fStatus, opts:[{v:'all',t:'Any status'},{v:'draft',t:'Draft'},{v:'in_review',t:'In review'},{v:'changes_requested',t:'Changes requested'},{v:'awaiting_disposition',t:'Awaiting disposition'},{v:'ready',t:'Ready for launch'}], on:this.act(function(n, e){ n.fStatus = e.target.value; })},
+      {id:'f-owner', label:'Owner', value:st.fOwner, opts:[{v:'all',t:'Any owner'}].concat(scopedOwners.map(function(x){ return {v:x, t:x}; })), on:this.act(function(n, e){ n.fOwner = e.target.value; })},
+      {id:'f-bu', label:'Group / BU', value:st.fBu, opts:[{v:'all',t:'Any group'}].concat(scopedBus.map(function(x){ return {v:x, t:x}; })), on:this.act(function(n, e){ n.fBu = e.target.value; })},
+      {id:'f-src', label:'Source record ID', value:st.fSrc, opts:[{v:'all',t:'Any'},{v:'known',t:'Known ID'},{v:'unknown',t:'Unknown'}], on:this.act(function(n, e){ n.fSrc = e.target.value; })}
+    ];
+    R.clearDisabled = !(term || st.fStatus !== 'all' || st.fOwner !== 'all' || st.fBu !== 'all' || st.fSrc !== 'all');
+    R.onClearFilters = this.act(function(n){ n.search = ''; n.fStatus = 'all'; n.fOwner = 'all'; n.fBu = 'all'; n.fSrc = 'all'; });
+    var scoped = st.role === 'owner' || st.role === 'spoc';
+    R.queueCountLine = scoped
+      ? (q.length + ' of ' + vis.length + ' case(s) shown · ' + vis.length + ' in your scope')
+      : (q.length + ' of ' + vis.length + ' case(s) shown · ' + vis.length + ' in your scope · ' + st.cases.length + ' in the desk overall');
+    R.qHasCards = q.length > 0;
+    R.qNoMatch = q.length === 0 && vis.length > 0;
+    R.qEmptyScope = vis.length === 0;
+    R.emptyScopeLine = (st.role === 'owner') ? 'You do not own a case yet. Opening one creates a draft you can build the pack in.' : 'No case in the desk falls inside your scope right now.';
+    R.qCards = q.map(function(k){
+      var L = self.LANES();
+      return {
+        id:k.id, name:k.name,
+        meta:k.bu + ' · ' + k.owner + ' · Model ' + k.modelVer + ' · Submission v' + k.ver + ' · Source ID ' + k.src,
+        stateLabel:self.stateLabel(k), stateStyle:self.chip(self.stateTone(k.state)),
+        lanes:L.map(function(l){ return {text:l.name + ' · ' + self.laneText(k.lanes[l.k], k.ver), style:self.chip(self.laneTone(k.lanes[l.k], k.ver))}; }),
+        findingText:self.curFindings(k).length + ' finding(s) · ' + self.openFindings(k) + ' still open',
+        nextAction:self.nextAction(st, k),
+        open:self.act(function(n){ n.view = 'case'; n.caseId = k.id; n.tab = 'docs'; n.modal = null; })
+      };
+    });
+
+    /* ---- new case form ---- */
+    var nc = st.nc;
+    var nameBad = nc.showErr && nc.name.trim().length < 4;
+    var srcBad = nc.showErr && nc.srcKnown === 'known' && nc.src.trim().length < 3;
+    var fieldBase = 'width:100%;border-radius:6px;padding:10px 11px;font-size:14px;background:#FFFFFF;border:1px solid ';
+    R.nc = {
+      name:nc.name, bu:(role.bu || ''), src:nc.src, srcKnown:nc.srcKnown === 'known',
+      nameErr:nameBad, srcErr:srcBad,
+      nameStyle:fieldBase + (nameBad ? '#E00000;' : '#E2E8F0;'),
+      srcStyle:fieldBase + (srcBad ? '#E00000;' : '#E2E8F0;'),
+      buOpts:[{v:(role.bu || ''), t:(role.bu || '')}],
+      buNote:'Fixed to ' + (role.bu || 'your unit') + ' in this prototype. Neither a case owner nor a BU SPOC can open a case in another business unit.',
+      modelVer:nc.modelVer, checklistVer:nc.checklistVer,
+      modelOpts:[{v:'1.0', t:'Model version 1.0'}, {v:'2.0', t:'Model version 2.0'}],
+      checklistOpts:[{v:'v1.0 Sheet3', t:'Checklist template v1.0 Sheet3 — SL2.1 numeric thresholds apply'}, {v:'v2.0', t:'Checklist template v2.0 — no numeric threshold defined in this desk'}],
+      onModelVer:self.act(function(n, e){ n.nc.modelVer = e.target.value; }),
+      onChecklistVer:self.act(function(n, e){ n.nc.checklistVer = e.target.value; }),
+      versionNote:'These are separate fields. Only checklist_template_version selects the hallucination threshold source; model version never does.',
+      srcModes:[
+        {v:'known', t:'Known — enter the register ID', checked:nc.srcKnown === 'known', on:self.act(function(n){ n.nc.srcKnown = 'known'; })},
+        {v:'unknown', t:'Unknown — no register ID is available', checked:nc.srcKnown === 'unknown', on:self.act(function(n){ n.nc.srcKnown = 'unknown'; })}
+      ],
+      vendorOpts:[
+        {v:'no', t:'No vendor or processor', checked:nc.vendor === 'no', on:self.act(function(n){ n.nc.vendor = 'no'; })},
+        {v:'yes', t:'External vendor or processor involved', checked:nc.vendor === 'yes', on:self.act(function(n){ n.nc.vendor = 'yes'; })}
+      ],
+      kindOpts:[
+        {v:'classic', t:'Classic ML (scoring, ranking, forecasting)', checked:nc.kind === 'classic', on:self.act(function(n){ n.nc.kind = 'classic'; })},
+        {v:'genai', t:'Generative AI (text generation, assistant)', checked:nc.kind === 'genai', on:self.act(function(n){ n.nc.kind = 'genai'; })}
+      ],
+      onName:self.act(function(n, e){ n.nc.name = e.target.value; }),
+      onBu:self.act(function(n, e){ n.nc.bu = e.target.value; }),
+      onSrc:self.act(function(n, e){ n.nc.src = e.target.value; }),
+      hint:nc.vendor === 'no' ? 'DPA and SOW will open as N/A with a stated reason.' : 'DPA and SOW will open as Not yet provided.',
+      onCreate:self.act(function(n){
+        n.nc.showErr = true;
+        if (n.nc.name.trim().length < 4) return;
+        if (n.nc.srcKnown === 'known' && n.nc.src.trim().length < 3) return;
+        var ts = self.tick(n);
+        var idn = 164 + n.cases.length;
+        var cr = self.roleOf(n.role);
+        var k = self.newCase({id:'RAI-2026-0' + idn, name:n.nc.name.trim(), bu:cr.bu, owner:self.actorName(n), ownerRole:n.role, modelVer:n.nc.modelVer, checklistVer:n.nc.checklistVer, kind:n.nc.kind, vendor:n.nc.vendor === 'yes', src:n.nc.srcKnown === 'known' ? n.nc.src.trim() : 'Unknown', riskScenario:'incomplete'});
+        if (n.nc.vendor === 'no') {
+          self.markNA(k, 'dpa', 'No external vendor or processor is in scope — no DPA exists for this case.', ts);
+          self.markNA(k, 'sow', 'No external vendor or processor is in scope — no statement of work exists for this case.', ts);
+        }
+        k.savedDocs = self.clone(k.docs);
+        k.history.push({ts:ts, actor:self.actorName(n), role:self.actorRole(n), action:'Case created', detail:'Draft opened in ' + k.bu + ' · source record ID ' + k.src + ' · model version ' + k.modelVer + ' · checklist template ' + k.checklistVer + ' · ' + (k.vendor ? 'external vendor in scope' : 'no external vendor in scope') + ' · nothing was written to any external register', ver:1});
+        n.cases.push(k);
+        n.view = 'case'; n.caseId = k.id; n.tab = 'docs';
+        self.toast(n, 'Draft ' + k.id + ' created. The nine slots are ready to fill.', 'ok');
+      })
+    };
+
+    /* ---- case detail ---- */
+    var k = st.caseId ? this.caseOf(st, st.caseId) : null;
+    var inScope = false;
+    if (k) { for (i = 0; i < vis.length; i++) { if (vis[i].id === k.id) inScope = true; } }
+    if (!k || !inScope) { if (R.isCase) { R.isCase = false; R.isQueue = true; } k = null; }
+
+    R.isDocs = false; R.isLanes = false; R.isFind = false; R.isHist = false;
+    R.c = {}; R.tabs = []; R.docRows = []; R.laneCards = []; R.findRows = []; R.histRows = []; R.snapRows = [];
+    R.noSnaps = true; R.noFindings = true; R.hasFindings = false; R.noFindingsText = ''; R.findingsFootnote = '';
+    R.saveDisabled = true;
+    R.onSubmit = this.act(function(n){});
+    R.onSaveDraft = this.act(function(n){});
+    R.onDiscard = this.act(function(n){});
+    R.onRisk = this.act(function(n){});
+
+    if (k) {
+      var editable = this.canEdit(st, k);
+      var cur = this.curFindings(k);
+      var openN = this.openFindings(k);
+      var L = this.LANES();
+
+      R.isDocs = st.tab === 'docs'; R.isLanes = st.tab === 'lanes'; R.isFind = st.tab === 'find'; R.isHist = st.tab === 'hist';
+      var tabDef = [
+        {key:'docs', label:'Documents', count:'9'},
+        {key:'lanes', label:'Review lanes', count:'3'},
+        {key:'find', label:'Findings', count:String(cur.length)},
+        {key:'hist', label:'History', count:String(k.history.length)}
+      ];
+      R.tabs = tabDef.map(function(t){
+        var sel = st.tab === t.key;
+        return {
+          key:t.key, label:t.label, count:t.count, sel:sel,
+          style:'display:inline-flex;align-items:center;gap:8px;border:none;border-bottom:3px solid ' + (sel ? accent : 'transparent') + ';background:none;padding:10px 16px 11px;font-size:13.5px;font-weight:' + (sel ? '700' : '600') + ';color:' + (sel ? '#303C46' : '#5B6878') + ';cursor:pointer;',
+          badgeStyle:'background:' + (sel ? '#FDECEC' : '#F3F3F6') + ';color:' + (sel ? '#B80000' : '#5B6878') + ';border-radius:999px;padding:1px 7px;font-size:11px;font-weight:700;',
+          on:self.act(function(n){ n.tab = t.key; })
+        };
+      });
+
+      var riskTier = k.riskScenario === 'high' ? 'High' : (k.riskScenario === 'medium' ? 'Medium' : 'Unknown');
+      var isDraftState = (k.state === 'draft' || k.state === 'changes_requested');
+      var lastSnap = k.snaps.length ? k.snaps[k.snaps.length - 1] : null;
+      var bannerTone = this.stateTone(k.state);
+      var bt = this.tone(bannerTone);
+      var bTitle, bBody;
+      if (k.state === 'draft') { bTitle = 'Draft — nothing has been submitted yet'; bBody = 'Fill the nine slots, then run the simulated checks and submit. Quality findings will not stop the submission.'; }
+      else if (k.state === 'in_review') { bTitle = 'Three lanes are open in parallel'; bBody = 'Each lane decides on its own gates. Simulated checks surface findings; they never block a lane decision.'; }
+      else if (k.state === 'changes_requested') { bTitle = 'Changes requested — Submission v' + (k.ver - 1) + ' is preserved read-only'; bBody = 'A single Submission v' + k.ver + ' draft is open with the documents carried forward. Approvals given on v' + (k.ver - 1) + ' are superseded and cannot affect this version. Resubmitting reopens all three lanes — a full three-lane re-review is proposed for this desk and is still pending confirmation.'; }
+      else if (k.state === 'awaiting_disposition') { bTitle = 'All lanes approved · awaiting disposition'; bBody = openN + ' finding(s) on Submission v' + k.ver + ' still have no disposition. The desk is not complete until every one of them is fixed with evidence, waived with a reason, or marked not applicable with a reason.'; }
+      else { bTitle = 'Review desk complete.'; bBody = 'Council and ITSM authorization remain outside this desk. Three current-version lane approvals are recorded and every finding on Submission v' + k.ver + ' is disposed.'; }
+
+      R.c = {
+        id:k.id, name:k.name, modelVer:k.modelVer, checklistVer:k.checklistVer, subVer:'v' + k.ver,
+        stateLabel:this.stateLabel(k), stateStyle:this.chip(bannerTone),
+        riskLabel:riskTier + ' (proposed) — view evidence',
+        facts:[
+          {k:'Business unit', v:k.bu},
+          {k:'Case owner', v:k.owner},
+          {k:'Source record ID', v:k.src},
+          {k:'Type', v:(k.kind === 'classic' ? 'Classic ML' : 'Generative AI') + (k.vendor ? ' · vendor in scope' : ' · in house')},
+          {k:'Model version', v:k.modelVer},
+          {k:'Checklist template version', v:k.checklistVer}
+        ],
+        versionNote:(k.checklistVer === 'v1.0 Sheet3'
+          ? 'Checklist template v1.0 Sheet3 selects the SL2.1 numeric thresholds. Model version ' + k.modelVer + ' has no part in that choice.'
+          : 'Checklist template ' + k.checklistVer + ' defines no numeric hallucination threshold in this desk, so the v1.0 Sheet3 SL2.1 figures are not applied. Model version ' + k.modelVer + ' has no part in that choice.'),
+        isDraftCfg:isDraftState,
+        cfgNowLabel:isDraftState ? 'Draft — will submit under' : 'Submitted under',
+        cfgNow:isDraftState
+          ? ('pack template ' + st.config.tpl + ' · configuration revision ' + st.config.rev + ' · checklist template ' + k.checklistVer + ' · model version ' + k.modelVer)
+          : (k.cfg ? ('pack template ' + k.cfg.tpl + ' · configuration revision ' + k.cfg.rev + ' · checklist template ' + k.cfg.checklistVer + ' · model version ' + k.cfg.modelVer + '. Later revisions do not change it.') : ''),
+        hasPrevCfg:isDraftState && lastSnap !== null,
+        cfgPrev:lastSnap ? ('Submission v' + lastSnap.ver + ' was submitted under pack template ' + lastSnap.cfgTpl + ' · configuration revision ' + lastSnap.cfgRev + ' · checklist template ' + lastSnap.checklistVer + ' · model version ' + lastSnap.modelVer + '. That snapshot is frozen.') : '',
+        bannerStyle:'background:' + bt.bg + ';border:1px solid ' + bt.bd + ';border-top:none;color:' + bt.fg + ';padding:13px 22px;',
+        bannerTitle:bTitle, bannerBody:bBody,
+        docsSummary:(function(){ var att = 0, na = 0, out = 0; var SS = self.SLOTS(); for (var z = 0; z < SS.length; z++) { var d = k.docs[SS[z].k]; if (d.state === 'attached') att++; else if (d.state === 'na') na++; else out++; } return att + ' attached · ' + na + ' N/A · ' + out + ' outstanding'; })(),
+        editable:editable,
+        readOnlyPack:!editable,
+        readOnlyReason:(k.state === 'in_review' || k.state === 'awaiting_disposition' || k.state === 'ready')
+          ? 'This submission is snapshotted and read-only. A document can only change by sending the case back, which opens a new submission draft.'
+          : (role.packs ? 'This case sits outside your business unit, so the pack is read-only for you.' : 'The pack is edited by the case owner or the BU SPOC for that unit. Your role reads it.'),
+        submitHint:'Submitting is allowed even with quality findings outstanding — the findings travel with the submission and the lanes decide.',
+        laneScopeLine:role.lane ? ('You act in the ' + this.laneOf(role.lane).name + ' lane. The other two lanes are read-only for you.') : 'Your role has no lane. All three lanes are read-only for you.',
+        dispositionAuthorityLine:role.lane ? ('You may dispose only of findings in the ' + this.laneOf(role.lane).name + ' lane.') : 'Your role cannot dispose of findings in this prototype.'
+      };
+
+      R.onRisk = this.act(function(n){ n.modal = {kind:'risk'}; });
+
+      /* documents */
+      R.saveDisabled = !k.dirty;
+      R.docRows = this.SLOTS().map(function(sl){
+        var d = k.docs[sl.k];
+        var gateNames = sl.lanes.map(function(x){ return self.laneOf(x).name; });
+        var detail = d.state === 'attached' ? d.doc.name : (d.state === 'na' ? 'Not applicable' : (d.state === 'missing' ? 'Recorded as missing' : 'No document yet'));
+        var sub = d.state === 'na' ? d.reason : (d.state === 'attached' ? ('Added ' + self.fmt(d.at)) : '');
+        return {
+          n:String(sl.n), name:sl.name,
+          gates:sl.lanes.length ? ('Gates: ' + gateNames.join(', ')) : 'Gates no lane',
+          stateLabel:self.docLabel(d.state), stateStyle:self.chip(self.docTone(d.state)),
+          detail:detail, sub:sub, hasSub:sub.length > 0,
+          rowStyle:rowShell('#FFFFFF'),
+          c1:cellStyle(26) + 'font-size:12.5px;color:#5B6878;font-weight:600;' + (stack ? '' : 'padding-top:2px;'),
+          c2:cellStyle(236),
+          c3:cellStyle(132),
+          c4:growCell(),
+          c5:actionCell(250),
+          hasEvidence:d.state === 'attached',
+          onEvidence:self.act(function(n){ n.modal = {kind:'evidence', ev:d.doc ? d.doc.ev : ''}; }),
+          editLabel:d.state === 'attached' ? 'Change' : 'Add document',
+          editDisabled:!editable,
+          onEdit:self.act(function(n){ if (self.canEdit(n, self.caseOf(n, k.id))) n.modal = {kind:'addoc', slot:sl.k, sel:(d.state === 'attached' ? d.doc.id : (d.state === 'na' ? '__na' : (d.state === 'missing' ? '__missing' : ''))), reason:d.reason || '', showErr:false}; })
+        };
+      });
+      R.onSaveDraft = this.act(function(n){ var kk = self.caseOf(n, k.id); kk.savedDocs = self.clone(kk.docs); kk.dirty = false; self.log(n, kk, self.actorName(n), self.actorRole(n), 'Draft saved', 'Document pack saved without submitting.'); self.toast(n, 'Draft saved.', 'ok'); });
+      R.onDiscard = this.act(function(n){ var kk = self.caseOf(n, k.id); kk.docs = self.clone(kk.savedDocs); kk.dirty = false; self.toast(n, 'Unsaved changes discarded. The pack is back to the last saved draft.', 'warn'); });
+      R.onSubmit = this.act(function(n){
+        var kk = self.caseOf(n, k.id);
+        var res = self.runQC(n, kk, 'pre-submit preview', null);
+        for (var z = res.created.length - 1; z >= 0; z--) { kk.findings.pop(); kk.fseq = kk.fseq - 1; }
+        n.modal = {kind:'qc', mode:'submit', caseId:kk.id, checks:res.checks, down:res.down, count:res.created.length};
+      });
+
+      /* lanes */
+      R.laneCards = L.map(function(l){
+        var st2 = k.lanes[l.k];
+        var mine = role.lane === l.k;
+        var laneF = cur.filter(function(f){ return f.lane === l.k; });
+        var actionable = mine && st2.state === 'open' && st2.ver === k.ver;
+        var decided = (st2.state === 'approved' || st2.state === 'sent_back') && st2.ver === k.ver;
+        var lockReason;
+        if (!mine) lockReason = role.lane ? ('Read-only: you act in the ' + self.laneOf(role.lane).name + ' lane, not this one.') : (st.role === 'admin' ? 'Read-only: the administrator role never approves a lane, by design.' : 'Read-only: your role has no lane decision.');
+        else if (k.state === 'draft' || k.state === 'changes_requested') lockReason = 'Read-only: this lane opens when the owner submits.';
+        else lockReason = 'Read-only: this lane has already decided on the current submission.';
+        return {
+          name:l.name, reviewer:l.reviewer + (mine ? ' · you' : ''),
+          aria:l.name + ' lane',
+          chipText:self.laneText(st2, k.ver), chipStyle:self.chip(self.laneTone(st2, k.ver)),
+          slaLine:st2.due ? ('Illustrative due ' + self.fmtDay(st2.due) + ' · ' + (l.k === 'dpo' ? (k.cfg ? k.cfg.slaDpo : st.config.slaDpo) : (k.cfg ? k.cfg.slaOther : st.config.slaOther)) + ' working days · no automatic escalation') : 'No due date until the case is submitted.',
+          fCount:String(laneF.length),
+          noFindings:laneF.length === 0,
+          noFindingsText:(k.state === 'draft' ? 'Nothing has been checked yet — the pack has not been submitted.' : 'The simulated checks raised nothing in this lane for the current submission.'),
+          findings:laneF.map(function(f){
+            var canDisp = role.lane === f.lane && !f.disp;
+            return {
+              sev:f.sev, sevStyle:self.tag(self.sevTone(f.sev)), title:f.title,
+              dispText:f.disp ? (self.dispLabel(f.disp.kind) + ' by ' + f.disp.by) : 'Open · no disposition yet',
+              onEvidence:self.act(function(n){ n.modal = {kind:'evidence', ev:f.ev}; }),
+              disposeLabel:f.disp ? 'Disposed' : 'Dispose',
+              disposeDisabled:!canDisp,
+              disposeStyle:canDisp ? R.btnLink : 'background:none;border:none;padding:0;font-size:11.5px;font-weight:600;color:#5B6878;',
+              onDispose:self.act(function(n){ n.modal = {kind:'dispose', caseId:k.id, fid:f.id, dkind:'fixed', reason:'', evidence:'', showErr:false}; })
+            };
+          }),
+          gates:l.gates.map(function(g){
+            var sl = self.slotOf(g), d = k.docs[g];
+            var okTone = d.state === 'attached' ? '#0B6B45' : (d.state === 'na' ? '#94A3B8' : '#E00000');
+            return {
+              slot:sl.name,
+              detail:d.state === 'attached' ? d.doc.name : (d.state === 'na' ? ('N/A — ' + d.reason) : self.docLabel(d.state)),
+              dotStyle:'width:8px;height:8px;border-radius:50%;margin-top:6px;flex-shrink:0;background:' + okTone + ';',
+              hasEvidence:d.state === 'attached',
+              onEvidence:self.act(function(n){ n.modal = {kind:'evidence', ev:d.doc ? d.doc.ev : ''}; })
+            };
+          }),
+          actionable:actionable, locked:!actionable && !decided, decided:decided,
+          lockReason:lockReason,
+          decisionText:st2.state === 'approved' ? ('Approved by ' + st2.by + ' on ' + self.fmt(st2.at) + '.') : (st2.state === 'sent_back' ? ('Sent back by ' + st2.by + ' on ' + self.fmt(st2.at) + ' — ' + (st2.artifact ? self.slotOf(st2.artifact).name : 'artifact not recorded') + ': ' + st2.note) : ''),
+          onApprove:self.act(function(n){
+            var kk = self.caseOf(n, k.id);
+            var res = self.runQC(n, kk, 'lane approval preview', l.k);
+            for (var z = res.created.length - 1; z >= 0; z--) { kk.findings.pop(); kk.fseq = kk.fseq - 1; }
+            n.modal = {kind:'qc', mode:'approve', caseId:kk.id, lane:l.k, checks:res.checks, down:res.down, count:res.created.length};
+          }),
+          onSendBack:self.act(function(n){ n.modal = {kind:'sendback', caseId:k.id, lane:l.k, slot:'', text:'', showErr:false}; })
+        };
+      });
+
+      /* findings tab */
+      R.noFindings = cur.length === 0;
+      R.hasFindings = cur.length > 0;
+      R.noFindingsText = k.state === 'draft' ? 'Nothing has been checked yet. Running the checks at submission is what raises findings.' : 'The simulated checks raised nothing on the current submission.';
+      R.findingsFootnote = 'Findings are scoped to Submission v' + k.ver + '. Findings raised against an earlier submission stay in the history and cannot affect this version.';
+      R.findRows = cur.map(function(f){
+        var canDisp = role.lane === f.lane && !f.disp;
+        var why = role.lane === f.lane ? '' : (st.role === 'owner' ? 'Owner cannot waive' : (st.role === 'admin' ? 'Admin cannot waive' : 'Other lane'));
+        return {
+          id:f.id, sev:f.sev, sevStyle:self.tag(self.sevTone(f.sev)), lane:self.laneOf(f.lane).name,
+          title:f.title, detail:f.detail,
+          origin:'Raised by ' + f.trigger + ' · ' + self.fmt(f.at) + ' · Submission v' + f.ver,
+          rowStyle:rowShell('#FFFFFF'),
+          c1:cellStyle(58) + 'font-size:12px;font-weight:700;color:#5B6878;' + (stack ? '' : 'padding-top:2px;'),
+          c2:cellStyle(74),
+          c3:cellStyle(118) + 'font-size:12.5px;line-height:1.4;',
+          c4:growCell(),
+          c5:cellStyle(180),
+          c6:actionCell(168),
+          dispLabel:f.disp ? self.dispLabel(f.disp.kind) : 'Open',
+          dispStyle:self.chip(f.disp ? (f.disp.kind === 'fixed' ? 'green' : 'grey') : 'amber'),
+          hasDispNote:!!f.disp,
+          dispNote:f.disp ? (f.disp.by + ' · ' + f.disp.reason) : '',
+          onEvidence:self.act(function(n){ n.modal = {kind:'evidence', ev:f.ev}; }),
+          disposeLabel:f.disp ? 'Disposed' : (canDisp ? 'Dispose' : why),
+          disposeDisabled:!canDisp,
+          onDispose:self.act(function(n){ n.modal = {kind:'dispose', caseId:k.id, fid:f.id, dkind:'fixed', reason:'', evidence:'', showErr:false}; })
+        };
+      });
+
+      /* history */
+      R.noSnaps = k.snaps.length === 0;
+      R.snapRows = k.snaps.map(function(s){
+        var isCurrent = s.ver === k.ver;
+        return {
+          ver:'v' + s.ver, tag:isCurrent ? 'Current' : 'Superseded · read-only', tagStyle:self.tag(isCurrent ? 'blue' : 'grey'),
+          line:'Snapshotted ' + self.fmt(s.at) + ' · pack template ' + s.cfgTpl + ' rev ' + s.cfgRev + ' · checklist template ' + s.checklistVer + ' · model version ' + s.modelVer + ' · ' + s.findingIds.length + ' finding(s) at submission · ' + self.decisionCount(k, s.ver) + ' lane decision(s) recorded since',
+          onView:self.act(function(n){ n.modal = {kind:'snap', caseId:k.id, ver:s.ver}; })
+        };
+      });
+      R.histRows = k.history.slice().reverse().map(function(h){
+        var isCur = h.ver === k.ver;
+        return {
+          when:self.fmt(h.ts), ver:'v' + h.ver, verStyle:self.tag(isCur ? 'blue' : 'grey'),
+          actor:h.actor + ' · ' + h.role, action:h.action, detail:h.detail,
+          rowStyle:rowShell(isCur ? '#FFFFFF' : '#F9F9FC'),
+          c1:cellStyle(150) + 'font-size:12px;color:#5B6878;',
+          c2:cellStyle(86),
+          c3:cellStyle(176) + 'font-size:12.5px;line-height:1.4;',
+          c4:cellStyle(196) + 'font-size:12.5px;font-weight:600;line-height:1.4;',
+          c5:growCell() + 'font-size:12.5px;color:#5B6878;line-height:1.5;'
+        };
+      });
+    }
+
+    /* ---- admin ---- */
+    var cfg = st.cfgDraft || st.config;
+    var dirtyCfg = !!st.cfgDraft;
+    var setCfg = function(field){
+      return self.act(function(n, e){
+        if (!n.cfgDraft) n.cfgDraft = self.clone(n.config);
+        var v = e.target.value;
+        n.cfgDraft[field] = (field === 'tpl') ? v : (v === '' ? '' : Number(v));
+      });
+    };
+    R.ad = {
+      tpl:cfg.tpl, slaDpo:String(cfg.slaDpo), slaOther:String(cfg.slaOther),
+      liveLabel:'Rev ' + st.config.rev + ' · pack template ' + st.config.tpl,
+      publishedLine:'Published ' + this.fmtDay(st.config.publishedAt),
+      onTpl:setCfg('tpl'), onSlaDpo:setCfg('slaDpo'), onSlaOther:setCfg('slaOther'),
+      thresholds:[
+        {id:'th-hi', label:'High band', value:String(cfg.hi), on:setCfg('hi')},
+        {id:'th-md', label:'Medium band', value:String(cfg.md), on:setCfg('md')},
+        {id:'th-lo', label:'Low band', value:String(cfg.lo), on:setCfg('lo')}
+      ],
+      publishDisabled:!dirtyCfg,
+      publishHint:dirtyCfg ? 'Publishing applies from the next submission onward. Cases already submitted keep the revision they were submitted under.' : 'Change a value to enable publishing. Nothing is applied until you publish.',
+      onPublish:this.act(function(n){
+        if (!n.cfgDraft) return;
+        var prev = n.config.rev;
+        n.config = n.cfgDraft;
+        n.config.rev = prev + 1;
+        n.config.publishedAt = self.tick(n);
+        n.cfgDraft = null;
+        self.toast(n, 'Configuration revision ' + n.config.rev + ' published. Submissions already in flight keep revision ' + prev + '.', 'ok');
+      }),
+      onRevert:this.act(function(n){ n.cfgDraft = null; self.toast(n, 'Configuration edits discarded.', 'warn'); }),
+      mapRows:[
+        {group:'AD-RAI-DESK-OWNERS-CM', role:'Case owner', acts:'Own cases · create, edit, save, submit, correct and resubmit the pack · no lane decision, no disposition'},
+        {group:'AD-RAI-DESK-SPOC-CM', role:'BU SPOC', acts:'Consumer Mobile cases · create, edit, save, submit, correct and resubmit the pack · no lane decision, no disposition'},
+        {group:'AD-RAI-COE-REVIEWERS', role:'AI/COE reviewer', acts:'All cases · approve, send back and dispose in the AI/COE lane only'},
+        {group:'AD-DPO-REVIEWERS', role:'DPO reviewer', acts:'All cases · approve, send back and dispose in the Privacy lane only'},
+        {group:'AD-ITSEC-REVIEWERS', role:'IT/Security reviewer', acts:'All cases · approve, send back and dispose in the IT/Security lane only'},
+        {group:'AD-RAI-DESK-ADMINS', role:'Desk administrator', acts:'Configuration only · never a lane approval or a disposition'}
+      ]
+    };
+
+    /* ---- drawers ---- */
+    R.drawerNotif = st.drawer === 'notif';
+    R.drawerNotes = st.drawer === 'notes';
+    R.noNotifs = myNotifs.length === 0;
+    R.notifRows = myNotifs.map(function(nf){
+      var tn = nf.kind === 'sendback' ? 'red' : (nf.kind === 'done' ? 'green' : (nf.kind === 'sla' ? 'amber' : 'blue'));
+      var lbl = nf.kind === 'sendback' ? 'Send-back' : (nf.kind === 'done' ? 'Desk complete' : (nf.kind === 'sla' ? 'SLA breach preview' : 'Lane opened'));
+      var target = null;
+      for (var z = 0; z < vis.length; z++) { if (vis[z].id === nf.caseId) target = vis[z]; }
+      return {
+        kindLabel:lbl, kindStyle:self.tag(tn), when:self.fmt(nf.at), title:nf.title, body:nf.body,
+        openLabel:target ? ('Open ' + nf.caseId) : (nf.caseId + ' — outside your scope'),
+        openDisabled:!target,
+        openStyle:target ? R.btnXs : (R.btnXs + 'color:#5B6878;'),
+        channel:'Would email the lane group · nothing is sent here',
+        onOpen:self.act(function(n){ var ok = false, vv = self.visible(n); for (var y = 0; y < vv.length; y++) { if (vv[y].id === nf.caseId) ok = true; } if (!ok) return; n.view = 'case'; n.caseId = nf.caseId; n.tab = 'lanes'; n.drawer = null; })
+      };
+    });
+    R.walkSteps = [
+      {n:'1', t:'Scenario 1, Owner: open RAI-2026-0147 and look at the nine slots. DPA and SOW are already N/A with a reason because no vendor is in scope.'},
+      {n:'2', t:'Run checks and submit. The simulated checks flag three defects and the submission still goes through — findings travel with it.'},
+      {n:'3', t:'Switch to AI/COE. Only the AI/COE lane is actionable. Send the case back, naming the BRD and what has to change.'},
+      {n:'4', t:'Switch back to Owner. Submission v1 is read-only; a single v2 draft is open. Change the BRD to the v1.1 sample and resubmit.'},
+      {n:'5', t:'Approve in AI/COE, DPO and IT/Security. Approving runs that lane’s checks first and shows them, then leaves the decision to you.'},
+      {n:'6', t:'The case lands on “All lanes approved · awaiting disposition”. Dispose of the remaining findings from their own lanes to reach Ready for launch.'},
+      {n:'7', t:'Scenario 3 shows the v2.0 case, where the v1.0 SL2.1 thresholds are refused. Scenario 4 shows what happens when the checks cannot run at all.'}
+    ];
+    R.noteGroups = [
+      {tag:'Scope', tagStyle:this.tag('blue'), title:'What this desk is, and is not',
+        items:[
+          {h:'A review desk, not the AI register', b:'There is no eight-stage lifecycle here and no official register. The desk records source_record_id as a known ID or as Unknown, and never writes back to another system — there is no external dual-write anywhere in this prototype.'},
+          {h:'Ready for launch means desk completion', b:'It means three current-version lane approvals and no undispositioned finding. Council and ITSM authorization stay outside this desk, so there is deliberately no Deploy button.'},
+          {h:'Who can edit a pack', b:'A case owner works on their own cases; a BU SPOC has the same pack actions — create, edit, save, submit, correct and resubmit — for every case in their own business unit, and none outside it. Neither can approve a lane or dispose of a finding.'},
+          {h:'Synthetic data only', b:'Every case, document, metric and evidence panel is invented for the demo. No real document, customer record, vendor or email address appears anywhere, and nothing is sent.'}
+        ]},
+      {tag:'Pending', tagStyle:this.tag('amber'), title:'Open policy decisions — decide before build',
+        items:[
+          {h:'AI/COE second gate: BRD or security assessment', b:'This prototype gates AI/COE on slot 1 (risk screening) and slot 5 (BRD), provisionally. Whether the second document should be slot 5 (BRD) or slot 7 (security assessment) is not confirmed. Changing it is a one-line change to the lane gate table.'},
+          {h:'Disposition authority is provisional', b:'Here, each reviewer disposes only of findings in their own lane, and the owner and administrator cannot waive anything. Whether a lane may waive its own High finding without a second pair of eyes is not settled.'},
+          {h:'Full three-lane re-review after a send-back', b:'Proposed, not agreed: a resubmission reopens all three lanes, even the ones that had approved. The alternative — only the sending lane re-reviews — leaves a stale approval attached to changed evidence, which is why the desk currently refuses it.'},
+          {h:'SLA days and due dates', b:'Proposed at 3 working days for DPO and 5 for the other two lanes, editable in Administration. Dates shown on lanes are illustrative: no holiday calendar or timezone policy is agreed, and nothing escalates automatically.'},
+          {h:'Character minimums are demo assumptions', b:'The 25-character minimum on send-back feedback and the 20-character minimum on a waiver reason exist so the prototype cannot accept an empty justification. Neither number is agreed policy — pick real ones, or replace the rule with a structured field, before build.'},
+          {h:'The risk instrument', b:'The actual seven-question instrument is unconfirmed, so this prototype does not reproduce one. The risk detail uses an explicitly labelled scenario selection instead. No official questionnaire wording or scoring is implied. Incomplete evidence proposes Unknown; High means Council confirms, and all three lanes still run.'},
+          {h:'Brand palette', b:'True Red #E00000, ink #303C46 and blue #00639F are a working reference taken from the public True website, not a formal brand certification. Status green and amber are additions this desk needs and are not part of that reference. BetterTogether is proprietary and unavailable, so the type stack is Segoe UI, Arial, Helvetica Neue. The identity is textual “True Corp” — no logo is invented.'}
+        ]},
+      {tag:'Checks', tagStyle:this.tag('grey'), title:'How the simulated checks behave',
+        items:[
+          {h:'Three triggers', b:'Checks run when a document is added, when the owner submits, and when a reviewer attempts to approve. Nothing about a check blocks a decision — submission and lane approval both proceed with findings outstanding.'},
+          {h:'What gets flagged', b:'A claim with no metric, no denominator, no threshold or no evidence behind it. A classic ML case needs a metric that matches what the model does, or a justified N/A.'},
+          {h:'Extraction accuracy is not a hallucination rate', b:'They measure different things. The desk raises a finding rather than accepting one as the other, and the evidence panel shows exactly what was measured.'},
+          {h:'SL2.1 thresholds are bound to the checklist template version', b:'High <1%, Medium <2%, Low <3% come from the exact v1.0 Sheet3 SL2.1 table and apply only where checklist_template_version is v1.0 Sheet3. A case on checklist template v2.0 must cite its own source or mark the slot N/A with a reason. Model version never selects the threshold — the desk keeps model_version, checklist_template_version and the desk configuration revision as three separate fields.'},
+          {h:'Unavailable is not clean', b:'If the check service cannot run, the desk raises an explicit finding in every lane. There is no silent clean pass anywhere in this design.'},
+          {h:'A re-run is not a clean run', b:'The summary on a check counts every flag raised in scope plus every finding still open there, separated into new and already recorded. A check that flags something which already has a finding against it still reads as flagged — the desk never reports clean because a finding happens to be old.'}
+        ]}
+    ];
+
+    /* ---- toast ---- */
+    R.toastOpen = !!st.toast;
+    var tk = st.toast ? (st.toast.kind === 'warn' ? 'amber' : 'green') : 'grey';
+    var tc = this.tone(tk);
+    R.toastStyle = 'position:absolute;left:' + (wide ? '256px' : '14px') + ';right:14px;bottom:18px;max-width:' + (wide ? '640px' : '100%') + ';display:flex;align-items:center;gap:11px;background:#FFFFFF;border:1px solid ' + tc.bd + ';border-left:4px solid ' + tc.fg + ';border-radius:9px;padding:12px 15px;box-shadow:0 8px 26px rgba(48,60,70,.16);z-index:50;';
+    R.toastDotStyle = 'width:9px;height:9px;border-radius:50%;flex-shrink:0;background:' + tc.fg + ';';
+    R.toastText = st.toast ? st.toast.text : '';
+    R.onToastClose = this.act(function(n){ n.toast = null; });
+
+    /* ---- modals ---- */
+    var m = st.modal;
+    R.modalOpen = !!m;
+    R.mAddDoc = false; R.mEvidence = false; R.mQC = false; R.mSendBack = false; R.mDispose = false; R.mRisk = false; R.mSnap = false;
+    R.modalTitle = ''; R.modalSub = ''; R.modalSubOn = false; R.modalEyebrow = ''; R.modalEyebrowOn = false; R.modalEyebrowStyle = this.tag('grey');
+    R.modalFoot = ''; R.modalHasPrimary = false; R.modalPrimaryLabel = ''; R.modalPrimaryStyle = R.btnP; R.modalCancelLabel = 'Close';
+    R.modalStyle = 'background:#FFFFFF;border-radius:12px;width:680px;max-width:100%;max-height:100%;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(48,60,70,.3);';
+    R.onCloseModal = this.act(function(n){ n.modal = null; });
+    R.onModalPrimary = this.act(function(n){});
+    R.addSamples = []; R.addStates = []; R.addNeedsReason = false; R.addReason = ''; R.addReasonErr = false; R.addReasonStyle = '';
+    R.onAddReason = this.act(function(n){});
+    R.ev = {source:'', quote:'', hasQuote:false, rows:[], note:''};
+    R.qc = {trigger:'', checks:[], down:false, summaryTitle:'', summaryBody:''};
+    R.sb = {slot:'', slots:[], text:'', count:'', slotErr:false, textErr:false, effect:'', slotStyle:'', textStyle:'', onSlot:R.onCloseModal, onText:R.onCloseModal};
+    R.dp = {sev:'', sevStyle:'', title:'', detail:'', kinds:[], needsEvidence:false, evidence:'', evOpts:[], evErr:false, evStyle:'', reason:'', reasonLabel:'', reasonPlaceholder:'', reasonErr:false, reasonErrText:'', reasonStyle:'', onReason:R.onCloseModal, onEvidence:R.onCloseModal};
+    R.rk = {opts:[], rows:[], tier:'', tierStyle:'', consequence:'', locked:true, lockReason:''};
+    R.sn = {line:'', rows:[], lanes:[], decNote:'', hasDisp:false, disp:[]};
+
+    var fieldBox = 'width:100%;border-radius:6px;padding:10px 11px;font-size:14px;background:#FFFFFF;line-height:1.5;border:1px solid ';
+
+    if (m && m.kind === 'addoc') {
+      var slotK = m.slot, slotObj = this.slotOf(slotK);
+      var kk0 = this.caseOf(st, st.caseId);
+      R.mAddDoc = true;
+      R.modalTitle = 'Slot ' + slotObj.n + ' · ' + slotObj.name;
+      R.modalEyebrowOn = true; R.modalEyebrow = 'Add sample document'; R.modalEyebrowStyle = this.tag('blue');
+      R.modalSubOn = true; R.modalSub = slotObj.lanes.length ? ('Gates: ' + slotObj.lanes.map(function(x){ return self.laneOf(x).name; }).join(', ')) : 'This slot gates no lane.';
+      var pickRow = function(sel){ return 'display:flex;gap:11px;align-items:flex-start;border:1px solid ' + (sel ? '#E00000' : '#E2E8F0') + ';background:' + (sel ? '#FDECEC' : '#FFFFFF') + ';border-radius:8px;padding:12px 13px;margin-bottom:9px;cursor:pointer;'; };
+      R.addSamples = (this.SAMPLES()[slotK] || []).map(function(s){
+        return {id:s.id, name:s.name, note:s.note, checked:m.sel === s.id, rowStyle:pickRow(m.sel === s.id), tag:s.tag, tagStyle:self.tag(s.flags.length ? 'amber' : 'green'),
+          on:self.act(function(n){ n.modal.sel = s.id; n.modal.showErr = false; })};
+      });
+      R.addStates = [
+        {id:'__na', name:'Mark not applicable', note:'Use when the document genuinely does not exist for this case. A reason is required.', checked:m.sel === '__na', rowStyle:pickRow(m.sel === '__na'), on:self.act(function(n){ n.modal.sel = '__na'; })},
+        {id:'__missing', name:'Record as missing', note:'Use when the document should exist and does not. Different from “not yet provided”.', checked:m.sel === '__missing', rowStyle:pickRow(m.sel === '__missing'), on:self.act(function(n){ n.modal.sel = '__missing'; n.modal.showErr = false; })}
+      ];
+      R.addNeedsReason = m.sel === '__na';
+      R.addReason = m.reason;
+      R.addReasonErr = m.showErr && m.sel === '__na' && m.reason.trim().length < 10;
+      R.addReasonStyle = fieldBox + (R.addReasonErr ? '#E00000;' : '#E2E8F0;') + 'resize:vertical;';
+      R.onAddReason = this.act(function(n, e){ n.modal.reason = e.target.value; });
+      R.modalHasPrimary = true; R.modalPrimaryLabel = 'Apply to slot'; R.modalCancelLabel = 'Cancel';
+      R.modalFoot = 'No file is uploaded and nothing leaves your browser. Each sample carries fixed synthetic content the checks read.';
+      R.onModalPrimary = this.act(function(n){
+        var mm = n.modal, kx = self.caseOf(n, n.caseId), ts = self.tick(n);
+        if (!mm.sel) { mm.showErr = true; return; }
+        if (mm.sel === '__na' && mm.reason.trim().length < 10) { mm.showErr = true; return; }
+        if (mm.sel === '__na') { self.markNA(kx, mm.slot, mm.reason.trim(), ts); }
+        else if (mm.sel === '__missing') { self.markMissing(kx, mm.slot, ts); }
+        else { self.attach(kx, mm.slot, mm.sel, ts); }
+        kx.dirty = true;
+        self.log(n, kx, self.actorName(n), self.actorRole(n), 'Document slot updated', slotObj.name + ' → ' + (mm.sel === '__na' ? ('N/A — ' + mm.reason.trim()) : (mm.sel === '__missing' ? 'recorded as missing' : self.sampleOf(mm.slot, mm.sel).name)));
+        n.modal = null;
+        self.toast(n, slotObj.name + ' updated. The change is unsaved until you save the draft or submit.', 'warn');
+      });
+    }
+
+    if (m && m.kind === 'evidence') {
+      var e0 = this.EV()[m.ev] || {source:'Evidence panel unavailable', quote:'', rows:[], note:'No synthetic panel is attached to this item.'};
+      R.mEvidence = true;
+      R.modalTitle = 'Evidence panel';
+      R.modalEyebrowOn = true; R.modalEyebrow = 'Synthetic'; R.modalEyebrowStyle = this.tag('grey');
+      R.modalSubOn = true; R.modalSub = 'This is the panel the simulated checks actually read. Findings cite it directly.';
+      R.ev = {source:e0.source, quote:e0.quote, hasQuote:!!e0.quote, rows:e0.rows.map(function(r){ return {k:r[0], v:r[1]}; }), note:e0.note};
+      R.modalCancelLabel = 'Close';
+      R.modalFoot = 'Synthetic content, invented for this prototype.';
+    }
+
+    if (m && m.kind === 'qc') {
+      var kq = this.caseOf(st, m.caseId);
+      var isApprove = m.mode === 'approve';
+      R.mQC = true;
+      R.modalTitle = isApprove ? ('Simulated checks before approving the ' + this.laneOf(m.lane).name + ' lane') : 'Simulated checks before submitting';
+      R.modalEyebrowOn = true; R.modalEyebrow = 'Quality checks';
+      R.modalSubOn = true;
+      R.modalSub = isApprove ? 'Checks run on this lane’s gates only. They do not block your decision either way.' : 'Checks run across every gated slot. A finding does not stop the submission.';
+      var scopeLanes = isApprove ? [m.lane] : ['coe','dpo','sec'];
+      var scopeWord = isApprove ? 'this lane' : 'this submission';
+      var openScoped = 0, disposedScoped = 0;
+      for (i = 0; i < kq.findings.length; i++) {
+        var fq = kq.findings[i];
+        if (fq.ver !== kq.ver || scopeLanes.indexOf(fq.lane) < 0) continue;
+        if (fq.disp) disposedScoped = disposedScoped + 1; else openScoped = openScoped + 1;
+      }
+      var flaggedN = 0, flaggedNew = 0, flaggedOld = 0;
+      for (i = 0; i < m.checks.length; i++) {
+        if (m.checks[i].result !== 'flag') continue;
+        flaggedN = flaggedN + 1;
+        if (m.checks[i].isNew) flaggedNew = flaggedNew + 1; else flaggedOld = flaggedOld + 1;
+      }
+      var qcClean = !m.down && flaggedN === 0 && openScoped === 0;
+      var sumTitle, sumBody;
+      if (m.down) {
+        sumTitle = 'No clean pass is recorded';
+        sumBody = 'An explicit finding goes into each lane so the gap is visible in the record. Continuing is allowed; the gap travels with the case.';
+      } else if (qcClean) {
+        sumTitle = 'Nothing flagged, and nothing open in ' + scopeWord;
+        sumBody = (disposedScoped > 0 ? (disposedScoped + ' finding(s) here have already been disposed. ') : '') + 'Every check ran and none flagged.';
+      } else {
+        sumTitle = flaggedN + ' check(s) flagged — ' + flaggedNew + ' new, ' + flaggedOld + ' already recorded';
+        sumBody = openScoped + ' finding(s) in ' + scopeWord + ' are open and still need a disposition'
+          + (disposedScoped > 0 ? (', and ' + disposedScoped + ' already disposed') : '')
+          + '. ' + (isApprove
+            ? 'Approving does not close them — the desk cannot reach Ready for launch while any of them is open. Your approval is recorded either way.'
+            : 'The findings are recorded against this submission and travel with it into the three lanes.');
+      }
+      R.qc = {
+        trigger:isApprove ? 'Trigger: lane approval attempt' : 'Trigger: submission',
+        down:m.down,
+        checks:m.checks.map(function(c){
+          var tn = c.result === 'pass' ? 'green' : (c.result === 'flag' ? 'amber' : 'red');
+          var badge = c.result === 'pass' ? 'Pass' : (c.result === 'flag' ? (c.isNew ? 'Flag · new' : 'Flag · recorded') : 'Fail');
+          return {label:c.label, note:c.note, badge:badge, badgeStyle:self.tag(tn)};
+        }),
+        summaryTitle:sumTitle,
+        summaryBody:sumBody
+      };
+      R.modalEyebrowStyle = this.tag(m.down ? 'red' : (qcClean ? 'green' : 'amber'));
+      R.modalHasPrimary = true;
+      R.modalPrimaryLabel = isApprove ? 'Approve lane anyway' : 'Submit anyway';
+      R.modalCancelLabel = 'Go back';
+      R.modalFoot = 'Simulated checks — nothing is sent to a real service.';
+      R.onModalPrimary = this.act(function(n){
+        var kx = self.caseOf(n, m.caseId);
+        if (isApprove) {
+          self.runQC(n, kx, 'lane approval', m.lane);
+          self.approveLane(n, kx, m.lane);
+          n.modal = null;
+          self.toast(n, self.laneOf(m.lane).name + ' lane approved on Submission v' + kx.ver + '.', 'ok');
+        } else {
+          var res = self.submitCase(n, kx, self.actorName(n), self.actorRole(n));
+          n.modal = null; n.tab = 'lanes';
+          self.toast(n, 'Submitted. Three lanes opened in parallel · ' + res.created.length + ' finding(s) recorded.', 'ok');
+        }
+      });
+    }
+
+    if (m && m.kind === 'sendback') {
+      var ls = this.laneOf(m.lane);
+      var sbSlotBad = m.showErr && !m.slot;
+      var sbTextBad = m.showErr && m.text.trim().length < 25;
+      R.mSendBack = true;
+      R.modalTitle = 'Send back from the ' + ls.name + ' lane';
+      R.modalEyebrowOn = true; R.modalEyebrow = 'Owner action required'; R.modalEyebrowStyle = this.tag('red');
+      R.modalSubOn = true; R.modalSub = 'A send-back has to name one artifact and say specifically what must change.';
+      R.sb = {
+        slot:m.slot,
+        slots:[{v:'', t:'Choose an artifact…'}].concat(ls.gates.map(function(g){ var s2 = self.slotOf(g); return {v:g, t:'Slot ' + s2.n + ' · ' + s2.name}; })),
+        text:m.text, count:m.text.trim().length + ' / 25 characters (demo assumption)',
+        slotErr:sbSlotBad, textErr:sbTextBad,
+        slotStyle:fieldBox + (sbSlotBad ? '#E00000;' : '#E2E8F0;'),
+        textStyle:fieldBox + (sbTextBad ? '#E00000;' : '#E2E8F0;') + 'resize:vertical;',
+        effect:'Sending back preserves the current submission read-only and opens a single new submission draft with the documents carried forward. Approvals already given are superseded and cannot carry over.',
+        onSlot:this.act(function(n, e){ n.modal.slot = e.target.value; n.modal.showErr = false; }),
+        onText:this.act(function(n, e){ n.modal.text = e.target.value; })
+      };
+      R.modalHasPrimary = true; R.modalPrimaryLabel = 'Send back to owner'; R.modalCancelLabel = 'Cancel';
+      R.modalFoot = 'A notification preview is raised. No email is sent.';
+      R.onModalPrimary = this.act(function(n){
+        var mm = n.modal;
+        if (!mm.slot || mm.text.trim().length < 25) { mm.showErr = true; return; }
+        var kx = self.caseOf(n, mm.caseId);
+        self.sendBack(n, kx, mm.lane, mm.slot, mm.text.trim());
+        n.modal = null; n.tab = 'hist';
+        self.toast(n, 'Sent back. Submission v' + (kx.ver - 1) + ' is read-only and a v' + kx.ver + ' draft is open for the owner.', 'warn');
+      });
+    }
+
+    if (m && m.kind === 'dispose') {
+      var kd = this.caseOf(st, m.caseId), fd = null;
+      for (i = 0; i < kd.findings.length; i++) { if (kd.findings[i].id === m.fid) fd = kd.findings[i]; }
+      var needEv = m.dkind === 'fixed';
+      var reasonMin = m.dkind === 'fixed' ? 10 : 20;
+      var dReasonBad = m.showErr && m.reason.trim().length < reasonMin;
+      var dEvBad = m.showErr && needEv && !m.evidence;
+      var evOpts = [{v:'', t:'Choose the evidence panel…'}];
+      var SS2 = this.SLOTS();
+      for (i = 0; i < SS2.length; i++) { var dd = kd.docs[SS2[i].k]; if (dd.state === 'attached') evOpts.push({v:dd.doc.ev, t:SS2[i].name + ' · ' + dd.doc.name}); }
+      var rowSel = function(sel){ return 'display:flex;gap:11px;align-items:flex-start;border:1px solid ' + (sel ? '#E00000' : '#E2E8F0') + ';background:' + (sel ? '#FDECEC' : '#FFFFFF') + ';border-radius:8px;padding:12px 13px;margin-bottom:9px;cursor:pointer;'; };
+      R.mDispose = true;
+      R.modalTitle = 'Dispose of ' + (fd ? fd.id : '');
+      R.modalEyebrowOn = true; R.modalEyebrow = fd ? this.laneOf(fd.lane).name + ' lane' : ''; R.modalEyebrowStyle = this.tag('blue');
+      R.dp = {
+        sev:fd ? fd.sev : '', sevStyle:this.tag(fd ? this.sevTone(fd.sev) : 'grey'),
+        title:fd ? fd.title : '', detail:fd ? fd.detail : '',
+        kinds:[
+          {v:'fixed', t:'Fixed with evidence', d:'The underlying gap is closed and a panel in this pack shows it.', checked:m.dkind === 'fixed', rowStyle:rowSel(m.dkind === 'fixed'), on:this.act(function(n){ n.modal.dkind = 'fixed'; n.modal.showErr = false; })},
+          {v:'waived', t:'Waived with reason', d:'The gap stands and is accepted for this submission. The reason is mandatory and is recorded against you.', checked:m.dkind === 'waived', rowStyle:rowSel(m.dkind === 'waived'), on:this.act(function(n){ n.modal.dkind = 'waived'; n.modal.showErr = false; })},
+          {v:'na', t:'Not applicable with reason', d:'The check does not apply to this case. The reason is mandatory.', checked:m.dkind === 'na', rowStyle:rowSel(m.dkind === 'na'), on:this.act(function(n){ n.modal.dkind = 'na'; n.modal.showErr = false; })}
+        ],
+        needsEvidence:needEv, evidence:m.evidence, evOpts:evOpts, evErr:dEvBad,
+        evStyle:fieldBox + (dEvBad ? '#E00000;' : '#E2E8F0;'),
+        reason:m.reason,
+        reasonLabel:needEv ? 'What changed' : 'Reason (required)',
+        reasonPlaceholder:needEv ? 'Say what was corrected and where it shows.' : 'Say why this gap is acceptable, on what basis, and for how long.',
+        reasonErr:dReasonBad, reasonErrText:'A disposition needs a reason of at least ' + reasonMin + ' characters — a demo assumption, not agreed policy. This text is kept in the audit record.',
+        reasonStyle:fieldBox + (dReasonBad ? '#E00000;' : '#E2E8F0;') + 'resize:vertical;',
+        onReason:this.act(function(n, e){ n.modal.reason = e.target.value; }),
+        onEvidence:this.act(function(n, e){ n.modal.evidence = e.target.value; n.modal.showErr = false; })
+      };
+      R.modalHasPrimary = true; R.modalPrimaryLabel = 'Record disposition'; R.modalCancelLabel = 'Cancel';
+      R.modalFoot = 'Appended to the record with your name and the time. It cannot be edited or removed afterwards.';
+      R.onModalPrimary = this.act(function(n){
+        var mm = n.modal, kx = self.caseOf(n, mm.caseId);
+        var minLen = mm.dkind === 'fixed' ? 10 : 20;
+        if (mm.reason.trim().length < minLen) { mm.showErr = true; return; }
+        if (mm.dkind === 'fixed' && !mm.evidence) { mm.showErr = true; return; }
+        self.disposeFinding(n, kx, mm.fid, mm.dkind, mm.reason.trim(), mm.evidence);
+        n.modal = null;
+        self.toast(n, mm.fid + ' disposed. ' + (self.openFindings(kx) === 0 ? 'No finding is left open on this submission.' : self.openFindings(kx) + ' finding(s) still open.'), 'ok');
+      });
+    }
+
+    if (m && m.kind === 'risk') {
+      var kr = this.caseOf(st, st.caseId);
+      var lockedR = !this.canEdit(st, kr);
+      var tierOf = function(s){ return s === 'high' ? 'High' : (s === 'medium' ? 'Medium' : 'Unknown'); };
+      var tierToneOf = function(s){ return s === 'high' ? 'red' : (s === 'medium' ? 'amber' : 'grey'); };
+      var rowSel2 = function(sel){ return 'display:flex;gap:11px;align-items:flex-start;border:1px solid ' + (sel ? '#E00000' : '#E2E8F0') + ';background:' + (sel ? '#FDECEC' : '#FFFFFF') + ';border-radius:8px;padding:12px 13px;margin-bottom:9px;cursor:' + (lockedR ? 'not-allowed' : 'pointer') + ';'; };
+      var evRows = kr.riskScenario === 'high'
+        ? [['Affected population','Walk-in retail customers, all stores (synthetic)'],['Decision impact','Assistant answers product and billing questions directly to customers'],['Human review','None at answer time'],['Special category data','Possible in free-text customer input'],['Evidence attached','Data inventory, impact note, escalation design']]
+        : (kr.riskScenario === 'medium'
+          ? [['Affected population','118,402 post-paid subscribers (synthetic)'],['Decision impact','Retention offer ranking; no service denial'],['Human review','Campaign manager reviews the ranked list before use'],['Special category data','None in scope'],['Evidence attached','Data inventory, impact note, sign-off']]
+          : [['Affected population','— not stated —'],['Decision impact','— not stated —'],['Human review','— not stated —'],['Special category data','— not stated —'],['Evidence attached','— none —']]);
+      R.mRisk = true;
+      R.modalTitle = 'Risk proposal — ' + kr.id;
+      R.modalEyebrowOn = true; R.modalEyebrow = 'Labelled demo scenario'; R.modalEyebrowStyle = this.tag('amber');
+      R.rk = {
+        locked:lockedR,
+        lockReason:'Read-only: the risk evidence can only be changed by the case owner while a submission draft is open.',
+        opts:[
+          {v:'medium', t:'Complete evidence, internal decision support', d:'Population, impact, human review and data scope all stated with evidence attached.', checked:kr.riskScenario === 'medium', rowStyle:rowSel2(kr.riskScenario === 'medium'), tier:'Medium', tierStyle:this.tag('amber'), on:this.act(function(n){ var kz = self.caseOf(n, n.caseId); if (self.canEdit(n, kz)) { kz.riskScenario = 'medium'; self.log(n, kz, self.actorName(n), self.actorRole(n), 'Risk evidence changed', 'Evidence scenario set to complete internal decision support · proposed tier Medium'); } })},
+          {v:'incomplete', t:'Incomplete evidence', d:'One or more of the evidence rows is not stated, so no tier can be proposed.', checked:kr.riskScenario === 'incomplete', rowStyle:rowSel2(kr.riskScenario === 'incomplete'), tier:'Unknown', tierStyle:this.tag('grey'), on:this.act(function(n){ var kz = self.caseOf(n, n.caseId); if (self.canEdit(n, kz)) { kz.riskScenario = 'incomplete'; self.log(n, kz, self.actorName(n), self.actorRole(n), 'Risk evidence changed', 'Evidence incomplete · proposed tier Unknown'); } })},
+          {v:'high', t:'Customer-facing, no human review at answer time', d:'Direct customer interaction with possible special-category free text and no reviewer in the loop.', checked:kr.riskScenario === 'high', rowStyle:rowSel2(kr.riskScenario === 'high'), tier:'High', tierStyle:this.tag('red'), on:this.act(function(n){ var kz = self.caseOf(n, n.caseId); if (self.canEdit(n, kz)) { kz.riskScenario = 'high'; self.log(n, kz, self.actorName(n), self.actorRole(n), 'Risk evidence changed', 'Evidence scenario set to customer-facing without human review · proposed tier High'); } })}
+        ],
+        rows:evRows.map(function(r){ return {k:r[0], v:r[1]}; }),
+        tier:tierOf(kr.riskScenario), tierStyle:this.chip(tierToneOf(kr.riskScenario)),
+        consequence:kr.riskScenario === 'high' ? 'High means the Council confirms the tier. All three lanes still open and still run — a High tier does not replace them.'
+          : (kr.riskScenario === 'medium' ? 'Medium is a proposal from the evidence shown. All three lanes run regardless of tier.'
+            : 'Evidence is incomplete, so the tier stays Unknown rather than being guessed. All three lanes still run.')
+      };
+      R.modalCancelLabel = 'Close';
+      R.modalFoot = 'No official questionnaire, wording or scoring is reproduced here.';
+    }
+
+    if (m && m.kind === 'snap') {
+      var ks = this.caseOf(st, m.caseId), snap = null;
+      for (i = 0; i < ks.snaps.length; i++) { if (ks.snaps[i].ver === m.ver) snap = ks.snaps[i]; }
+      R.mSnap = true;
+      R.modalTitle = 'Submission v' + m.ver + ' — immutable snapshot';
+      R.modalEyebrowOn = true; R.modalEyebrow = 'Read-only'; R.modalEyebrowStyle = this.tag('grey');
+      R.modalStyle = 'background:#FFFFFF;border-radius:12px;width:820px;max-width:100%;max-height:100%;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(48,60,70,.3);';
+      var superseded = m.ver !== ks.ver;
+      R.sn = {
+        line:snap ? ('Taken ' + this.fmt(snap.at) + ' by ' + snap.by + ' · pack template ' + snap.cfgTpl + ' revision ' + snap.cfgRev + ' · checklist template ' + snap.checklistVer + ' · model version ' + snap.modelVer + '. The document pack and configuration below are frozen as submitted; a later configuration revision does not alter them.') : 'Snapshot not found.',
+        rows:snap ? this.SLOTS().map(function(sl){
+          var d = snap.docs[sl.k];
+          return {n:String(sl.n), slot:sl.name, stateLabel:self.docLabel(d.state), stateStyle:self.chip(self.docTone(d.state)), detail:d.state === 'attached' ? d.doc.name : (d.state === 'na' ? d.reason : '—')};
+        }) : [],
+        lanes:snap ? this.LANES().map(function(l){
+          var dec = self.lastDecision(ks, m.ver, l.k);
+          if (!dec) {
+            return {name:l.name, text:'No decision recorded', style:self.chip('grey'),
+              note:superseded ? 'This lane recorded no decision on Submission v' + m.ver + ' before it was superseded.' : 'Open — this lane has not decided on this submission yet.'};
+          }
+          return {
+            name:l.name,
+            text:dec.kind === 'approved' ? 'Approved' : 'Sent back',
+            style:self.chip(dec.kind === 'approved' ? 'green' : 'red'),
+            note:(dec.kind === 'approved' ? 'Approved by ' : 'Sent back by ') + dec.by + ' on ' + self.fmt(dec.at) + (dec.artifact ? (' — ' + self.slotOf(dec.artifact).name + ': ' + dec.note) : '') + (superseded ? ' · recorded against Submission v' + m.ver + ', cannot affect the current version.' : '')
+          };
+        }) : [],
+        decNote:superseded
+          ? 'Decisions are appended after the snapshot is taken, so this list grows while the documents above stay frozen. Everything here is scoped to Submission v' + m.ver + ' and cannot affect the current version.'
+          : 'Decisions are appended after the snapshot is taken, so this list grows while the documents above stay frozen.',
+        hasDisp:false, disp:[]
+      };
+      var dsp = [];
+      for (i = 0; i < ks.findings.length; i++) {
+        var fz = ks.findings[i];
+        if (fz.ver !== m.ver) continue;
+        dsp.push({
+          id:fz.id, sev:fz.sev, sevStyle:this.tag(this.sevTone(fz.sev)), title:fz.title,
+          state:fz.disp ? this.dispLabel(fz.disp.kind) : 'Open at the close of this submission',
+          stateStyle:this.chip(fz.disp ? (fz.disp.kind === 'fixed' ? 'green' : 'grey') : 'amber'),
+          note:fz.disp ? (fz.disp.by + ' · ' + this.fmt(fz.disp.at) + ' · ' + fz.disp.reason) : 'No disposition recorded against this submission.'
+        });
+      }
+      R.sn.disp = dsp;
+      R.sn.hasDisp = dsp.length > 0;
+      R.modalCancelLabel = 'Close';
+      R.modalFoot = 'Snapshots are written once at submission and never edited.';
+    }
+
+    return R;
+  }
+
+  dispLabel(kind){ return kind === 'fixed' ? 'Fixed with evidence' : (kind === 'waived' ? 'Waived with reason' : 'N/A with reason'); }
+  decisionCount(k, ver){ var n = 0; for (var i = 0; i < k.decisions.length; i++) { if (k.decisions[i].ver === ver) n = n + 1; } return n; }
+  lastDecision(k, ver, lane){
+    var out = null;
+    for (var i = 0; i < k.decisions.length; i++) { var d = k.decisions[i]; if (d.ver === ver && d.lane === lane) out = d; }
+    return out;
+  }
+}
