@@ -14,7 +14,11 @@ export type SourceRecordId = Static<typeof SourceRecordIdSchema>;
 
 export const MODEL_TYPES = ['llm', 'classic_ml', 'other'] as const; // desk-local (W0-04 fields)
 export type ModelType = (typeof MODEL_TYPES)[number];
-export const ModelTypeSchema = Type.Union(MODEL_TYPES.map((v) => Type.Literal(v)));
+export const ModelTypeSchema = Type.Union([
+  Type.Literal('llm'),
+  Type.Literal('classic_ml'),
+  Type.Literal('other'),
+]); // a tuple, not MODEL_TYPES.map(): a mapped array widens the inferred type to never (W1-02, as W1-01 did for IdentityMode)
 
 export type RiskTier = string; // opaque placeholder: D07 records the labels before W5; null throughout slice 1
 
@@ -79,7 +83,9 @@ export interface CaseSummary {
 export const CaseCreateRequestSchema = CaseWritableFieldsSchema;
 export type CaseCreateRequest = CaseWritableFields;
 
-// Any key outside CaseWritableFields (for example privacyStatus) → 422 invalid_input (additionalProperties: false).
+// Any key outside CaseWritableFields → 422 invalid_input at body.fields.<key>: a projected name (privacyStatus) as
+// error.invalid_input.projected_field from the route hook, any other name as validation.unknown_field from this
+// additionalProperties: false (the server turns Ajv's removeAdditional off so the key is rejected, not stripped).
 export const CaseUpdateRequestSchema = Type.Object({
   expectedCaseRevision: Type.Integer({ minimum: 1 }),
   fields: Type.Partial(CaseWritableFieldsSchema, { additionalProperties: false }),

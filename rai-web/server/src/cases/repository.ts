@@ -1,0 +1,274 @@
+// W0-04 `CaseWriteRepository` for W1-02 (`create`, `updateDraftFields`) plus the reads behind the 7.3 shapes. The
+// editable column set is a Pick (W0-04 fields rule, layer 2): the four projections and `risk_tier` are not in it and
+// cannot be written from here; `applyLaneProjection` / `applyReadiness` arrive with the workflow module (W2) and
+// take a WorkflowTx. Every write takes a transaction handle; the create caller holds the (actor, key) lock and the
+// edit caller holds the case row lock (service.ts). The two scope columns are written only by `updateDraftFields`
+// after the W0-05 post-edit authorization, which is the one W0-05-permitted action that may change them.
+
+import { and, count, desc, eq, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
+import { uuidv7 } from '@rai/shared/ids';
+import { NON_VENDOR_DEFAULT_REASON_KEY, type SlotNumber, type StageContext } from '@rai/shared/schemas/pack';
+import type { CaseSummary, CaseView } from '@rai/shared/schemas/cases';
+import type { Actor } from '../authz/policy.js';
+import type { Executor, Tx } from '../db/client.js';
+import { artifactSlot } from '../db/schema/artifact-slot.js';
+import { cases } from '../db/schema/case.js';
+import { packVersion } from '../db/schema/pack-version.js';
+import { registryCounter } from '../db/schema/registry-counter.js';
+import { caseScopeWhere } from './scope.js';
+import { fromStoredSourceRecordId } from './source-record-id.js';
+import { deriveCaseStatus } from './status.js';
+
+export type CaseRow = typeof cases.$inferSelect;
+export type PackVersionRow = typeof packVersion.$inferSelect;
+
+/** W0-04 `EditableCaseFields`: the inherited descriptive fields and the two desk-local fields; no projections. */
+export type EditableCaseFields = Pick<
+  CaseRow,
+  | 'sourceRecordId'
+  | 'useCaseName'
+  | 'businessUnit'
+  | 'businessOwner'
+  | 'technicalOwner'
+  | 'useCaseGroup'
+  | 'vendorInvolved'
+  | 'modelType'
+>;
+/** The two W0-05 scope columns, writable through `case.edit_draft` only after the post-edit authorization. */
+export type ScopeColumns = Pick<CaseRow, 'ownerSubjectId' | 'businessUnitId'>;
+export type DraftEditableColumns = EditableCaseFields & ScopeColumns;
+
+export const SLOT_NUMBERS: readonly SlotNumber[] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+/** Slots 3 (DPA) and 4 (SOW) default to not_applicable when no vendor is involved (A02, W0-04 create row). */
+export const VENDOR_SLOTS: readonly SlotNumber[] = [3, 4];
+
+export const REGISTRY_ID_MAX_PER_YEAR = 9999;
+
+export class RegistryYearExhausted extends Error {
+  constructor(readonly year: number) {
+    super(`registry year ${year} has no number left`);
+    this.name = 'RegistryYearExhausted';
+  }
+}
+
+/** `RAI-<yyyy>-<nnnn>` from the per-year counter, under the counter row's lock (W0-04 `case.registry_id`). */
+export async function allocateRegistryId(tx: Tx, at: Date): Promise<string> {
+  const year = at.getUTCFullYear();
+  const [row] = await tx
+    .insert(registryCounter)
+    .values({ year, last: 1 })
+    .onConflictDoUpdate({ target: registryCounter.year, set: { last: sql`${registryCounter.last} + 1` } })
+    .returning({ last: registryCounter.last });
+  const n = row?.last;
+  if (n === undefined || n > REGISTRY_ID_MAX_PER_YEAR) throw new RegistryYearExhausted(year);
+  return `RAI-${year}-${String(n).padStart(4, '0')}`;
+}
+
+export interface CreateCaseInput {
+  fields: EditableCaseFields;
+  ownerSubjectId: string;
+  businessUnitId: string;
+  createdBy: string;
+  stageContext: StageContext;
+  checklistTemplateVersion: string;
+  now: Date;
+}
+
+export interface CreatedCase {
+  caseRow: CaseRow;
+  draft: PackVersionRow;
+}
+
+/** Inserts the case (registry id allocated here), draft v1 and its nine slots (W0-04 "Create case" row). */
+export async function insertCase(tx: Tx, input: CreateCaseInput): Promise<CreatedCase> {
+  const caseId = uuidv7(input.now.getTime());
+  const draftId = uuidv7(input.now.getTime());
+  const registryId = await allocateRegistryId(tx, input.now);
+  const [caseRow] = await tx
+    .insert(cases)
+    .values({
+      id: caseId,
+      registryId,
+      ...input.fields,
+      ownerSubjectId: input.ownerSubjectId,
+      businessUnitId: input.businessUnitId,
+      deskStatus: 'draft',
+      currentVersionId: null,
+      draftVersionId: draftId, // deferrable FK: the draft row follows in this transaction
+      rowVersion: 1,
+      createdBy: input.createdBy,
+      createdAt: input.now,
+      updatedAt: input.now,
+    })
+    .returning();
+  const [draft] = await tx
+    .insert(packVersion)
+    .values({
+      id: draftId,
+      caseId,
+      versionNumber: 1,
+      parentVersionId: null,
+      createdBy: input.createdBy,
+      createdAt: input.now,
+      stageContext: input.stageContext,
+      checklistTemplateVersion: input.checklistTemplateVersion,
+    })
+    .returning();
+  await tx.insert(artifactSlot).values(
+    SLOT_NUMBERS.map((slot) => {
+      const notApplicable = !input.fields.vendorInvolved && VENDOR_SLOTS.includes(slot);
+      return {
+        id: uuidv7(input.now.getTime()),
+        versionId: draftId,
+        slot,
+        state: notApplicable ? 'not_applicable' : 'missing',
+        reason: notApplicable ? NON_VENDOR_DEFAULT_REASON_KEY : null,
+        artifactId: null,
+        updatedBy: input.createdBy,
+        updatedAt: input.now,
+      };
+    }),
+  );
+  return { caseRow: caseRow!, draft: draft! };
+}
+
+export class RowVersionMismatch extends Error {
+  constructor(readonly caseId: string) {
+    super(`case ${caseId} row_version does not match the expected revision`);
+    this.name = 'RowVersionMismatch';
+  }
+}
+
+/**
+ * Writes a Pick of the editable columns with the W0-04 `row_version` check; the counter increments by exactly one.
+ * Throws RowVersionMismatch when nothing matched (the caller, holding the case lock, maps it to 409 stale_version).
+ */
+export async function updateDraftFields(
+  tx: Tx,
+  caseId: string,
+  fields: Partial<DraftEditableColumns>,
+  expectedRowVersion: number,
+  now: Date,
+): Promise<CaseRow> {
+  const [row] = await tx
+    .update(cases)
+    .set({ ...fields, rowVersion: sql`${cases.rowVersion} + 1`, updatedAt: now })
+    .where(and(eq(cases.id, caseId), eq(cases.rowVersion, expectedRowVersion)))
+    .returning();
+  if (row === undefined) throw new RowVersionMismatch(caseId);
+  return row;
+}
+
+export async function readCaseRow(exec: Executor, caseId: string): Promise<CaseRow | undefined> {
+  const [row] = await exec.select().from(cases).where(eq(cases.id, caseId)).limit(1);
+  return row;
+}
+
+export async function readVersionRow(exec: Executor, versionId: string): Promise<PackVersionRow | undefined> {
+  const [row] = await exec.select().from(packVersion).where(eq(packVersion.id, versionId)).limit(1);
+  return row;
+}
+
+/** The 7.3 `CaseView` for one stored case: the row plus its open draft and latest submitted version. */
+export async function readCaseView(exec: Executor, caseId: string): Promise<CaseView | undefined> {
+  const row = await readCaseRow(exec, caseId);
+  if (row === undefined) return undefined;
+  return caseViewFrom(exec, row);
+}
+
+export async function caseViewFrom(exec: Executor, row: CaseRow): Promise<CaseView> {
+  const [draft, current] = await Promise.all([
+    row.draftVersionId === null ? undefined : readVersionRow(exec, row.draftVersionId),
+    row.currentVersionId === null ? undefined : readVersionRow(exec, row.currentVersionId),
+  ]);
+  return {
+    caseId: row.id,
+    registryId: row.registryId,
+    useCaseName: row.useCaseName,
+    businessUnitId: row.businessUnitId,
+    businessUnit: row.businessUnit,
+    businessOwner: row.ownerSubjectId, // the SubjectId in owner_subject_id, not the descriptive text (W0-05 section 8)
+    technicalOwner: row.technicalOwner,
+    sourceRecordId: fromStoredSourceRecordId(row.sourceRecordId),
+    useCaseGroup: row.useCaseGroup,
+    vendorInvolved: row.vendorInvolved,
+    modelType: row.modelType as CaseView['modelType'],
+    status: deriveCaseStatus({
+      draft: draft === undefined ? null : { parentVersionId: draft.parentVersionId },
+      current: current === undefined ? null : { readyAt: current.readyAt },
+    }),
+    riskTier: row.riskTier, // null throughout slice 1 (D07 before W5)
+    privacyStatus: row.privacyStatus as CaseView['privacyStatus'],
+    securityStatus: row.securityStatus as CaseView['securityStatus'],
+    raiStatus: row.raiStatus as CaseView['raiStatus'],
+    aiReadinessStatus: row.aiReadinessStatus as CaseView['aiReadinessStatus'],
+    currentVersion:
+      current === undefined || current.submittedAt === null
+        ? null
+        : {
+            versionId: current.id,
+            versionNumber: current.versionNumber,
+            submittedBy: current.submittedBy ?? '',
+            submittedAt: current.submittedAt.toISOString(),
+            isLatest: true,
+          },
+    draft:
+      draft === undefined
+        ? null
+        : { draftId: draft.id, versionNumber: draft.versionNumber, updatedAt: row.updatedAt.toISOString() },
+    caseRevision: row.rowVersion,
+    createdBy: row.createdBy,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+export interface ListPage {
+  page: number;
+  pageSize: number;
+}
+
+/** The scoped list (W0-05 "Query scope"): `caseScopeWhere(actor)` first, then order, LIMIT and COUNT over it. */
+export async function listCases(
+  exec: Executor,
+  actor: Actor,
+  page: ListPage,
+): Promise<{ items: CaseSummary[]; total: number }> {
+  const where = caseScopeWhere(actor);
+  const current = alias(packVersion, 'current');
+  const draft = alias(packVersion, 'draft');
+  const [rows, [totalRow]] = await Promise.all([
+    exec
+      .select({
+        c: cases,
+        currentVersionNumber: current.versionNumber,
+        currentReadyAt: current.readyAt,
+        draftParentVersionId: draft.parentVersionId,
+      })
+      .from(cases)
+      .leftJoin(current, eq(current.id, cases.currentVersionId))
+      .leftJoin(draft, eq(draft.id, cases.draftVersionId))
+      .where(where)
+      .orderBy(desc(cases.updatedAt), desc(cases.id))
+      .limit(page.pageSize)
+      .offset((page.page - 1) * page.pageSize),
+    exec.select({ total: count() }).from(cases).where(where),
+  ]);
+  const items: CaseSummary[] = rows.map((r) => ({
+    caseId: r.c.id,
+    registryId: r.c.registryId,
+    useCaseName: r.c.useCaseName,
+    businessUnitId: r.c.businessUnitId,
+    businessUnit: r.c.businessUnit,
+    businessOwner: r.c.ownerSubjectId,
+    useCaseGroup: r.c.useCaseGroup,
+    status: deriveCaseStatus({
+      draft: r.c.draftVersionId === null ? null : { parentVersionId: r.draftParentVersionId },
+      current: r.c.currentVersionId === null ? null : { readyAt: r.currentReadyAt },
+    }),
+    currentVersionNumber: r.c.currentVersionId === null ? null : r.currentVersionNumber,
+    updatedAt: r.c.updatedAt.toISOString(),
+  }));
+  return { items, total: totalRow?.total ?? 0 };
+}

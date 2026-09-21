@@ -3,7 +3,8 @@
 // context), the allow-list logger, and the one error handler that maps a ContractError to the W0-06 8.2 envelope
 // and everything else to internal_error. W1-01 adds the cookie parser, the authorization middleware (authz/, the
 // only place scope is enforced) and the sign-in surface (identity/routes.ts); a schema validation failure maps to
-// 422 invalid_input with field paths (W0-06 8.2). Routes arrive with W1-02 onwards and declare `config.auth`.
+// 422 invalid_input with field paths (W0-06 8.2). Routes arrive with W1-02 onwards and declare `config.auth`;
+// W1-02 registers the case routes (cases/routes.ts) when `cases` deps are given.
 
 import Fastify, { LogController, type FastifyError, type FastifyInstance } from 'fastify';
 import cookie from '@fastify/cookie';
@@ -11,6 +12,7 @@ import { InvalidInputError, isContractError, internalErrorResponse } from '@rai/
 import type { CorrelationId } from '@rai/shared/ids';
 import type { AppConfig } from './config.js';
 import { registerAuthorization, type ScopeFactsSource } from './authz/middleware.js';
+import { registerCaseRoutes, type CaseRouteDeps } from './cases/routes.js';
 import type { FixtureIdentityProvider } from './identity/fixture.js';
 import { registerAuthRoutes } from './identity/routes.js';
 import { cookieNames, type SessionStore } from './identity/session.js';
@@ -30,6 +32,8 @@ export interface AppDeps {
   config: Pick<AppConfig, 'nodeEnv' | 'log' | 'trustProxy' | 'publicBaseUrl'>;
   /** Absent only in substrate-level tests that register no route; main.ts always passes it. */
   identity?: IdentityDeps;
+  /** W1-02: the case routes' dependencies (database, configured BUs, subject directory). Needs `identity`. */
+  cases?: Omit<CaseRouteDeps, 'emitter'>;
 }
 
 export interface App {
@@ -37,16 +41,26 @@ export interface App {
   emitter: Emitter;
 }
 
-/** Fastify's ajv failure → the W0-06 8.2 invalid_input envelope: field paths only, never values. */
+/**
+ * Fastify's ajv failure → the W0-06 8.2 invalid_input envelope: field paths only, never values. `required` names
+ * the missing key; `additionalProperties` names the unknown key (W0-02 7.3: any key outside CaseWritableFields on
+ * PATCH is 422, so the Ajv default `removeAdditional: true`, which would strip it silently, is turned off below).
+ */
 function validationToInvalidInput(error: FastifyError): InvalidInputError {
   const fields = (error.validation ?? []).map((v) => {
     const path = `${error.validationContext ?? 'body'}${v.instancePath.replaceAll('/', '.')}`;
-    const missing =
-      v.keyword === 'required' ? (v.params as { missingProperty?: string }).missingProperty : undefined;
-    return {
-      path: missing === undefined ? path : `${path}.${missing}`,
-      messageKey: v.keyword === 'required' ? 'validation.required' : 'validation.not_in_configured_list',
-    };
+    const params = v.params as { missingProperty?: string; additionalProperty?: string };
+    switch (v.keyword) {
+      case 'required':
+        return { path: `${path}.${params.missingProperty}`, messageKey: 'validation.required' as const };
+      case 'additionalProperties':
+        return {
+          path: `${path}.${params.additionalProperty}`,
+          messageKey: 'validation.unknown_field' as const,
+        };
+      default:
+        return { path, messageKey: 'validation.not_in_configured_list' as const };
+    }
   });
   return new InvalidInputError(fields);
 }
@@ -58,6 +72,7 @@ export function buildApp(deps: AppDeps): App {
     requestIdHeader: false,
     trustProxy: deps.config.trustProxy,
     logController: new LogController({ disableRequestLogging: true }), // one request.completed line per request (W0-10 3.4), emitted by W3-07's hook
+    ajv: { customOptions: { removeAdditional: false } }, // a key an `additionalProperties: false` shape does not list is 422, never stripped
   });
   const emitter = createEmitter(fastify.log, { strict: deps.config.nodeEnv === 'test' });
 
@@ -119,6 +134,13 @@ export function buildApp(deps: AppDeps): App {
       });
       done();
     });
+    const caseDeps = deps.cases;
+    if (caseDeps !== undefined) {
+      void fastify.register((instance, _opts, done) => {
+        registerCaseRoutes(instance, { ...caseDeps, emitter });
+        done();
+      });
+    }
   }
 
   return { fastify, emitter };

@@ -43,7 +43,7 @@ test('migrations apply from an empty database and a rerun applies nothing', asyn
   assert.deepEqual(third, second);
 });
 
-test('the schema holds the W0-04 tables (plus W1-01 session and W1-09 fixture_set), triggers and grants', async () => {
+test('the schema holds the W0-04 tables (plus W1-01 session, W1-09 fixture_set and W1-02 registry_counter), triggers and grants', async () => {
   const tables = await db.raw('owner', (c) =>
     c.query<{ tablename: string }>(
       `SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename`,
@@ -60,6 +60,7 @@ test('the schema holds the W0-04 tables (plus W1-01 session and W1-09 fixture_se
       'fixture_set', // W1-09 (0002_w1_09_fixture_set)
       'idempotency_key',
       'pack_version',
+      'registry_counter', // W1-02 (0003_w1_02_registry_counter; W0-04 case.registry_id per-year sequence)
       'session', // W1-01 (0001_w1_01_session; W0-03 section 6.3)
     ],
   );
@@ -111,6 +112,9 @@ test('the schema holds the W0-04 tables (plus W1-01 session and W1-09 fixture_se
     'pack_version:INSERT',
     'pack_version:SELECT',
     'pack_version:UPDATE',
+    'registry_counter:INSERT', // W1-02: the per-year counter is upserted inside the create transaction
+    'registry_counter:SELECT',
+    'registry_counter:UPDATE',
     'session:INSERT', // W1-01: W0-03 section 6.3 session rows (last_seen_at, revoked_at, locale are the mutable columns)
     'session:SELECT',
     'session:UPDATE',

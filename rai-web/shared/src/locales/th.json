@@ -63,5 +63,8 @@
   "validation.no_open_draft": "เคสนี้ไม่มีฉบับร่างที่เปิดอยู่",
   "validation.not_in_configured_list": "ค่านี้ไม่อยู่ในรายการที่กำหนดไว้",
   "validation.reason_required": "กรุณาระบุเหตุผลเมื่อเลือกไม่เกี่ยวข้อง",
-  "validation.required": "กรุณากรอกข้อมูลนี้"
+  "validation.required": "กรุณากรอกข้อมูลนี้",
+  "validation.source_record_id_prefix": "รหัสรายการต้นทางต้องขึ้นต้นด้วย TPM- หรือ VRO- หรือเลือก \"ไม่ทราบ\"",
+  "validation.unknown_field": "ไม่รู้จักฟิลด์นี้",
+  "validation.subject_unresolvable": "ไม่พบผู้ใช้ที่ระบุเป็นเจ้าของ"
 }

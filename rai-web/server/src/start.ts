@@ -6,6 +6,12 @@ import type { AddressInfo } from 'node:net';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from './app.js';
 import { createScopeFactsSource } from './authz/facts.js';
+import {
+  businessUnitsFromGrants,
+  createBusinessUnitDirectory,
+  type BusinessUnitDirectory,
+} from './cases/business-units.js';
+import { createSubjectDirectory } from './cases/subject-directory.js';
 import { ConfigError, EXIT_CONFIG, parseConfig, type Env } from './config.js';
 import { createDb, type DbHandle } from './db/client.js';
 import { currentRevision } from './configuration/store.js';
@@ -24,6 +30,8 @@ export interface StartOverrides {
   exit?: (code: number) => never;
   /** The fixture table (fixture mode only); defaults to a dynamic import of @rai/fixtures/data/users. */
   fixtureUsers?: readonly FixtureIdentity[];
+  /** The slice-1 BU key list (every mode); defaults to FIXTURE_BUSINESS_UNITS from the same dynamic import. */
+  fixtureBusinessUnits?: readonly string[];
   discovery?: Discovery;
   now?: () => Date;
 }
@@ -31,20 +39,42 @@ export interface StartOverrides {
 export interface StartedServer {
   fastify: FastifyInstance;
   emitter: Emitter;
+  /** The configured BU keys the case routes accept (W0-04 `case.business_unit_id`), observable by tests. */
+  businessUnits: BusinessUnitDirectory;
   close(): Promise<void>;
 }
 
-/** Fixture mode only: the eight W0-03 identities from @rai/fixtures, resolved at run time so the server never imports fixtures statically. */
-export async function loadFixtureUsers(): Promise<readonly FixtureIdentity[] | undefined> {
+/** @rai/fixtures/data/users resolved at run time, so the server never imports fixtures statically (absent in a production install). */
+async function loadFixtureUsersModule(): Promise<Record<string, unknown> | undefined> {
   const specifier = '@rai/fixtures/data/users'; // a variable, so tsc does not resolve it (fixtures depends on server; no cycle)
   try {
-    const mod = (await import(specifier)) as { FIXTURE_USERS?: unknown };
-    const users = mod.FIXTURE_USERS;
-    if (!Array.isArray(users)) return undefined;
-    return users as readonly FixtureIdentity[]; // createFixtureIdentityProvider re-validates every invariant
+    return (await import(specifier)) as Record<string, unknown>;
   } catch {
     return undefined;
   }
+}
+
+/** Fixture mode only: the eight W0-03 identities from @rai/fixtures. */
+export async function loadFixtureUsers(): Promise<readonly FixtureIdentity[] | undefined> {
+  const users = (await loadFixtureUsersModule())?.FIXTURE_USERS;
+  if (!Array.isArray(users)) return undefined;
+  return users as readonly FixtureIdentity[]; // createFixtureIdentityProvider re-validates every invariant
+}
+
+/**
+ * Every mode: the slice-1 BU key list (`CM`, `HR`; W0-03 section 7) that W0-04 `case.business_unit_id` names, read
+ * from `FIXTURE_BUSINESS_UNITS`. Only the keys are taken; the identities stay fixture-mode only. Undefined when the
+ * fixtures package is absent (a production install), where the W6/W8 group mapping will supply the keys.
+ */
+export async function loadFixtureBusinessUnits(): Promise<readonly string[] | undefined> {
+  const units = (await loadFixtureUsersModule())?.FIXTURE_BUSINESS_UNITS;
+  if (!Array.isArray(units)) return undefined;
+  const keys: string[] = [];
+  for (const unit of units as unknown[]) {
+    const id = (unit as { businessUnitId?: unknown } | null)?.businessUnitId;
+    if (typeof id === 'string') keys.push(id);
+  }
+  return keys;
 }
 
 /** process.refused (W0-10 3.3): the reason code only, never a value; written before any logger exists. */
@@ -90,6 +120,16 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
     throw err;
   }
 
+  // W1-02: the configured BU keys are the slice-1 fixture BU list (W0-04 `case.business_unit_id`: "a key from the
+  // fixture BU list (CM, HR; W0-03 section 7) in slice 1; the AD-group mapping arrives at W6/W8") in every identity
+  // mode, so a local-google account (W0-03 4.1: an unmapped account is owner and "sees nothing until it creates a
+  // case") can file a case; the `business_unit` grants of an injected fixture table are added. The subject
+  // directory knows the fixture identities plus every subject that has signed in.
+  const knownIdentities = fixtureUsers ?? [];
+  const businessUnits = createBusinessUnitDirectory([
+    ...(overrides.fixtureBusinessUnits ?? (await loadFixtureBusinessUnits()) ?? []),
+    ...businessUnitsFromGrants(knownIdentities.flatMap((u) => [...u.roles])),
+  ]);
   const { fastify, emitter } = buildApp({
     config,
     identity: {
@@ -97,6 +137,12 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
       sessionStore: createPgSessionStore(db.db),
       facts: createScopeFactsSource(db.db),
       ...(fixtureUsers === undefined ? {} : { fixtureProvider: createFixtureIdentityProvider(fixtureUsers) }),
+      ...(overrides.now === undefined ? {} : { now: overrides.now }),
+    },
+    cases: {
+      db: db.db,
+      businessUnits,
+      subjects: createSubjectDirectory(db.db, { known: knownIdentities }),
       ...(overrides.now === undefined ? {} : { now: overrides.now }),
     },
   });
@@ -113,5 +159,5 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
     throw err;
   }
   emitter.log('process.started', startedFields(config));
-  return { fastify, emitter, close };
+  return { fastify, emitter, businessUnits, close };
 }
