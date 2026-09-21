@@ -43,6 +43,28 @@ Shell: `export PATH=$HOME/.nvm/versions/node/v24.21.0/bin:$PATH` (node v24.21.0,
 | `git diff --check` | clean |
 | `POSTGRES_PORT=54326 docker compose -p rai-w1-06 down -v` (repository root) | run after the PR opened |
 
+### Fix round 1 (review finding: backward focus trap)
+
+Finding: `trapFocus` wrapped Shift+Tab only when the active element was the first radio in DOM order (`attached`), but the dialog opens on the checked radio (`missing` for slot 7 of `fx-case-missing-slot`, third in DOM order), so one Shift+Tab from the opening state left the dialog (`document.activeElement` became `<body>`). The spec only Tabbed forward, so it could not see this.
+
+Fix: the state radio group is one tab stop whose entry is the checked radio, so `trapFocus` now computes `entry` (the checked radio of the first group, else the first control) and wraps on Shift+Tab when the active element is `entry`, `first` or the dialog; the forward wrap from the last control lands on `entry` as well. `slot-dialog.tsx` only; no markup, locale or contract change. The dialog test gained an 8-press Shift+Tab loop beside the 12-press Tab loop, each press asserting a visible focus ring and focus inside `dialog[open]`. Sequence: the loop was added first and failed on all three widths against the unfixed component (`no element is focused (focus is on the body)` at the first Shift+Tab), then passed after the fix.
+
+| Command (from `rai-web/` unless noted) | Result |
+| --- | --- |
+| `npx playwright test -c tests/browser/playwright.substitute.config.ts -g "contains focus"` (before the fix) | `3 failed` — first Shift+Tab leaves the dialog at 1440 / 834 / 390 |
+| same (after the fix) | `3 passed (4.2s)` |
+| `npm run lint` | eslint clean; Prettier clean; `check-css: no outline removal outside :focus-visible` |
+| `npm run typecheck` | clean |
+| `npm run test:unit` | `tests 297, pass 297, fail 0` |
+| `npm run migrate` then `npm run test:integration` (Postgres `rai-w1-06`, port 54326) | `applied 4 migration(s)`; `tests 103, pass 103, fail 0` |
+| `npm run build && npm run check:substitute-absent` | `scanned 343 files, 0 with the marker` |
+| `npm run test:browser:server` | `21 passed (4.2s)` |
+| `npm run test:browser:substitute` | `21 passed (17.2s)`; JSON report: 21 expected, 0 `axe-non-blocking` annotations (zero violations of any impact) |
+| `node --test tests/*.test.mjs` (repository root) | `tests 22, pass 22, fail 0` |
+| `node scripts/check-links.mjs` (repository root) | `130 Markdown files, 666 relative links checked, 0 broken` |
+| `node scripts/check-frozen-source.mjs`; `git diff --check` (repository root) | hash matches; clean |
+| `POSTGRES_PORT=54326 docker compose -p rai-w1-06 down -v` (repository root) | run after the push |
+
 ## Done-when clauses → evidence (`w1-06-case-pack-versions.substitute.spec.ts`, every width)
 
 | Clause | Evidence |
@@ -50,7 +72,7 @@ Shell: `export PATH=$HOME/.nvm/versions/node/v24.21.0/bin:$PATH` (node v24.21.0,
 | Every slot state and reason is reachable | "every slot state and reason is reachable by keyboard…": from the keyboard alone (Tab to the seventh Change, Enter, arrow keys on the radio group, Tab to Apply, Enter) slot 7 of `fx-case-missing-slot` goes missing → not applicable with a typed Thai reason → not yet → missing → attached (an upload through 7.4, the filename link appears); slot 8 goes to N/A with a reason; the default non-vendor reason renders from its locale key on slots 3 and 4; the typed reason of `fx-case-na-reasons` slot 4 renders verbatim |
 | The N/A reason field cannot be skipped | same test: Apply with an empty reason and with whitespace keeps the dialog open, shows `validation.reason_required` in a `role="alert"` and moves focus to the field; the row only changes once a reason is typed. The API's own 422 for a reason-less N/A is rendered on the row through `slotOfFieldPath` (unit-tested), and `reasonIsValid` is unit-tested at 0 / whitespace / 1 / 500 / 501 characters |
 | No client-side check decides access | "forbidden and unauthenticated answers are rendered as received": `fx-user-owner-cm-2` (no fixture case) opens the owner's case → the 403 envelope's `error.forbidden` is shown, no Change button and nothing about the case; signed out → `/sign-in?returnTo=%2Fcases%2F<id>`. A version id of another case → the 404 envelope. `web/src` holds no role, scope or policy logic (the only place scope is enforced is `server/src/authz/`, which the substitute calls) |
-| Keyboard-only operation of every action | the slot journey, the save, the submit and the version link are driven with Tab / arrows / Enter through `tests/browser/support/keyboard.ts`, which asserts a visible focus ring at every stop; the dialog test Tabs 12 times inside the dialog (focus never leaves), Escape closes and returns focus to the invoking Change button, Escape with unsaved reason text asks (Close and discard / Keep editing, both by keyboard) |
+| Keyboard-only operation of every action | the slot journey, the save, the submit and the version link are driven with Tab / arrows / Enter through `tests/browser/support/keyboard.ts`, which asserts a visible focus ring at every stop; the dialog test Tabs 12 times forward and Shift+Tabs 8 times backward inside the dialog (focus never leaves in either direction), Escape closes and returns focus to the invoking Change button, Escape with unsaved reason text asks (Close and discard / Keep editing, both by keyboard) |
 | Accessibility audit passes with zero critical issues | `expectAccessible` (axe-core, tags wcag2a / wcag2aa / wcag21a / wcag21aa / wcag22aa) on every state above with `lang="th"` and once with `lang="en"`: zero violations of any impact; `expectStatusElementsHaveText` on every screen; no horizontal scroll at 390 |
 | No hard-coded user-facing string | `npm run lint` (`react/jsx-no-literals` + the attribute selectors over `web/`) and `no-literals.test.ts` (compiler scan of the W1-06 screens) both green; the spec resolves every label through `t()` from the shared catalogue, so a bare string in the UI would not be found |
 | Version navigation shows the submitted versions the substitute serves | "submit freezes the pack…": after Submit on `fx-case-nonvendor` the URL is `/cases/<id>/versions/<versionId>`, the navigation lists exactly the items of `GET /api/cases/{id}/versions` (count, number, `href`), the latest is marked, no draft entry remains, the frozen view shows submitter, `lane-mapping/v1`, the configuration revision and the nine frozen slots with no Change or Submit; `/cases/<id>` redirects to the latest version |

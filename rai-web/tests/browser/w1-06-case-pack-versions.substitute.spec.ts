@@ -257,6 +257,13 @@ test.describe('W1-06 case flow on the W1-13 substitute (fx-case-missing-slot, fx
       await expectVisibleFocus(page);
       await expectFocusInsideDialog(page);
     }
+    // Backwards too: the dialog opened on the checked radio (third in DOM order), so the first Shift+Tab
+    // must wrap to the last control instead of leaving the dialog.
+    for (let i = 0; i < 8; i += 1) {
+      await pressTab(page, 1, true);
+      await expectVisibleFocus(page);
+      await expectFocusInsideDialog(page);
+    }
     await expectAccessible(page, testInfo, { name: 'slot-dialog-th', lang: 'th' });
     await page.keyboard.press('Escape');
     await expect(dialog).toBeHidden();

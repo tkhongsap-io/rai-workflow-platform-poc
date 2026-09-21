@@ -81,6 +81,8 @@ export function SlotDialog({
 
   // Section 9, item 3: focus is trapped inside. Chromium lets Tab leave a modal dialog for the browser UI
   // before cycling back, so Tab on the last focusable control and Shift+Tab on the first wrap explicitly.
+  // The first control is the state radio group, which is one tab stop whose entry is the checked radio (the
+  // dialog opens there), so the backward wrap fires from that radio, not only from the first in DOM order.
   const trapFocus = (event: KeyboardEvent<HTMLDialogElement>): void => {
     if (event.key !== 'Tab') return;
     const dialog = event.currentTarget;
@@ -90,11 +92,16 @@ export function SlotDialog({
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
     if (first === undefined || last === undefined) return;
+    const entry =
+      first instanceof HTMLInputElement && first.type === 'radio'
+        ? (dialog.querySelector<HTMLInputElement>(`input[type="radio"][name="${first.name}"]:checked`) ??
+          first)
+        : first;
     const active = document.activeElement;
     if (!event.shiftKey && active === last) {
       event.preventDefault();
-      first.focus();
-    } else if (event.shiftKey && (active === first || active === dialog)) {
+      entry.focus();
+    } else if (event.shiftKey && (active === entry || active === first || active === dialog)) {
       event.preventDefault();
       last.focus();
     }
