@@ -1,13 +1,16 @@
 // Test-server process for the integration layer (W0-02 section 8.1: "for restart tests, a spawned process") and
 // the log capture the W0-10 test obligations need (OBS-xx assert on emitted lines). Lane C owns this file (W1-12).
 //
-// Spawns the one deployable (`server/src/main.ts` through tsx, no build step) in test mode on a free loopback
-// port with the fixture identity provider, the in-memory mail sink and the QC substitute, captures every JSON
-// line the process writes to stdout and stderr, waits for `process.started`, and stops it with SIGTERM. Nothing
-// here reaches an external service: the database is the local Postgres that `.env` or the shell names, and the
-// identity mode is `fixture`, which config.ts accepts only under NODE_ENV=test on a loopback bind (W0-03 S13, S14).
+// Spawns the one deployable (`server/src/main.ts` through tsx, no build step; or, with `built: true`, the built
+// `server/dist/main.js` that `npm start` runs, which W1-INT's journey restarts) in test mode on a free loopback
+// port (or the `port` the caller names, so a restarted process keeps its origin) with the fixture identity
+// provider, the in-memory mail sink and the QC substitute, captures every JSON line the process writes to stdout
+// and stderr, waits for `process.started`, and stops it with SIGTERM. Nothing here reaches an external service:
+// the database is the local Postgres that `.env` or the shell names, and the identity mode is `fixture`, which
+// config.ts accepts only under NODE_ENV=test on a loopback bind (W0-03 S13, S14).
 
 import { spawn, type ChildProcess } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -74,15 +77,32 @@ export interface StartOptions {
   env?: Record<string, string>;
   /** How long to wait for `process.started` (or a refusal) before giving up. */
   startTimeoutMs?: number;
+  /** Spawn the built deployable (`node server/dist/main.js`, what `npm start` runs) instead of the source through tsx. */
+  built?: boolean;
+  /** Listen on this loopback port instead of a free one (a restart keeps its origin). */
+  port?: number;
+}
+
+/** The built entry point `npm start` runs; W1-INT's journey and evidence-configuration checks spawn it. */
+export const BUILT_MAIN = path.join(RAI_WEB_ROOT, 'server', 'dist', 'main.js');
+
+export class BuiltServerMissingError extends Error {
+  constructor() {
+    super(`${BUILT_MAIN} does not exist; run npm run build first`);
+    this.name = 'BuiltServerMissingError';
+  }
 }
 
 /** Starts the server and resolves once it logged `process.started`; rejects with the captured lines otherwise. */
 export async function startTestServer(options: StartOptions = {}): Promise<TestServerProcess> {
-  const port = await freeLoopbackPort();
+  const port = options.port ?? (await freeLoopbackPort());
   const env = testServerEnv(port, options.env);
+  if (options.built === true && !existsSync(BUILT_MAIN)) throw new BuiltServerMissingError();
   const child = spawn(
     process.execPath,
-    ['--import', 'tsx', '--conditions=rai-source', path.join('server', 'src', 'main.ts')],
+    options.built === true
+      ? [BUILT_MAIN]
+      : ['--import', 'tsx', '--conditions=rai-source', path.join('server', 'src', 'main.ts')],
     { cwd: RAI_WEB_ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] },
   );
   const capture = attachCapture(child);
