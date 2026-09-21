@@ -2,7 +2,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatDate, formatDateTime, INTL_LOCALE_BY_LOCALE } from './format.js';
+import { formatBytes, formatDate, formatDateTime, INTL_LOCALE_BY_LOCALE } from './format.js';
 
 test('a UTC instant renders in Asia/Bangkok (UTC+7) in both locales', () => {
   // 2026-09-21T17:30:00Z is 2026-09-22 00:30 in Bangkok: the day rolls over.
@@ -24,4 +24,11 @@ test('the Thai locale uses the Gregorian calendar, not the Buddhist era', () => 
 test('an unparsable timestamp is returned unchanged rather than rendered as Invalid Date', () => {
   assert.equal(formatDateTime('en', 'not-a-date'), 'not-a-date');
   assert.equal(formatDate('th', ''), '');
+});
+
+test('W1-06: file sizes render through Intl unit formatting in both locales', () => {
+  assert.match(formatBytes('en', 512), /512/);
+  assert.match(formatBytes('en', 20 * 1024), /20/);
+  assert.match(formatBytes('en', 3 * 1024 * 1024 + 200_000), /3\.2/);
+  assert.match(formatBytes('th', 3 * 1024 * 1024), /3/);
 });

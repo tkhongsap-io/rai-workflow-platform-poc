@@ -1,7 +1,9 @@
 // Playwright configuration for Lane B specs against the W1-13 in-memory API substitute (W0-02 sections 3.4 and
-// 8.1; W1-07 adds it). Two loopback processes: the substitute CLI (fixtures/src/substitutes/api/serve.ts, fixture
-// state, NODE_ENV=test) and the Vite dev server with VITE_API_SUBSTITUTE=true proxying /api and /auth to it. The
-// three handoff widths run as projects; one worker, because the substitute's state is shared by every spec.
+// 8.1; W1-07 adds it). Two loopback processes: the substitute (support/substitute-server.ts: the W1-13 handler
+// on node:http plus a test-only `POST /__substitute/reset` so a spec that saves, uploads or submits can start
+// each test from the fixture state; W1-06) and the Vite dev server with VITE_API_SUBSTITUTE=true proxying /api
+// and /auth to it. The three handoff widths run as projects; one worker, because the substitute's state is
+// shared by every spec.
 //
 // Never evidence: a Lane B ticket's Proves IDs are realised only when Wx-INT runs the same spec against the real
 // server through playwright.config.ts (section 8.1). Specs for this configuration are named `*.substitute.spec.ts`
@@ -29,7 +31,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `npx tsx --conditions=rai-source fixtures/src/substitutes/api/serve.ts --port ${substitutePort}`,
+      command: `npx tsx --conditions=rai-source tests/browser/support/substitute-server.ts --port ${substitutePort}`,
       cwd: '../..',
       port: substitutePort,
       reuseExistingServer: false,

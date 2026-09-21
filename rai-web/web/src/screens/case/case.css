@@ -1,0 +1,289 @@
+/* W1-06 case flow layout on the W1-07 tokens and primitives of styles.css (cards, buttons, badges, notices,
+   fields, dialog). Only what the case screens add: the overview header, the facts grid, the lane projections,
+   the version navigation beside the content on wide screens, the nine slot rows, the pack settings and the
+   slot-state choices. Reflows at 1440 / 834 / 390 without horizontal scroll (W0-02 section 9, item 7); no
+   outline is removed outside :focus-visible (item 4; scripts/check-css.mjs). */
+
+.case-screen > .btn-ghost {
+  margin-bottom: 12px;
+}
+
+/* Overview header */
+.case-head-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.case-head-meta {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--color-muted);
+}
+
+.case-head-registry {
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.case-head h1 {
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+
+.case-head-status {
+  text-align: right;
+}
+
+.case-next {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  background: var(--surface-alt);
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px 16px;
+  margin: 16px 0 0;
+}
+
+.facts dt {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.facts dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.lanes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  align-items: center;
+  margin-top: 16px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.lanes-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+
+/* Body layout: version navigation beside the content on wide screens, stacked on narrow ones */
+.case-body {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .case-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.versions-nav {
+  padding: 14px 16px;
+}
+
+.versions-nav h2 {
+  margin-bottom: 8px;
+}
+
+.versions-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.version-link {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.version-link-active {
+  border-color: var(--color-ink);
+  background: var(--surface-alt);
+}
+
+.version-name {
+  font-weight: 600;
+}
+
+.version-meta {
+  width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.versions-none {
+  padding: 8px 0;
+}
+
+/* Panels */
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.panel-head p {
+  margin: 4px 0 0;
+}
+
+.panel-summary {
+  text-align: right;
+}
+
+@media (max-width: 900px) {
+  .panel-summary {
+    text-align: left;
+  }
+}
+
+/* Slot rows */
+.slots {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.slot-row {
+  display: grid;
+  grid-template-columns: 32px minmax(180px, 1.2fr) 150px minmax(0, 2fr) auto;
+  gap: 8px 12px;
+  align-items: start;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+}
+
+.slot-row:first-child {
+  border-top: none;
+}
+
+.slot-row:nth-child(even) {
+  background: var(--surface-page);
+}
+
+.slot-row-pending {
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}
+
+.slot-number {
+  color: var(--color-muted);
+  font-weight: 700;
+}
+
+.slot-name {
+  display: flex;
+  flex-direction: column;
+}
+
+.slot-title {
+  font-weight: 600;
+}
+
+.slot-doc {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.doc {
+  display: flex;
+  flex-direction: column;
+}
+
+.slot-actions {
+  justify-self: end;
+}
+
+@media (max-width: 900px) {
+  .slot-row {
+    grid-template-columns: 32px minmax(0, 1fr);
+  }
+
+  .slot-state,
+  .slot-doc,
+  .slot-actions {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
+/* Pack settings and the slot-state choices */
+.pack-settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  margin-bottom: 14px;
+}
+
+.pack-settings > .field {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.slot-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.slot-choice {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 0 10px;
+  align-items: start;
+  padding: 6px 0;
+  cursor: pointer;
+}
+
+.slot-choice input {
+  grid-row: 1 / span 2;
+  margin: 5px 0 0;
+  accent-color: var(--color-primary);
+  width: 18px;
+  height: 18px;
+}
+
+.slot-choice-label {
+  font-weight: 600;
+}
+
+.slot-choice-help {
+  color: var(--color-muted);
+  font-size: 12.5px;
+}
