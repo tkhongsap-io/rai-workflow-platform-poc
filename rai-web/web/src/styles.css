@@ -1,0 +1,653 @@
+/* W1-07 (Lane B): design tokens from docs/design/DEVELOPER_HANDOFF.md as CSS custom properties; no CSS framework
+   (W0-02 section 4.1). Focus rings follow section 9 item 4: the outline is never removed outside :focus-visible
+   (scripts/check-css.mjs). Thai-capable system font stack and line-height >= 1.6 per section 10 item 7. */
+
+:root {
+  --color-primary: #e00000;
+  --color-primary-hover: #b80000;
+  --color-ink: #303c46;
+  --color-muted: #5b6878;
+  --color-link: #00639f;
+  --color-link-hover: #004b80;
+  --surface-page: #f9f9fc;
+  --surface-card: #ffffff;
+  --surface-alt: #f3f3f6;
+  --border: #e2e8f0;
+  --border-strong: #c6d0db;
+  --danger-bg: #fdecec;
+  --danger-border: #f3c9c9;
+  --danger-ink: #8f0000;
+  --success-bg: #e4f5ea;
+  --success-ink: #0f5a2b;
+  --info-bg: #e6f0fa;
+  --info-ink: #0b4a7a;
+  --warn-bg: #fff4e0;
+  --warn-ink: #7a4a00;
+  --focus: #00639f;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --font: 'Noto Sans Thai', 'Sarabun', system-ui, 'Segoe UI', Arial, 'Helvetica Neue', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: var(--font);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+  background: var(--surface-page);
+  color: var(--color-ink);
+  font-size: 15px;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+  line-height: 1.6;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+a {
+  color: var(--color-link);
+}
+
+a:hover {
+  color: var(--color-link-hover);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Shell ------------------------------------------------------------------------------------------------------ */
+
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -60px;
+  background: var(--surface-card);
+  color: var(--color-link);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  z-index: 10;
+}
+
+.skip-link:focus-visible {
+  top: 12px;
+}
+
+.shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.shell > header {
+  position: relative;
+}
+
+.shell-header {
+  background: var(--surface-card);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--color-ink);
+  font-weight: 700;
+  font-size: 17px;
+}
+
+.brand-mark {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-primary);
+}
+
+.shell-tools {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.signed-in-as {
+  font-size: 13px;
+  color: var(--color-muted);
+  max-width: 320px;
+}
+
+.locale-switch {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.locale-switch button {
+  background: var(--surface-card);
+  border: 0;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.locale-switch button[aria-pressed='true'] {
+  background: var(--color-ink);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.shell-nav {
+  background: var(--surface-card);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.shell-nav a {
+  display: inline-block;
+  padding: 10px 12px;
+  text-decoration: none;
+  color: var(--color-ink);
+  border-bottom: 3px solid transparent;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.shell-nav a[aria-current='page'] {
+  border-bottom-color: var(--color-primary);
+}
+
+.banner-substitute {
+  margin: 0;
+  background: var(--danger-bg);
+  border-bottom: 1px solid var(--danger-border);
+  color: var(--danger-ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 24px;
+}
+
+.shell-main {
+  flex: 1;
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+/* The landmark receives focus after a client-side navigation (route-focus.tsx); the replacement ring is subtle
+   because the landmark is a region, not a control (section 9 item 4 allows a replacement inside :focus-visible). */
+.shell-main:focus-visible {
+  outline: 2px solid var(--border-strong);
+  outline-offset: -2px;
+}
+
+@media (max-width: 480px) {
+  .shell-header,
+  .shell-nav,
+  .banner-substitute {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .shell-main {
+    padding: 16px;
+  }
+}
+
+/* Typography and blocks -------------------------------------------------------------------------------------- */
+
+h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+}
+
+h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.lede {
+  margin: 6px 0 0;
+  color: var(--color-muted);
+  font-size: 13.5px;
+  max-width: 720px;
+}
+
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.card {
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+}
+
+.card + .card {
+  margin-top: 16px;
+}
+
+.muted {
+  color: var(--color-muted);
+}
+
+.small {
+  font-size: 12.5px;
+}
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+/* Buttons ---------------------------------------------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: var(--radius-sm);
+  padding: 9px 16px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  text-decoration: none;
+  min-height: 40px;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: #ffffff;
+}
+
+.btn-primary:hover:enabled {
+  background: var(--color-primary-hover);
+}
+
+.btn-secondary {
+  background: var(--surface-card);
+  color: var(--color-ink);
+  border-color: var(--border-strong);
+}
+
+.btn-secondary:hover:enabled {
+  background: var(--surface-alt);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--color-link);
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Status badge (section 9 item 2: text plus icon plus colour, never colour alone) ----------------------------- */
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--surface-alt);
+  color: var(--color-ink);
+  border: 1px solid var(--border);
+}
+
+.status-badge[data-status='in_review'] {
+  background: var(--info-bg);
+  color: var(--info-ink);
+  border-color: transparent;
+}
+
+.status-badge[data-status='sent_back'] {
+  background: var(--danger-bg);
+  color: var(--danger-ink);
+  border-color: transparent;
+}
+
+.status-badge[data-status='awaiting_disposition'] {
+  background: var(--warn-bg);
+  color: var(--warn-ink);
+  border-color: transparent;
+}
+
+.status-badge[data-status='ready_for_launch'] {
+  background: var(--success-bg);
+  color: var(--success-ink);
+  border-color: transparent;
+}
+
+.status-icon {
+  font-size: 11px;
+  line-height: 1;
+}
+
+/* Notices ---------------------------------------------------------------------------------------------------- */
+
+.notice {
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-alt);
+  margin: 0 0 16px;
+}
+
+.notice-error {
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
+  color: var(--danger-ink);
+}
+
+.notice-success {
+  background: var(--success-bg);
+  border-color: transparent;
+  color: var(--success-ink);
+}
+
+.notice p {
+  margin: 0;
+}
+
+.notice ul {
+  margin: 6px 0 0;
+  padding-left: 20px;
+}
+
+/* Case list -------------------------------------------------------------------------------------------------- */
+
+.case-grid {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+}
+
+.case-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 18px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+}
+
+.case-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: 0 2px 10px rgba(48, 60, 70, 0.07);
+}
+
+.case-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.case-card h2 {
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+
+.case-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.case-facts dt {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.case-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.case-card-foot {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: auto;
+}
+
+.case-version {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.empty-state {
+  background: var(--surface-card);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  padding: 40px 24px;
+  text-align: center;
+  margin-top: 16px;
+}
+
+.empty-state p {
+  max-width: 460px;
+  margin: 8px auto 16px;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+
+/* Forms ------------------------------------------------------------------------------------------------------ */
+
+.form-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.form-row-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+@media (max-width: 700px) {
+  .form-row-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.field label,
+.field legend,
+.field-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.field input[type='text'],
+.field select {
+  width: 100%;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 10px 11px;
+  font-size: 14px;
+  background: var(--surface-card);
+  min-height: 42px;
+}
+
+.field input[aria-invalid='true'],
+.field select[aria-invalid='true'] {
+  border-color: var(--color-primary);
+}
+
+.field-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.field-error {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  color: var(--danger-ink);
+  font-weight: 600;
+}
+
+.required-mark {
+  color: var(--color-primary);
+}
+
+fieldset.field {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin: 0;
+}
+
+fieldset.field legend {
+  padding: 0 6px;
+  margin-bottom: 0;
+}
+
+.field label.choice,
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 0;
+  font-size: 14px;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.choice input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-primary);
+  margin: 0;
+}
+
+.form-actions {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* Dialog (section 9 item 3: native <dialog> with showModal) -------------------------------------------------- */
+
+dialog.dialog {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px;
+  max-width: 440px;
+  width: calc(100% - 32px);
+  color: var(--color-ink);
+  background: var(--surface-card);
+}
+
+dialog.dialog::backdrop {
+  background: rgba(48, 60, 70, 0.45);
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+/* Sign-in ---------------------------------------------------------------------------------------------------- */
+
+.sign-in {
+  max-width: 560px;
+  margin: 24px auto;
+}
+
+.sign-in .card {
+  margin-top: 20px;
+}
+
+.user-roles {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: var(--color-muted);
+}

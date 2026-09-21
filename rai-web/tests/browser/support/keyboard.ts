@@ -67,3 +67,12 @@ export async function tabUntil(
   }
   throw new Error(`no focusable element matched within ${maxSteps} Tab presses`);
 }
+
+/**
+ * Waits until the main landmark holds focus. RouteFocus (web/src/route-focus.tsx) moves focus in a useEffect,
+ * which runs after the new screen has painted, so a one-shot read taken as soon as the screen's heading is
+ * visible can land between paint and effect (seen once in CI at 1440). Polling closes that window.
+ */
+export async function expectMainFocused(page: Page): Promise<void> {
+  await expect.poll(async () => (await focusedElement(page))?.tag, { timeout: 5_000 }).toBe('main');
+}
