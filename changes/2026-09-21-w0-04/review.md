@@ -36,3 +36,12 @@ No product suite exists yet (the skeleton arrives with W1-00), so `npm test`, li
 - [x] Interface, error contract and test substitute (W0 contract rule for W0-03/04/07/10).
 - [x] Cross-linked to the consuming ticket IDs and the sibling W0 specs by ticket and contract anchor.
 - [x] D07-D10 untouched; frozen source spec unchanged; no real data, credentials or endpoints.
+
+## Fix round 1 (PR #61 review)
+
+Two blocking findings, both in `docs/engineering/persistence-and-artifact-store.md`:
+
+1. **Notification dedup collapsed two lanes' send-backs.** `notification.lane` was stored as `'-'` for `send_back`, so `UNIQUE (event, version_id, lane, recipient)` made the second concurrent send-back (W2-03) a `UniqueViolation` → 409, contradicting D05, A07 and the no-duplicate-on-retry rule. Fix: `lane` now carries the deciding lane for `send_back` (and the opened lane for `lane_open`), matching the D06 identity (event, version, lane, recipient); `'-'` is reserved for `ready` and `sla_breach_digest`. The W2-02 and W2-03 recipes and the W2-03 test-map row (two `send_back` rows, one per lane, no `UniqueViolation`) were updated.
+2. **Cross-case artifact reference.** The `artifact` table allowed slot rows "across versions or cases" to reference one artifact row while `artifact.case_id` binds download authorization to the uploading case, so an attached cross-case slot would be un-downloadable and would leak the other case's filename and size through the slot listing. Fix: sharing is now "across versions of the same case"; `VersionWriteRepository.updateDraftSlot` must load the artifact row and reject an `artifact_id` whose `case_id` differs from the version's case with the new `ArtifactCaseMismatch` error (422 `invalid_input`, field `artifactId`, key `error.artifact_case_mismatch`), tested in W1-04 (new test-map row); an optional database backing (`UNIQUE (artifact.id, case_id)` plus a composite FK from a denormalised `artifact_slot.case_id`) is named for W1-04.
+
+Checks after the fix (same shell): `node --test tests/*.test.mjs` → 22 pass, 0 fail; `git diff --check` clean; relative-link and anchor audit over the spec → 46 links, 0 broken; `docs/product/source-spec.md` untouched.

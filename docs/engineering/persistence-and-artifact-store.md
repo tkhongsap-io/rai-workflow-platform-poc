@@ -170,14 +170,14 @@ Nine rows per version, created with the draft (state `missing` until the owner a
 | `slot` | smallint NOT NULL | 1-9, `CHECK (slot BETWEEN 1 AND 9)` |
 | `state` | text NOT NULL | `attached`, `not_yet`, `not_applicable`, `missing` (source spec: four distinct facts) |
 | `reason` | text NULL | Required when `state = 'not_applicable'`: `CHECK (state <> 'not_applicable' OR reason IS NOT NULL)`. The slot 3/4 non-vendor default writes a locale key here (D12), for example `slot.na.reason.non_vendor_default`, so the reason stays visible and translatable. |
-| `artifact_id` | uuid NULL FK | Required when `state = 'attached'`: `CHECK (state <> 'attached' OR artifact_id IS NOT NULL)`; NULL otherwise. |
+| `artifact_id` | uuid NULL FK | Required when `state = 'attached'`: `CHECK (state <> 'attached' OR artifact_id IS NOT NULL)`; NULL otherwise. Must reference an `artifact` row whose `case_id` is the version's case (see the case binding under [`artifact`](#artifact)). |
 | `updated_by`, `updated_at` | | Last draft edit. |
 
 Copying to a successor draft: the send-back transaction inserts nine new rows for version N+1 with the same `state`, `reason` and `artifact_id` as version N. Version N's rows are untouched. Replacing a document in the draft points the draft's row at a new `artifact` row; the old `artifact` row and blob remain because version N references them.
 
 ### `artifact`
 
-Metadata for one accepted upload. Immutable once inserted. Several slot rows (across versions or cases) may reference one artifact row; several artifact rows may reference one blob (same bytes uploaded twice keep separate metadata: different filename, uploader or time).
+Metadata for one accepted upload. Immutable once inserted. Several slot rows (across versions of the same case) may reference one artifact row, never a slot row of another case (the case binding below); several artifact rows may reference one blob (same bytes uploaded twice keep separate metadata: different filename, uploader or time).
 
 | Column | Type | Notes |
 |---|---|---|
@@ -188,7 +188,7 @@ Metadata for one accepted upload. Immutable once inserted. Several slot rows (ac
 | `media_type` | text NOT NULL | The **sniffed** type from W0-08, never the client's `Content-Type`. |
 | `uploaded_by`, `uploaded_role` | text NOT NULL | |
 | `uploaded_at` | timestamptz NOT NULL | |
-| `case_id` | uuid FK NOT NULL | The case the upload was authorised against. Download authorization is checked against this case's scope; an artifact cannot be reached through another case's URL. |
+| `case_id` | uuid FK NOT NULL | The case the upload was authorised against. Download authorization is checked against this case's scope; an artifact cannot be reached through another case's URL. **Case binding:** `VersionWriteRepository.updateDraftSlot` loads the artifact row inside the draft transaction and rejects an `artifact_id` whose `case_id` differs from the version's case with `ArtifactCaseMismatch` (422 `invalid_input`, field `artifactId`), so a slot can never point at another case's upload, which would otherwise be un-downloadable under the slot's case and would leak the other case's filename and size through the slot listing. W1-04 tests this. W1-04 may additionally back it in the database with `UNIQUE (id, case_id)` here and a denormalised `artifact_slot.case_id` under a composite FK `(artifact_id, case_id) REFERENCES artifact (id, case_id)`; the repository check is required either way. |
 | `correlation_id` | text NOT NULL | |
 | `bytes_state` | text NOT NULL DEFAULT `'present'` | `present` or `destroyed`. Reserved for the D08 deletion options; slice 1 never writes `destroyed`. |
 
@@ -232,7 +232,7 @@ A finding counts as **dispositioned** for the Ready predicate when its latest ev
 
 ### `notification`
 
-One row per (event, version, lane, recipient), the D06 dedup identity: `UNIQUE (event, version_id, lane, recipient)` with `lane` stored as `'-'` for events without a lane (send-back to owner, Ready, breach digest) so the unique index holds. Columns: `id`, `event` (`lane_open`, `send_back`, `ready`, `sla_breach_digest`), `version_id` FK NULL (NULL for the digest), `case_id` FK NULL, `lane`, `recipient` (email address; in slice 1 only fixture addresses and the W0-08 synthetic operator recipient), `deep_link_path` (path only, never a token that grants access; the link still requires sign-in and scope), `template_key` (D12 locale key), `template_params` jsonb, `status` (`queued`, `sent`, `failed`), `attempts` smallint, `next_attempt_at`, `last_error_code`, `created_at`, `correlation_id`. The row is inserted in the committing business transaction (so no mail exists for a rolled-back transition, A05); the mail sink updates only `status`, `attempts`, `next_attempt_at`, `last_error_code` (W3-04). No other column is updatable.
+One row per (event, version, lane, recipient), the D06 dedup identity: `UNIQUE (event, version_id, lane, recipient)`. `lane` is the lane the event belongs to: the opened lane for `lane_open` and the **deciding** lane for `send_back` (D06 includes the lane in the dedup identity, so two lanes sending back the same version to the same owner are two rows, never one collision; a retry of the same lane's send-back is the same row). `lane` is stored as `'-'` only for the two events that have no lane, `ready` and `sla_breach_digest`, so the unique index holds. Columns: `id`, `event` (`lane_open`, `send_back`, `ready`, `sla_breach_digest`), `version_id` FK NULL (NULL for the digest), `case_id` FK NULL, `lane`, `recipient` (email address; in slice 1 only fixture addresses and the W0-08 synthetic operator recipient), `deep_link_path` (path only, never a token that grants access; the link still requires sign-in and scope), `template_key` (D12 locale key), `template_params` jsonb, `status` (`queued`, `sent`, `failed`), `attempts` smallint, `next_attempt_at`, `last_error_code`, `created_at`, `correlation_id`. The row is inserted in the committing business transaction (so no mail exists for a rolled-back transition, A05); the mail sink updates only `status`, `attempts`, `next_attempt_at`, `last_error_code` (W3-04). No other column is updatable.
 
 ### `configuration_revision`
 
@@ -398,8 +398,8 @@ Isolation is `READ COMMITTED` (the Postgres default); correctness comes from the
 | Edit case / save draft (W1-02, W1-04) | update editable `case` columns or draft slot rows with `row_version` check, audit `case.edited` / `draft.saved` | optional | `row_version` (409 `stale_version` on mismatch) |
 | Upload (W1-03) | blob committed first (outside the transaction, see above); then insert `artifact`, audit `artifact.uploaded` | yes | none |
 | **Submit** (W1-05, W2-01) | resolve current configuration revisions and the lane-mapping constant; run submit QC through W0-07 and insert `qc_run` + `qc_finding` rows (an `unavailable` result is a finding, not an exception); update draft `pack_version`: `submitted_*`, frozen columns, `manifest_hash`; update `case`: `current_version_id = draft`, `draft_version_id = NULL`, `desk_status = 'in_review'`, three projections `pending`; insert three `notification` rows (`lane_open`, one per lane); audit `version.submitted` | yes | `draft_version_id` must equal the submitted draft; `row_version` for the draft |
-| **Decide** approve / send back (W2-02) | run approve-attempt QC (approve only) and insert its rows; insert `lane_decision`; update the lane's projection; for `send_back`: if `draft_version_id IS NULL` insert successor `pack_version` N+1 (`parent_version_id = N`, `stage_context`, `checklist_template_version` copied) and nine slot rows copied from N, set `draft_version_id`, audit `draft.successor_created`; insert `notification` (`send_back` to owner); audit `lane.approved` / `lane.sent_back` | yes | `current_version_id` |
-| **Send back, concurrent** (W2-03) | the second send-back waits on the case lock, then finds `draft_version_id` set and appends only its own decision and notification; exactly one successor exists (`UNIQUE (case_id, version_number)` would also refuse a second N+1) | yes | `current_version_id` |
+| **Decide** approve / send back (W2-02) | run approve-attempt QC (approve only) and insert its rows; insert `lane_decision`; update the lane's projection; for `send_back`: if `draft_version_id IS NULL` insert successor `pack_version` N+1 (`parent_version_id = N`, `stage_context`, `checklist_template_version` copied) and nine slot rows copied from N, set `draft_version_id`, audit `draft.successor_created`; insert `notification` (`send_back` to owner, `lane` = the deciding lane); audit `lane.approved` / `lane.sent_back` | yes | `current_version_id` |
+| **Send back, concurrent** (W2-03) | the second send-back waits on the case lock, then finds `draft_version_id` set and appends only its own decision and its own `send_back` notification (a distinct `lane` in the dedup key, so the second row cannot collide with the first lane's row; a retry of either lane replays through its idempotency key and inserts nothing); exactly one successor exists (`UNIQUE (case_id, version_number)` would also refuse a second N+1) | yes | `current_version_id` |
 | **Resubmit** (W2-04) | same as submit on the successor draft; additionally `ai_readiness_status = 'not_ready'`; audit `version.resubmitted` with `before_ref.current_version_id = N` | yes | as submit |
 | Disposition (W2-05) | insert `disposition_event`; audit `disposition.recorded` | yes | `current_version_id` (a finding on a superseded version cannot be dispositioned; W0-06 confirms) |
 | **Ready** (W2-06) | recheck under the lock: three `lane_decision` rows with `decision = 'approve'` on `current_version_id`, one per lane, and zero `qc_finding` rows on that version whose latest `disposition_event` is absent or `fixed_proposed`; if either fails, return the W0-06 not-ready result and write nothing; else update `case`: `ai_readiness_status = 'ready'`, `desk_status = 'ready'`; insert `notification` (`ready`); audit `case.ready` | yes | `current_version_id` |
@@ -543,7 +543,7 @@ export type EditableCaseFields = Pick<CaseRow,
 
 export interface VersionWriteRepository {
   createSuccessorDraft(caseId: string, parentVersionId: string): Promise<VersionRow>; // copies nine slots
-  updateDraftSlot(versionId: string, slot: number, patch: SlotPatch): Promise<SlotRow>; // fails with FrozenVersion after submit
+  updateDraftSlot(versionId: string, slot: number, patch: SlotPatch): Promise<SlotRow>; // fails with FrozenVersion after submit; ArtifactCaseMismatch if patch.artifactId belongs to another case
   updateDraftContext(versionId: string, patch: { stageContext?: StageContext; checklistTemplateVersion?: string }): Promise<VersionRow>;
   freeze(versionId: string, frozen: FrozenFields): Promise<VersionRow>;               // the submit update; computes manifest_hash
 }
@@ -589,6 +589,7 @@ Persistence errors are typed in the server and mapped once, in the Fastify error
 | `FrozenVersion` | an update reached a submitted version or its slots (trigger `rai.frozen_version`) | 409 `stale_version` with `reason: 'frozen'` (the client acted on a version that has since been submitted); also an internal alert (W0-10) because a correct client never hits it |
 | `ProjectionWriteForbidden` | trigger `rai.projection_write_forbidden` | 500 internal; alert. Unreachable through a valid route because the shape rejects the fields first (422 `invalid_input`) |
 | `IdempotencyKeyReused` | same key, different request digest | 422 `invalid_input`, field `idempotencyKey`, key `error.idempotency_key_reused` |
+| `ArtifactCaseMismatch { artifactId }` | `updateDraftSlot` given an `artifact_id` whose `artifact.case_id` is not the draft version's case | 422 `invalid_input`, field `artifactId`, key `error.artifact_case_mismatch`; no slot row changes |
 | `NotFound { kind, id }` | in-scope reference to a missing row or blob metadata | 404 `not_found` |
 | `BlobTooLarge` | `put` exceeded `maxBytes` | 422 `unsafe_upload` (W0-08 owns the message key) |
 | `BlobIntegrity { hash, reason }` | `verify` failure, size mismatch on dedupe, or hash mismatch on a re-hashed download | 500 internal; alert; the download is aborted, never served partially as valid |
@@ -614,9 +615,10 @@ Which ticket proves which clause of this document:
 | Configuration revision immutable; audit store has no update/delete path | W1-00 | update/delete of a published revision fails; `AuditLog` exposes only `append`/`read`; raw UPDATE/DELETE on `audit_event` fails as `rai_app` |
 | Desk-local fields stored; projection writes rejected | W1-02 | `vendor_involved`/`model_type` round-trip; edit body with `privacy_status` → 422; raw UPDATE of a projection outside the workflow setting → trigger error |
 | Content hash, private storage, authorized download, Thai filename | W1-03 | hash recorded equals `sha256sum`; direct path/hash URL unreachable; no-session download 401; bytes match hash; `filename*` round-trips `ตัวอย่าง.pdf` |
+| Slot attach bound to the case | W1-04 | attaching an artifact uploaded under another case → 422 `invalid_input` (`artifactId`), slot row unchanged, no audit `draft.saved`; the same artifact attaches to a later version of its own case |
 | Freeze, frozen columns, manifest hash, restart | W1-05, W1-INT | frozen columns non-null and equal to the configuration/mapping in force; slot update after submit → `rai.frozen_version`; restart recipe above |
 | Lane decision append, projection write, stale version, idempotent replay | W2-02 | second decision on same (version, lane) rejected; projection reflects the lane; stale `expectedVersionId` → 409 and no rows; same key replays the stored response with no new rows |
-| One successor under concurrency | W2-03 | two connections send back concurrently; one `pack_version` N+1; both decisions recorded |
+| One successor under concurrency | W2-03 | two connections send back concurrently; one `pack_version` N+1; both decisions recorded; two `send_back` notification rows, one per deciding lane, and no `UniqueViolation` |
 | Resubmit reopens all lanes | W2-04 | projections `pending`; no N approval counted by the predicate |
 | Findings immutable, dispositions append, `unavailable` blocks | W2-05 | update of `qc_finding` fails; second disposition appends; `unavailable` finding appears in the predicate's second query |
 | Ready atomic recheck | W2-06 | a disposition inserted between the client's read and the Ready call is respected; a stale approval blocks; the predicate runs inside the transaction (asserted by a failure injected after the recheck leaving no `ready` state) |
