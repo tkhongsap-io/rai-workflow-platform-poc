@@ -6,7 +6,7 @@ Status: planning. Named people come from the [source spec](../product/source-spe
 
 | Role | Who | Owns |
 |---|---|---|
-| Product owner | Ta | Scope, D04 with the lead, merges to main, all publication; recorded D02, D03, D05, D06, D11, D12 on 2026-09-21 |
+| Product owner | Ta | Scope, all publication, package exit review; recorded D02-D06, D11, D12 on 2026-09-21; merge for W0-W3 delegated to the reviewed ticket flow (D03 amendment) |
 | Gate operator | Nakhun (confirmed under D01, 2026-09-21) | Operator rules in D06, W7 rehearsal and acceptance |
 | DPO | Montri Stapornkul | DPO lane expertise, D08 with IT/Security |
 | AI/COE lead | To be named | D07 questionnaire, D09 evaluation set |
@@ -57,7 +57,7 @@ Every agent PR is reviewed by a human engineer before merge. Tickets marked **Hu
 
 ## Working agreement
 
-- One ticket per branch and PR, named `codex/<ticket-id>-<topic>` (D03).
+- One ticket per branch and PR, named `codex/<ticket-id>-<topic>` (D03). A PR merges only after the independent reviewer agents report no blocking finding and the full test suite is green on the branch and again on main after merge.
 - Each PR states the ticket ID, the R/A IDs it proves, the commands run and their output.
 - Each package closes with a dated `changes/<date>-<slug>/` record as defined in [BUILD_PLAN](../../BUILD_PLAN.md) "Definition of done".
 - A blocked ticket stays blocked. Nobody works around an open decision (D04, D07-D10) by picking a default in code without recording it as provisional; recorded decisions are implemented as written.

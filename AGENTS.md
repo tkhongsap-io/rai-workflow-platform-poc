@@ -9,7 +9,7 @@ This repository contains product documentation, an authorized synthetic local de
 - Readable, immutable submitted versions and version-scoped human decisions are required. AI may flag or propose; it cannot approve, waive defects or grant production permission.
 - Frame each substantial change in changes/<date>-<slug>/ using intent, spec, plan and review. Record plan before code, relevant ADRs and exact checks afterward.
 - Do not commit raw case documents, credentials, private endpoints or real personal data in fixtures. Use synthetic examples.
-- Do not send mail, deploy, change access, merge to main or publish without explicit owner authorization. Under D03 (recorded 2026-09-21), an assigned ticket may be committed to its `codex/<ticket-id>-<topic>` branch and opened as a reviewed PR; only Ta merges. Anything outside an assigned ticket or a documentation branch still needs Ta's instruction.
+- Do not send mail, deploy, change access, merge to main or publish without explicit owner authorization. Under D03 (recorded 2026-09-21), an assigned ticket may be committed to its `codex/<ticket-id>-<topic>` branch and opened as a reviewed PR; merging is delegated to the ticket flow (independent review agents must pass first; D03 amendment 2026-09-21); Ta reviews package exit records. Anything outside an assigned ticket or a documentation branch still needs Ta's instruction.
 - For the authorized demo, use demo/README.md and TESTING.md. Production stack and release gates remain pending; never promote synthetic checks to production acceptance.
 - Keep product source snapshots immutable; record an approved successor and its provenance when requirements change.
 
