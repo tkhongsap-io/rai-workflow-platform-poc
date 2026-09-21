@@ -188,8 +188,8 @@ The orchestrator wraps the runner and is the only code that touches the store fo
 1. **Build the request** from the frozen version (or the draft for `upload`) and the actor's already-checked scope. It sets `runKey` and `attempt` (section 3.7: the lookup of the latest attempt under the key decides whether this is a replay that returns the existing run or a new attempt), `correlationId` from the request context, and `deadlineMs` from `QC_TIMEOUT_MS`.
 2. **Insert the QC run row** with status `running` and this `attempt` in its own short transaction, so a crash mid-run leaves a visible `running` row. A `running` row whose `startedAt` is older than `2 × QC_TIMEOUT_MS` (proposed margin; W2-05 confirms) is **aged out**: the readiness/operator view (W0-10) and the next trigger's lookup (3.7) both treat it as `unavailable:runner_error`, the orchestrator moves the row to that status and appends the QC-unavailable finding for it (3.6; or records `alreadyRecorded` under step 6 when one is already open for that trigger and lane) in the same transaction as the next attempt's `running` row, and a late result for the aged-out row is discarded as in step 3. An aged-out row is never returned as the current run.
 3. **Call `runner.run(request, signal)`** with an `AbortController` whose timer is `deadlineMs`. On timer expiry: abort, and treat the outcome as `unavailable` with reason `timeout`, regardless of what the runner returns afterwards (a late result is discarded and logged, never persisted).
-4. **Validate the result** against the shared schema. Any violation (unknown field, `ruleRevision` ≠ `qcRulesRevision`, `owningLane` outside the lane type, `excerpt` over 300 code units, missing evidence, a `measure` whose `thresholdSource` ≠ `checklistTemplateVersion`) is treated as `unavailable:runner_error` with the violation name in `detail`. Malformed output never becomes a finding.
-5. **Stamp `owningLane`** through the W0-06 assignment function. For `recorded_rule` scopes the function's value must equal the runner's; a mismatch is a `runner_error`. For provisional scopes the orchestrator writes the runner's value and keeps `owningLaneBasis` on the row (section 3.6).
+4. **Validate the result** against the shared schema. Any violation (unknown field, `ruleRevision` ≠ `qcRulesRevision`, `owningLane` outside the lane type, `excerpt` over 300 code units, missing evidence, a `measure` whose `thresholdSource` ≠ `checklistTemplateVersion`, a finding with `scope.kind === 'run'` or `ruleId === 'QC-UNAVAILABLE'`, which only the orchestrator builds) is treated as `unavailable:runner_error` with the violation name in `detail`. Malformed output never becomes a finding.
+5. **Stamp `owningLane`** through the resolution in section 3.6, which wraps the W0-06 assignment function. For **runner-produced** findings: on `recorded_rule` scopes the function's value must equal the runner's, and a mismatch is a `runner_error`; on provisional scopes (slot 5, slot 9, pack) the orchestrator writes the runner's value and keeps `owningLaneBasis` on the row. For findings the **orchestrator builds itself** (the QC-unavailable finding, whether from an `unavailable` result, an aged-out `running` row in step 2, or the `QC_RUNNER=none` runner) there is no runner value to take: the orchestrator resolves the lane from the provisional owning-lane companion entry for the version's `laneMappingVersion` (section 3.6) and stamps `owningLaneBasis = 'provisional_pending_w0_06_refinement'`.
 6. **Persist** in one transaction: the run row moves to `completed` or `unavailable`; each finding is appended with a new `findingId`, `status = 'open'`, the run ID and `correlationId`; for `unavailable` the single QC-unavailable finding (section 3.6) is appended. A finding whose `(ruleId, ruleRevision, scopeKey)` already has an *open* finding on the same version is not appended again (`scopeKey` is the scope's fields joined in order, so two unavailable runs with different triggers or lanes stay distinct); the run records `alreadyRecorded: findingId` for it (the demo's "already recorded as a finding on this submission" behaviour). Dispositioned findings do not suppress a new one.
 7. **Emit** one structured log event per run (`qc.run.finished`) with `correlationId`, `runId`, `versionId`, `trigger`, `lane`, `status`, `reason`, finding count and `runner` identity. No `excerpt`, no filename, no message params (W0-10 redaction rule).
 
@@ -208,16 +208,52 @@ The real catalogue is Admin configuration keyed to `checklist_template_version` 
 | `ACC-EXTRACTION-NOT-HALLUCINATION` | approve_attempt | artifact | required (`metric: 'extraction_accuracy'`) | Extraction % is not a hallucination rate (v1.0 item 3.5) |
 | `ACC-BAND-V1-SHEET3` | approve_attempt | artifact | required, `thresholdSource` must be the v1.0 Sheet-3 SL#2.1 version | H <1%, M <2%, L <3% apply only under that template version; other versions never inherit them |
 | `ACC-CLASSIC-ML-METRIC` | approve_attempt | artifact | required or slot N/A reason | Classic-ML uses that sheet's matching metric or N/A |
-| `QC-UNAVAILABLE` | any | run | null | QC failure is an explicit finding, never a clean pass |
+| `QC-UNAVAILABLE` | any | run | null | QC failure is an explicit finding, never a clean pass. Built by the orchestrator only (3.6); a script never contains it, and a runner that returns it fails validation (3.4 step 4) |
 
-Severity in scripts: `high` for `ACC-BAND-V1-SHEET3`, `ACC-EXTRACTION-NOT-HALLUCINATION` and `QC-UNAVAILABLE`; `medium` for the rest. These are fixture values, not thresholds of record.
+Severity: `high` for `ACC-BAND-V1-SHEET3` and `ACC-EXTRACTION-NOT-HALLUCINATION` in scripts and for `QC-UNAVAILABLE` in the orchestrator; `medium` for the rest. These are fixture values, not thresholds of record.
 
 ### 3.6 Owning lane and the QC-unavailable finding
 
 Every finding carries `owningLane` because D05 makes the owning lane the authority for waived and N/A dispositions and the confirmer of the owner's proposed "fixed" (W2-05). The value comes from the **W0-06 owning-lane assignment rule**:
 
 - **Recorded now (W0-06, under D02 and D05):** a finding on a single-lane slot (1, 2, 3, 4, 6, 7, 8) is owned by that slot's lane under the mapping constant recorded on the version (AI/COE 1 and 5; DPO 2, 3, 4, 5; IT/Security 5, 6, 7, 8). `owningLaneBasis = 'recorded_rule'`.
-- **Not recorded yet (W0-06 open item, review leads before W2-05):** slot 5 (BRD, shared), slot 9 (no lane gate), pack-level findings and the QC-unavailable finding. Until the refinement is recorded, the substitute's script files carry an explicit `owningLane` for such findings with `owningLaneBasis = 'provisional_pending_w0_06_refinement'`, the orchestrator persists that basis on the finding row, and the UI (W2-09) shows the basis. **This spec does not choose the value**; the script files hold whatever value W2-05's tests need to exercise "a waiver by a non-owning lane is forbidden" on a slot-5 and a pack-level finding, and the tests are rewritten to the recorded rule when W0-06 records it. No code path defaults to a lane.
+- **Not recorded yet (W0-06 open item, review leads before W2-05):** slot 5 (BRD, shared), slot 9 (no lane gate), pack-level findings and the QC-unavailable finding. Until the refinement is recorded, every finding in these categories carries `owningLaneBasis = 'provisional_pending_w0_06_refinement'`, the orchestrator persists that basis on the finding row, and the UI (W2-09) shows the basis. The provisional value has exactly one source per producer, and **this spec chooses neither value**; both sources hold whatever value W2-05's tests need (to exercise "a waiver by a non-owning lane is forbidden" on a slot-5 and a pack-level finding, and "`unavailable` recorded, not zero findings"), both are replaced by the recorded rule when W0-06 records it, and the tests are rewritten to that rule then. No code path defaults to a lane: a missing value is a startup error, never a fallback.
+  - *Runner-produced findings (slot 5, slot 9, pack):* the substitute's script files carry an explicit `owningLane`, and the orchestrator writes that value (3.4 step 5).
+  - *Orchestrator-built findings (the QC-unavailable finding, scope `run`):* the orchestrator never receives a runner value for these (an `unavailable` result carries no lane, an aged-out `running` row has no result at all, and the `QC_RUNNER=none` runner returns nothing), so it reads the **provisional owning-lane companion** of the lane-mapping constant, resolved by the `laneMappingVersion` recorded on the version (for an `upload` on a draft, the current constant's version, which is what submit will record), never by the current constant directly.
+
+The companion and the resolution the orchestrator calls, in TypeScript notation:
+
+```ts
+// rai-web/shared/src/workflow/provisional-owning-lane.ts  (W1-00 creates; path per W0-02; deleted when W0-06 records the rule)
+
+export interface ProvisionalOwningLane {
+  readonly basis: 'provisional_pending_w0_06_refinement';   // the only basis this constant can ever confer
+  readonly pendingRecord: 'W0-06 section 7.3';              // the recorded rule replaces this file
+  /** Owning lane of the QC-unavailable finding, by trigger. 'trigger_lane' resolves to request.lane and is valid only for approve_attempt. */
+  readonly run: {
+    readonly upload: Lane;
+    readonly submit: Lane;
+    readonly approve_attempt: Lane | 'trigger_lane';
+  };
+}
+
+/** Keyed by LaneMapping.version (W0-06). One entry per exported mapping constant; values are W1-00 fixture choices, not decisions. */
+export const PROVISIONAL_OWNING_LANE_BY_MAPPING: Readonly<Record<string, ProvisionalOwningLane>>;
+
+/** The resolution the orchestrator calls (Lane A). Wraps owningLaneForSlot (W0-06) for artifact and slot scopes. */
+export function resolveOwningLane(
+  scope: FindingScope,
+  request: Pick<QcRunRequest, 'trigger' | 'lane' | 'laneMappingVersion'>,
+  runnerValue: { owningLane: Lane; owningLaneBasis: OwningLaneBasis } | null,   // null for orchestrator-built findings
+): { owningLane: Lane; owningLaneBasis: OwningLaneBasis };
+```
+
+Rules for the companion:
+
+- **A separate constant keyed by the same version string**, not a field of `LANE_MAPPING_V1`: the D02 constant is frozen by the W0-06 test on its exact shape and changing it needs a register row, while this file exists only until the refinement is recorded. Resolving by the recorded `laneMappingVersion` means a later entry, or the recorded rule, never reinterprets a finding stored under an earlier one.
+- **Startup fails closed** (W1-00 configuration validation, same posture as the `QC_RUNNER` row in 3.9): the server refuses to start unless every exported lane-mapping version has an entry whose three `run` fields are each a `Lane` (or `'trigger_lane'` for `approve_attempt`). A missing entry or an unset field is a startup error naming the mapping version; the shared type has no optional field and no default value.
+- **No miss at run time.** A stored version can only record an exported mapping version, so the lookup cannot miss after the startup check. If it ever does (a row restored with an unknown `laneMappingVersion`), `resolveOwningLane` throws before the run row is written, the error is logged with the `correlationId` (W0-10), and nothing is recorded with a guessed lane.
+- **`resolveOwningLane` is pure and unit-tested by W1-00:** an `artifact` or `slot` scope on a single-lane slot returns `owningLaneForSlot` with `recorded_rule` and throws when `runnerValue` disagrees (the orchestrator maps that throw to `runner_error`, 3.4 step 5); an `artifact`, `slot` or `pack` scope on a provisional category returns `runnerValue` and throws when it is `null` (a runner may not omit it); a `run` scope ignores `runnerValue` and returns the companion value with the provisional basis, `'trigger_lane'` resolving to `request.lane` on `approve_attempt` and throwing on any other trigger; an unknown `laneMappingVersion` throws.
 
 **QC-unavailable finding.** When the result is `unavailable` (timeout, runner error, not configured, unreadable artifact), the orchestrator appends exactly one finding per run:
 
@@ -229,7 +265,7 @@ Every finding carries `owningLane` because D05 makes the owning lane the authori
   trigger: request.trigger,
   scope: { kind: 'run', trigger: request.trigger, lane: request.lane },
   severity: 'high',
-  owningLane: /* W0-06 rule; for approve_attempt the trigger lane is an input to that rule */,
+  owningLane: resolveOwningLane(scope, request, null).owningLane,   // companion entry for request.laneMappingVersion, by trigger (above); no runner value exists
   owningLaneBasis: 'provisional_pending_w0_06_refinement',
   evidence: [{ artifactId: null, contentHash: null, slot: null, locator: { kind: 'absent' } }],
   measure: null,
@@ -242,7 +278,11 @@ It is dispositioned like any other finding (fixed by a later completed run, the 
 
 ### 3.7 Idempotency, attempts and replay
 
-`runKey = sha256(versionId | trigger | lane ?? '-' | qcRulesRevision | sorted artifact contentHashes)`. Every run row carries `runKey` and `attempt` (1..n). The QC run table has a unique index on `(runKey, attempt)` and a partial unique index on `runKey` where `status = 'completed'`, so a key has any number of `unavailable` attempts but at most one `completed` run. On a trigger the orchestrator reads the latest attempt under the key, in the same short transaction as step 2 of 3.4, and acts on its status:
+```ts
+runKey = sha256(versionId | trigger | (lane ?? '-') | qcRulesRevision | sorted(`${slot}:${contentHash}` for each request.artifacts[i]))
+```
+
+The `slot:contentHash` pair, not the bare hash, is what identifies the input: the same bytes attached to two slots are two placements with two sets of completeness rules (source spec, QC triggers: "On each upload: that artefact's own completeness rules"), so on the `upload` trigger, where `versionId` is the draft ID, uploading the same file to a second slot on the same draft yields a different key and a new run, never a replay of the first slot's run. Uploading the same bytes to the *same* slot again does replay (same placement, same rules, same result). `artifactId` is not part of the key: it is a row identity, and two rows with the same `(slot, contentHash)` are the same QC input. Every run row carries `runKey` and `attempt` (1..n). The QC run table has a unique index on `(runKey, attempt)` and a partial unique index on `runKey` where `status = 'completed'`, so a key has any number of `unavailable` attempts but at most one `completed` run. On a trigger the orchestrator reads the latest attempt under the key, in the same short transaction as step 2 of 3.4, and acts on its status:
 
 | Latest attempt under `runKey` | Behaviour |
 |---|---|
@@ -301,10 +341,10 @@ Tests W1-10 must ship (all `node:test`, unit layer, no Postgres):
 | no write path to workflow state, structural | walking the substitute's module graph (`import.meta.resolve` over its files) reaches nothing under `rai-web/server`, no `drizzle-orm`, `pg`, `fastify`, `node:fs` write APIs, `node:net`, `node:http`; only `rai-web/shared` and `node:` read-only modules | "a test asserts it has no write path to workflow state" |
 | no write path, behavioural | the request object is deep-frozen before the call and unchanged after; a store spy passed nowhere records zero calls; `artifacts[i].read` is the only capability and the run for a `submit` script never invokes it | same |
 | schema conformance | every scripted finding passes the shared validator; a finding with a 301-code-unit excerpt fails | supports orchestrator step 4 |
-| provisional owning lane visible | every slot-5, pack and run finding in the scripts has `owningLaneBasis = 'provisional_pending_w0_06_refinement'`; every single-lane-slot finding has `'recorded_rule'` and its `owningLane` equals the W0-06 function's value | section 3.6 |
-| fail closed on configuration (owner W1-00 for the loader, W1-10 for the runner identity it selects, same pattern as the 4.8 "no external mail path" row) | the config loader with identity mode `production` and `QC_RUNNER=scripted` throws at startup, naming the key; `QC_RUNNER=other` (any value outside `scripted` \| `none`) throws, in every identity mode; `QC_RUNNER` unset throws; `QC_RUNNER=none` loads and every run is `unavailable:not_configured`; the readiness payload (W0-10) reports `qc.runner = { runner: 'scripted_substitute', runnerVersion }` when `scripted` is selected | 3.9 opening paragraph, section 6 |
+| provisional owning lane visible | every slot-5, slot-9 and pack finding in the scripts has `owningLaneBasis = 'provisional_pending_w0_06_refinement'`; every single-lane-slot finding has `'recorded_rule'` and its `owningLane` equals the W0-06 function's value; no script contains a `run`-scoped finding or `ruleId = 'QC-UNAVAILABLE'` (the substitute throws at construction on such a script, since only the orchestrator builds that finding) | section 3.6 |
+| fail closed on configuration (owner W1-00 for the loader, W1-10 for the runner identity it selects, same pattern as the 4.8 "no external mail path" row) | the config loader with identity mode `production` and `QC_RUNNER=scripted` throws at startup, naming the key; `QC_RUNNER=other` (any value outside `scripted` \| `none`) throws, in every identity mode; `QC_RUNNER` unset throws; `QC_RUNNER=none` loads and every run is `unavailable:not_configured`; the readiness payload (W0-10) reports `qc.runner = { runner: 'scripted_substitute', runnerVersion }` when `scripted` is selected; startup throws, naming the mapping version, when `PROVISIONAL_OWNING_LANE_BY_MAPPING` lacks an entry for an exported lane-mapping version or an entry's `run` field is unset (3.6) | 3.9 opening paragraph, 3.6, section 6 |
 
-Integration tests that consume the substitute belong to W2-05 (record and disposition; `unavailable` recorded not treated as zero findings; a replayed trigger after `completed` returns the same run and appends nothing; a second run after `unavailable` starts `attempt = 2` under the same `runKey`, completes and appends its findings while the QC-unavailable finding stays `open`; an aged-out `running` row becomes `unavailable:runner_error` and the next trigger starts a new attempt), W2-07/W2-09 (rendering, disposition UI) and W3-07 (a simulated timeout appears once in the operator view and in the log with the same correlation ID).
+Integration tests that consume the substitute belong to W2-05 (record and disposition; `unavailable` recorded not treated as zero findings; a replayed trigger after `completed` returns the same run and appends nothing; a second run after `unavailable` starts `attempt = 2` under the same `runKey`, completes and appends its findings while the QC-unavailable finding stays `open`; an aged-out `running` row becomes `unavailable:runner_error` and the next trigger starts a new attempt; the same bytes uploaded to two slots on one draft produce two runs with distinct `runKey`s, each evaluating its own slot's rules, while the same bytes uploaded to the same slot again replay the first run; the QC-unavailable finding recorded for a `QC_RUNNER=none` run or a simulated timeout carries the provisional owning lane resolved from the version's `laneMappingVersion` (3.6) with `owningLaneBasis = 'provisional_pending_w0_06_refinement'`, and a request built for a version whose `laneMappingVersion` has no provisional entry fails before any run row is written), W2-07/W2-09 (rendering, disposition UI) and W3-07 (a simulated timeout appears once in the operator view and in the log with the same correlation ID).
 
 ## 4. Mail sink
 
@@ -541,7 +581,7 @@ Substitute runs are never acceptance evidence for the real QC (W4) or a real tra
 
 | Ticket | Uses from this spec |
 |---|---|
-| W1-00 | Shared types in `contracts/qc.ts` and `contracts/mail.ts`; the config keys in section 6; synthetic-domain rule for fixture user addresses; the `(runKey, attempt)` and completed-`runKey` unique indexes on the W0-04 QC run entity (3.7) |
+| W1-00 | Shared types in `contracts/qc.ts` and `contracts/mail.ts`; the provisional owning-lane companion, `resolveOwningLane` and its startup check (3.6); the config keys in section 6; synthetic-domain rule for fixture user addresses; the `(runKey, attempt)` and completed-`runKey` unique indexes on the W0-04 QC run entity (3.7) |
 | W1-03 | `upload` trigger after the artifact is stored |
 | W1-05 | `submit` trigger after the version freezes; `qcRulesRevision` and `laneMappingVersion` on the request |
 | W1-09 | Fixture case IDs the scripts key on; the single synthetic operator address |
@@ -562,7 +602,7 @@ Product sources: [workflow](../product/workflow.md) (failure behaviour, notifica
 
 ## 10. Open items carried, not resolved
 
-- [ ] Owning lane for slot 5, slot 9, pack-level and QC-unavailable findings — review leads, W0-06, before W2-05. Scripts carry `provisional_pending_w0_06_refinement` until then.
+- [ ] Owning lane for slot 5, slot 9, pack-level and QC-unavailable findings — review leads, W0-06, before W2-05. Until then the scripts (slot 5, slot 9, pack) and the provisional owning-lane companion (QC-unavailable, by trigger) carry `provisional_pending_w0_06_refinement` values that this spec does not choose (3.6); the companion file is deleted when the rule is recorded. W0-06 section 7.4, merged after this branch was cut, states the alternative posture for the interim (no owning lane on slot-5, slot-9 or pack fixtures and no stored `unavailable` finding until the record exists); the W0-09 exit review picks one interim posture for W1-10 and W2-05. Neither posture chooses a lane, and the recorded rule replaces both.
 - [ ] Final repository paths for the pieces in section 2 — W0-02.
 - [ ] Backoff numbers and the digest dedup mapping — W3-04 and W3-03 contract PRs confirm the proposals in 4.4 and 4.5.
 - [ ] Model or extraction method behind `QcRunner`, its data handling and evaluation fixtures — ADR-0006 at W4 entry (D08, D09).
@@ -574,7 +614,7 @@ Product sources: [workflow](../product/workflow.md) (failure behaviour, notifica
 |---|---|
 | Inputs are a version reference and authorized artifact references | 3.1, `QcRunRequest` in 3.3 |
 | Typed findings: rule ID, rule revision, evidence location, metric/denominator/threshold where relevant, severity, `owning_lane` = AI/COE \| DPO \| IT/Security assigned by the W0-06 rule | `QcFinding`, `Measure`, `EvidenceLocation` in 3.3; 3.6 |
-| Explicit `unavailable` result recorded as a finding with an `owning_lane` under the same rule | 3.3 `QcRunResult`, 3.6; a later attempt under the same `runKey` appends beside it, never closes it (3.7) |
+| Explicit `unavailable` result recorded as a finding with an `owning_lane` under the same rule | 3.3 `QcRunResult`, 3.6 (`resolveOwningLane`, the provisional companion resolved by `laneMappingVersion`, fail-closed startup check); a later attempt under the same `runKey` appends beside it, never closes it (3.7) |
 | QC has no approval, mail or write access to workflow state | 3.1, 3.4, 3.9 structural and behavioural tests |
 | Slice-1 substitute returns scripted synthetic findings and can simulate a timeout | 3.9 |
 | No model chosen (D08, D09) | 1, 10 |
