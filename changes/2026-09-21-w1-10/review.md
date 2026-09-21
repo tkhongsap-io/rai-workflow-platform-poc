@@ -6,8 +6,7 @@
 
 - **`rai-web/fixtures/src/substitutes/qc/`** (Lane C): `scripted-runner.ts` (`ScriptedQcRunner` implementing the shared `QcRunner` port and the W0-07 3.9 `ScriptedQcRunnerControl`: `script()`, `simulateTimeout('hang' | 'immediate', selector)`, `simulateError(reason)`, `health()`, `probe()` for the W0-10 5.5 `qc` probe, `calls`, `reset()`; `identity = { runner: 'substitute-scripted', runnerVersion: '0.0.0' }`; references `SUBSTITUTE_MARKER`), `scripts.ts` (script table validated at construction: only `artifact`/`slot` scopes on single-lane slots with `owningLane === owningLaneForSlot`, no slot 5/9/pack/run finding, no `QC-UNAVAILABLE`, locale-key messages, `thresholdSource` equal to the script's template, no document-text fields), `scripts/fx-case-{nonvendor,vendor,missing-slot,na-reasons}.json` (the five scripted rule families of W0-07 3.5 with the severities it states; `fx-case-hr-dualrole` has no script and is the "unscripted → zero findings" case), `version.ts`, `index.ts`, `test-support.ts` (request builder) and five colocated `node:test` files.
 - **`rai-web/shared/src/qc/validate.ts`** (+ test): the shared validator W0-07 3.4 step 4 and 3.9 name, as TypeBox schemas (`QcFindingSchema`, `QcRunResultSchema`, `additionalProperties: false` throughout) and pure functions `validateQcFinding(value, context)` (named violations: `unknown_field`, `document_text_field`, `excerpt_hash_invalid`, `evidence_missing`, `rule_id_invalid`, `rule_revision_mismatch`, `trigger_mismatch`, `owning_lane_invalid`, `threshold_source_mismatch`, `run_scope_forbidden`, `qc_unavailable_rule_forbidden`, `finding_key_mismatch`, `schema_violation`), `checkOwningLane(finding, mapping)` (step 5: `owning_lane_mismatch`, `owning_lane_rule_pending`), `scopeKeyOf`/`findingKeyOf` (the 3.4 step 6 dedup identity), and the type guards `isEvidenceLocator`/`isMeasure` so the substitute needs no schema library. Additive, in Lane A's package, for W2-05's orchestrator to consume.
-- **`rai-web/shared/src/constants.ts`**: `owningLaneForSlot(slot, mapping)` transcribed verbatim from W0-06 7.1 (W0-02 places it in `shared/src/constants.ts`; W1-00 had not added it), with a test.
-- **`rai-web/shared/src/locales/{th,en}.json`**: six `qc.finding.*` keys (the five scripted families plus the orchestrator's `qc.finding.unavailable` of W0-07 3.6), Thai first (D12).
+- **Consumed from the contract PR #74, not carried here** (review round 1, 2026-09-22): `owningLaneForSlot` in `shared/src/constants.ts` (W0-06 7.1; named by W0-07 3.3) and the six `qc.finding.*` locale keys (W0-07 3.5/3.6; W0-02 section 10 rules 1 and 8). Both are W1-00 rows; they landed as `codex/w1-00-qc-shared-contract` with `changes/2026-09-22-w1-00-qc-shared-contract/`, and this branch is rebased on it. `scripts.test.ts` keeps asserting every script message key exists in both catalogues.
 - **`rai-web/fixtures/src/index.ts`**: re-exports the substitute as `qcSubstitute`.
 
 ## Design choices inside the spec (for the reviewer)
@@ -20,7 +19,7 @@
 
 ## Commands run and results
 
-Shell: `export PATH=$HOME/.nvm/versions/node/v24.21.0/bin:$PATH` (node v24.21.0, npm 11). Postgres for this ticket: `POSTGRES_PORT=54330 docker compose -p rai-w1-10 up -d --wait` from the worktree root; `.env` from `.env.example` with the port set to 54330 (gitignored). Torn down with `docker compose -p rai-w1-10 down -v` after the run.
+Re-run in full on 2026-09-22 after the rebase onto #74. Shell: `export PATH=$HOME/.nvm/versions/node/v24.21.0/bin:$PATH` (node v24.21.0, npm 11). Postgres for this ticket: `POSTGRES_PORT=54330 docker compose -p rai-w1-10 up -d --wait` from the worktree root; `.env` from `.env.example` with the port set to 54330 (gitignored). Torn down with `docker compose -p rai-w1-10 down -v` after the run.
 
 | Command (from `rai-web/` unless noted) | Result |
 |---|---|
@@ -28,7 +27,7 @@ Shell: `export PATH=$HOME/.nvm/versions/node/v24.21.0/bin:$PATH` (node v24.21.0,
 | `npm run migrate` | `migrate: applied 1 migration(s), 0 already applied` |
 | `npm run lint` | `eslint .` clean; `All matched files use Prettier code style!`; `check-css: no outline removal outside :focus-visible` |
 | `npm run typecheck` | `tsc -b` clean over the five workspaces |
-| `npm run test:unit` | `tests 93, pass 93, fail 0` (58 before this ticket; +19 `scripted-runner.test.ts`, +6 `scripts.test.ts`, +3 `no-write-path.test.ts`, +2 `config.test.ts`, +4 `shared/src/qc/validate.test.ts`, +1 `constants.test.ts`) |
+| `npm run test:unit` | `tests 93, pass 93, fail 0` (59 on the #74 base; +19 `scripted-runner.test.ts`, +6 `scripts.test.ts`, +3 `no-write-path.test.ts`, +2 `config.test.ts`, +4 `shared/src/qc/validate.test.ts`) |
 | `npm run test:integration` | `tests 14, pass 14, fail 0` (unchanged W1-00 suites against the port-54330 Postgres) |
 | `npm run verify` | lint, typecheck, unit and integration green (the counts above) |
 | `npm run build && npm run check:substitute-absent` | `check-substitute-absent: scanned 138 files, 0 with the marker`; `fixtures/dist/substitutes/qc/scripts/*.json` present |
@@ -48,7 +47,7 @@ W0-07 3.9 rows beyond the four clauses: schema conformance (`scripts.test.ts`: e
 
 ## Deviations, defaults and limitations (for the reviewer)
 
-- **Three additive touches in Lane A's `shared/` package**, each named in the plan: `qc/validate.ts` (the "shared validator" W0-07 3.4/3.9 name; W2-05's orchestrator consumes it), `owningLaneForSlot` in `constants.ts` (W0-06 7.1 verbatim; W0-02 places it there), and six `qc.finding.*` locale keys (W0-02 section 10 rules 1 and 8). No existing export changed.
+- **One additive file in the `shared/` package**: `qc/validate.ts` (+ test), the "shared validator" W0-07 3.4/3.9 name that W2-05's orchestrator consumes. W0-02 1.1 places `shared/src/qc/` in the QC-boundary module owned with ticket W1-10, so it stays here. The two Lane A rows this branch first carried (`owningLaneForSlot`, the `qc.finding.*` keys) were refused in review round 1 and moved to the contract PR #74; this branch is rebased on it (base `codex/w1-00-qc-shared-contract` until #74 merges, then `main`). No existing export changed.
 - **`config.ts` is not edited.** W0-07 3.9 assigns the loader row to W1-00: "identity mode `production` with `QC_MODE=substitute` throws at startup". The W1-00 loader accepts that pair today; this ticket's test covers the rows it owns (the single accepted value, every refused value in every identity mode, the runner identity) and reports the gap here for the lead, rather than editing Lane A's file. In practice the pair cannot reach a bind: `production` needs credentials no slice-1 environment has (W0-03 S-rows).
 - **`computeReadiness` does not exist yet** (W3-07). The "health answer reaches readiness" row is proven at the probe: `probe()` is the `HealthProbes['qc']` shape and returns the configured answer; the composed report (`qc.status` reported, readiness stays `ready`) is asserted where the function lands.
 - **The `QC_RUNNER=none` behaviour** the task brief names is not a W0-02 key; the recorded key is `QC_MODE` with the single value `substitute`. The test asserts `QC_MODE=none` (and the other spellings) fails closed and that `QC_RUNNER` has no effect. A disabled mode stays the W0-07 section 10 proposal.
