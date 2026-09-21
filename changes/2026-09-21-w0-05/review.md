@@ -28,13 +28,22 @@ One blocking finding: three matrix rows with a stated scope had no obligation in
 
 No obligation was removed or weakened; numbering is unchanged.
 
+## Fix round 3 (review findings on PR #58)
+
+One blocking finding, same class as fix round 2: two 3.2 write actions with a stated Own / BU / — scope, `artifact.upload` and `case.resubmit`, appeared in no section 7 row, so an authenticated out-of-scope actor uploading into another owner's draft or resubmitting another owner's case was a stated denial that W1-08/W2-08/W3-06 would never exercise. Changes, in the section 7 table and nothing else:
+
+- T10 now covers `case.edit_draft`, `artifact.upload` and `case.resubmit` for `reviewer-dpo` on any case: 403 `role` (W1-02, W1-03, W2-04; A01).
+- T11 now covers three `owner-b` writes against owner-a: `artifact.download` (403 `scope`, no bytes, as before), `artifact.upload` into owner-a's draft (403 `scope`, no bytes stored, `authorization.denied` audited; W1-03) and `case.resubmit` on owner-a's case (403 `scope`, no N+1 draft created; W2-04). A01.
+
+No obligation was removed or weakened; numbering is unchanged. Sweep after the change: every identifier in the `Action` union appears in a section 7 row except `config.read_effective`, whose 3.2 row is Yes for every role (no stated denial to exercise; its `operator_recipients` exclusion is a field projection covered by the W3-07 seed, not an authorization row).
+
 ## Checks
 
 Shell: `export PATH=$HOME/.nvm/versions/node/v24.21.0/bin:$PATH` (node v24.21.0).
 
 | Command | Result |
 |---|---|
-| `node --test tests/*.test.mjs` | 22 pass, 0 fail, 0 skipped (rerun after fix round 2: 22 pass, 0 fail) |
+| `node --test tests/*.test.mjs` | 22 pass, 0 fail, 0 skipped (rerun after fix round 2: 22 pass, 0 fail; after fix round 3: 22 pass, 0 fail) |
 | `git diff --check` (after `git add -N` of the new files) | clean |
 | `shasum -a 256 docs/product/source-spec.md` | `92c4f7123058b8fec3c2ba7abdf10538fad034778624b0675975b39de440b354`, matches docs/sources.md |
 | Relative-link and anchor audit over the new document (script in the PR description) | 36 links, 0 broken (fix round 1; 30 before). Rerun after fix round 2 with a fresh script: 35 relative links, 0 broken; no link was changed |

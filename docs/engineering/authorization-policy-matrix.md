@@ -275,8 +275,8 @@ Fixture identities come from W1-00 (six single-role users and the W0-03 dual-rol
 | T7 | `owner-a` | `case.create` | body naming `owner-b` as owner | 403 `scope`; no case row written. Same body from `spoc-b1` with `business_unit = B1` naming `owner-a`: 201, case owner = owner-a, audit actor = spoc-b1 | W1-02, W1-INT | A01, A02 |
 | T8 | `owner-b`, `spoc-b1` | `case.list` | — | owner-b's list omits owner-a's case; spoc-b1's list holds B1 cases only and no B2 case; both queries go through `caseScopeWhere` | W1-02 | A01 |
 | T9 | `reviewer-dpo` | `case.view`, `version.view`, `history.view` | any case, any version | 200 | W1-02, W1-05 | A01, A07 |
-| T10 | `reviewer-dpo` | `case.edit_draft` | any case | 403 `role` | W1-02 | A01 |
-| T11 | `owner-b` | `artifact.download` | artifact on owner-a's case | 403 `scope`; no bytes | W1-03 | A01 |
+| T10 | `reviewer-dpo` | `case.edit_draft`, `artifact.upload`, `case.resubmit` | any case | 403 `role` | W1-02, W1-03, W2-04 | A01 |
+| T11 | `owner-b` | `artifact.download`, `artifact.upload`, `case.resubmit` | artifact on owner-a's case; owner-a's draft; owner-a's case | download: 403 `scope`, no bytes; upload: 403 `scope`, no bytes stored, `authorization.denied` audited; resubmit: 403 `scope`, no N+1 draft created | W1-03, W2-04 | A01 |
 | T12 | no session | direct blob path / artifact URL | any | 401; blob directory not routable | W1-03 | A01 |
 | T13 | any actor | `case.create` / `case.edit_draft` with `privacy_status` in body | — | 422 `invalid_input` `projected_field` | W1-02 | W0-04 fields |
 | T14 | `admin` | `config.read_revisions`, `config.publish`, `audit.read`, `operator.view` | — | admin 200; every other role 403 `role` | W1-00, W3-07 | A01, A11 |
