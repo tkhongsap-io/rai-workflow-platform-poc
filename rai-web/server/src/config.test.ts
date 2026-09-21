@@ -108,6 +108,26 @@ test('LOG_PRETTY is refused in production (W0-10 section 3.1)', () => {
   );
 });
 
+test('an upload limit above the W0-08 section 3 default is refused at start in fixture and local-google modes (W1-03)', () => {
+  assert.equal(reasonOf(withEnv({ UPLOAD_MAX_FILE_BYTES: '26214401' })), 'invalid:UPLOAD_MAX_FILE_BYTES');
+  assert.equal(reasonOf(withEnv({ UPLOAD_MAX_PACK_BYTES: '157286401' })), 'invalid:UPLOAD_MAX_PACK_BYTES');
+  assert.equal(reasonOf(withEnv({ UPLOAD_MAX_IMAGE_PIXELS: '40000001' })), 'invalid:UPLOAD_MAX_IMAGE_PIXELS');
+  assert.equal(
+    reasonOf(
+      withEnv({
+        NODE_ENV: 'development',
+        RAI_IDENTITY_MODE: 'local-google',
+        RAI_IDENTITY_GOOGLE_CLIENT_ID: 'x',
+        RAI_IDENTITY_GOOGLE_CLIENT_SECRET: 'y',
+        UPLOAD_MAX_FILE_BYTES: '26214401',
+      }),
+    ),
+    'invalid:UPLOAD_MAX_FILE_BYTES',
+  );
+  // a smaller value is a valid local narrowing
+  assert.equal(parseConfig(withEnv({ UPLOAD_MAX_FILE_BYTES: '1024' })).upload.maxFileBytes, 1024);
+});
+
 test('parseDatabaseConfig needs only the three database variables', () => {
   const db = parseDatabaseConfig({
     DATABASE_URL: base.DATABASE_URL,

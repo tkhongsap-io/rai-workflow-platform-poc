@@ -58,6 +58,13 @@ export class ConfigError extends Error {
 
 export type Env = Readonly<Record<string, string | undefined>>;
 
+/** W0-08 section 3 defaults (synthetic data; D08 revisits). A larger value is refused in local-google and fixture modes. */
+export const UPLOAD_LIMIT_DEFAULTS = Object.freeze({
+  UPLOAD_MAX_FILE_BYTES: 26_214_400,
+  UPLOAD_MAX_PACK_BYTES: 157_286_400,
+  UPLOAD_MAX_IMAGE_PIXELS: 40_000_000,
+});
+
 /** The one process.env read. Loads rai-web/.env when present without overriding variables already set. */
 export function readEnv(): Env {
   try {
@@ -171,6 +178,21 @@ export function parseConfig(env: Env): AppConfig {
   const logPretty = bool(env, 'LOG_PRETTY');
   if (logPretty && nodeEnv === 'production') throw new ConfigError('log_pretty_in_production');
 
+  const upload = {
+    maxFileBytes: integer(env, 'UPLOAD_MAX_FILE_BYTES', { min: 1 }),
+    maxPackBytes: integer(env, 'UPLOAD_MAX_PACK_BYTES', { min: 1 }),
+    maxImagePixels: integer(env, 'UPLOAD_MAX_IMAGE_PIXELS', { min: 1 }),
+  };
+  if (mode === 'local-google' || mode === 'fixture') {
+    // W0-08 section 3: a local override cannot quietly widen the policy; raising a limit is a D08 change.
+    if (upload.maxFileBytes > UPLOAD_LIMIT_DEFAULTS.UPLOAD_MAX_FILE_BYTES)
+      throw new ConfigError('invalid:UPLOAD_MAX_FILE_BYTES');
+    if (upload.maxPackBytes > UPLOAD_LIMIT_DEFAULTS.UPLOAD_MAX_PACK_BYTES)
+      throw new ConfigError('invalid:UPLOAD_MAX_PACK_BYTES');
+    if (upload.maxImagePixels > UPLOAD_LIMIT_DEFAULTS.UPLOAD_MAX_IMAGE_PIXELS)
+      throw new ConfigError('invalid:UPLOAD_MAX_IMAGE_PIXELS');
+  }
+
   return {
     nodeEnv,
     host,
@@ -179,11 +201,7 @@ export function parseConfig(env: Env): AppConfig {
     trustProxy,
     database: parseDatabaseConfig(env),
     blobDir: required(env, 'BLOB_DIR'),
-    upload: {
-      maxFileBytes: integer(env, 'UPLOAD_MAX_FILE_BYTES', { min: 1 }),
-      maxPackBytes: integer(env, 'UPLOAD_MAX_PACK_BYTES', { min: 1 }),
-      maxImagePixels: integer(env, 'UPLOAD_MAX_IMAGE_PIXELS', { min: 1 }),
-    },
+    upload,
     idempotencyTtlHours: integer(env, 'IDEMPOTENCY_TTL_HOURS', { min: 1 }),
     blobOrphanMinAgeHours: integer(env, 'BLOB_ORPHAN_MIN_AGE_HOURS', { min: 0 }),
     blobTmpMaxAgeHours: integer(env, 'BLOB_TMP_MAX_AGE_HOURS', { min: 0 }),
