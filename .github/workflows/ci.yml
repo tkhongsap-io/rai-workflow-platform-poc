@@ -1,0 +1,287 @@
+# CI checks on every PR (W0-02 plan, docs/engineering/implementation-plan-w1-w3.md section 6; ticket W1-12).
+# One workflow, one job per section-6 row, every job required for merge, on every PR to main and on main after
+# merge. Owner type HRR: agents never edit this file after it merges; a change to .github/, scripts/ or
+# docker-compose.yml is reviewed by the lead. No continue-on-error anywhere. CI never holds Google, mail or
+# external credentials: the identity mode is `fixture`, mail goes to the in-memory sink, QC is the substitute.
+#
+# Branch protection on main must require the `required` job (which fails when any check below failed, was
+# cancelled or was skipped), or each job by name; enabling it is a repository setting the lead applies.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Section 6: every check runs with the test-mode substitutes. The npm test scripts set NODE_ENV=test and
+  # RAI_IDENTITY_MODE=fixture themselves (section 3.5); these are the remaining two. NODE_ENV is set per job so
+  # that `npm run build` produces the production bundle that check-substitute-absent inspects.
+  RAI_IDENTITY_MODE: fixture
+  MAIL_MODE: sink-memory
+  QC_MODE: substitute
+  # Postgres service port; docs/sources of truth for the image: docker-compose.yml (same pin, W0-02 section 2).
+  POSTGRES_PORT: '54320'
+  PLAYWRIGHT_BASE_URL: http://127.0.0.1:8788
+
+defaults:
+  run:
+    working-directory: rai-web
+
+jobs:
+  # 1. Install and lockfile drift
+  install:
+    name: install (npm ci, lockfile)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: rai-web/.nvmrc
+          cache: npm
+          cache-dependency-path: rai-web/package-lock.json
+      - run: npm ci
+      - name: lockfile unchanged by install
+        run: git diff --exit-code -- package-lock.json
+
+  # 2. Lint and format
+  lint:
+    name: lint (eslint, prettier, check-css)
+    runs-on: ubuntu-latest
+    env:
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: rai-web/.nvmrc
+          cache: npm
+          cache-dependency-path: rai-web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+
+  # 3. Typecheck
+  typecheck:
+    name: typecheck (tsc -b)
+    runs-on: ubuntu-latest
+    env:
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: rai-web/.nvmrc
+          cache: npm
+          cache-dependency-path: rai-web/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+
+  # 4. Unit tests
+  unit:
+    name: unit tests
+    runs-on: ubuntu-latest
+    env:
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: rai-web/.nvmrc
+          cache: npm
+          cache-dependency-path: rai-web/package-lock.json
+      - run: npm ci
+      - run: npm run test:unit
+
+  # 5. Migrations and integration tests against the Postgres 16 service container
+  integration:
+    name: migrations and integration tests
+    runs-on: ubuntu-latest
+    env:
+      NODE_ENV: test
+    services:
+      postgres:
+        image: postgres:16.15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres-local # synthetic CI credential; the app connects as the W0-04 roles
+          POSTGRES_DB: rai
+        ports:
+          - 54320:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d rai"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: rai-web/.nvmrc
+          cache: npm
+          cache-dependency-path: rai-web/package-lock.json
+      - run: npm ci
+      - name: create the W0-04 roles (the compose init script, applied once to the service container)
+        working-directory: .
+        run: docker exec -i ${{ job.services.postgres.id }} psql -v ON_ERROR_STOP=1 -U postgres -d rai < docker/postgres/init/001-roles.sql
+      - name: local configuration (placeholders only; DATABASE_URL names the service port)
+        run: cp .env.example .env
+      - run: npm run migrate
+      - run: npm run test:integration
+
+  # 6. Build and substitute absence (production bundle: NODE_ENV deliberately unset here)
+  build:
+    name: build and substitute absence
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: rai-web/.nvmrc
+          cache: npm
+          cache-dependency-path: rai-web/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm run check:substitute-absent
+
+  # 7. Browser journeys and accessibility audit (Chromium only, section 2); report uploaded as an artifact
+  browser:
+    name: browser journeys and accessibility audit
+    runs-on: ubuntu-latest
+    env:
+      NODE_ENV: test
+    services:
+      postgres:
+        image: postgres:16.15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres-local
+          POSTGRES_DB: rai
+        ports:
+          - 54320:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d rai"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: rai-web/.nvmrc
+          cache: npm
+          cache-dependency-path: rai-web/package-lock.json
+      - run: npm ci
+      - name: create the W0-04 roles
+        working-directory: .
+        run: docker exec -i ${{ job.services.postgres.id }} psql -v ON_ERROR_STOP=1 -U postgres -d rai < docker/postgres/init/001-roles.sql
+      - run: cp .env.example .env
+      - run: npm run migrate
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+      - name: upload the Playwright report and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            rai-web/playwright-report
+            rai-web/test-results
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # 8. Legacy demo suite and frozen-source hash (repository root; the demo suite never shares a command with rai-web)
+  demo-and-frozen-source:
+    name: legacy demo suite and frozen-source hash
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: rai-web/.nvmrc
+      - name: legacy demo suite
+        run: node --test tests/*.test.mjs
+      - name: frozen-source hash (docs/product/source-spec.md against docs/sources.md)
+        run: node scripts/check-frozen-source.mjs
+      - name: repository script tests (an altered snapshot copy must fail the hash check)
+        run: node --test scripts/*.test.mjs
+
+  # 9. Markdown link check
+  links:
+    name: markdown link check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: rai-web/.nvmrc
+      - run: node scripts/check-links.mjs
+
+  # 10. Dependency advisories (runtime dependencies, high and above)
+  audit:
+    name: dependency advisories
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: rai-web/.nvmrc
+      - run: npm audit --omit=dev --audit-level=high
+
+  # 11. Whitespace
+  whitespace:
+    name: whitespace (git diff --check)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: pull request - every change against main
+        if: github.event_name == 'pull_request'
+        run: git diff --check origin/main...HEAD
+      - name: main - the merged change
+        if: github.event_name == 'push'
+        run: git diff --check HEAD^ HEAD
+
+  # The one status branch protection requires: red when any check above did not succeed.
+  required:
+    name: required
+    if: always()
+    needs:
+      - install
+      - lint
+      - typecheck
+      - unit
+      - integration
+      - build
+      - browser
+      - demo-and-frozen-source
+      - links
+      - audit
+      - whitespace
+    runs-on: ubuntu-latest
+    steps:
+      - name: every check succeeded
+        run: |
+          echo '${{ toJSON(needs) }}' | tee needs.json
+          if grep -Eq '"result": *"(failure|cancelled|skipped)"' needs.json; then
+            echo 'at least one required check did not succeed' >&2
+            exit 1
+          fi
+        working-directory: .
