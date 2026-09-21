@@ -59,6 +59,7 @@ test('the base schema holds the W0-04 tables, triggers and grants', async () => 
       'configuration_revision',
       'idempotency_key',
       'pack_version',
+      'session', // W1-01 (0001_w1_01_session; W0-03 section 6.3)
     ],
   );
 
@@ -107,9 +108,12 @@ test('the base schema holds the W0-04 tables, triggers and grants', async () => 
     'pack_version:INSERT',
     'pack_version:SELECT',
     'pack_version:UPDATE',
+    'session:INSERT', // W1-01: W0-03 section 6.3 session rows (last_seen_at, revoked_at, locale are the mutable columns)
+    'session:SELECT',
+    'session:UPDATE',
   ]);
-  // rai_operator: rai_app (by membership, docker/postgres/init) plus DELETE on idempotency_key only.
-  assert.deepEqual(byGrantee('rai_operator'), ['idempotency_key:DELETE']);
+  // rai_operator: rai_app (by membership, docker/postgres/init) plus DELETE on idempotency_key and on session (W1-01 sweep).
+  assert.deepEqual(byGrantee('rai_operator'), ['idempotency_key:DELETE', 'session:DELETE']);
 });
 
 test('rai_app has no DDL: it cannot create a table or a function', async () => {

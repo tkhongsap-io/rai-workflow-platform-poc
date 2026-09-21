@@ -59,7 +59,12 @@ export type Locale = Static<typeof LocaleSchema>;
 
 export const SessionInfoSchema = Type.Object({
   principal: PrincipalSchema,
-  identityMode: Type.Union(IDENTITY_MODES.map((m) => Type.Literal(m))),
+  identityMode: Type.Union([
+    Type.Literal('fixture'),
+    Type.Literal('local-google'),
+    Type.Literal('network'),
+    Type.Literal('production'),
+  ]), // a tuple, not IDENTITY_MODES.map(): a mapped array widens the inferred type to never
   expiresAt: Type.String(),
   locale: LocaleSchema, // the viewer's stored preference; default 'th' (D12)
 });

@@ -76,7 +76,7 @@ npm run migrate            # apply pending migrations as rai_owner (DATABASE_MIG
 npm run fixtures:generate  # write the W0-08 synthetic documents; prints the fixture set name, version and manifest hash
 npm run fixtures:load      # synthetic fixture set into an empty database (W1-09); refuses a non-empty one
 npm run reset              # db:down, db:up, migrate, fixtures:load, remove rai-web/.local (blobs, mail sink); development and test only
-npm run db:cleanup         # operator command: expire idempotency keys; --report lists stale drafts and orphan blobs (dry run until D08)
+npm run db:cleanup         # operator command: expire idempotency keys and remove expired or revoked session rows (W1-01); --report lists stale drafts and orphan blobs (dry run until D08)
 npm run store:verify       # operator command: re-hash every referenced blob; non-zero exit on any mismatch
 npm run store:cleanup      # operator command: remove stale temp files under BLOB_DIR/tmp
 ```
@@ -87,6 +87,8 @@ Run:
 npm run dev                # API http://127.0.0.1:8787 (local-google identity, loopback only) + Vite http://127.0.0.1:5174
 npm run build && npm start # the one deployable: server/dist serving web/dist
 ```
+
+Sign-in surface (W1-01, W0-03 section 6): `POST /auth/sign-in` → `GET /auth/callback` for `local-google` (loopback only; the process refuses to start on a non-loopback bind, an unknown mode, a missing client or `TRUST_PROXY=true`, exit 78 with the reason code), `GET /auth/fixture/users` and `POST /auth/fixture/sign-in { fixtureUserId }` in `fixture` mode only (`NODE_ENV=test`, loopback; the built server loads the eight identities from `@rai/fixtures` at run time, so `fixtures/dist` must exist: `npm run typecheck` emits it), `GET /api/session`, `POST /api/session/locale`, `POST /auth/sign-out` (needs `Sec-Fetch-Site: same-origin` or `none`). Every route declares its `config.auth`; a request without a session is `401 unauthenticated` before anything else and a wrong role or out-of-scope case is `403 forbidden` from `rai-web/server/src/authz/middleware.ts`, the only place scope is enforced.
 
 Test, lint, typecheck:
 
