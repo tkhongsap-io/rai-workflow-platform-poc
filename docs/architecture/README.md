@@ -1,6 +1,6 @@
 # Planned architecture
 
-Status: conceptual; no service, language, framework, model or hosting selected.
+Status: boundaries fixed; stack recorded in [ADR-0003](../../adr/0003-stack-and-deployment-boundary.md) (D04, 2026-09-21); paths assigned by the [W0-02 file-level plan](../engineering/implementation-plan-w1-w3.md). No model or production hosting selected (D08-D10 open).
 
 ```mermaid
 flowchart LR
@@ -18,20 +18,20 @@ flowchart LR
 
 ## Boundaries, owners and tickets
 
-Paths are assigned by the W0-02 file-level plan after D04, in the same PR, never before. Until then every Path cell reads as shown.
+Paths were assigned by the [W0-02 file-level plan](../engineering/implementation-plan-w1-w3.md#11-module-ownership) after D04; that plan's module-ownership table is authoritative and this column mirrors it. Paths are relative to the repository root; nothing under them exists until W1-00 creates the skeleton.
 
 | Boundary | Owns | Lane | Spec ticket | Build tickets | Path in repo |
 |---|---|---|---|---|---|
-| Identity adapter | Verified subject, roles, mode (local-google / network / production) | A | W0-03 | W1-01 | assigned by W0-02 |
-| Server authorization | Scope on every read, search, download, deep link | A | W0-05 | W1-01, W3-01 | assigned by W0-02 |
-| Review workflow and Ready predicate | States, transitions, idempotency, audit events | A | W0-06 | W2-01 to W2-04, W2-06 | assigned by W0-02 |
-| Case metadata, configuration revisions and audit store | Immutable versions, append-only audit, schema evolution | A | W0-04 | W1-00, W1-02, W1-05 | assigned by W0-02 |
-| Private artifact storage | Protected bytes, hashes, upload safety | A | W0-04, W0-08 | W1-03 | assigned by W0-02 |
-| QC boundary (substitute in slice 1) | Typed findings, unavailable state, no authority | B / C | W0-07 | W1-10, W2-05, W4 | assigned by W0-02 |
-| UI substitute (dev/test only) | Fixture-backed shapes for Lane B; never evidence | C | W0 interface specs | W1-13, W2-10, W3-08 | assigned by W0-02 |
-| Notification boundary (mail sink in slice 1) | Committed events, recipients, deep links, dedup | B / C | W0-07 | W1-11, W3-03, W3-04 | assigned by W0-02 |
-| Desk observability | Correlation IDs, redacted logs, readiness, operator view | A | W0-10 | W3-07, W8 | assigned by W0-02 |
-| Product UI | Screens from the design handoff | B | design handoff | W1-06, W1-07, W2-07, W2-09, W3-02 | assigned by W0-02 |
+| Identity adapter | Verified subject, roles, mode (local-google / network / production) | A | W0-03 | W1-01 | `rai-web/server/src/identity/` |
+| Server authorization | Scope on every read, search, download, deep link | A | W0-05 | W1-01, W3-01 | `rai-web/server/src/authz/` |
+| Review workflow and Ready predicate | States, transitions, idempotency, audit events | A | W0-06 | W2-01 to W2-04, W2-06 | `rai-web/server/src/workflow/`, `rai-web/server/src/versions/` |
+| Case metadata, configuration revisions and audit store | Immutable versions, append-only audit, schema evolution | A | W0-04 | W1-00, W1-02, W1-05 | `rai-web/server/src/db/`, `rai-web/server/drizzle/` (migrations), `rai-web/server/src/cases/`, `rai-web/server/src/configuration/`, `rai-web/server/src/audit/` |
+| Private artifact storage | Protected bytes, hashes, upload safety | A | W0-04, W0-08 | W1-03 | `rai-web/server/src/artifacts/`; bytes in `rai-web/.local/blobs/` (gitignored, `BLOB_DIR`) |
+| QC boundary (substitute in slice 1) | Typed findings, unavailable state, no authority | B / C | W0-07 | W1-10, W2-05, W4 | port `rai-web/server/src/qc/`, types `rai-web/shared/src/qc/`, substitute `rai-web/fixtures/src/substitutes/qc/` |
+| UI substitute (dev/test only) | Fixture-backed shapes for Lane B; never evidence | C | W0 interface specs | W1-13, W2-10, W3-08 | `rai-web/fixtures/src/substitutes/api/` |
+| Notification boundary (mail sink in slice 1) | Committed events, recipients, deep links, dedup | B / C | W0-07 | W1-11, W3-03, W3-04 | `rai-web/server/src/notifications/`, types `rai-web/shared/src/mail/`, sink `rai-web/fixtures/src/substitutes/mail-sink/` |
+| Desk observability | Correlation IDs, redacted logs, readiness, operator view | A | W0-10 | W3-07, W8 | `rai-web/server/src/observability/` |
+| Product UI | Screens from the design handoff | B | design handoff | W1-06, W1-07, W2-07, W2-09, W3-02 | `rai-web/web/src/` |
 | External trackers | Reference only (L3, L6) | — | — | none | — |
 
 ## Documents this build executes
@@ -48,4 +48,4 @@ Notification capability accepts committed business events, authorized recipients
 
 Contract errors distinguish unauthenticated/forbidden, stale version, invalid input, unsafe upload, QC unavailable and mail delivery failed. Storage transactions must keep audit, decisions and state consistent; retries cannot create duplicate successor versions or notifications. These are acceptance obligations, not a commitment to microservices: prefer the simplest implementation that preserves boundaries.
 
-[Workflow](../product/workflow.md), [data](../product/data-contract.md), [threat model](../security/threat-model.md) and [ADRs](../../adr/README.md) define details. Stack choice and operational topology remain gated.
+[Workflow](../product/workflow.md), [data](../product/data-contract.md), [threat model](../security/threat-model.md) and [ADRs](../../adr/README.md) define details. The stack is recorded (ADR-0003, D04); the shared request/response contract lives in `rai-web/shared/` and is written in the [W0-02 plan](../engineering/implementation-plan-w1-w3.md#7-w1-interface-shapes). Production hosting and operational topology remain gated (D10).
