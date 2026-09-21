@@ -48,7 +48,7 @@ The check reads the local file header at offset 0 and the **central directory**;
 - Every entry uses compression method 0 (stored) or 8 (deflate). Method 99 (AES) and any other method are refused. [`container_invalid`]
 - No entry has general-purpose bit 0 set (encrypted). [`encrypted_entry`]
 - No entry name contains a NUL byte, a backslash, a `..` path segment or starts with `/`. [`container_invalid`]
-- No entry is named `vbaProject.bin` in any directory (case-insensitive), and `[Content_Types].xml` does not declare a `macroEnabled` content type. Macro-enabled packages (`.docm`, `.xlsm`, `.dotm`, `.xltm`) are also refused by extension before the bytes are read. [`macro_enabled`]
+- No entry is named `vbaProject.bin` in any directory (case-insensitive). This is a name check on the central directory only; `[Content_Types].xml` is deflate-compressed in any real package and is never inflated or parsed (2.4), so its content types are not consulted. Macro-enabled packages (`.docm`, `.xlsm`, `.dotm`, `.xltm`) are also refused by extension before the bytes are read. [`macro_enabled`]
 - No entry name ends with an archive or executable extension from section 2.3 (for example an embedded `.zip`, `.exe` or `.js` inside `word/embeddings/`). OLE embeddings (`.bin`) other than `vbaProject.bin` are allowed for synthetic data; D08 decides for real data. [`nested_archive`]
 - The package kind (DOCX or XLSX) is determined by the presence of `word/document.xml` versus `xl/workbook.xml`, exactly one of them, and must match the declared extension. [`type_mismatch` when the other kind's extension is declared; `container_invalid` when neither or both are present]
 
@@ -87,7 +87,7 @@ The sniff is a pure module: `(bytes: Buffer, declaredFilename: string) → { ok:
 | Empty file | 0 bytes rejected | Server | `empty_file`; no zero-byte blob is ever stored |
 | Image pixels | width × height ≤ 40,000,000 | Sniff (PNG `IHDR`, JPEG `SOF`) | Decompression-bomb guard for any later viewer or parser; a 25 MiB PNG can declare a 100,000 × 100,000 canvas |
 | ZIP container | ≤ 2,000 entries; ≤ 100 MiB per entry; ≤ 500 MiB total declared uncompressed | Sniff (central directory) | Decompression-bomb guard; nothing inflates in W1 |
-| Filename | ≤ 200 Unicode code points after NFC normalisation; no `/`, `\`, NUL, U+0000-U+001F, U+007F; no leading or trailing whitespace; not `.` or `..`; must end with an allowed extension | Server, before the bytes are read | Thai filenames (up to 3 bytes per code point in UTF-8) fit inside Postgres and the `filename*` download header; path characters are refused rather than stripped so the uploader sees what was wrong |
+| Filename | ≤ 200 Unicode code points after NFC normalisation; no `/`, `\`, NUL, U+0000-U+001F, U+007F; no leading or trailing whitespace; not `.` or `..`; must end with an allowed extension and have at least one code point before the extension (the stem is non-empty, so `.pdf` alone is refused) | Server, before the bytes are read | Thai filenames (up to 3 bytes per code point in UTF-8) fit inside Postgres and the `filename*` download header; path characters are refused rather than stripped so the uploader sees what was wrong |
 | Request body time | 120 s per upload request | Fastify `connectionTimeout` / route config, confirmed as a W0-09 budget | A stalled client does not hold a staging file open indefinitely |
 | In-flight uploads per session | Not set here; W0-09 performance budgets | — | Recorded as a target with the workload numbers, not a policy value |
 

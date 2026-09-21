@@ -24,6 +24,10 @@ Reviewer finding: the 8.6 "Pack total" row uploaded four 40 MiB PDFs, but each e
 
 Reviewer finding: the section 8.2 `fx-coe` display name "Dr. Anan V." reused the first name of a real person named in the frozen source spec ("Anan Sanongchitcharorn", AI Transformation Lead) for the fixture in the matching AI/COE reviewer role, against section 8.1's promise of invented names and the W0-08 rule of no Life-OS content; the W1-09 provenance check would have failed on it. Fixed by renaming the display name to "Dr. Kittipat V.", which matches none of the four named people in the source spec (Nakhun, Montri, Anan, Joao). Subject, email, role and scope are unchanged; no other rows change. The same name remains in the legacy `demo/` reference copy, which stays untouched by contract and is not a fixture source.
 
+## Fix round 4
+
+Reviewer findings: (1) the section 2.2 macro rule required that `[Content_Types].xml` not declare a `macroEnabled` content type, but the same rule says the check never inflates an entry and 2.4 says no XML parsing of OOXML parts; in any real DOCX/XLSX that part is deflate-compressed, so the clause was unimplementable as written and the 8.6 "Macro package" row only exercised the `vbaProject.bin` name, leaving the clause untested. (2) The 8.6 "Bad filename" row expected the declared name `.pdf` to be rejected `filename_invalid`, but the section 3 filename rule admitted it. Fixed by deleting the `[Content_Types].xml` clause and stating that the macro check is a central-directory name check on `vbaProject.bin` only (plus the extension refusal already stated), and by adding "at least one code point before the extension (the stem is non-empty, so `.pdf` alone is refused)" to the section 3 Filename row so the rule and the 8.6 row agree. No reason codes, limits or fixture rows changed.
+
 ## Checks
 
 Shell: `export PATH=$HOME/.nvm/versions/node/v24.21.0/bin:$PATH` (node v24.21.0). No Postgres needed: document ticket.
