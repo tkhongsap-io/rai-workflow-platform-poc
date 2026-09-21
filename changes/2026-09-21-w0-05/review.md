@@ -19,16 +19,25 @@ Both blocking findings pointed at the same gap: `case.create` was declared with 
 
 Not edited, on purpose: `docs/product/decisions.md` (no decision recorded; D05, D06, W0-04 fields carried as written; D07-D10 untouched), `docs/product/source-spec.md` (frozen; hash unchanged), `adr/0003-stack-and-deployment-boundary.md` (its W0-05 open-item checkbox is outside this ticket's files; W0-09 ticks it at the exit review), `adr/README.md` (nothing to change: W0-05 produces an interface spec, not an ADR), `docs/architecture/README.md` and `TESTING.md` (W0-02 only), the ticket row status (issue #10 tracks it), DEVLOG/CHANGELOG/board (appended by the merge step). Sibling W0 specs are linked through their W0-contract section anchors because their `docs/engineering/` files are on parallel branches.
 
+## Fix round 2 (review findings on PR #58)
+
+One blocking finding: three matrix rows with a stated scope had no obligation in section 7, so the behaviour could break without a failing test. Lane-open recipients (3.3, and the Done-when clause "lane-open, send-back and Ready recipients follow case-view scope") were missing from T28, which named send-back and Ready only; `operator.view` (3.2, Admin only) and `config.publish` (3.2, whose Rule cell says the row exists so W1-00 can test that nobody else has it) were missing from T14. Changes, both in the section 7 table and nothing else:
+
+- T28 now covers lane-open, send-back and Ready recipients: lane-open expects every holder of that lane's reviewer role and no other subject; send-back and Ready expect owner-a only; links carry no token (W3-03, A05).
+- T14 now covers `config.read_revisions`, `config.publish`, `audit.read` and `operator.view`: admin 200, every other role 403 `role` (W1-00 for the config and audit rows, W3-07 for the operator view; A01, A11).
+
+No obligation was removed or weakened; numbering is unchanged.
+
 ## Checks
 
 Shell: `export PATH=$HOME/.nvm/versions/node/v24.21.0/bin:$PATH` (node v24.21.0).
 
 | Command | Result |
 |---|---|
-| `node --test tests/*.test.mjs` | 22 pass, 0 fail, 0 skipped |
+| `node --test tests/*.test.mjs` | 22 pass, 0 fail, 0 skipped (rerun after fix round 2: 22 pass, 0 fail) |
 | `git diff --check` (after `git add -N` of the new files) | clean |
 | `shasum -a 256 docs/product/source-spec.md` | `92c4f7123058b8fec3c2ba7abdf10538fad034778624b0675975b39de440b354`, matches docs/sources.md |
-| Relative-link and anchor audit over the new document (script in the PR description) | 36 links, 0 broken (fix round 1; 30 before) |
+| Relative-link and anchor audit over the new document (script in the PR description) | 36 links, 0 broken (fix round 1; 30 before). Rerun after fix round 2 with a fresh script: 35 relative links, 0 broken; no link was changed |
 
 No product suite exists yet (the application skeleton arrives with W1-00 under the layout W0-02 assigns), so `npm test`, lint, typecheck and Playwright do not apply to this ticket.
 

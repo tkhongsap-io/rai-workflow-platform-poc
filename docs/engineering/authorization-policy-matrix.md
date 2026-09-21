@@ -279,7 +279,7 @@ Fixture identities come from W1-00 (six single-role users and the W0-03 dual-rol
 | T11 | `owner-b` | `artifact.download` | artifact on owner-a's case | 403 `scope`; no bytes | W1-03 | A01 |
 | T12 | no session | direct blob path / artifact URL | any | 401; blob directory not routable | W1-03 | A01 |
 | T13 | any actor | `case.create` / `case.edit_draft` with `privacy_status` in body | — | 422 `invalid_input` `projected_field` | W1-02 | W0-04 fields |
-| T14 | `admin` | `config.read_revisions`, `audit.read` | — | 200; every other role 403 `role` | W1-00 | A01, A11 |
+| T14 | `admin` | `config.read_revisions`, `config.publish`, `audit.read`, `operator.view` | — | admin 200; every other role 403 `role` | W1-00, W3-07 | A01, A11 |
 | T15 | any role | unknown action / policy row lookup for unknown role | — | `authorize` throws; no route reachable | W1-00 | A01 |
 | T16 | `reviewer-dpo` | `lane.approve` | lane `dpo` on a case where reviewer-dpo is neither owner nor SPOC | 200 | W2-02 | A09 |
 | T17 | `reviewer-dpo` | `lane.approve` | lane `itsec` | 403 `lane` | W2-02 | A09 |
@@ -293,7 +293,7 @@ Fixture identities come from W1-00 (six single-role users and the W0-03 dual-rol
 | T25 | dual-role | `finding.waive` | finding owned by lane L on a case in B2 | 403 `self_approval` (provisional default) | W2-05 | A09 |
 | T26 | any actor | set Ready by request | — | no route exists; predicate runs only inside W2-06 | W2-06 | A09 |
 | T27 | `owner-a`, `spoc-b1`, `owner-b` | `queue.search`, `queue.count` | each key | results, counts and filter options equal the scoped set; owner-b sees zero of owner-a's cases and identical counts to a user with no cases | W3-01 | A06 |
-| T28 | mail sink | send-back and Ready recipients | case owned by owner-a | recipient = owner-a only; link has no token | W3-03 | A05 |
+| T28 | mail sink | lane-open, send-back and Ready recipients | case owned by owner-a | lane-open: every holder of that lane's reviewer role and no other subject; send-back/Ready: owner-a only; links carry no token | W3-03 | A05 |
 | T29 | mail sink | breach digest | — | recipients = `operator_recipients` seed; link without session yields 401 | W3-03 | A05 |
 | T30 | any denied write | audit | — | `authorization.denied` event with reason and correlation ID; denied read logged, not audited | W1-01, W3-07 | A11 |
 
