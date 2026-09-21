@@ -36,7 +36,7 @@ Shell: `export PATH=$HOME/.nvm/versions/node/v24.21.0/bin:$PATH` (node v24.21.0,
 | `git diff --check` | clean |
 | CI role-init step, simulated locally | `docker run postgres:16.15-alpine` on 54398 (no init volume), `docker exec -i <id> psql -v ON_ERROR_STOP=1 -U postgres -d rai < docker/postgres/init/001-roles.sql` → `CREATE ROLE ×3, GRANT ROLE, ALTER DATABASE, REVOKE, GRANT`; then `npm run migrate` against it → `applied 1 migration(s)` |
 
-The workflow's first real run is the run on this PR; its per-job results are recorded in the PR after the push (an agent cannot run GitHub Actions locally).
+The workflow's first real run is the run on this PR: [run 35628315903](https://github.com/tkhongsap-io/rai-workflow-platform-poc/actions/runs/35628315903) on PR #70, all twelve jobs green on the first attempt — `install` 26 s, `lint` 36 s, `typecheck` 30 s, `unit tests` 31 s, `migrations and integration tests` 47 s (service container, roles created, `migrate` applied, 23/23), `build and substitute absence` 32 s, `browser journeys and accessibility audit` 1 m 25 s (`Running 21 tests using 1 worker`, `21 passed (15.1s)`; artifact `playwright-report`, 292 297 bytes, uploaded), `legacy demo suite and frozen-source hash` 15 s, `markdown link check` 11 s, `dependency advisories` 17 s, `whitespace` 5 s, `required` 3 s.
 
 ## Done-when clauses → evidence
 
