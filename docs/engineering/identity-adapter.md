@@ -316,7 +316,7 @@ Fixture users (W1-00 owns the table; W1-09 owns the cases that reference them):
 | `fx-admin` | `fixture:fx-admin` | Desk Admin (fixture) | `admin@fixture.example.test` | `admin` / all cases |
 | `fx-dual-coe-spoc-rp` | `fixture:fx-dual-coe-spoc-rp` | Rattanaporn C. | `dual.coe-spoc.rp@fixture.example.test` | `ai_coe` / all cases **and** `bu_spoc` / `BU-RP` |
 
-The owner's display name carries Thai script on purpose so that the sign-in screen, the queue and the audit trail prove Thai rendering (D12) from the first fixture. The dual-role identity's lane is AI/COE: on a BU-RP case it may read everything, may create, edit and submit as SPOC, and must be refused approve/send-back of the AI/COE lane on that case (W2-02 negative), while still being allowed to approve the AI/COE lane on a BU-CM case.
+The owner's display name carries Thai script on purpose so that the sign-in screen, the queue and the audit trail prove Thai rendering (D12) from the first fixture. The dual-role identity's lane is AI/COE: on a BU-RP case it may read everything, may create, edit and submit as SPOC, and must be refused approve of the AI/COE lane on that case (D05; W2-02 negative), while still being allowed to approve the AI/COE lane on a BU-CM case. Whether send-back is also withheld from a dual-role reviewer is not part of D05 as recorded; see section 14.
 
 Rules:
 
@@ -412,7 +412,7 @@ Resolution: for each `groups` entry in the token, every matching rule contribute
 | ID-10 | Fixture routes are 404 in every non-fixture mode; `fixture` outside `NODE_ENV=test` exits 78 | integration | W1-01 |
 | ID-11 | Callback error branches (state, nonce, transaction cookie missing, email not verified) return 401 with `auth.sign_in_failed` and no session; uses a synthetic claims object, not Google | unit | W1-01 |
 | ID-12 | Sign-in through the fixture provider lands each user on that user's scoped list; an out-of-scope case is absent; no client-side check decides access | browser, Playwright | W1-07 (on W1-13), W1-INT (real server) |
-| ID-13 | The dual-role identity is refused approve/send-back of the AI/COE lane on a BU-RP case and permitted on a BU-CM case (D05) | integration | W2-02, W2-08 |
+| ID-13 | The dual-role identity is refused approve of the AI/COE lane on a BU-RP case and permitted approve on a BU-CM case (D05) | integration | W2-02, W2-08 |
 | ID-14 | Manual: Google sign-in on a loopback bind with a locally held OAuth client, recorded as "Google sign-in on loopback: pass" without the account address; unknown-mode and non-loopback refusals recorded with exit code | manual, outside CI | W1-08 |
 | ID-15 | No email, token, secret or allow-list content appears in any log line or audit row for a sign-in, a refusal and a start-up refusal | integration | W3-07 |
 | ID-16 | `network` mode start-up against a stub OIDC discovery document (allow-list source) and the A01 network clause | integration | W7-00, only if the rehearsal is networked |
@@ -473,6 +473,7 @@ Architecture boundary: "Identity adapter" row of the [boundary table](../archite
 - [ ] Custody mechanism on the True host (`env` from the host secret manager, `file` mount, or a third `SecretSource`) — D10, ADR-0004/0007.
 - [ ] Whether the W7 rehearsal is networked; if so which `network` source and, for `allow-list`, which non-True issuer — W7 entry.
 - [ ] The `local-google` default-to-`owner` rule for unmapped accounts (4.1) — lead confirms at this ticket's review.
+- [ ] Whether a dual-role reviewer (also owner or BU SPOC on the case) is withheld send-back as well as approve. D05 as recorded withholds approve only; extending it to send-back is a W0-05 refinement under D05's "review leads may refine" clause, recorded there if adopted, not in this spec.
 - [ ] Any drift between this spec's route and variable names and the W0-02 sections that mirror them — W0-09 exit review.
 
 ## 15. Stop-condition check

@@ -29,6 +29,10 @@ Shell: `export PATH=$HOME/.nvm/versions/node/v24.21.0/bin:$PATH` (node v24.21.0)
 
 No product suite exists yet (the application skeleton arrives with W1-00), so `npm test`, lint, typecheck and Playwright do not apply; the TypeScript in the spec is notation, not compiled code. No Postgres was started for this ticket.
 
+## Review fix round 1 (PR #62)
+
+Finding: section 7 and test row ID-13 said the dual-role fixture is refused "approve/send-back" of its lane on a BU-RP case and attributed this to D05. D05 as recorded withholds approve only ("No one who is owner or BU SPOC on a case may approve a lane on that case"); send-back is not in the decision. Fix: both places now say "refused approve ... (D05)"; whether send-back is also withheld is listed in section 14 as a possible W0-05 refinement under D05's "review leads may refine" clause, not as D05. Checks below were rerun after the change.
+
 ## Done-when check (W0 contract, W0-03 section and exit checklist)
 
 - [x] Interface: verified login in; subject ID, display name, email, (role, scope) pairs out; BU scope for SPOC, owned cases for owner.
