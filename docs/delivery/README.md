@@ -35,3 +35,16 @@ W4-W8 ............................ outline only; not authorized
 Per package: contract PR → lane PRs in parallel → Wx-INT → exit evidence. The per-package `changes/` record follows BUILD_PLAN "Definition of done".
 
 Live ownership and progress go in the append-only [build board](../board/README.md), one stream per lane. These documents define the work; the board records who holds it.
+
+## Tracker of record (D03): GitHub issues
+
+Opened 2026-09-21 on Ta's instruction: one epic per package and one issue per ticket, labelled by package, lane, owner type and status, with milestones W0 exit, M1, M2, M3. If an issue and these documents disagree, the document wins and the issue is corrected.
+
+| Epic | Issue |
+|---|---|
+| W0 technical contract | [#51](https://github.com/tkhongsap-io/rai-workflow-platform-poc/issues/51) (10 tickets, Ready) |
+| W1 scoped case and versioned pack | [#52](https://github.com/tkhongsap-io/rai-workflow-platform-poc/issues/52) (15 tickets, blocked by W0 exit) |
+| W2 parallel reviews, send-back, Ready | [#53](https://github.com/tkhongsap-io/rai-workflow-platform-poc/issues/53) (11 tickets) |
+| W3 queue, notifications, SLA | [#54](https://github.com/tkhongsap-io/rai-workflow-platform-poc/issues/54) (9 tickets) |
+
+Filter: `label:package:W0 label:status:ready` shows what can start now. W4-W8 have no issues; they are not authorized.

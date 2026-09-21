@@ -29,3 +29,10 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: Tech lead claims lane-lead-integration and opens W0-01 (stack ADR, D04).
 - Author: operator=ta session=planning-session model=claude-opus-5
 - Evidence: docs/product/decisions.md, changes/2026-09-21-g0-close/
+
+## 2026-09-21 (time not recorded) — GitHub issues opened for W0-W3
+- What: 4 epics (#51, #52, #53, #54) and 45 ticket issues created from the delivery pack, with labels, milestones and dependency links. W0 tickets are status:ready.
+- Why: Ta asked for the tracker of record (D03) to be populated so the team can start.
+- Next: Tech lead claims lane-lead-integration and takes #6 (W0-01 stack ADR).
+- Author: operator=ta session=planning-session model=claude-opus-5
+- Evidence: https://github.com/tkhongsap-io/rai-workflow-platform-poc/issues
