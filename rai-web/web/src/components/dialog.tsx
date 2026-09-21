@@ -60,6 +60,11 @@ export function Dialog({
       entryOf(dialog, focusables(dialog))?.focus();
     } else if (!open && dialog.open) {
       dialog.close();
+      // Restore focus here, synchronously, and nowhere else: the browser's own restoration and a `close` listener
+      // both run later as queued tasks, and a second restoration landing after the caller has already moved focus
+      // (W1-06: to the next slot's Change button) would snap it back to the previous opener.
+      const opener = openerRef.current;
+      if (opener instanceof HTMLElement) opener.focus();
     }
   }, [open]);
 
@@ -71,10 +76,6 @@ export function Dialog({
       event.preventDefault();
       if (hasUnsavedInput && !window.confirm(t('dialog.discard_confirm'))) return;
       onClose();
-    };
-    const onClosed = (): void => {
-      const opener = openerRef.current;
-      if (opener instanceof HTMLElement) opener.focus();
     };
     const onKeyDown = (event: KeyboardEvent): void => {
       // Tab wraps inside the dialog (section 9 item 3) instead of leaving the document for the browser chrome.
@@ -94,11 +95,9 @@ export function Dialog({
       }
     };
     dialog.addEventListener('cancel', onCancel);
-    dialog.addEventListener('close', onClosed);
     dialog.addEventListener('keydown', onKeyDown);
     return () => {
       dialog.removeEventListener('cancel', onCancel);
-      dialog.removeEventListener('close', onClosed);
       dialog.removeEventListener('keydown', onKeyDown);
     };
   }, [hasUnsavedInput, onClose, t]);

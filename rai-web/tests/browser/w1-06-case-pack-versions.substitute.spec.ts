@@ -6,7 +6,7 @@
 // for the stale-version case. Fixture ids: fx-case-missing-slot (RAI-2000-0003), fx-case-nonvendor (RAI-2000-0001),
 // fx-case-na-reasons (RAI-2000-0004); users fx-user-owner-cm, fx-user-owner-cm-2.
 
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import type { CaseListResponse } from '@rai/shared/schemas/cases';
 import type { PackDraft } from '@rai/shared/schemas/pack';
 import type { VersionListResponse } from '@rai/shared/schemas/versions';
@@ -71,6 +71,17 @@ async function expectNoHorizontalScroll(page: Page): Promise<void> {
   );
 }
 
+/**
+ * Enter on a focused Change button opens the slot dialog. The dialog's showModal() and its focus move run in a
+ * React effect after the click commits, so wait for the dialog and for the current-state radio to hold focus
+ * before the first arrow key; an arrow pressed earlier lands on the still-focused button and changes nothing.
+ */
+async function openSlotDialog(page: Page, dialog: Locator): Promise<void> {
+  await page.keyboard.press('Enter');
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('radio', { checked: true })).toBeFocused();
+}
+
 async function expectFocusInsideDialog(page: Page): Promise<void> {
   const inside = await page.evaluate(() => {
     const dialog = document.querySelector('dialog[open]');
@@ -132,11 +143,10 @@ test.describe('W1-06 case flow on the W1-13 substitute (fx-case-missing-slot, fx
     const button7 = changeButton(page, 7, 'slot.s7.name');
     await expect(button7).toBeFocused();
     await expectVisibleFocus(page);
-    await page.keyboard.press('Enter');
     const dialog = page.getByRole('dialog', {
       name: t('th', 'slot.dialog.title', { number: 7, name: t('th', 'slot.s7.name') }),
     });
-    await expect(dialog).toBeVisible();
+    await openSlotDialog(page, dialog);
     await expectFocusInsideDialog(page);
     await expect(
       dialog.getByRole('radio', { name: t('th', 'slot.state.missing'), exact: false }),
@@ -172,8 +182,7 @@ test.describe('W1-06 case flow on the W1-13 substitute (fx-case-missing-slot, fx
     await expect(button7).toBeFocused();
 
     // Not yet.
-    await page.keyboard.press('Enter');
-    await expect(dialog).toBeVisible();
+    await openSlotDialog(page, dialog);
     await page.keyboard.press('ArrowUp'); // not_applicable → missing
     await page.keyboard.press('ArrowUp'); // missing → not_yet
     await tabUntil(page, (info) => info.tag === 'button' && info.text === apply, 10);
@@ -182,7 +191,7 @@ test.describe('W1-06 case flow on the W1-13 substitute (fx-case-missing-slot, fx
 
     // Missing (back to the saved state: the row is no longer marked pending).
     await expect(button7).toBeFocused();
-    await page.keyboard.press('Enter');
+    await openSlotDialog(page, dialog);
     await page.keyboard.press('ArrowDown'); // not_yet → missing
     await tabUntil(page, (info) => info.tag === 'button' && info.text === apply, 10);
     await page.keyboard.press('Enter');
@@ -190,7 +199,8 @@ test.describe('W1-06 case flow on the W1-13 substitute (fx-case-missing-slot, fx
     await expect(slotRow(page, 7)).not.toHaveClass(/slot-row-pending/);
 
     // Attached: an upload through 7.4, then the slot points at the artifact.
-    await page.keyboard.press('Enter');
+    await expect(button7).toBeFocused();
+    await openSlotDialog(page, dialog);
     await page.keyboard.press('ArrowUp'); // missing → not_yet
     await page.keyboard.press('ArrowUp'); // not_yet → attached
     const fileInput = dialog.locator('input[type="file"]');
@@ -211,8 +221,13 @@ test.describe('W1-06 case flow on the W1-13 substitute (fx-case-missing-slot, fx
     await expect(slotRow(page, 7)).toHaveClass(/slot-row-pending/);
 
     // Slot 8 to N/A with a reason, then save both with the keyboard.
-    await changeButton(page, 8, 'slot.s8.name').focus();
-    await page.keyboard.press('Enter');
+    const button8 = changeButton(page, 8, 'slot.s8.name');
+    await button8.focus();
+    await expect(button8).toBeFocused();
+    const dialog8 = page.getByRole('dialog', {
+      name: t('th', 'slot.dialog.title', { number: 8, name: t('th', 'slot.s8.name') }),
+    });
+    await openSlotDialog(page, dialog8);
     await page.keyboard.press('ArrowDown'); // not_yet → missing
     await page.keyboard.press('ArrowDown'); // missing → not_applicable
     await tabUntil(page, (info) => info.tag === 'textarea', 5);
@@ -274,8 +289,7 @@ test.describe('W1-06 case flow on the W1-13 substitute (fx-case-missing-slot, fx
     // Unsaved reason: Escape asks through the shared dialog's confirm (dialog.discard_confirm); declining keeps
     // the dialog and the typed text, accepting closes and discards. Both answers are keyboard operations of the
     // native confirm; here the test answers them.
-    await page.keyboard.press('Enter');
-    await expect(dialog).toBeVisible();
+    await openSlotDialog(page, dialog);
     await page.keyboard.press('ArrowDown');
     await tabUntil(page, (info) => info.tag === 'textarea', 5);
     await page.keyboard.type('draft reason');
