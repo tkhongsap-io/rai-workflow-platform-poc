@@ -35,7 +35,7 @@ One blocking finding, same class as fix round 2: two 3.2 write actions with a st
 - T10 now covers `case.edit_draft`, `artifact.upload` and `case.resubmit` for `reviewer-dpo` on any case: 403 `role` (W1-02, W1-03, W2-04; A01).
 - T11 now covers three `owner-b` writes against owner-a: `artifact.download` (403 `scope`, no bytes, as before), `artifact.upload` into owner-a's draft (403 `scope`, no bytes stored, `authorization.denied` audited; W1-03) and `case.resubmit` on owner-a's case (403 `scope`, no N+1 draft created; W2-04). A01.
 
-No obligation was removed or weakened; numbering is unchanged. Sweep after the change: every identifier in the `Action` union appears in a section 7 row except `config.read_effective`, whose 3.2 row is Yes for every role (no stated denial to exercise; its `operator_recipients` exclusion is a field projection covered by the W3-07 seed, not an authorization row).
+No obligation was removed or weakened; numbering is unchanged. The sweep sentence that closed this round is superseded by the one under fix round 5 below.
 
 ## Fix round 4 (review findings on PR #58, after W0-02/W0-04/W0-06/W0-10 merged)
 
@@ -50,16 +50,37 @@ One blocking finding: section 2 fixed role, lane and scope identifiers (`reviewe
 
 No matrix row, rule or test obligation was removed or weakened; T1-T30 numbering is unchanged. The fix-round-1 note above about an "optional `owner_subject_id`" in the W0-02 shape is superseded by this round.
 
+## Fix round 5 (review findings on PR #58)
+
+Two blocking findings.
+
+**Stated denials with no test obligation** (same class as fix rounds 2 and 3). Section 7 table only, T1-T30 numbering unchanged:
+
+- T10 now covers `case.create`, `case.edit_draft`, `case.submit`, `artifact.upload` and `case.resubmit` for both `reviewer-dpo` and `admin`: 403 `role` on every action, nothing written (W1-02, W1-03, W1-05, W2-04; A01). Admin on create/edit/submit was previously untested.
+- T11 now adds `case.edit_draft` and `case.submit` by `owner-b` on owner-a's draft: 403 `scope`, no field written, `caseRevision` unchanged, no version submitted; every denied write audits `authorization.denied`.
+- T18 now covers `admin` on `lane.approve`, `lane.send_back`, `finding.propose_fixed`, `finding.confirm_fixed`, `finding.waive` and `finding.mark_na`: 403 `role`, no decision or disposition row (W2-02, W2-05).
+- T22 now covers `owner-a` and `spoc-b1` on `lane.approve` and `lane.send_back` (lane `dpo`, owner-a's case) and on the three dispositions, and `reviewer-dpo` on `finding.propose_fixed`: 403 `role` for every pair (W2-02, W2-05; A09). This is the basic A09 negative the finding named.
+- Two neighbours in the same class closed while sweeping: T3 adds `version.view`, `history.view`, the version's findings and a deep link for `owner-b` on owner-a's case (403 `scope`; the 3.2 "Old versions", "QC evidence" and "Deep link" rows had no scope negative); T17 adds `lane.send_back` on lane `it_security` for `reviewer-dpo` (403 `lane`; the 3.1 row names both actions).
+
+**Scope columns rewritable through `case.edit_draft`.** W0-02 `CaseUpdateRequest.fields` is `Partial<CaseWritableFields>` and includes `businessOwner` and `businessUnit`, the values behind the W0-04 scope columns; the spec evaluated `case.edit_draft` against the stored facts only, so an owner could PATCH the case to another owner and a SPOC could PATCH it into a BU outside every grant. Choice (b) from the finding, keeping the W0-02 shape intact:
+
+- New section 2 subsection "Edit target (`case.edit_draft`)": the action is evaluated against the stored `CaseScopeFacts` and, when the body carries either field, a second time against the post-edit facts with the same `inScope` predicate as the create target (owner: `businessOwner` must remain the actor; `bu_spoc`: the resulting `business_unit_id` must be in a grant, and the SPOC may name an owner within that BU); a deny on either evaluation is 403 `scope`, nothing is written, `authorization.denied` is audited; `case.updated` carries old and new `owner_subject_id` / `business_unit_id`; an unresolvable owner or BU is 422 `invalid_input` before policy.
+- Referenced from a new 3.2 row "Edit a draft's case fields (`case.edit_draft`)", the section 2 facts paragraph, the section 4 error table `scope` row, the section 6 `Target` comment and the W1-01 middleware paragraph (second `authorize` call on the post-edit facts).
+- Section 7 gains T31 (appended, numbering unchanged): `owner-a` PATCH `businessOwner = owner-b` and `spoc-b1` PATCH `businessUnit` resolving to B2 on a B1 case: 403 `scope`, scope columns and `caseRevision` unchanged, `authorization.denied` audited; positive counterpart `spoc-b1` PATCH `businessOwner = owner-b` on a B1 case: 200, `case.updated` with old and new owner, audit actor = spoc-b1 (W1-02; A01).
+- Section 8 lists the (a)/(b) choice as an engineering default for the tech lead: (b) chosen because (a) would narrow `Partial<CaseWritableFields>`; if (a) is preferred the W0-02 owner removes the two fields from `CaseUpdateRequest.fields` and T31 flips to 422.
+
+No matrix row, rule or test obligation was removed or weakened. Sweep after the change, over every `—` and every Own / BU cell in 3.1 and 3.2: each stated role denial has a 403 `role` row (T10 create/edit/submit/upload/resubmit for reviewers and admin; T14 config/audit/operator for every non-admin role; T18 lane and finding actions for admin; T22 lane decisions and dispositions for owner and SPOC, proposal for a reviewer); each stated scope denial has a 403 `scope` row (T3 view/version/history/findings/deep link; T5 SPOC other BU; T6-T7 create target; T8 list; T11 edit/submit/download/upload/resubmit; T27 queue; T31 post-edit scope fields); lane and self-exclusion denials are T17, T19, T23, T25; the no-actor rows are T13 (projected fields) and T26 (Ready). Every identifier in the `Action` union appears in a section 7 row except `config.read_effective`, whose 3.2 row is Yes for every role (no stated denial to exercise; its `operator_recipients` exclusion is a field projection covered by the W3-07 seed, not an authorization row).
+
 ## Checks
 
 Shell: `export PATH=$HOME/.nvm/versions/node/v24.21.0/bin:$PATH` (node v24.21.0).
 
 | Command | Result |
 |---|---|
-| `node --test tests/*.test.mjs` | 22 pass, 0 fail, 0 skipped (rerun after fix round 2: 22 pass, 0 fail; after fix round 3: 22 pass, 0 fail; after fix round 4 on the rebased branch: 22 pass, 0 fail) |
+| `node --test tests/*.test.mjs` | 22 pass, 0 fail, 0 skipped (rerun after fix round 2: 22 pass, 0 fail; after fix round 3: 22 pass, 0 fail; after fix round 4 on the rebased branch: 22 pass, 0 fail; after fix round 5: 22 pass, 0 fail) |
 | `git diff --check` (after `git add -N` of the new files) | clean |
 | `shasum -a 256 docs/product/source-spec.md` | `92c4f7123058b8fec3c2ba7abdf10538fad034778624b0675975b39de440b354`, matches docs/sources.md |
-| Relative-link and anchor audit over the new document (script in the PR description) | 36 links, 0 broken (fix round 1; 30 before). Rerun after fix round 2 with a fresh script: 35 relative links, 0 broken; no link was changed. Rerun after fix round 4 (sibling links repointed at the merged `docs/engineering/` files, anchors checked against those files): 47 relative links, 0 broken |
+| Relative-link and anchor audit over the new document (script in the PR description) | 36 links, 0 broken (fix round 1; 30 before). Rerun after fix round 2 with a fresh script: 35 relative links, 0 broken; no link was changed. Rerun after fix round 4 (sibling links repointed at the merged `docs/engineering/` files, anchors checked against those files): 47 relative links, 0 broken. Rerun after fix round 5 (new in-page anchor `#edit-target-caseedit_draft`): 53 relative links, 0 broken |
 
 No product suite exists yet (the application skeleton arrives with W1-00 under the layout W0-02 assigns), so `npm test`, lint, typecheck and Playwright do not apply to this ticket.
 
