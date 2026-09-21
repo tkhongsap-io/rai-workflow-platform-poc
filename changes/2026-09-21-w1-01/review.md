@@ -23,7 +23,7 @@ Shell: `export PATH=$HOME/.nvm/versions/node/v24.21.0/bin:$PATH` (node v24.21.0,
 | `npx drizzle-kit generate --config server/drizzle.config.ts` | `No schema changes, nothing to migrate` (snapshot 0001 matches the schema) |
 | `npm run lint` | `eslint .` clean; `All matched files use Prettier code style!`; `check-css: no outline removal outside :focus-visible` |
 | `npm run typecheck` | `tsc -b` clean over the five workspaces |
-| `npm run test:unit` | `tests 156, pass 156, fail 0` (W1-00's 58 plus 98 from this ticket) |
+| `npm run test:unit` | `tests 157, pass 157, fail 0` (W1-00's 58 plus 99 from this ticket; fix round 1 added the unparsable-body row) |
 | `npm run test:integration` | `tests 23, pass 23, fail 0` (W1-00's 14 plus 9; serial, real Postgres on 54321; two real `main.ts` process spawns) |
 | `npm run verify` | lint, typecheck, unit and integration green (counts above) |
 | `npm run build && npm run check:substitute-absent` | `check-substitute-absent: scanned 214 files, 0 with the marker` |
@@ -43,8 +43,13 @@ Shell: `export PATH=$HOME/.nvm/versions/node/v24.21.0/bin:$PATH` (node v24.21.0,
 |---|---|
 | Each fixture user, including the dual-role identity, signs in through the fixture identity provider and receives its (role, scope) pairs | `tests/integration/w1-01-fixture-sign-in.test.ts` "ID-03": all eight `FIXTURE_USERS` sign in through `POST /auth/fixture/sign-in` on the real server and Postgres; `SessionInfo.principal` deep-equals the table entry; `fx-user-dpo-spoc-hr` keeps `dpo`/`all_cases` and `bu_spoc`/`HR`; `identity.signed_in` audit rows carry `role:scopeKind[:bu]` summaries and no email. Smoke above repeats it on the built server |
 | A request without a session is unauthenticated | same file "ID-08" (`/api/session`, a `none` route, a case route → 401) and `authz/middleware.test.ts` (no cookie, unknown cookie, garbage cookie; 401 precedes a validation 422; no `authz.denied` line) |
-| A wrong-role request is forbidden | "ID-08": DPO on an Admin-only action → 403 with exactly `{ code, messageKey: 'error.forbidden', correlationId }`; `middleware.test.ts`: `authz.denied` with `reason: 'role'`; a reviewer with an invalid body is 403, never 422; another owner in CM is 403 `scope` whether or not the case exists |
+| A wrong-role request is forbidden | "ID-08": DPO on an Admin-only action → 403 with exactly `{ code, messageKey: 'error.forbidden', correlationId }`; `middleware.test.ts`: `authz.denied` with `reason: 'role'`; a reviewer with an invalid body is 403, never 422; a reviewer or out-of-scope owner with an unparsable JSON body (`{not json`) is 403 with one `authz.denied` line, because the policy hook runs in `preParsing`, before the body is parsed; another owner in CM is 403 `scope` whether or not the case exists |
 | `local-google` refuses to start on a non-loopback bind and on an unknown mode | `w1-01-startup-refusals.test.ts` runs the real `main.ts`: `HOST=0.0.0.0` → exit 78 `bind_not_loopback`; `RAI_IDENTITY_MODE=nonsense` and empty → exit 78 `mode_unknown`; nothing listens. `identity/config.test.ts` covers S1/S2 in the pure table; `start.test.ts` covers S16 with a real listen |
+
+## Fix round 1 (PR #73 review)
+
+- **Policy hook moved from `preValidation` to `preParsing`** (`server/src/authz/middleware.ts`). Fastify parses the body between `preParsing` and `preValidation`, so a wrong-role request with an unparsable JSON body reached the error handler before `authorize` and answered 500 instead of 403, and a denied actor had its payload parsed. Route params are resolved before `preParsing`, so the facts lookup is unchanged; the hook returns the payload stream untouched. New `middleware.test.ts` row: DPO (403 `role`) and another owner (403 `scope`) posting `{not json` to a case write route get the plain envelope and one `authz.denied` line each; only the allowed owner reaches a body error at all. Reran: `npm run lint` clean, `npm run typecheck` clean, `npm run test:unit` `tests 157, pass 157, fail 0`, `npm run migrate` on a fresh `rai-w1-01` Postgres (`applied 2 migration(s), 0 already applied`) then `npm run test:integration` `tests 23, pass 23, fail 0`.
+- **Substrate note for the lead (W1-00, not this ticket):** the W1-00 error handler in `server/src/app.ts` maps Fastify's own body-parse error (`FST_ERR_CTP_INVALID_JSON_BODY`, status 400, no `validation` array) to `500 internal_error`. W0-06 8.2 would call a malformed body `422 invalid_input`. With the hook order fixed, only an allowed actor can reach it; it is left for a W1-00 follow-up rather than widened here.
 
 ## Deviations, defaults and limitations (for the reviewer)
 

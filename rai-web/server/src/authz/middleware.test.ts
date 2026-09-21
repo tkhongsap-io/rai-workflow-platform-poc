@@ -251,6 +251,37 @@ test('a reviewer sending an invalid body to a write route is 403 role, never 422
   expectEnvelope(ownerRes, 422, 'invalid_input');
 });
 
+test('a reviewer sending an unparsable JSON body to a write route is 403 role: the policy runs before the body is parsed', async () => {
+  const h = await harness();
+  const res = await h.app.inject({
+    method: 'POST',
+    url: `/probe/cases/${CASE_CM}/submit`,
+    headers: { cookie: await h.cookieFor(dpo), 'content-type': 'application/json' },
+    payload: '{not json',
+  });
+  expectEnvelope(res, 403, 'forbidden');
+  assert.equal(h.denied.length, 1, 'exactly one authz.denied line');
+  assert.equal((h.denied[0] as { reason: string }).reason, 'role');
+  // an out-of-scope owner with the same body: 403 scope, still before parsing
+  const scoped = await h.app.inject({
+    method: 'POST',
+    url: `/probe/cases/${CASE_CM}/submit`,
+    headers: { cookie: await h.cookieFor(ownerB), 'content-type': 'application/json' },
+    payload: '{not json',
+  });
+  expectEnvelope(scoped, 403, 'forbidden');
+  assert.equal((h.denied[1] as { reason: string }).reason, 'scope');
+  // only an allowed actor can reach a body-shape error at all
+  const allowed = await h.app.inject({
+    method: 'POST',
+    url: `/probe/cases/${CASE_CM}/submit`,
+    headers: { cookie: await h.cookieFor(owner), 'content-type': 'application/json' },
+    payload: '{not json',
+  });
+  assert.notEqual(allowed.statusCode, 403);
+  assert.equal(h.denied.length, 2, 'the allowed actor emits no denial');
+});
+
 test("scope: an owner sees its own case and is 403 on another owner's case, whether or not the case exists", async () => {
   const h = await harness();
   const cookie = await h.cookieFor(ownerB);

@@ -1,8 +1,10 @@
 // W0-05 section 6 "Middleware (W1-01, Fastify)": the one place scope is enforced (W0-02 section 1.1). Every route
 // declares `config.auth`; an `onRoute` hook rejects a route without one at start-up. The W0-06 section 4 order,
 // session → authorization → existence, runs before validation: the session check is an `onRequest` hook (401
-// before anything else, including body parsing errors) and the policy check a `preValidation` hook (403 before any
-// 422). Loading CaseScopeFacts is the only pre-authorization read (three columns); the facts lookup, the
+// before anything else, including body parsing errors) and the policy check a `preParsing` hook (403 before the
+// body is parsed, so before any 422 and before a body-parse error; route params are resolved by then, and a denied
+// actor never makes the server parse its payload). Loading CaseScopeFacts is the only pre-authorization read
+// (three columns); the facts lookup, the
 // `authorize` call and the 404 answer for an allowed-but-unresolved id are one helper so the 403 and 404 paths
 // cannot diverge. A deny emits `authz.denied` (W0-10 3.3) and no audit row; a 401 never reaches `authorize`.
 
@@ -162,9 +164,12 @@ export function registerAuthorization(fastify: FastifyInstance, deps: Authorizat
     if (request.principal === undefined) throw new UnauthenticatedError(); // 401 before anything else
   });
 
-  fastify.addHook('preValidation', async (request: FastifyRequest, _reply: FastifyReply) => {
+  // preParsing, not preValidation: the body is parsed after this hook, so a wrong-role or out-of-scope actor is 403
+  // whatever the body carries (unparsable JSON included) and never gets its payload parsed. The payload stream is
+  // returned untouched.
+  fastify.addHook('preParsing', async (request: FastifyRequest, _reply: FastifyReply, payload) => {
     const auth = request.routeOptions.config.auth;
-    if (auth === undefined || auth.kind !== 'action') return;
+    if (auth === undefined || auth.kind !== 'action') return payload;
     if (request.principal === undefined) throw new UnauthenticatedError(); // cannot happen after onRequest; belt and braces
     const ids: { caseId?: string; artifactId?: string } = {};
     const caseId = paramOf(request, 'caseId');
@@ -172,5 +177,6 @@ export function registerAuthorization(fastify: FastifyInstance, deps: Authorizat
     if (caseId !== undefined) ids.caseId = caseId;
     if (artifactId !== undefined) ids.artifactId = artifactId;
     request.authz = await authorizeRequest(deps, request.principal, auth, ids);
+    return payload;
   });
 }
