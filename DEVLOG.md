@@ -2,6 +2,10 @@
 
 ## Build log: 2026-09-21
 
+- W0-02 merged (PR #65): File-level implementation plan for W1-W3: layout, commands, pinned deps, env list, CI checks, W1 interface shapes, test-layer map, UI quality bar, language rule; architecture paths and TESTING commands filled.
+- W0-04 merged (PR #61): Persistence and artifact-store spec: entities, immutability, transactions, audit log, schema evolution, retention options for D08.
+- W0-06 merged (PR #63): Workflow transition and error contract: states, events, lane-mapping constant, D05 rules, owning-lane assignment, seven error types with HTTP codes.
+- W0-10 merged (PR #59): Observability contract for the desk runtime: correlation IDs, redaction, readiness, error capture, operator view.
 - W0-01 merged (PR #57): ADR-0003 stack and deployment boundary (D04): Fastify API serving React SPA, Postgres, Drizzle, openid-client; scored against seven criteria.
 
 ## Tracker populated: 2026-09-21

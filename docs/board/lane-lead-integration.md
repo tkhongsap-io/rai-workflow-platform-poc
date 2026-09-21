@@ -15,3 +15,31 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: next ticket in the dependency map.
 - Author: operator=ta session=build-workflow model=claude-opus-5
 - Evidence: https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/57
+
+## 2026-09-21 (time not recorded) — W0-02 merged
+- What: File-level implementation plan for W1-W3: layout, commands, pinned deps, env list, CI checks, W1 interface shapes, test-layer map, UI quality bar, language rule; architecture paths and TESTING commands filled. PR #65.
+- Why: Ticket W0-02 of the delivery pack; two independent reviewer agents passed before merge.
+- Next: next ticket in the dependency map.
+- Author: operator=ta session=build-workflow model=claude-opus-5
+- Evidence: https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/65
+
+## 2026-09-21 (time not recorded) — W0-04 merged
+- What: Persistence and artifact-store spec: entities, immutability, transactions, audit log, schema evolution, retention options for D08. PR #61.
+- Why: Ticket W0-04 of the delivery pack; two independent reviewer agents passed before merge.
+- Next: next ticket in the dependency map.
+- Author: operator=ta session=build-workflow model=claude-opus-5
+- Evidence: https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/61
+
+## 2026-09-21 (time not recorded) — W0-06 merged
+- What: Workflow transition and error contract: states, events, lane-mapping constant, D05 rules, owning-lane assignment, seven error types with HTTP codes. PR #63.
+- Why: Ticket W0-06 of the delivery pack; two independent reviewer agents passed before merge.
+- Next: next ticket in the dependency map.
+- Author: operator=ta session=build-workflow model=claude-opus-5
+- Evidence: https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/63
+
+## 2026-09-21 (time not recorded) — W0-10 merged
+- What: Observability contract for the desk runtime: correlation IDs, redaction, readiness, error capture, operator view. PR #59.
+- Why: Ticket W0-10 of the delivery pack; two independent reviewer agents passed before merge.
+- Next: next ticket in the dependency map.
+- Author: operator=ta session=build-workflow model=claude-opus-5
+- Evidence: https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/59
