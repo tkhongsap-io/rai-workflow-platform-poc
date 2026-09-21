@@ -181,7 +181,7 @@ The blob interface and metadata are W0-04's; this section fixes the safety prope
 | Threat ([threat model](../security/threat-model.md)) | Control in this policy | Proven by |
 |---|---|---|
 | Malicious archive/PDF | Deny-by-default allow-list; extension and byte sniff must agree; ZIP central-directory rules refuse nested archives, executables, macros, encryption, polyglots; PDF active-content scan; no server-side parsing or rendering; attachment download under `sandbox` and `nosniff` | W1-03 unit tests on the hostile set (8.6); W1-08 negative "unsafe upload" |
-| Oversized upload or decompression bomb | Per-file limit aborts the stream; pack total in the transaction; image pixel cap; ZIP entry and declared-size caps | W1-03 tests at 25 MiB and 25 MiB + 1; PNG `IHDR` 100,000 × 100,000; ZIP with a 1 GiB declared entry |
+| Oversized upload or decompression bomb | Per-file limit aborts the stream; pack total in the transaction; image pixel cap; ZIP entry and declared-size caps | W1-03 tests at 25 MiB and 25 MiB + 1; W1-03 pack-total test at 150 MiB and 150 MiB + 1 (8.6 "Pack total" rows); PNG `IHDR` 100,000 × 100,000; ZIP with a 1 GiB declared entry |
 | Owner reads another BU's case via download | Download only through the authorized route with case-view scope; blob directory never served; keys are hashes, not guessable case IDs, and a hash alone still needs a session and scope | W1-03 "direct file URL without an authorized session is refused"; W1-INT cross-BU download negative |
 | Document tells model to approve or reveal another case | Bytes are never parsed by a model in slice 1; QC substitute is scripted (W0-07); W4 isolation is ADR-0006 | W1-10 test "no write path to workflow state" |
 | Credentials/PII in logs | Rejection log carries reason and sizes, never filename or bytes (5.1); W0-10 redaction rule | W1-03 log-shape test |
@@ -311,7 +311,8 @@ Each is built in a temp directory by the same helpers and must be rejected with 
 | Empty | 0 bytes | `empty.pdf` | `empty_file` |
 | Boundary accept | 26,214,400 bytes of valid PDF (fixture PDF + filler) | `max.pdf` | accepted |
 | Boundary reject | 26,214,401 bytes | `max.pdf` | `too_large` |
-| Pack total | four 40 MiB valid PDFs into one version | `p1.pdf` … `p4.pdf` | fourth rejected `pack_total_exceeded` (160 > 150) |
+| Pack total, boundary accept | six 26,214,400-byte valid PDFs (fixture PDF + filler, each at the per-file limit) into slots 1-6 of one version | `p1.pdf` … `p6.pdf` | all six accepted; pack total is 157,286,400 bytes, 150 MiB exactly |
+| Pack total, boundary reject | the six PDFs above, then the smallest valid fixture PDF into slot 7 of the same version | `p7.pdf` | seventh rejected `pack_total_exceeded` at check 10 (150 MiB + any byte); checks 5-9 pass for the file itself, so the reason is the pack total, not `too_large` |
 | Bad filename | fixture PDF | `../escape.pdf`, `a\u0000b.pdf`, 201 code points, `.pdf` | `filename_invalid` |
 | Double extension | fixture PDF | `report.pdf.exe` | `extension_not_allowed` |
 | Legacy Office | `D0 CF 11 E0 A1 B1 1A E1` + zeros | `old.doc` | `extension_not_allowed` (and `type_not_allowed` if renamed `.docx`) |
