@@ -16,7 +16,7 @@
   - `screens/sign-in/sign-in-screen.tsx` — `GET /auth/fixture/users` 200 → picker (display names and the (role, scope) pairs the server listed), 404 → provider button (`POST /auth/sign-in` → `redirectUrl`); `returnTo` accepted only as a same-origin path; the signed-out and session-expired notices.
   - `screens/cases/case-list-screen.tsx` (+ `case-list.view-model.ts`) — `GET /api/cases` rendered as returned: cards with registry id, name, status badge, BU, group, owner, submission version or "not yet submitted", next action by status, updated time in Bangkok, "Open case" link; scope line from the principal's grants (display only); empty state; pagination when `total > pageSize`.
   - `screens/cases/new-case-screen.tsx` (+ `new-case.view-model.ts`) — every `CaseWritableFields` input (`businessOwner` defaults to the actor; a SPOC's single BU grant pre-fills the key and is offered as a datalist suggestion, never enforced; `useCaseGroup` from `GET /api/configuration/current`, D11; `sourceRecordId` Unknown / known; `vendorInvolved`; `modelType`); `POST /api/cases` with a fresh UUID key per attempt; 201 → the list with a created notice; 422 → the server's field errors on their inputs (a field sent blank reads `validation.required`); 403 → the forbidden notice; 401 → sign-in. No role check anywhere: a reviewer reaches the form and the server's 403 is what stops the create.
-- **`rai-web/shared/src/locales/th.json`, `en.json`** — 96 new keys (`shell.*`, `common.*`, `sign_in.*`, `scope.*`, `cases.*`, `next_action.*`, `new_case.*`, `field.*`, `model_type.*`, `not_found.*`, `case.placeholder_*`, `dialog.discard_confirm`); identical key sets (`locales.test.ts`).
+- **Locale keys** (`shell.*`, `common.*`, `sign_in.*`, `scope.*`, `cases.*`, `next_action.*`, `new_case.*`, `field.*`, `model_type.*`, `not_found.*`, `case.placeholder_*`, `dialog.discard_confirm`; 88 keys) are read from contract PR #84 (W1-00 amendment, Lane A), on which this branch is based. This PR changes nothing under `shared/`.
 - **`rai-web/eslint.config.js`** (`web/**` block only) — `react/jsx-no-literals` with `ignoreProps: true` (the rule cannot distinguish `className` from `aria-label`; as merged it flagged every attribute including `type="button"`, which made the rule unusable) plus `no-restricted-syntax` selectors for the section 10 user-facing attributes; `·` and `*` join the punctuation allow-list.
 - **`rai-web/web/vite.config.ts`** — `API_PROXY_TARGET` for the dev-server proxy (default unchanged: the API on 8787). **`rai-web/web/tsconfig.json`** — `node` types for the colocated unit tests.
 - **Browser suite** — `rai-web/tests/browser/playwright.substitute.config.ts` (substitute CLI on 8789 + Vite dev server on 5175 with `VITE_API_SUBSTITUTE=true`, three widths, one worker) and `w1-07-shell-sign-in-cases.substitute.spec.ts` (19 tests × 3 widths); `playwright.config.ts` ignores `*.substitute.spec.ts`; `package.json` `test:browser` now runs `test:browser:server` then `test:browser:substitute`, so CI's browser job (unchanged, HRR) covers both.
@@ -44,6 +44,21 @@ Shell: `export PATH=$HOME/.nvm/versions/node/v24.21.0/bin:$PATH` (node v24.21.0,
 | `git diff --check` | clean |
 | `POSTGRES_PORT=54327 docker compose -p rai-w1-07 down -v` (repository root) | run after the PR opened |
 
+### Fix round 1 (rebased on contract PR #84, `32c057c`)
+
+| Command (from `rai-web/` unless noted) | Result |
+| --- | --- |
+| `npm ci` | no dependency change |
+| `npm run lint` / `npm run typecheck` | clean / `tsc -b` clean |
+| `npm run test:unit` | `tests 306, pass 306, fail 0` |
+| `npm run migrate` / `npm run test:integration` (port 54327) | `applied 4 migration(s)`; `tests 103, pass 103, fail 0` |
+| `npm run build && npm run check:substitute-absent` | `scanned 343 files, 0 with the marker` |
+| `npm run test:browser` | server suite `21 passed`; substitute suite `57 passed`; the substitute suite run three times, green each time |
+| `playwright test -c tests/browser/playwright.substitute.config.ts -g "keyboard alone" --repeat-each 10` | `30 passed` (10 per width), run twice: before and after the rebase |
+| `node --test tests/*.test.mjs`, `node scripts/check-links.mjs`, `node scripts/check-frozen-source.mjs`, `node --test scripts/*.test.mjs` (repository root) | `22 pass`; `132 Markdown files, 668 relative links checked, 0 broken`; hash matches; `18 pass` |
+| `git diff --check` | clean |
+| `git diff codex/w1-00-w1-07-locale-contract --stat -- rai-web/shared/` | empty: this branch changes nothing under `shared/` |
+
 ## Done-when clauses → evidence (`w1-07-shell-sign-in-cases.substitute.spec.ts`)
 
 | Clause | Evidence |
@@ -59,11 +74,11 @@ Also proved: the locale switch renders English, `<html lang>` follows, the choic
 
 ## Deviations, defaults and limitations (for the reviewer)
 
-- **Locale catalogues.** The keys live in `shared/src/locales/` because W0-02 section 10 names those files as the one catalogue; `shared/` is Lane A contract territory, and the ticket brief assigns each Lane B ticket its keys. No other `shared/` file changed.
+- **Locale catalogues.** The first cut of this PR added its keys to `shared/src/locales/` directly. Review round 1 refused that (W0-02 section 1.1: `shared/src/` is Lane A, contract PRs only; the same rule refused #69 a day earlier). The keys now land through contract PR #84, merged first; this branch is rebased on it, its base is #84's branch until that merges, and the four keys the first cut never read (`common.close`, `common.confirm`, `common.status`, `shell.session_status`) are gone.
 - **ESLint rule change.** As merged, `react/jsx-no-literals` with `ignoreProps: false, noAttributeStrings: true` flagged every attribute string (`className`, `type`, `href`), which no screen can satisfy. The web block now ignores props and names the user-facing attributes explicitly; the unit test scans the same shapes. Text nodes and string children are still errors.
 - **`/cases/:caseId`** is a placeholder element so list rows, `refreshPath` values and deep links resolve inside the SPA and require a session; W1-06 replaces the element in `router.tsx`. After a create the form returns to the list with a notice; W1-06 may redirect to the case screen instead.
 - **Business unit key.** The contract has no BU-list read; the form takes the key as text (a SPOC's grant pre-fills it) and the server's 422 names an unknown key. `businessOwner` is a subject-id text field defaulting to the actor.
 - **Blank fields.** The server (and the substitute) report an empty required string as `validation.not_in_configured_list` (the Ajv `minLength` mapping in `app.ts`); the form renders `validation.required` for a field it sent blank, keeping the server's key otherwise. The server's 422 remains the decision.
 - **Substitute runs are never evidence.** The real-server Playwright configuration cannot render the SPA yet (`server/src/static.ts` arrives with W1-INT), so the Lane B spec runs against the substitute in its own configuration and `test:browser` runs both. The `SUBSTITUTE_PORT` / `SUBSTITUTE_WEB_PORT` / `API_PROXY_TARGET` variables are dev/test-only and outside the section 5 table.
-- **Headless first Tab.** After a fresh navigation headless Chromium occasionally sends the first Tab to its own UI; the keyboard test presses again once before asserting the stop order (documented in the spec).
+- **Keyboard journey and the loading state.** Review round 1 found the keyboard-only test flaky ("no element is focused" on every width, roughly 1 in 10 runs). Cause: `RouteFocus` puts focus on the main landmark after the sign-in navigation, and a Tab pressed while the list still shows its loading state lands on a control that the loaded re-render replaces, so focus falls to the body. The spec now waits for the list's `case-count` line before its first Tab on the list, and the comment states that cause. The first cut's "headless Chromium sends the first Tab to its own UI" note and its extra-press fallback on the sign-in page were wrong and are removed; that Tab is pressed on a settled screen (the picker is awaited) and the journey ran 30/30 across the three widths without the fallback.
 - **`VITE_API_SUBSTITUTE`** does not bundle the substitute (it depends on `node:*`); it marks the dev build (banner) while the Vite proxy points at the substitute process. `npm run build` forces it off; `check-substitute-absent` proves the bundle is clean.

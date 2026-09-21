@@ -293,10 +293,9 @@ test.describe('W1-07 keyboard-only, dialog, locale and reflow (fx-user-spoc-cm)'
     await page.goto('/sign-in');
     await expect(page.getByLabel(th['auth.fixture_user_select'])).toBeVisible();
     // First stop on a fresh load: the skip link; then the locale switch; then the picker, chosen with type-ahead.
-    // Headless Chromium occasionally sends the first Tab after a navigation to its own UI rather than the
-    // document; a second press then enters the page. The order of stops below is what is asserted.
+    // The picker is awaited above, so the first Tab is pressed on a settled screen (see the list step below for
+    // why that matters). The order of stops below is what is asserted.
     await pressTab(page);
-    if ((await focusedElement(page)) === null) await pressTab(page);
     const skip = await expectVisibleFocus(page);
     expect(skip.text).toBe(th['shell.skip_to_content']);
     const picker = await tabUntil(page, (info) => info.tag === 'select');
@@ -309,7 +308,11 @@ test.describe('W1-07 keyboard-only, dialog, locale and reflow (fx-user-spoc-cm)'
     await expect(page.getByRole('heading', { level: 1, name: th['cases.title'] })).toBeVisible();
 
     // List: focus moved to the main landmark on navigation, so Tab walks the new screen's controls in visual
-    // order (the New case button, then each card's Open case link); open the first case by keyboard.
+    // order (the New case button, then each card's Open case link); open the first case by keyboard. The list
+    // must have finished loading first: a Tab pressed while the screen still shows its loading state lands on a
+    // control that the loaded re-render replaces, and focus falls back to the body (seen as a flaky
+    // "no element is focused" on every width before this wait).
+    await expect(page.getByTestId('case-count')).toBeVisible();
     expect((await focusedElement(page))?.tag).toBe('main');
     const openCase = await tabUntil(page, (info) => info.tag === 'a' && info.text === th['cases.open']);
     expect(openCase.text).toBe(th['cases.open']);
