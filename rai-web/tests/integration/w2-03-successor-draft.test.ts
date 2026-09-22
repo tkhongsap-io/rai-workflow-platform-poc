@@ -448,6 +448,48 @@ describe(`W2-03 successor draft concurrency and stale actions — ${SET}`, () =>
     assert.equal((drafts.rows[0] as { n: number }).n, 0);
   });
 
+  it('Ready + naming a real non-current version is version_closed (guidance ready), not version_superseded', async () => {
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, NONVENDOR.caseId);
+    const revision = await caseRevision(NONVENDOR.caseId);
+    const dpo = await signIn(DPO);
+    const ai = await signIn(AI_COE);
+
+    const sent = await sendBack(dpo, NONVENDOR.caseId, version.versionId, 'dpo', {
+      expectedVersion: { versionId: version.versionId, revision },
+      feedback: { items: [{ slot: 2, deficiency: 'open successor' }] },
+    });
+    assert.equal(sent.statusCode, 201, sent.body);
+    const draftId = sent.json<LaneDecisionResponse>().successorDraftVersionId;
+    assert.ok(draftId);
+
+    const beforeDecisions = await db.owner.execute(sql`SELECT count(*)::int AS n FROM lane_decision`);
+    const beforeAudit = (await auditStore.read(db.owner)).length;
+    const beforeDrafts = await db.owner.execute(
+      sql`SELECT count(*)::int AS n FROM pack_version WHERE case_id = ${NONVENDOR.caseId} AND submitted_at IS NULL`,
+    );
+
+    await db.owner.execute(sql`UPDATE pack_version SET ready_at = ${now()} WHERE id = ${version.versionId}`);
+
+    // Name the successor draft (exists on this case, not current) — Ready wins over version_superseded.
+    const closed = await approve(ai, NONVENDOR.caseId, draftId, 'ai_coe', {
+      expectedVersion: { versionId: draftId, revision },
+      qcRunId: randomUUID(),
+    });
+    assert.equal(closed.statusCode, 409, closed.body);
+    const details = staleOf(closed);
+    assert.equal(details.reason, 'version_closed');
+    assert.equal(details.guidanceKey, 'error.stale_version.guidance.ready');
+
+    const afterDecisions = await db.owner.execute(sql`SELECT count(*)::int AS n FROM lane_decision`);
+    assert.equal((afterDecisions.rows[0] as { n: number }).n, (beforeDecisions.rows[0] as { n: number }).n);
+    assert.equal((await auditStore.read(db.owner)).length, beforeAudit);
+    const afterDrafts = await db.owner.execute(
+      sql`SELECT count(*)::int AS n FROM pack_version WHERE case_id = ${NONVENDOR.caseId} AND submitted_at IS NULL`,
+    );
+    assert.equal((afterDrafts.rows[0] as { n: number }).n, (beforeDrafts.rows[0] as { n: number }).n);
+  });
+
   it('approve after a successor draft exists is version_closed; N stays readable', async () => {
     const owner = await signIn(OWNER_A);
     const version = await submitOk(owner, NONVENDOR.caseId);
