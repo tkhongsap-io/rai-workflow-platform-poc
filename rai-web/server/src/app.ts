@@ -21,6 +21,7 @@ import { registerCaseRoutes, type CaseRouteDeps } from './cases/routes.js';
 import { registerPackRoutes, type PackRouteDeps } from './pack/routes.js';
 import { registerVersionRoutes, type VersionRouteDeps } from './versions/routes.js';
 import { registerDecideRoutes, type DecideRouteDeps } from './workflow/routes.js';
+import { registerFindingsRoutes, type FindingsRouteDeps } from './findings/routes.js';
 import { staticPlugin, type StaticOptions } from './static.js';
 import type { FixtureIdentityProvider } from './identity/fixture.js';
 import { registerAuthRoutes } from './identity/routes.js';
@@ -52,6 +53,8 @@ export interface AppDeps {
   versions?: Omit<VersionRouteDeps, 'nodeEnv'>;
   /** W2-02: lane approve / send-back. Needs `identity`. */
   decide?: DecideRouteDeps;
+  /** W2-05: findings disposition + lane QC run. Needs `identity`. */
+  findings?: Omit<FindingsRouteDeps, 'emitter'>;
   /** W1-INT: the built SPA to serve from web/dist (static.ts); absent when there is no web build (API only). */
   static?: StaticOptions;
   /** Test seam: where the pino lines go instead of stdout, so a suite can assert on emitted events. */
@@ -201,6 +204,13 @@ export function buildApp(deps: AppDeps): App {
     if (decideDeps !== undefined) {
       void fastify.register((instance, _opts, done) => {
         registerDecideRoutes(instance, decideDeps);
+        done();
+      });
+    }
+    const findingsDeps = deps.findings;
+    if (findingsDeps !== undefined) {
+      void fastify.register((instance, _opts, done) => {
+        registerFindingsRoutes(instance, { ...findingsDeps, emitter });
         done();
       });
     }

@@ -72,6 +72,7 @@
   "error.invalid_input": "Some fields are invalid. Check them and try again.",
   "error.invalid_input.idempotency_key_reused": "This request key was already used with different content.",
   "error.invalid_input.lane_qc_not_run": "Review the lane QC result before approving.",
+  "error.invalid_input.fixed_confirmed_without_proposal": "Confirm fixed only after the owner or SPOC has proposed a fix.",
   "error.invalid_input.projected_field": "This status field is written only by the workflow.",
   "error.invalid_input.send_back_artifact_required": "Send-back feedback must name at least one artifact.",
   "error.mail_delivery_failed": "The notification email could not be delivered. The decision is recorded and delivery will be retried.",

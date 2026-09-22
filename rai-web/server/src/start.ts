@@ -191,6 +191,11 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
         sendBackRecipientsFromIdentities(knownIdentities, ownerSubjectId),
       ...(overrides.now === undefined ? {} : { now: overrides.now }),
     },
+    // W2-05: disposition routes; production keeps QC unbound (no substitute in server/dist).
+    findings: {
+      db: db.db,
+      ...(overrides.now === undefined ? {} : { now: overrides.now }),
+    },
     ...(serveWeb ? { static: { root: webDistDir } } : {}),
   });
   const close = async () => {

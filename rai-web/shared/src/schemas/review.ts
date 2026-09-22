@@ -74,3 +74,94 @@ export const LaneDecisionResponseSchema = Type.Object({
   caseRevision: Type.Integer({ minimum: 1 }),
 });
 export type LaneDecisionResponse = Static<typeof LaneDecisionResponseSchema>;
+
+/** W0-06 4.8 disposition kinds. */
+export const DISPOSITION_KINDS = [
+  'fixed_proposed',
+  'fixed',
+  'fixed_confirmed',
+  'waived',
+  'not_applicable',
+] as const;
+export type DispositionKind = (typeof DISPOSITION_KINDS)[number];
+
+export const DispositionKindSchema = Type.Union([
+  Type.Literal('fixed_proposed'),
+  Type.Literal('fixed'),
+  Type.Literal('fixed_confirmed'),
+  Type.Literal('waived'),
+  Type.Literal('not_applicable'),
+]);
+
+/** POST …/findings/{findingId}/dispositions — W0-06 4.7. */
+export const DispositionRequestSchema = Type.Object({
+  expectedVersion: ExpectedVersionSchema,
+  kind: DispositionKindSchema,
+  reason: Type.Optional(Type.String({ maxLength: 2000 })),
+  evidence: Type.Optional(
+    Type.Object(
+      {
+        slot: Type.Optional(SlotNumberSchema),
+        artifactId: Type.Optional(Type.String({ minLength: 1 })),
+      },
+      { additionalProperties: false },
+    ),
+  ),
+});
+export type DispositionRequest = Static<typeof DispositionRequestSchema>;
+
+export const DispositionResponseSchema = Type.Object({
+  dispositionId: Type.String(),
+  findingId: Type.String(),
+  kind: DispositionKindSchema,
+  recordedAt: Type.String(),
+  caseRevision: Type.Integer({ minimum: 1 }),
+});
+export type DispositionResponse = Static<typeof DispositionResponseSchema>;
+
+/** POST …/lanes/{lane}/qc-run — W0-06 4.4 lane-QC run (W2-05 persistence). */
+export const LaneQcRunRequestSchema = Type.Object({
+  expectedVersion: ExpectedVersionSchema,
+});
+export type LaneQcRunRequest = Static<typeof LaneQcRunRequestSchema>;
+
+export const StoredFindingSummarySchema = Type.Object({
+  findingId: Type.String(),
+  ruleId: Type.String(),
+  slot: Type.Union([
+    Type.Literal(1),
+    Type.Literal(2),
+    Type.Literal(3),
+    Type.Literal(4),
+    Type.Literal(5),
+    Type.Literal(6),
+    Type.Literal(7),
+    Type.Literal(8),
+    Type.Literal(9),
+    Type.Null(),
+  ]),
+  severity: Type.Union([
+    Type.Literal('high'),
+    Type.Literal('medium'),
+    Type.Literal('low'),
+    Type.Literal('info'),
+  ]),
+  owningLane: LaneSchema,
+  messageKey: Type.String(),
+});
+export type StoredFindingSummary = Static<typeof StoredFindingSummarySchema>;
+
+export const LaneQcRunResponseSchema = Type.Object({
+  runId: Type.Union([Type.String(), Type.Null()]),
+  status: Type.Union([Type.Literal('completed'), Type.Literal('unavailable')]),
+  reason: Type.Optional(
+    Type.Union([
+      Type.Literal('timeout'),
+      Type.Literal('runner_error'),
+      Type.Literal('not_configured'),
+      Type.Literal('artifact_unreadable'),
+    ]),
+  ),
+  findings: Type.Array(StoredFindingSummarySchema),
+});
+export type LaneQcRunResponse = Static<typeof LaneQcRunResponseSchema>;
