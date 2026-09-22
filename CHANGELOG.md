@@ -4,6 +4,8 @@
 
 - W3-08: scoped queue substitute: The dev/test-only API substitute now implements the queue contract, including scoped filters/counts, pagination, successor versions and frozen SLA dates. Regression tests cover role scopes, unknown query keys and disposition states. Full local verification passed: 413 unit, 198 integration and 213 browser tests. Independent review is clean after fixes. PR #108; integration acceptance remains W3-INT.
 
+- W3-01: scoped server queue: GET /api/queue applies authorization before search, counts, options and pagination in one consistent database snapshot. Results expose current lane state and frozen SLA dates while retaining successor draft versions. Full local verification passed: 409 unit, 205 integration and 213 browser tests. Independent review is clean. PR #109; 1,000-case latency and integrated M3 evidence remain pending.
+
 - W3-05 (PR #104, `39bbf0a`): Working-day SLA due dates from the SLA and holiday list frozen at submit (Asia/Bangkok; weekends and holidays skipped; the open day is not counted). A later SLA revision does not move an already submitted version. Resubmit starts a new clock. `listSlaBreaches` returns only pending lanes on the current review target that are past due. No SLA HTTP route, no mail, no escalation. Issue #46 closed. Next ticket is W3-01 (queue), which can use the due-date shape. W3-03 and W3-04 still need the W1-11 mail sink on `main` (PR #68 merged only onto `codex/w1-00-mail-dedup`).
 
 - Case-row lock (PR #103, `7382222`): Lane QC no longer holds `SELECT … FOR UPDATE` across the QC runner. Persist re-locks, treats an open successor draft as `version_closed`, and replays a completed run that landed during the call.
