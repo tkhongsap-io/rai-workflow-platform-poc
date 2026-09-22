@@ -51,7 +51,7 @@ export interface IdentityDeps {
 export interface AppDeps {
   observability?: ObservabilityDeps;
   /** W3-03a initial post-commit notifications; retries and digest remain separate. */
-  notifications?: Omit<NotificationDeps, 'emitter'>;
+  notifications?: Omit<NotificationDeps, 'emitter' | 'errors'>;
   config: Pick<AppConfig, 'nodeEnv' | 'log' | 'trustProxy' | 'publicBaseUrl'>;
   /** Absent only in substrate-level tests that register no route; main.ts always passes it. */
   identity?: IdentityDeps;
@@ -123,7 +123,13 @@ export function buildApp(deps: AppDeps): App {
   const requestErrors = new WeakMap<object, ErrorCategory>();
   const drain = createDrain(fastify); // first hook: every accepted request is counted (shutdown.ts)
   if (deps.notifications !== undefined)
-    registerNotifications(fastify, createNotifications({ ...deps.notifications, emitter }), emitter, drain);
+    registerNotifications(
+      fastify,
+      createNotifications({ ...deps.notifications, emitter, errors }),
+      emitter,
+      drain,
+      errors,
+    );
 
   fastify.addHook('onRequest', (request, reply, done) => {
     void reply.header('X-Correlation-Id', request.id);

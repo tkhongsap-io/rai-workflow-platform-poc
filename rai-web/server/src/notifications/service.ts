@@ -1,3 +1,4 @@
+import type { ErrorCapture } from '../observability/errors.js';
 // W3-04 bounded retry dispatcher; W3-03a committed composition remains unchanged. Reads committed outbox rows on its own connection; never called with a workflow Tx.
 import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import { Value } from 'typebox/value';
@@ -38,6 +39,7 @@ const ACTIONS = {
   ready_for_launch: 'case.ready_for_launch',
 } as const;
 export interface NotificationDeps {
+  errors?: ErrorCapture;
   db: Db;
   sink: MailSink;
   identities: readonly MailIdentity[];
@@ -229,13 +231,19 @@ export function createNotifications(deps: NotificationDeps) {
           attempt,
           sinkKind: deps.sink.identity.sink,
         });
-      else if (update.status === 'failed')
+      else if (update.status === 'failed') {
         deps.emitter.log('mail.failed', {
           notificationId: row.id,
           attempts: attempt,
           errorCode: update.lastErrorCode,
         });
-      else
+        deps.errors?.job({
+          category: 'mail_delivery_failed',
+          notificationId: row.id,
+          attempts: 4,
+          errorCode: receipt.error?.code ?? 'sink_failure',
+        });
+      } else
         deps.emitter.log('mail.attempt_failed', {
           notificationId: row.id,
           attempt,

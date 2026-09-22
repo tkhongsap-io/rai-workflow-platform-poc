@@ -118,6 +118,18 @@ test('ID-02 control: with the real address resolution on localhost the server st
       ['fx-user-admin'],
     );
     assert.equal((await fetch(`http://127.0.0.1:${port}/api/session`)).status, 401);
+    const headers = { cookie: 'rai_session=RAI-DESK-SYNTHETIC-FIXTURE' };
+    assert.equal((await fetch(`http://127.0.0.1:${port}/healthz`, { headers })).status, 200);
+    const readiness = await fetch(`http://127.0.0.1:${port}/readyz`, { headers });
+    assert.equal(readiness.status, 503);
+    const report = (await readiness.json()) as {
+      store: { db: string };
+      mailSink: { status: string };
+      qc: { status: string };
+    };
+    assert.equal(report.store.db, 'unreachable');
+    assert.equal(report.mailSink.status, 'ok');
+    assert.equal(report.qc.status, 'ok');
   } finally {
     await server.close();
   }

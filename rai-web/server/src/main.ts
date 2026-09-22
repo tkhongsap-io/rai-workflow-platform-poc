@@ -12,6 +12,8 @@
 import { readEnv } from './config.js';
 import { SHUTDOWN_DRAIN_MS } from './shutdown.js';
 import { startServer } from './start.js';
+import { buildLogLine } from './observability/log.js';
+import { sanitizeStack } from './observability/redact.js';
 
 /** After the drain budget, this much longer for the close to complete before the hard exit. */
 const SHUTDOWN_HARD_EXIT_GRACE_MS = 5_000;
@@ -36,7 +38,13 @@ async function main(): Promise<void> {
 
 main().catch((err: unknown) => {
   console.error(
-    JSON.stringify({ event: 'process.refused', reason: err instanceof Error ? err.name : 'unknown' }),
+    JSON.stringify(
+      buildLogLine(
+        'error.captured',
+        { ...sanitizeStack(err), code: 'internal_error', httpStatus: 500 },
+        { strict: true },
+      ),
+    ),
   );
   process.exit(1);
 });

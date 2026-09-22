@@ -1,3 +1,4 @@
+import { createErrorCapture, type ErrorCapture } from '../observability/errors.js';
 // Minimal W3-03a wiring; dynamic local-sink import keeps fixture code out of server/dist.
 import type { FastifyInstance } from 'fastify';
 import type { MailSink } from '@rai/shared/mail/types';
@@ -28,6 +29,7 @@ export function registerNotifications(
   notifications: Notifications,
   emitter: Emitter,
   drain: Drain,
+  errors: ErrorCapture = createErrorCapture(emitter),
 ): void {
   const active = new Set<Promise<void>>();
   let stopping = false;
@@ -35,9 +37,9 @@ export function registerNotifications(
   function run(correlationId?: string): Promise<void> {
     if (stopping || drain.signal.aborted) return Promise.resolve();
     if (active.size !== 0) return Promise.all(active).then(() => undefined);
-    const task = notifications.deliverPending(correlationId, drain.signal).catch(() => {
+    const task = notifications.deliverPending(correlationId, drain.signal).catch((error: unknown) => {
       if (drain.signal.aborted) return;
-      emitter.log('error.captured', { category: 'dependency', code: 'mail_delivery_failed' });
+      errors.internal(error);
     });
     active.add(task);
     drain.track(task);
