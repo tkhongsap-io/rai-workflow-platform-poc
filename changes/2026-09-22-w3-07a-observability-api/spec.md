@@ -15,3 +15,8 @@ Store probes compare ordered migration hashes, not just counts, and never apply 
 ### Independent review corrections
 
 Health routes bypass session resolution even when the caller supplies a cookie: liveness is independent of the session store and readiness reports probe failures as 503. Other public/session/action routes retain their existing identity behavior. Per W0-10 section 3.3, health.readiness emits the first observed status and subsequent status changes, not every poll; request.completed remains per readiness request.
+
+
+### Runtime assembly semantics
+
+The existing notification worker retains domain events and commits before terminal capture. Terminal mail_delivery_failed is a job classification (502 metadata), not a synchronous HTTP response; unexpected worker load/DB and producer infrastructure failures use sanitized internal_error. Persisted digest stage failures retain sla.digest.failed plus their job row and correlation. Readiness observes the same configured mail sink and QC runner; use sink.health() and runner.probe(), never the substitute health setter. main.ts startup surprises emit sanitized internal error fields without raw exception names/messages. W3-INT binds the server-local submit-QC API after the actual submission commit, with its originating correlation; this API alone does not claim the trigger is wired.

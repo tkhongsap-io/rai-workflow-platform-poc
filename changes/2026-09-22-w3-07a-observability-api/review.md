@@ -1,8 +1,8 @@
 # Review and evidence
 
-Planning recorded before consumer edits. Runtime implementation and OBS acceptance have not yet been verified on this branch. Prerequisite verification belongs to d931cea and does not certify this consumer.
+Current review candidate includes actual main 848f89e, reviewed retry preparation d96ba24 plus isolated browser harness fix fecffd4 (local e6868f5), and reviewed digest binding 9e17851. Actual retry and producer fault paths are now tested; the chronological checkpoint notes below retain their original evidence boundaries. Pending publication merges are not represented as merged acceptance.
 
-Pending: independent runtime modules; coordinated startup integration; actual notification retry/digest integration; W3-INT synthetic submit-trigger acceptance; focused and full verification on the final integrated head. Authoritative unresolved QC owning lanes remain explicit.
+Submit-QC API is available at 1bf72b8; W3-INT owns after-commit binding and restart acceptance. Issue 35 owning-lane decisions remain unresolved. Combined verify:full is running against this assembled tree; independent review remains required before a PR. No push or PR is authorized here.
 
 ## Independent module checkpoint — 2026-09-22
 
@@ -62,3 +62,12 @@ Added runAndPersistSubmitQc(deps, {caseId, versionId, correlationId}) using the 
 ### Actual retry/runtime preparation checkpoint
 
 The existing dispatcher now receives the app-owned ErrorCapture: an unexpected load/query failure captures safe internal_error, while a committed terminal fourth receipt captures mail_delivery_failed with the notification ID, attempts and bounded retained cause. Existing mail.failed remains a separate domain event. start.ts readiness observes the same configured sink health() and runner probe(); no extra worker, sink or runner. main.ts unexpected startup failure no longer emits raw exception names. Actual retry integration suite: 21 passed, including fourth-failure capture once and Admin operator read view. Runtime shutdown/error suite: 5 passed; actual startup suite: 7 passed, including cookie-bearing probes with refused DB connection and live configured sink/QC probes. Typecheck and targeted lint passed before the final startup-test addition. This is preparation against d96ba24, not merged-dependency acceptance.
+
+
+### Combined producer fault proof and dependency assembly
+
+Merged actual main 848f89e after digest preparation. Add/add conflicts from the squashed composer preserved the later reviewed retry dispatcher, digest loader and 07a capture/readiness changes; the lane-B board retained both append entries. Cherry-picked only fecffd4 for browser outbox isolation; production code unchanged by that patch.
+
+Actual digest producer query/render/enqueue fault tests now join the persisted operator_job_run correlation to exactly one sla.digest.failed and the operator read model's last run/recent failures. All 20 digest integration tests pass; raw error/address canaries stay absent. The daily producer's unexpected-error callback now uses the same app-owned errors.internal; known persisted stage failures retain their existing domain event. Shared log capture and child-process decoding preserve split UTF-8 characters, with a committed negative Thai-filename regression so byte boundaries cannot evade noPII checks.
+
+Current scope remains API/diagnostics plus authorized minimal existing-runtime seams. No second mail worker, sink, scheduler or QC runner; no real QC or invented owning lane. Root issue acceptance still includes W3-INT submit binding, the explicit pending-migration HTTP scenario and whole-suite/browser noPII coverage beyond the recorded canary captures. Schema version remains truthful unknown when not established; do not promote a guessed migration number. The size exception for the prerequisite contract does not cover this consumer: recommend a cohesive review split between independent observability modules and runtime integration before publication if the parent cannot approve a bounded exception.

@@ -1,3 +1,4 @@
+import { StringDecoder } from 'node:string_decoder';
 // Test-server process for the integration layer (W0-02 section 8.1: "for restart tests, a spawned process") and
 // the log capture the W0-10 test obligations need (OBS-xx assert on emitted lines). Lane C owns this file (W1-12).
 //
@@ -190,8 +191,9 @@ function attachCapture(child: ChildProcess) {
     }
   };
   let buffers = { stdout: '', stderr: '' };
+  const decoders = { stdout: new StringDecoder('utf8'), stderr: new StringDecoder('utf8') };
   const onData = (stream: 'stdout' | 'stderr') => (chunk: Buffer) => {
-    buffers[stream] += chunk.toString('utf8');
+    buffers[stream] += decoders[stream].write(chunk);
     const cut = buffers[stream].lastIndexOf('\n');
     if (cut === -1) return;
     push(stream, buffers[stream].slice(0, cut));
@@ -201,8 +203,10 @@ function attachCapture(child: ChildProcess) {
   child.stderr?.on('data', onData('stderr'));
   const exited = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve) => {
     child.once('exit', (code, signal) => {
-      for (const stream of ['stdout', 'stderr'] as const)
+      for (const stream of ['stdout', 'stderr'] as const) {
+        buffers[stream] += decoders[stream].end();
         if (buffers[stream] !== '') push(stream, buffers[stream]);
+      }
       resolve({ code, signal });
     });
   });

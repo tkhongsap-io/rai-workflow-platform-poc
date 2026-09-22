@@ -1,3 +1,6 @@
+import { readDeskHealth } from '@rai/server/observability/operator';
+import { computeReadiness } from '@rai/server/observability/health';
+import { createStoreProbes } from '@rai/server/observability/probes';
 import { after, before, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -211,6 +214,29 @@ for (const stage of ['query', 'render', 'enqueue'] as const)
     assert.equal(line!.correlationId, job!.correlationId);
     assert.equal(line!.fields.stage, stage);
     assert.doesNotMatch(JSON.stringify(line), /SECRET|private@/);
+    const readiness = await computeReadiness(
+      {
+        identity: () => ({ mode: 'fixture', ready: true }),
+        loopbackBind: true,
+        mailKind: 'memory',
+        qcKind: 'substitute',
+        build: { commit: 'dev', schemaVersion: 'unknown' },
+      },
+      {
+        ...createStoreProbes(db.urls.app, path.join(scratch, 'blobs')),
+        mailSink: () => Promise.resolve('ok'),
+        qc: () => Promise.resolve('disabled'),
+      },
+    );
+    const view = await readDeskHealth(db.app, readiness, app.errors.counters());
+    assert.equal(view.slaDigest.lastRun?.correlationId, job!.correlationId);
+    assert.equal(view.slaDigest.lastRun?.errorCode, `${stage}_failed`);
+    assert.equal(view.slaDigest.recentFailures.filter((failure) => failure.jobRunId === job!.id).length, 1);
+    assert.equal(
+      logs.filter((raw) => (JSON.parse(raw) as { event: string }).event === 'sla.digest.failed').length,
+      1,
+    );
+    assert.doesNotMatch(logs.join(''), /SECRET|private@/);
   });
 test('configuration recipient, not role, authorizes digest; invalid synthetic address fails render', async () => {
   await submit();

@@ -1,3 +1,4 @@
+import { StringDecoder } from 'node:string_decoder';
 import assert from 'node:assert/strict';
 import { Writable } from 'node:stream';
 import { FIXTURE_USERS } from '@rai/fixtures/data/users';
@@ -15,9 +16,10 @@ export const FIXTURE_FORBIDDEN: ReadonlyArray<string | RegExp> = [
 ];
 export function createLogCapture() {
   let output = '';
+  let decoder = new StringDecoder('utf8');
   const stream = new Writable({
     write(chunk: Buffer, _encoding, done) {
-      output += chunk.toString('utf8');
+      output += decoder.write(chunk);
       done();
     },
   });
@@ -26,6 +28,7 @@ export function createLogCapture() {
     text: () => output,
     clear: () => {
       output = '';
+      decoder = new StringDecoder('utf8');
     },
     lines: () =>
       output

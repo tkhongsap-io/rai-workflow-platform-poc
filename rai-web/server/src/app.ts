@@ -127,9 +127,8 @@ export function buildApp(deps: AppDeps): App {
   const requestErrors = new WeakMap<object, ErrorCategory>();
   const drain = createDrain(fastify); // first hook: every accepted request is counted (shutdown.ts)
   if (deps.digest !== undefined)
-    registerDailyDigest(fastify, { ...deps.digest, emitter }, drain, () => {
-      // W3-07a replaces this fixed safe fallback with its app-owned errors.internal.
-      emitter.log('error.captured', { category: 'internal_error', code: 'internal_error', httpStatus: 500 });
+    registerDailyDigest(fastify, { ...deps.digest, emitter }, drain, (error) => {
+      errors.internal(error);
     });
   if (deps.notifications !== undefined)
     registerNotifications(
