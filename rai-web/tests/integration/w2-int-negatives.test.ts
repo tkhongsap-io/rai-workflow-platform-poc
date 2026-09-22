@@ -7,7 +7,7 @@
 // fx-case-hr-dualrole; users fx-user-owner-cm, fx-user-dpo, fx-user-ai-coe, fx-user-it-security, fx-user-admin,
 // fx-user-dpo-spoc-hr.
 
-import { after, before, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -53,9 +53,10 @@ let server: TestServerProcess;
 before(async () => {
   db = await openTestDatabase();
   outputDir = await mkdtemp(path.join(tmpdir(), 'rai-w2-int-negatives-'));
-  server = await startTestServer();
 });
 beforeEach(async () => {
+  // Drain background submit QC/mail before taking TRUNCATE's exclusive locks.
+  await server?.stop();
   await db.reset();
   await db.owner.execute(sql.raw('TRUNCATE TABLE "session", "registry_counter"'));
   await rm(path.join(BLOB_DIR, 'sha256'), { recursive: true, force: true });
@@ -65,9 +66,14 @@ beforeEach(async () => {
     blobDir: BLOB_DIR,
     outputDir,
   });
+  server = await startTestServer();
+});
+afterEach(async () => {
+  // Includes failed test bodies; stop() drains the child and audits its captured logs.
+  if (server !== undefined) assert.deepEqual(await server.stop(), { code: 0, signal: null });
 });
 after(async () => {
-  await server.stop();
+  await server?.stop();
   await db.close();
   await rm(outputDir, { recursive: true, force: true });
 });
