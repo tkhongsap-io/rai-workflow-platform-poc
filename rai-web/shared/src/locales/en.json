@@ -193,6 +193,8 @@
   "review.disposition.fixed_confirmed": "Confirm fixed",
   "review.disposition.fixed_proposed": "Propose fixed",
   "review.disposition.not_applicable": "Not applicable",
+  "review.disposition.owner_heading": "Findings awaiting a proposed fix",
+  "review.disposition.owner_intro": "You may propose that a finding is fixed. The owning lane confirms later.",
   "review.disposition.reason.intro": "A reason is required before this disposition can be recorded.",
   "review.disposition.reason.label": "Reason",
   "review.disposition.reason.required": "Enter a reason before recording",

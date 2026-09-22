@@ -193,6 +193,8 @@
   "review.disposition.fixed_confirmed": "ยืนยันการแก้ไข",
   "review.disposition.fixed_proposed": "เสนอว่าแก้ไขแล้ว",
   "review.disposition.not_applicable": "ไม่เกี่ยวข้อง",
+  "review.disposition.owner_heading": "ข้อค้นพบที่รอการเสนอแก้ไข",
+  "review.disposition.owner_intro": "คุณสามารถเสนอว่าแก้ไขแล้วได้เมื่อข้อค้นพบพร้อม ช่องทางที่เป็นเจ้าของจะยืนยันในภายหลัง",
   "review.disposition.reason.intro": "ต้องระบุเหตุผลก่อนบันทึกการจัดการนี้",
   "review.disposition.reason.label": "เหตุผล",
   "review.disposition.reason.required": "กรุณาระบุเหตุผลก่อนบันทึก",

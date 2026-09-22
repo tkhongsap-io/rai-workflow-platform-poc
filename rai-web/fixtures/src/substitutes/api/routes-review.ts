@@ -464,6 +464,7 @@ export function reviewRoutes(): RouteDefinition[] {
       handler: (ctx) => {
         const stored = authorizedCase(ctx);
         const versionId = ctx.params.versionId ?? '';
+        if (!UUID_PATTERN.test(versionId)) throw new NotFoundError('version');
         const version = stored.versions.find((v) => v.versionId === versionId);
         if (version === undefined) throw new NotFoundError('version');
         const findings: VersionFindingsResponse['findings'] = [];

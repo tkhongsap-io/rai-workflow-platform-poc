@@ -26,6 +26,7 @@ import { readVersionRow } from '../cases/repository.js';
 import { runAndPersistLaneQc, type QcOrchestratorDeps } from '../qc/orchestrator.js';
 import { listFindingsForVersion, owningLaneOf, readFindingForCase } from './repository.js';
 import { recordDisposition, type DispositionServiceDeps } from './service.js';
+import { isUuid } from '../versions/repository.js';
 
 export interface FindingsRouteDeps extends DispositionServiceDeps {
   emitter: Emitter;
@@ -100,6 +101,7 @@ export function registerFindingsRoutes(fastify: FastifyInstance, deps: FindingsR
       },
     },
     async (request) => {
+      if (!isUuid(request.params.versionId)) throw new NotFoundError('version');
       const version = await readVersionRow(deps.db, request.params.versionId);
       if (version === undefined || version.caseId !== request.params.caseId) {
         throw new NotFoundError('version');

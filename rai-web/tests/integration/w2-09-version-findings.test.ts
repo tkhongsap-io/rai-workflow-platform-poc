@@ -249,5 +249,13 @@ describe(`W2-09 version findings read — ${SET}`, () => {
     });
     assert.equal(unknown.statusCode, 404);
     assert.equal(unknown.json<ErrorResponse>().error.code, 'not_found');
+
+    const notUuid = await app.inject({
+      method: 'GET',
+      url: `/api/cases/${VENDOR.caseId}/versions/not-a-uuid/findings`,
+      headers: asUser(owner),
+    });
+    assert.equal(notUuid.statusCode, 404);
+    assert.equal(notUuid.json<ErrorResponse>().error.code, 'not_found');
   });
 });

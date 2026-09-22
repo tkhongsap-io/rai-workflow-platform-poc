@@ -1,6 +1,6 @@
 // W2-09: findings and disposition UI on the W2-10 substitute. Every disposition kind is reachable: owner
 // proposes fixed via GET …/findings (not qc-run); owning-lane reviewer confirms after latestDisposition is
-// fixed_proposed; waive requires a reason. Keyboard-only; axe zero critical/serious. Issue #35 stays open.
+// fixed_proposed; waive / N/A require a reason. Keyboard-only; axe zero critical/serious. Issue #35 stays open.
 
 import { test, expect, type Page } from '@playwright/test';
 import type { CaseListResponse } from '@rai/shared/schemas/cases';
@@ -84,6 +84,9 @@ test.describe('W2-09 disposition UI on the W2-10 substitute (fx-case-nonvendor)'
     const findingId = await firstRow.getAttribute('data-finding-id');
     expect(findingId).toBeTruthy();
 
+    await expect(
+      page.getByRole('heading', { name: t('th', 'review.disposition.owner_heading') }),
+    ).toBeVisible();
     await expect(firstRow.locator('[data-disposition-kind-action="fixed_proposed"]')).toBeVisible();
     await expect(firstRow.locator('[data-disposition-kind-action="waived"]')).toHaveCount(0);
     await expect(firstRow.locator('[data-disposition-kind-action="fixed"]')).toHaveCount(0);
@@ -117,7 +120,7 @@ test.describe('W2-09 disposition UI on the W2-10 substitute (fx-case-nonvendor)'
     await expect(row).toBeVisible();
   });
 
-  test('keyboard waive: empty reason stays, finding shows waived; admin has no controls', async ({
+  test('keyboard N/A and waive kinds; empty reason stays; admin has no controls', async ({
     page,
   }, testInfo) => {
     const { caseId, versionId } = await submitNonvendor(page);
@@ -130,8 +133,14 @@ test.describe('W2-09 disposition UI on the W2-10 substitute (fx-case-nonvendor)'
     const findingId = await firstRow.getAttribute('data-finding-id');
     expect(findingId).toBeTruthy();
 
-    const waiveLabel = t('th', 'review.disposition.waived');
-    await tabUntil(page, (info) => info.tag === 'button' && info.text === waiveLabel, 80);
+    await expect(firstRow.locator('[data-disposition-kind-action="fixed"]')).toBeVisible();
+    await expect(firstRow.locator('[data-disposition-kind-action="waived"]')).toBeVisible();
+    await expect(firstRow.locator('[data-disposition-kind-action="not_applicable"]')).toBeVisible();
+    await expect(firstRow.locator('[data-disposition-kind-action="fixed_confirmed"]')).toHaveCount(0);
+    await expect(firstRow.locator('[data-disposition-kind-action="fixed_proposed"]')).toHaveCount(0);
+
+    const naLabel = t('th', 'review.disposition.not_applicable');
+    await tabUntil(page, (info) => info.tag === 'button' && info.text === naLabel, 80);
     await page.keyboard.press('Enter');
 
     const dialog = page.getByRole('dialog', { name: t('th', 'review.disposition.reason.title') });
@@ -149,7 +158,7 @@ test.describe('W2-09 disposition UI on the W2-10 substitute (fx-case-nonvendor)'
     await expect(dialog.getByRole('alert')).toContainText(t('th', 'review.disposition.reason.required'));
 
     await tabUntil(page, (info) => info.tag === 'textarea', 8);
-    await page.keyboard.type('accepted residual risk for this fixture finding');
+    await page.keyboard.type('out of scope for this lane finding');
     await tabUntil(
       page,
       (info) => info.tag === 'button' && info.text === t('th', 'review.disposition.reason.submit'),
@@ -157,8 +166,8 @@ test.describe('W2-09 disposition UI on the W2-10 substitute (fx-case-nonvendor)'
     );
     await page.keyboard.press('Enter');
     await expect(dialog).toBeHidden();
-    await expect(firstRow.locator('[data-disposition-kind="waived"]')).toContainText(
-      t('th', 'review.disposition.waived'),
+    await expect(firstRow.locator('[data-disposition-kind="not_applicable"]')).toContainText(
+      t('th', 'review.disposition.not_applicable'),
     );
     await expect(page.locator(`[data-finding-id="${findingId}"]`)).toHaveCount(1);
 

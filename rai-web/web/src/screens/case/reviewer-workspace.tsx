@@ -1,6 +1,7 @@
 // Reviewer workspace (W2-07 / W2-09): owning-lane reviewer runs qc-run then enriches latestDisposition via
-// GET …/findings; owner/BU SPOC loads that GET only and may propose fixed. After every disposition POST the
-// GET is refetched so reload shows the kind. qc-run auth is unchanged. Issue #35 stays open.
+// GET …/findings; owner/BU SPOC loads that GET only and may propose fixed — the owner panel renders only after
+// GET returns at least one finding (no loading/empty status). After every disposition POST the GET is refetched.
+// qc-run auth is unchanged. Issue #35 stays open.
 
 import { useCallback, useEffect, useState, type JSX } from 'react';
 import type { CaseView } from '@rai/shared/schemas/cases';
@@ -73,8 +74,9 @@ function ReviewerWorkspaceBody({
   onDecided,
   onDispositionRecorded,
   onUnauthenticated,
-}: ReviewerWorkspaceProps & { lane: Lane | null }): JSX.Element {
+}: ReviewerWorkspaceProps & { lane: Lane | null }): JSX.Element | null {
   const { t } = useLocale();
+  const isPropose = lane === null;
   const loadKey = `${caseId}/${version.versionId}/${lane ?? 'propose'}`;
   const [stored, setStored] = useState<{ key: string; result: LoadResult } | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
@@ -170,7 +172,6 @@ function ReviewerWorkspaceBody({
     [onDispositionRecorded, caseId, version.versionId, lane, onUnauthenticated],
   );
 
-  const headingLane = lane !== null ? t(laneKey(lane)) : t('role.owner');
   const mergedKinds = (
     base: ReadonlyMap<string, DispositionKind | null>,
   ): Map<string, DispositionKind | null> => {
@@ -179,22 +180,54 @@ function ReviewerWorkspaceBody({
     return out;
   };
 
+  // Owner/SPOC: render nothing while GET is in flight or when there are no findings (no second role=status).
+  if (isPropose) {
+    if (state.kind === 'loading') return null;
+    if (state.kind === 'ready' && state.findings.length === 0) return null;
+    if (state.kind === 'error') {
+      return (
+        <ErrorNotice error={state.error}>
+          <button
+            type={'button'}
+            className={'btn btn-secondary'}
+            onClick={() => {
+              setReloadToken((n) => n + 1);
+            }}
+          >
+            {t('action.reload')}
+          </button>
+        </ErrorNotice>
+      );
+    }
+  }
+
   return (
     <section className={'card reviewer-workspace'} aria-labelledby={'reviewer-findings-heading'}>
       <div className={'panel-head'}>
         <div>
-          <h2 id={'reviewer-findings-heading'}>{t('review.findings.heading', { lane: headingLane })}</h2>
-          <p className={'muted'}>{t('review.findings.intro')}</p>
+          {lane === null ? (
+            <>
+              <h2 id={'reviewer-findings-heading'}>{t('review.disposition.owner_heading')}</h2>
+              <p className={'muted'}>{t('review.disposition.owner_intro')}</p>
+            </>
+          ) : (
+            <>
+              <h2 id={'reviewer-findings-heading'}>
+                {t('review.findings.heading', { lane: t(laneKey(lane)) })}
+              </h2>
+              <p className={'muted'}>{t('review.findings.intro')}</p>
+            </>
+          )}
         </div>
       </div>
 
-      {state.kind === 'loading' ? (
+      {!isPropose && state.kind === 'loading' ? (
         <p className={'muted'} role={'status'} data-review-qc={'loading'}>
           {t('review.findings.loading')}
         </p>
       ) : null}
 
-      {state.kind === 'error' ? (
+      {!isPropose && state.kind === 'error' ? (
         <ErrorNotice error={state.error}>
           <button
             type={'button'}
