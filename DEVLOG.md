@@ -1,5 +1,9 @@
 # Development log
 
+## W3-08: scoped queue substitute — 2026-09-22
+
+The dev/test-only API substitute now implements the queue contract, including scoped filters/counts, pagination, successor versions and frozen SLA dates. Regression tests cover role scopes, unknown query keys and disposition states. Full local verification passed: 413 unit, 198 integration and 213 browser tests. Independent review is clean after fixes. PR #108; integration acceptance remains W3-INT.
+
 ## Handoff after W3-05 — 2026-09-22
 
 `main` is `39bbf0a`. W3-05 (PR #104) and the QC case-lock fix (PR #103, `7382222`) are recorded in CHANGELOG.md and in the BUILD_PLAN status section. README build status no longer says the next step is W0. **Next ticket is W3-01** (role-scoped queue). It can use `LaneDue` / `SlaBreach`. Do not start W3-03 or W3-04 until the W1-11 mail sink is on `main`. Issue #35 and epic #53 stay open. W4–W8 are not authorized.
