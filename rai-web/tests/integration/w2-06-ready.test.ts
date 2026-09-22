@@ -39,6 +39,7 @@ import { ScriptedQcRunner } from '@rai/fixtures/substitutes/qc/index';
 import type { VersionRef } from '@rai/shared/qc/types';
 import { openTestDatabase, type TestDatabase } from '../support/db.js';
 import { asUser, signInAsFixture, type FixtureSession } from '../support/sign-in.js';
+import { upload } from './w1-03-helpers.js';
 
 const SET = fixtureSetLabel(readManifest());
 const publicBaseUrl = new URL('http://127.0.0.1:8787');
@@ -55,9 +56,11 @@ const OWNER_A = 'fx-user-owner-cm';
 const DPO = 'fx-user-dpo';
 const AI_COE = 'fx-user-ai-coe';
 const IT_SEC = 'fx-user-it-security';
+const SPOC_CM = 'fx-user-spoc-cm';
 const NONVENDOR = findFixtureCase('fx-case-nonvendor')!;
 const VENDOR = findFixtureCase('fx-case-vendor')!;
 const emailOf = (id: string) => findFixtureUser(id)!.email;
+const subjectOf = (id: string) => findFixtureUser(id)!.subjectId;
 
 const fixtureCaseIdByRowId = new Map(FIXTURE_CASES.map((c) => [c.caseId, c.fixtureCaseId]));
 
@@ -115,11 +118,13 @@ async function rebuildApp(withQc: boolean): Promise<void> {
       db: db.app,
       now,
       sendBackRecipientsForOwner: ownerRecipients,
+      knownIdentities: FIXTURE_USERS,
     },
     findings: {
       db: db.app,
       now,
       readyRecipientsForOwner: ownerRecipients,
+      knownIdentities: FIXTURE_USERS,
       ...(withQc ? { qc: { runner, now } } : {}),
     },
   });
@@ -510,5 +515,62 @@ describe(`W2-06 Ready predicate — ${SET}`, () => {
     const state = await readyState(NONVENDOR.caseId, version.versionId);
     assert.equal(state.readyAudits.length, 1);
     assert.equal(state.readyNotices.length, 1);
+  });
+
+  it('a BU SPOC approval inserted by SQL (simulated policy bug) blocks Ready even with two real lane approvals', async () => {
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, NONVENDOR.caseId);
+    const revision = await caseRevision(NONVENDOR.caseId);
+
+    // Simulated policy bug: CM BU SPOC recorded as the DPO lane approver.
+    await db.owner.execute(sql`
+      INSERT INTO lane_decision (
+        id, version_id, lane, decision, actor_subject_id, actor_role,
+        feedback, observed_qc_run_id, decided_at, correlation_id
+      ) VALUES (
+        ${randomUUID()}::uuid, ${version.versionId}::uuid, 'dpo', 'approve',
+        ${subjectOf(SPOC_CM)}, 'dpo', NULL, ${randomUUID()}::uuid,
+        ${now()}, ${randomUUID()}
+      )
+    `);
+
+    const ai = await signIn(AI_COE);
+    const it = await signIn(IT_SEC);
+    const a1 = await approve(ai, NONVENDOR.caseId, version.versionId, 'ai_coe', revision);
+    assert.equal(a1.statusCode, 201, a1.body);
+    assert.equal(a1.json<LaneDecisionResponse>().ready, false);
+    const a2 = await approve(it, NONVENDOR.caseId, version.versionId, 'it_security', revision);
+    assert.equal(a2.statusCode, 201, a2.body);
+    assert.equal(a2.json<LaneDecisionResponse>().ready, false);
+
+    const state = await readyState(NONVENDOR.caseId, version.versionId);
+    assert.equal(state.version.ready_at, null);
+    assert.equal(state.caseRow.desk_status, 'in_review');
+    assert.equal(state.readyAudits.length, 0);
+  });
+
+  it('upload on a Ready case is 409 version_closed, not no_open_draft', async () => {
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, NONVENDOR.caseId);
+    const revision = await caseRevision(NONVENDOR.caseId);
+    const last = await approveAllThree(NONVENDOR.caseId, version.versionId, revision);
+    assert.equal(last.ready, true);
+
+    const res = await upload(
+      app,
+      owner,
+      NONVENDOR.caseId,
+      'after-ready.pdf',
+      Buffer.from('%PDF-1.4\n%%EOF\n'),
+      'application/pdf',
+    );
+    assert.equal(res.statusCode, 409, res.body);
+    const err = res.json<ErrorResponse>();
+    assert.equal(err.error.code, 'stale_version');
+    assert.equal((err.error.details as { reason: string }).reason, 'version_closed');
+    assert.equal(
+      (err.error.details as { guidanceKey: string }).guidanceKey,
+      'error.stale_version.guidance.ready',
+    );
   });
 });

@@ -110,8 +110,9 @@ async function rebuildApp(): Promise<void> {
       now,
       sendBackRecipientsForOwner: (ownerSubjectId) =>
         sendBackRecipientsFromIdentities(FIXTURE_USERS, ownerSubjectId),
+      knownIdentities: FIXTURE_USERS,
     },
-    findings: { db: db.app, now, qc: { runner, now } },
+    findings: { db: db.app, now, qc: { runner, now }, knownIdentities: FIXTURE_USERS },
   });
   app = built.fastify;
   await app.ready();
@@ -438,8 +439,9 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
         now,
         sendBackRecipientsForOwner: (ownerSubjectId) =>
           sendBackRecipientsFromIdentities(FIXTURE_USERS, ownerSubjectId),
+        knownIdentities: FIXTURE_USERS,
       },
-      findings: { db: db.app, now },
+      findings: { db: db.app, now, knownIdentities: FIXTURE_USERS },
     });
     app = built.fastify;
     await app.ready();

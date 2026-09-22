@@ -2,9 +2,11 @@
 // lane.approved and disposition transactions under the case row lock — never a user route. Desk completion
 // only; not Council or ITSM approval.
 import { and, eq, sql } from 'drizzle-orm';
-import { LANES, type Lane } from '@rai/shared/constants';
+import { LANE_MAPPINGS_BY_VERSION, type Lane } from '@rai/shared/constants';
+import type { RoleScope } from '@rai/shared/schemas/auth';
 import type { AuditRefValue } from '../audit/store.js';
 import { auditStore } from '../audit/store.js';
+import { isOwnerOrSpocOnCase, type Actor, type CaseScopeFacts } from '../authz/policy.js';
 import { readVersionRow, type CaseRow } from '../cases/repository.js';
 import type { Tx } from '../db/client.js';
 import { cases } from '../db/schema/case.js';
@@ -18,6 +20,12 @@ export type ReadyTrigger = {
   id: string;
   /** Event name stored on case.ready_for_launch.target_ref.triggered_by_event. */
   event: 'lane.approved' | 'disposition.recorded' | 'disposition.proposed' | 'disposition.confirmed';
+};
+
+/** Known identities (fixture list in slice 1) used to resolve approver grants for §6 condition 4. */
+export type ReadyKnownIdentity = {
+  subjectId: string;
+  roles: readonly RoleScope[];
 };
 
 export type ReadyEval =
@@ -46,21 +54,50 @@ function caseRef(row: CaseRow): Record<string, AuditRefValue> {
 }
 
 /**
+ * Lanes required by the mapping frozen on the version (same resolution as open-lanes). Unknown or
+ * missing `lane_mapping_version` fails closed.
+ */
+export function requiredLanesForMapping(laneMappingVersion: string | null): readonly Lane[] | null {
+  if (laneMappingVersion === null || laneMappingVersion === '') return null;
+  const mapping = LANE_MAPPINGS_BY_VERSION[laneMappingVersion];
+  if (mapping === undefined) return null;
+  return Object.keys(mapping.slotsByLane) as Lane[];
+}
+
+function actorFromKnown(subjectId: string, known: readonly ReadyKnownIdentity[]): Actor | undefined {
+  const match = known.find((u) => u.subjectId === subjectId);
+  if (match === undefined) return undefined;
+  return { subjectId: match.subjectId, roles: [...match.roles] };
+}
+
+/**
  * W0-06 §6 + persistence Ready SQL sketches. Runs under the case lock. Approvals on any earlier version
- * do not count; fixed_proposed alone leaves a finding undispositioned; owner-as-approver fails closed.
+ * do not count; fixed_proposed alone leaves a finding undispositioned; owner/BU-SPOC as approver fails closed.
  */
 export async function evaluateReadyPredicate(
   tx: Tx,
   caseRow: CaseRow,
   versionId: string,
+  knownIdentities: readonly ReadyKnownIdentity[],
 ): Promise<ReadyEval> {
+  const notReady = (missing: readonly Lane[] = []): ReadyEval => ({
+    ready: false,
+    missingApprovals: [...missing],
+    undispositionedFindingIds: [],
+  });
+
   if (caseRow.currentVersionId !== versionId) {
-    return { ready: false, missingApprovals: [...LANES], undispositionedFindingIds: [] };
+    return notReady();
   }
 
   const version = await readVersionRow(tx, versionId);
   if (version === undefined || version.submittedAt === null || version.readyAt != null) {
-    return { ready: false, missingApprovals: [...LANES], undispositionedFindingIds: [] };
+    return notReady();
+  }
+
+  const requiredLanes = requiredLanesForMapping(version.laneMappingVersion);
+  if (requiredLanes === null || requiredLanes.length === 0) {
+    return notReady();
   }
 
   const approvals = await tx
@@ -73,7 +110,7 @@ export async function evaluateReadyPredicate(
     .where(and(eq(laneDecision.versionId, versionId), eq(laneDecision.decision, 'approve')));
 
   const byLane = new Map(approvals.map((row) => [row.lane as Lane, row]));
-  const missingApprovals = LANES.filter((lane) => !byLane.has(lane));
+  const missingApprovals = requiredLanes.filter((lane) => !byLane.has(lane));
 
   const undispositioned = await tx.execute(sql`
     SELECT f.id::text AS id
@@ -90,10 +127,21 @@ export async function evaluateReadyPredicate(
   `);
   const undispositionedFindingIds = (undispositioned.rows as Array<{ id: string }>).map((r) => r.id);
 
-  // §6 condition 4: approving actors must not be the case owner (SPOC/self-approval already enforced at 4.4).
-  const ownerAsApprover = approvals.some((row) => row.actorSubjectId === caseRow.ownerSubjectId);
+  // §6 condition 4: each approving actor must be neither owner nor BU SPOC of the case (recheck under lock).
+  // Unknown subject (not in the known-identity list) fails closed.
+  const facts: CaseScopeFacts = {
+    ownerSubjectId: caseRow.ownerSubjectId,
+    businessUnitId: caseRow.businessUnitId,
+  };
+  const selfApprovalLeak = requiredLanes.some((lane) => {
+    const row = byLane.get(lane);
+    if (row === undefined) return false;
+    const actor = actorFromKnown(row.actorSubjectId, knownIdentities);
+    if (actor === undefined) return true;
+    return isOwnerOrSpocOnCase(actor, facts);
+  });
 
-  if (missingApprovals.length > 0 || undispositionedFindingIds.length > 0 || ownerAsApprover) {
+  if (missingApprovals.length > 0 || undispositionedFindingIds.length > 0 || selfApprovalLeak) {
     return { ready: false, missingApprovals, undispositionedFindingIds };
   }
 
@@ -114,7 +162,7 @@ export async function evaluateReadyPredicate(
 
   return {
     ready: true,
-    approvalDecisionIds: LANES.map((lane) => byLane.get(lane)!.id),
+    approvalDecisionIds: requiredLanes.map((lane) => byLane.get(lane)!.id),
     dispositionedFindingCount,
   };
 }
@@ -132,9 +180,10 @@ export async function applyReadyIfHeld(
     correlationId: string;
     occurredAt: Date;
     recipients: readonly string[];
+    knownIdentities: readonly ReadyKnownIdentity[];
   },
 ): Promise<{ applied: true; caseRow: CaseRow } | { applied: false }> {
-  const evaluation = await evaluateReadyPredicate(tx, caseRow, versionId);
+  const evaluation = await evaluateReadyPredicate(tx, caseRow, versionId, input.knownIdentities);
   if (!evaluation.ready) return { applied: false };
 
   const [versionAfter] = await tx

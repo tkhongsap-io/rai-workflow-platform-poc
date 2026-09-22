@@ -14,7 +14,7 @@ import { staleDetails } from '../cases/service.js';
 import type { Db } from '../db/client.js';
 import { withWorkflowTransaction, type WorkflowResult } from '../versions/transaction.js';
 import { nextMonotonicStamp } from '../workflow/monotonic-stamp.js';
-import { applyReadyIfHeld, type ReadyTrigger } from '../workflow/ready.js';
+import { applyReadyIfHeld, type ReadyKnownIdentity, type ReadyTrigger } from '../workflow/ready.js';
 import { isUuid } from '../versions/repository.js';
 import {
   findLatestSubmittedVersionId,
@@ -28,6 +28,8 @@ export interface DispositionServiceDeps {
   now?: () => Date;
   /** Owner email(s) for ready notices; resolved from identity data in start.ts / tests. */
   readyRecipientsForOwner?: (ownerSubjectId: string) => readonly string[];
+  /** Known identities for Ready §6 condition 4 (same list as decide notices). */
+  knownIdentities?: readonly ReadyKnownIdentity[];
 }
 
 export interface ActionContext {
@@ -213,6 +215,7 @@ export async function recordDisposition(
           correlationId: ctx.correlationId,
           occurredAt: stamp,
           recipients,
+          knownIdentities: deps.knownIdentities ?? [],
         });
 
         const body: DispositionResponse = {

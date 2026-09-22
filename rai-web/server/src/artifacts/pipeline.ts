@@ -6,10 +6,17 @@
 
 import { and, eq, sql } from 'drizzle-orm';
 import type { Readable } from 'node:stream';
-import { InvalidInputError, UnsafeUploadError, type UnsafeUploadReason } from '@rai/shared/errors';
+import {
+  InvalidInputError,
+  StaleVersionError,
+  UnsafeUploadError,
+  type UnsafeUploadReason,
+} from '@rai/shared/errors';
 import { uuidv7 } from '@rai/shared/ids';
 import type { AllowedMediaType, ArtifactRef } from '@rai/shared/schemas/artifacts';
 import { auditStore } from '../audit/store.js';
+import { readCaseRow, readVersionRow } from '../cases/repository.js';
+import { staleDetails } from '../cases/service.js';
 import type { Db, Executor } from '../db/client.js';
 import { artifact } from '../db/schema/artifact.js';
 import { artifactSlot } from '../db/schema/artifact-slot.js';
@@ -71,6 +78,26 @@ export async function openDraftOf(exec: Executor, caseId: string): Promise<strin
   return row?.draftVersionId ?? null;
 }
 
+/**
+ * W0-06 §4.12 / §5.2: any mutating action on a Ready case is version_closed. Checked before the
+ * no-open-draft invalid_input so Ready is not reported as a missing draft.
+ */
+async function assertNotReadyForUpload(exec: Executor, caseId: string): Promise<void> {
+  const caseRow = await readCaseRow(exec, caseId);
+  if (caseRow === undefined || caseRow.currentVersionId === null) return;
+  const current = await readVersionRow(exec, caseRow.currentVersionId);
+  if (current === undefined || current.readyAt == null) return;
+  throw new StaleVersionError(
+    staleDetails(
+      'version_closed',
+      'error.stale_version.guidance.ready',
+      current,
+      caseRow.rowVersion,
+      `/cases/${caseId}/versions/${current.id}`,
+    ),
+  );
+}
+
 /** W0-08 check 10: bytes the open draft's attached artifacts already reference. */
 export async function attachedBytesOf(exec: Executor, draftVersionId: string): Promise<number> {
   const [row] = await exec
@@ -121,7 +148,13 @@ export async function storeUpload(
     throw new UploadRejected(reason, params);
   };
 
-  // Check 3: open draft, before any byte is read.
+  // Check 3: Ready closes uploads (§4.12); otherwise an open draft is required before any byte is read.
+  try {
+    await assertNotReadyForUpload(db, caseId);
+  } catch (err) {
+    part?.stream.destroy();
+    throw err;
+  }
   const draftVersionId = await openDraftOf(db, caseId);
   if (draftVersionId === null) {
     part?.stream.destroy();
@@ -186,6 +219,7 @@ export async function storeUpload(
     row = await withTransaction(db, async (tx) => {
       if (!(await lockCase(tx, caseId)))
         throw new InvalidInputError([{ path: 'caseId', messageKey: 'validation.no_open_draft' }]);
+      await assertNotReadyForUpload(tx, caseId);
       const draftNow = await openDraftOf(tx, caseId);
       if (draftNow === null)
         throw new InvalidInputError([{ path: 'caseId', messageKey: 'validation.no_open_draft' }]);
