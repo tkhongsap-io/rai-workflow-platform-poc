@@ -339,7 +339,7 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
     assert.deepEqual(after.rows, before.rows, 'finding row bytes must not change after disposition');
   });
 
-  it('latest disposition uses Postgres clock_timestamp when the application clock is frozen', async () => {
+  it('latest disposition uses a monotonic stamp when the application clock is frozen', async () => {
     const owner = await signIn(OWNER_A);
     const version = await submitOk(owner, VENDOR.caseId);
     const revision = await caseRevision(VENDOR.caseId);
@@ -347,7 +347,7 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
     const qc = await runLaneQc(ai, VENDOR.caseId, version.versionId, 'ai_coe', revision);
     const findingId = (qc.body as LaneQcRunResponse).findings[0]!.findingId;
 
-    // Freeze the app clock across both inserts so uuidv7(appNow) would share a ms prefix.
+    // Freeze the app clock across both inserts; monotonic stamp still orders them.
     clock = Date.parse('2026-09-22T07:00:00.000Z');
     await rebuildApp();
     const ownerFrozen = await signIn(OWNER_A);
@@ -358,8 +358,6 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
     });
     assert.equal(proposed.statusCode, 201, proposed.body);
 
-    // Wall time still advances between requests; created_at comes from clock_timestamp().
-    await new Promise((r) => setTimeout(r, 5));
     const confirmed = await dispose(aiFrozen, VENDOR.caseId, findingId, {
       expectedVersion: { versionId: version.versionId, revision },
       kind: 'fixed_confirmed',
@@ -367,12 +365,119 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
     assert.equal(confirmed.statusCode, 201, confirmed.body);
 
     const latest = await db.owner.execute(sql`
-      SELECT kind FROM disposition_event
+      SELECT kind, created_at FROM disposition_event
       WHERE finding_id = ${findingId}
       ORDER BY created_at DESC, id DESC
       LIMIT 1
     `);
     assert.equal((latest.rows[0] as { kind: string }).kind, 'fixed_confirmed');
+    const createdAt = (latest.rows[0] as { created_at: Date }).created_at;
+
+    const audit = await db.owner.execute(sql`
+      SELECT occurred_at FROM audit_event
+      WHERE action = 'disposition.confirmed'
+        AND target_ref->>'disposition_id' = ${confirmed.json<DispositionResponse>().dispositionId}
+      ORDER BY seq DESC
+      LIMIT 1
+    `);
+    assert.equal(audit.rows.length, 1);
+    assert.equal(
+      new Date((audit.rows[0] as { occurred_at: Date }).occurred_at).toISOString(),
+      new Date(createdAt).toISOString(),
+    );
+  });
+
+  it('unavailable not_configured stores one unbound run; a second call returns the same id', async () => {
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, VENDOR.caseId);
+    const revision = await caseRevision(VENDOR.caseId);
+
+    // Rebuild without a QC runner (production posture).
+    if (app !== undefined) await app.close();
+    const adapter = createIdentityAdapter({
+      env: {
+        RAI_IDENTITY_MODE: 'fixture',
+        RAI_SESSION_ABSOLUTE_HOURS: '12',
+        RAI_SESSION_IDLE_MINUTES: '120',
+      },
+      nodeEnv: 'test',
+      discovery: () => Promise.reject(new Error('never called in fixture mode')),
+      groupMappingSource: () => Promise.resolve(null),
+      fixtureUsers: FIXTURE_USERS,
+      now,
+    });
+    await adapter.start({ host: '127.0.0.1', port: 8787, publicBaseUrl, trustProxy: false });
+    const logStream = new Writable({
+      write(_chunk: Buffer, _enc, cb) {
+        cb();
+      },
+    });
+    const built = buildApp({
+      config: { nodeEnv: 'test', log: { level: 'info', pretty: false }, trustProxy: false, publicBaseUrl },
+      logStream,
+      identity: {
+        adapter,
+        sessionStore: createPgSessionStore(db.app),
+        facts: createScopeFactsSource(db.app),
+        fixtureProvider: createFixtureIdentityProvider(FIXTURE_USERS),
+        now,
+      },
+      cases: {
+        db: db.app,
+        businessUnits: createBusinessUnitDirectory(
+          businessUnitsFromGrants(FIXTURE_USERS.flatMap((u) => [...u.roles])),
+        ),
+        subjects: createSubjectDirectory(db.app, { known: FIXTURE_USERS }),
+        now,
+      },
+      artifacts: { store, db: db.app, limits: LIMITS },
+      pack: { db: db.app, limits: { maxPackBytes: LIMITS.maxPackBytes }, now },
+      versions: { db: db.app, now, laneOpenRecipients: LANE_OPEN_RECIPIENTS },
+      decide: {
+        db: db.app,
+        now,
+        sendBackRecipientsForOwner: (ownerSubjectId) =>
+          sendBackRecipientsFromIdentities(FIXTURE_USERS, ownerSubjectId),
+      },
+      findings: { db: db.app, now },
+    });
+    app = built.fastify;
+    await app.ready();
+
+    const ai = await signIn(AI_COE);
+    const first = await runLaneQc(ai, VENDOR.caseId, version.versionId, 'ai_coe', revision);
+    assert.equal(first.statusCode, 200, JSON.stringify(first.body));
+    const firstBody = first.body as LaneQcRunResponse;
+    assert.equal(firstBody.status, 'unavailable');
+    assert.equal(firstBody.reason, 'not_configured');
+    assert.ok(firstBody.runId);
+    assert.equal(firstBody.findings.length, 0);
+
+    const second = await runLaneQc(ai, VENDOR.caseId, version.versionId, 'ai_coe', revision);
+    assert.equal(second.statusCode, 200);
+    const secondBody = second.body as LaneQcRunResponse;
+    assert.equal(secondBody.status, 'unavailable');
+    assert.equal(secondBody.runId, firstBody.runId);
+
+    const runs = await db.owner.execute(
+      sql`SELECT id, status, engine_id FROM qc_run WHERE version_id = ${version.versionId}`,
+    );
+    assert.equal(runs.rows.length, 1);
+    assert.equal((runs.rows[0] as { status: string }).status, 'unavailable');
+    assert.equal((runs.rows[0] as { engine_id: string }).engine_id, 'unbound');
+    const findings = await db.owner.execute(
+      sql`SELECT id FROM qc_finding WHERE version_id = ${version.versionId}`,
+    );
+    assert.equal(findings.rows.length, 0);
+    const audits = await db.owner.execute(sql`
+      SELECT target_ref->>'finding_count' AS finding_count
+      FROM audit_event
+      WHERE action = 'qc.run_recorded' AND target_version_id = ${version.versionId}
+    `);
+    assert.equal(audits.rows.length, 1);
+    assert.equal((audits.rows[0] as { finding_count: string }).finding_count, '0');
+
+    await rebuildApp();
   });
 
   it('unavailable result stores qc_run status=unavailable with zero findings and returns runId', async () => {

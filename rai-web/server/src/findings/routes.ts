@@ -27,7 +27,7 @@ import { recordDisposition, type DispositionServiceDeps } from './service.js';
 
 export interface FindingsRouteDeps extends DispositionServiceDeps {
   emitter: Emitter;
-  /** Injected QcRunner for lane QC; absent → qc-run returns unavailable:not_configured with nothing stored. */
+  /** Optional QC runner injection; absent → lane QC persists unavailable:not_configured with engine_id unbound. */
   qc?: Omit<QcOrchestratorDeps, 'db'>;
 }
 
@@ -154,6 +154,7 @@ export function registerFindingsRoutes(fastify: FastifyInstance, deps: FindingsR
   );
 
   // POST …/lanes/:lane/qc-run — owning-lane reviewer only (lane.approve); persists storeable defects.
+  // Unbound (no runner) still records an unavailable qc_run with engine_id `unbound`.
   app.post(
     '/api/cases/:caseId/versions/:versionId/lanes/:lane/qc-run',
     {
@@ -168,16 +169,12 @@ export function registerFindingsRoutes(fastify: FastifyInstance, deps: FindingsR
       if (request.body.expectedVersion.versionId !== request.params.versionId) {
         throw new NotFoundError('version');
       }
-      if (deps.qc === undefined) {
-        return {
-          runId: null,
-          status: 'unavailable' as const,
-          reason: 'not_configured' as const,
-          findings: [],
-        };
-      }
       const outcome = await runAndPersistLaneQc(
-        { db: deps.db, ...deps.qc },
+        {
+          db: deps.db,
+          ...(deps.now === undefined ? {} : { now: deps.now }),
+          ...(deps.qc === undefined ? {} : deps.qc),
+        },
         {
           caseId: request.params.caseId,
           versionId: request.params.versionId,

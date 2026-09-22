@@ -1,5 +1,5 @@
 // W2-05 store helpers for qc_run / qc_finding (append-only inserts).
-import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq } from 'drizzle-orm';
 import type { Lane } from '@rai/shared/constants';
 import type { QcTrigger } from '@rai/shared/qc/types';
 import type { Executor, Tx } from '../db/client.js';
@@ -36,6 +36,7 @@ export interface InsertFindingInput {
   threshold: number | null;
   messageKey: string;
   messageParams: unknown;
+  createdAt: Date;
 }
 
 export async function insertQcRun(tx: Tx, input: InsertRunInput): Promise<void> {
@@ -71,19 +72,19 @@ export async function insertQcFinding(tx: Tx, input: InsertFindingInput): Promis
     threshold: input.threshold === null ? null : String(input.threshold),
     messageKey: input.messageKey,
     messageParams: input.messageParams,
-    createdAt: sql`clock_timestamp()`,
+    createdAt: input.createdAt,
   });
 }
 
-/** Latest approve_attempt run for the frozen input identity (W0-07 §3.7). */
+/** Latest approve_attempt run for the frozen input identity (W0-07 §3.7); order by monotonic requested_at. */
 export async function findLatestApproveAttemptRun(
   exec: Executor,
   versionId: string,
   lane: Lane,
   ruleRevision: string,
-): Promise<{ id: string; status: string } | undefined> {
+): Promise<{ id: string; status: string; engineId: string } | undefined> {
   const [row] = await exec
-    .select({ id: qcRun.id, status: qcRun.status })
+    .select({ id: qcRun.id, status: qcRun.status, engineId: qcRun.engineId })
     .from(qcRun)
     .where(
       and(
@@ -93,7 +94,7 @@ export async function findLatestApproveAttemptRun(
         eq(qcRun.ruleRevision, ruleRevision),
       ),
     )
-    .orderBy(desc(qcRun.completedAt), desc(qcRun.id))
+    .orderBy(desc(qcRun.requestedAt), desc(qcRun.id))
     .limit(1);
   return row;
 }

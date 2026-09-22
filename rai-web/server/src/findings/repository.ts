@@ -1,5 +1,5 @@
 // W2-05: qc_finding / disposition_event reads and appends.
-import { and, asc, desc, eq, isNotNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, isNotNull } from 'drizzle-orm';
 import type { Lane } from '@rai/shared/constants';
 import type { DispositionKind } from '@rai/shared/schemas/review';
 import type { Executor, Tx } from '../db/client.js';
@@ -79,27 +79,23 @@ export interface InsertDispositionInput {
   evidenceRef: Record<string, unknown> | null;
   actorSubjectId: string;
   actorRole: string;
+  createdAt: Date;
   correlationId: string;
 }
 
-export async function insertDisposition(tx: Tx, input: InsertDispositionInput): Promise<{ createdAt: Date }> {
-  const [row] = await tx
-    .insert(dispositionEvent)
-    .values({
-      id: input.id,
-      findingId: input.findingId,
-      kind: input.kind,
-      reason: input.reason,
-      evidenceRef: input.evidenceRef,
-      actorSubjectId: input.actorSubjectId,
-      actorRole: input.actorRole,
-      createdAt: sql`clock_timestamp()`,
-      correlationId: input.correlationId,
-      idempotencyKeyId: null,
-    })
-    .returning({ createdAt: dispositionEvent.createdAt });
-  if (row === undefined) throw new Error('disposition_event insert returned no row');
-  return row;
+export async function insertDisposition(tx: Tx, input: InsertDispositionInput): Promise<void> {
+  await tx.insert(dispositionEvent).values({
+    id: input.id,
+    findingId: input.findingId,
+    kind: input.kind,
+    reason: input.reason,
+    evidenceRef: input.evidenceRef,
+    actorSubjectId: input.actorSubjectId,
+    actorRole: input.actorRole,
+    createdAt: input.createdAt,
+    correlationId: input.correlationId,
+    idempotencyKeyId: null,
+  });
 }
 
 export function owningLaneOf(row: QcFindingRow): Lane {

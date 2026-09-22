@@ -12,6 +12,7 @@ import { readVersionRow, type CaseRow, type PackVersionRow } from '../cases/repo
 import { staleDetails } from '../cases/service.js';
 import type { Db } from '../db/client.js';
 import { withWorkflowTransaction, type WorkflowResult } from '../versions/transaction.js';
+import { nextMonotonicStamp } from '../workflow/monotonic-stamp.js';
 import { isUuid } from '../versions/repository.js';
 import {
   findLatestSubmittedVersionId,
@@ -78,7 +79,7 @@ export async function recordDisposition(
   request: DispositionRequest,
   idempotencyKey: string,
 ): Promise<WorkflowResult<DispositionResponse>> {
-  const now = (deps.now ?? (() => new Date()))();
+  const stamp = nextMonotonicStamp(deps.now ?? (() => new Date()));
   if (!isUuid(findingId)) throw new NotFoundError('finding');
   if (request.expectedVersion.versionId !== undefined && !isUuid(request.expectedVersion.versionId)) {
     throw new NotFoundError('version');
@@ -96,7 +97,7 @@ export async function recordDisposition(
       action: DISPOSITION_ACTION,
       idempotencyKey,
       requestDigest: requestDigest(DISPOSITION_ACTION, { ...request, findingId }),
-      now,
+      now: stamp,
     },
     {
       async apply({ tx, caseRow: before, audit }) {
@@ -157,7 +158,7 @@ export async function recordDisposition(
           }
         }
 
-        const dispositionId = uuidv7();
+        const dispositionId = uuidv7(stamp.getTime());
         const evidenceRef =
           request.evidence === undefined
             ? null
@@ -168,7 +169,7 @@ export async function recordDisposition(
                   : { artifact_id: request.evidence.artifactId }),
               };
 
-        const inserted = await insertDisposition(tx, {
+        await insertDisposition(tx, {
           id: dispositionId,
           findingId: finding.id,
           kind: request.kind,
@@ -176,6 +177,7 @@ export async function recordDisposition(
           evidenceRef,
           actorSubjectId: ctx.actor.subjectId,
           actorRole: ctx.role,
+          createdAt: stamp,
           correlationId: ctx.correlationId,
         });
 
@@ -183,7 +185,7 @@ export async function recordDisposition(
           dispositionId,
           findingId: finding.id,
           kind: request.kind,
-          recordedAt: inserted.createdAt.toISOString(),
+          recordedAt: stamp.toISOString(),
           caseRevision: before.rowVersion,
         };
 
@@ -201,6 +203,7 @@ export async function recordDisposition(
           },
           beforeRef: caseRef(before),
           afterRef: caseRef(before),
+          occurredAt: stamp,
         });
 
         return { status: 201, body };
