@@ -29,6 +29,7 @@ import type {
   CaseView,
   ConfigurationView,
 } from '@rai/shared/schemas/cases';
+import type { QueueQuery, QueueResponse } from '@rai/shared/schemas/queue';
 import type { PackDraft, PackDraftUpdateRequest } from '@rai/shared/schemas/pack';
 import type {
   ApproveLaneRequest,
@@ -51,6 +52,7 @@ export const API_PATHS = Object.freeze({
   fixtureUsers: '/auth/fixture/users',
   fixtureSignIn: '/auth/fixture/sign-in',
   cases: '/api/cases',
+  queue: '/api/queue',
   configuration: '/api/configuration/current',
   artifacts: '/api/artifacts',
 });
@@ -197,6 +199,18 @@ export function createApiClient(fetchImpl: FetchLike = (input, init) => fetch(in
     /** `local-google`, `network`, `production`: returns the provider redirect the browser must follow. */
     startSignIn: (body: SignInRequest) => request<SignInResponse>('POST', API_PATHS.signIn, { body }),
     signOut: () => request<undefined>('POST', API_PATHS.signOut),
+    getQueue: (query: QueueQuery = {}) =>
+      request<QueueResponse>('GET', API_PATHS.queue, {
+        query: {
+          search: query.search,
+          searchBy: query.searchBy,
+          status: query.status,
+          owner: query.owner,
+          useCaseGroup: query.useCaseGroup,
+          page: query.page,
+          pageSize: query.pageSize,
+        },
+      }),
     listCases: (query: CaseListQuery = {}) =>
       request<CaseListResponse>('GET', API_PATHS.cases, {
         query: { page: query.page, pageSize: query.pageSize },
