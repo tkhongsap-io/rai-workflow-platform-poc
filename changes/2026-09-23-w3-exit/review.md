@@ -2,6 +2,14 @@
 
 This records completed synthetic engineering evidence and its delivery gates. It is not owner/operator acceptance and does not authorize W4–W8. Final PR review and CI outcomes belong to the W3-06 delivery PR; merge requires all checks to pass on the exact reviewed head.
 
+## Final delivery reconciliation — 2026-09-23
+
+PR [#124](https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/124) merged as `6d60181a9e3ee6f24c39883a4b77c6d12cde1a12`; its [actual-main CI](https://github.com/tkhongsap-io/rai-workflow-platform-poc/actions/runs/35777702205) subsequently passed all 12 checks. PR [#125](https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/125) merged as `e62b669ab2aa36a3e4343a095b5bedcd9e159c19`, after independent performance/archive and documentation reviews and successful reviewed-head CI. The final main tree matches reviewed head `18903a151b0995baa0775771973bb9bccfec0144`.
+
+[Final actual-main CI 35781574925](https://github.com/tkhongsap-io/rai-workflow-platform-poc/actions/runs/35781574925) passed all 12 checks: 565 unit, 293 integration, 174 real-server browser, 171 separate UI rehearsal and 40 repository tests, with no reported failures or skips. The [delivery verification comment](https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/125#issuecomment-5784166620) records final delivery evidence.
+
+All nine W3 engineering issues are closed. Epic #54 remains open for Ta’s package review; #35/#53, manual Google sign-in and workload/target confirmation remain pending. No W4 authorization or production acceptance is implied. The sections below retain preparation-time source attribution, failures and merge-process exceptions; their prospective CI/review statements are superseded by this final delivery record.
+
 ## Outcome and evidence boundary
 
 W3 integrates the scoped queue, frozen working-day SLA, committed ordinary notifications, daily configured-recipient digest, bounded retries, safe operator diagnostics and one same-case keyboard journey through upload, submission, process restart, protected mail links, send-back, v2, disposition and three approvals to Ready. The API and PostgreSQL are real local services; identity, QC outputs and mail delivery use explicit synthetic fixture/file adapters. Ready means desk completion only.
@@ -21,7 +29,7 @@ Frozen source SHA256: `92c4f7123058b8fec3c2ba7abdf10538fad034778624b0675975b39de
 | Integration | 293 passed, zero failures/skips, from missing generated outputs at3e9228; migration opt-in enabled; clean bootstrap and busy-child reset proof included |
 | Real browser | Carver independently passed174 across1440/834/390 at27ad01b, zero skips/retries; both Ready paths and the strengthened full keyboard journey |
 | UI rehearsal | 171 passed at27ad01b; separate API-substitute harness, not real-server acceptance |
-| Repository | 40 passed, Markdown links/frozen source/whitespace passed; final exit-document checks Final checks recorded below. |
+| Repository | 40 passed, Markdown links/frozen source/whitespace passed; final exit-document checks are recorded below. |
 | Performance | HTTP profiles at0c99d61; corrected complete five-page batch at9b8a2ea; both use runtime/UI27ad01b. 3,760 measured samples +560 warmups in the selected baseline; independent numerical audits clean. All345 product/config inventory entries match mergedmain6d60181; only the two authorized test-script changes differ. See the archived report and source reconciliation. |
 
 Tests from different revisions are explicitly attributed. Document/test-only successors do not become fictitious full-suite reruns; final CI validates the delivered head. No aggregate count sums overlapping runs.
@@ -50,7 +58,7 @@ The [full performance report](../2026-09-22-w3-06-performance/evidence/candidate
 
 Not measured: every JSON route, concurrent users, mobile/tablet latency, cold-cache capacity, dense findings/five-version histories, full150MiB packs or50GiB storage. This baseline does not size production infrastructure or validate real QC quality. Ta/operator confirmation of proposed volumes and targets is pending.
 
-The first A01 page attempt failed during overview warmup because the harness expected the entry route after the app correctly redirected to a submitted version. Its seven warmup attempts and zero measured samples are retained; no overview percentile was computed. The corrected page harness9b8a2ea was independently reviewed and all27 pure checks passed. A separate untimed five-route diagnostic passed with all59 HTTP requests successful and queue/case/version state preserved. B02 completed all five profiles (150 warmups +1,000 samples), zero failures. Its independently recomputed quantiles and11 sealed hashes matched;22 sealed A01 artifacts remained unchanged. The selected baseline retains2,760 HTTP samples fromA01 plus1,000 page samples fromB02, with560 warmups. The original200 queue-page samples and failed overview warmup remain historical rather than being erased or blended into the final page baseline..
+The first A01 page attempt failed during overview warmup because the harness expected the entry route after the app correctly redirected to a submitted version. Its seven warmup attempts and zero measured samples are retained; no overview percentile was computed. The corrected page harness9b8a2ea was independently reviewed and all27 pure checks passed. A separate untimed five-route diagnostic passed with all59 HTTP requests successful and queue/case/version state preserved. B02 completed all five profiles (150 warmups +1,000 samples), zero failures. Its independently recomputed quantiles and11 sealed hashes matched;22 sealed A01 artifacts remained unchanged. The selected baseline retains2,760 HTTP samples fromA01 plus1,000 page samples fromB02, with560 warmups. The original200 queue-page samples and failed overview warmup remain historical rather than being erased or blended into the final page baseline.
 
 ## Recording
 

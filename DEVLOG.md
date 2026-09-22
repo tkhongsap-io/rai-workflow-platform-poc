@@ -2,7 +2,11 @@
 
 ## W3 synthetic engineering exit — 2026-09-23
 
-All implementation tickets through W3-INT are merged. The [exit review](changes/2026-09-23-w3-exit/review.md) maps source-attributed tests, the supplementary keyboard recording and the independently audited performance baseline:3,760 samples across selected HTTP/page profiles, with advisory targets met. The reviewed performance harness is included in normal unit/type checks; final delivery remains governed by independent review and exact-head CI. Earlier failed/repaired attempts and the PR120 merge-process exception remain disclosed. Ta’s package review, workload confirmation, manual Google sign-in and issue #35/#53 remain separate; W4–W8 are not authorized.
+All nine W3 engineering tickets, including W3-INT and W3-06, are merged. PR #125 delivered main `e62b669ab2aa36a3e4343a095b5bedcd9e159c19`; [actual-main CI](https://github.com/tkhongsap-io/rai-workflow-platform-poc/actions/runs/35781574925) passed all 12 checks. The final run passed 565 unit, 293 integration, 174 real-server browser, 171 separate UI rehearsal and 40 repository tests. The [exit review](changes/2026-09-23-w3-exit/review.md) records the independently reviewed delivery, supplementary keyboard recording and 3,760-sample advisory performance baseline.
+
+Ta’s package review remains pending under epic #54. Workload/target confirmation, manual Google sign-in and finding-ownership issue #35/epic #53 remain open; W4–W8 are not authorized. This is a synthetic engineering exit, not operator or production acceptance.
+
+The dated entries below preserve preparation-time results and outstanding work as recorded then. Final delivery resolves their W3 engineering review/CI dependencies; it does not replace their source-attributed evidence or erase the PR120 merge-process exception.
 
 ## W3-INT: integrated synthetic review journey — 2026-09-23
 
@@ -12,7 +16,7 @@ The completed full run at `2ed4fd2` passed 536 unit, 280 integration, 168 real-s
 
 ## W3-07b: Admin operator UI finalization — 2026-09-23
 
-Replayed only the reviewed UI consumer and its review record onto main `4fa14d6`, after API #123 merged. The resulting `rai-web` tree exactly matches the combined full-verification tree: 530 unit, 256 integration, 126 real-server browser and 171 substitute browser tests passed, zero skips. The page provides bilingual read-only diagnostics, manual refresh and immediate removal of stale Admin data after session changes. Controlled operator browser rehearsals remain separate from real OBS-17 acceptance in W3-INT. Local delivery awaits independent review before any push; PR #119 remains draft and parent owns CI/merge. See `changes/2026-09-22-w3-07b-operator-ui/review.md` for exact provenance and focused checks.
+Replayed only the reviewed UI consumer and its review record onto main `4fa14d6`, after API #123 merged. The resulting `rai-web` tree exactly matches the combined full-verification tree: 530 unit, 256 integration, 126 real-server browser and 171 substitute browser tests passed, zero skips. The page provides bilingual read-only diagnostics, manual refresh and immediate removal of stale Admin data after session changes. Controlled operator browser rehearsals remain separate from real OBS-17 acceptance in W3-INT. Delivery resolution: PR #119 merged as `a0d4287e7811`; real-server operator proof was subsequently integrated in PR #124 and included in the final PR #125 CI above. See `changes/2026-09-22-w3-07b-operator-ui/review.md` for exact provenance and focused checks.
 
 ## W3-07a: operator runtime and correlation — 2026-09-23
 
