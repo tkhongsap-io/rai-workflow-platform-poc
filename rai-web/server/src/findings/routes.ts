@@ -200,6 +200,7 @@ export function registerFindingsRoutes(fastify: FastifyInstance, deps: FindingsR
           severity: f.severity as 'high' | 'medium' | 'low' | 'info',
           owningLane: f.owningLane,
           messageKey: f.messageKey,
+          ...(f.messageParams === undefined ? {} : { messageParams: f.messageParams }),
         })),
       };
     },

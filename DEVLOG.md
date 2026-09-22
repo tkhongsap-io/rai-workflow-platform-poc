@@ -1,5 +1,9 @@
 # Development log
 
+## W2-07: reviewer workspace UI — 2026-09-22
+
+On a current submitted version the owning-lane reviewer sees that lane's QC findings (from `POST …/qc-run`) above approve / send-back. Controls wait for the run, including an unavailable run (still has a run id). Send-back reuses the shared dialog and cannot submit without naming a slot. Admin, owner, wrong lane and stale/superseded versions never draw the buttons. History keeps frozen N readable after send-back. Substitute Playwright path is keyboard-only with axe zero critical / zero serious. Copy comes from the catalogue keys in the W2-07 contract PR. This is not the W2 exit; disposition UI remains W2-09.
+
 ## W2-07 locale keys — 2026-09-22
 
 Reviewer-workspace copy (`review.*`, `finding.severity.*`) is in both catalogues so the Lane B screen can read keys without editing `shared/` in the UI PR. Not the W2 exit.

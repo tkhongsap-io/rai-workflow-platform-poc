@@ -161,6 +161,39 @@ test('W1-06: saveDraft PUTs the body; submitDraft POSTs with the caller-minted k
   assert.equal(artifactDownloadPath('a 1'), '/api/artifacts/a%201');
 });
 
+test('W2-07: lane qc-run, approve and send-back paths carry expectedVersion and the mint key', async () => {
+  const calls: { input: string; init: RequestInit | undefined }[] = [];
+  const client = createApiClient((input, init) => {
+    calls.push({ input, init });
+    return Promise.resolve(
+      new Response(JSON.stringify({ runId: 'r1', status: 'completed', findings: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+  });
+  const expectedVersion = { versionId: 'v-1', revision: 1 };
+  await client.runLaneQc('c1', 'v/1', 'ai_coe', { expectedVersion });
+  assert.equal(calls[0]?.input, '/api/cases/c1/versions/v%2F1/lanes/ai_coe/qc-run');
+  assert.equal(calls[0]?.init?.method, 'POST');
+  await client.approveLane('c1', 'v1', 'dpo', { expectedVersion, qcRunId: 'r1' }, 'key-a');
+  assert.equal(calls[1]?.input, '/api/cases/c1/versions/v1/lanes/dpo/approve');
+  assert.equal((calls[1]?.init?.headers as Record<string, string>)['idempotency-key'], 'key-a');
+  await client.sendBackLane(
+    'c1',
+    'v1',
+    'it_security',
+    {
+      expectedVersion,
+      // SlotNumberSchema Static is `never` (map construction); the runtime value is a slot 1..9.
+      feedback: { items: [{ slot: 7, deficiency: 'needs assessment' }] } as never,
+    },
+    'key-b',
+  );
+  assert.equal(calls[2]?.input, '/api/cases/c1/versions/v1/lanes/it_security/send-back');
+  assert.equal((calls[2]?.init?.headers as Record<string, string>)['idempotency-key'], 'key-b');
+});
+
 test('W1-06: a 409 stale_version exposes its guidance and refresh path; other codes expose none', async () => {
   const client = createApiClient(
     fetchAnswering(409, {

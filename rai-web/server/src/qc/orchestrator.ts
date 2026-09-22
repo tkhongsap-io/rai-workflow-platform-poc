@@ -56,6 +56,7 @@ export interface StoredFindingView {
   severity: string;
   owningLane: Lane;
   messageKey: string;
+  messageParams?: Record<string, string | number>;
 }
 
 export type PersistQcOutcome =
@@ -247,6 +248,7 @@ async function persistCompleted(
       severity: finding.severity,
       owningLane: finding.owningLane,
       messageKey: finding.message.key,
+      messageParams: { ...finding.message.params },
     });
   }
 

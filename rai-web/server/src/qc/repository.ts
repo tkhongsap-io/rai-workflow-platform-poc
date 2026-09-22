@@ -110,6 +110,7 @@ export async function listFindingsForRun(
     severity: string;
     owningLane: Lane;
     messageKey: string;
+    messageParams?: Record<string, string | number>;
   }>
 > {
   const rows = await exec
@@ -120,16 +121,39 @@ export async function listFindingsForRun(
       severity: qcFinding.severity,
       owningLane: qcFinding.owningLane,
       messageKey: qcFinding.messageKey,
+      messageParams: qcFinding.messageParams,
     })
     .from(qcFinding)
     .where(eq(qcFinding.runId, runId))
     .orderBy(asc(qcFinding.createdAt), asc(qcFinding.id));
-  return rows.map((r) => ({
-    findingId: r.findingId,
-    ruleId: r.ruleId,
-    slot: r.slot,
-    severity: r.severity,
-    owningLane: r.owningLane as Lane,
-    messageKey: r.messageKey,
-  }));
+  return rows.map((r) => {
+    const out: {
+      findingId: string;
+      ruleId: string;
+      slot: number | null;
+      severity: string;
+      owningLane: Lane;
+      messageKey: string;
+      messageParams?: Record<string, string | number>;
+    } = {
+      findingId: r.findingId,
+      ruleId: r.ruleId,
+      slot: r.slot,
+      severity: r.severity,
+      owningLane: r.owningLane as Lane,
+      messageKey: r.messageKey,
+    };
+    const params = asMessageParams(r.messageParams);
+    if (params !== undefined) out.messageParams = params;
+    return out;
+  });
+}
+
+function asMessageParams(value: unknown): Record<string, string | number> | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
+  const out: Record<string, string | number> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (typeof entry === 'string' || typeof entry === 'number') out[key] = entry;
+  }
+  return out;
 }

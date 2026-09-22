@@ -287,6 +287,7 @@ async function runLaneQc(
       severity: finding.severity,
       owningLane: finding.owningLane,
       messageKey: finding.message.key,
+      messageParams: { ...finding.message.params },
     };
     const storedFinding: StoredFinding = {
       ...summary,

@@ -7,9 +7,11 @@
 
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
+import type { SessionInfo } from '@rai/shared/schemas/auth';
 import type { ArtifactRef } from '@rai/shared/schemas/artifacts';
 import type { CaseView, ConfigurationView } from '@rai/shared/schemas/cases';
 import type { PackDraft, PackDraftUpdateRequest, SlotNumber, SlotState } from '@rai/shared/schemas/pack';
+import type { LaneDecisionResponse } from '@rai/shared/schemas/review';
 import type { SubmittedVersion, VersionSummary } from '@rai/shared/schemas/versions';
 import { ApiError, api } from '../../api/client.js';
 import { ErrorNotice } from '../../components/error-notice.js';
@@ -20,6 +22,7 @@ import './case.css';
 import { CaseOverview } from './case-overview.js';
 import { PackEditor, type PendingSettings } from './pack-editor.js';
 import { PackFrozen } from './pack-frozen.js';
+import { ReviewerWorkspace } from './reviewer-workspace.js';
 import type { ArtifactLookup } from './slot-rows.js';
 import { VersionNav } from './version-nav.js';
 import { SLOT_NUMBERS, applySlotChange, type PendingSlots } from './view-model.js';
@@ -37,7 +40,10 @@ type LoadState = { kind: 'loading' } | LoadResult;
 type VersionResult = { kind: 'error'; error: unknown } | { kind: 'ready'; version: SubmittedVersion };
 type VersionState = { kind: 'idle' } | { kind: 'loading' } | VersionResult;
 
-export type Notice = { key: 'pack.saved' | 'pack.submitted'; params: Record<string, string | number> };
+export type Notice =
+  | { key: 'pack.saved' | 'pack.submitted'; params: Record<string, string | number> }
+  | { key: 'review.decided.approve' | 'review.decided.send_back'; params: Record<string, string | number> }
+  | { key: 'review.decided.ready'; params: Record<string, string | number> };
 
 async function loadAll(caseId: string): Promise<Loaded> {
   const [configuration, view, versions] = await Promise.all([
@@ -54,7 +60,7 @@ export function CaseScreen(): JSX.Element {
   const caseId = params.caseId ?? '';
   const versionId = params.versionId;
   const navigate = useNavigate();
-  const { signedOut } = useSession();
+  const { signedOut, state: sessionState } = useSession();
 
   // Loading is derived: a result is current only when it was produced for the key of the current request, so
   // no effect sets state synchronously (react-hooks/set-state-in-effect); the async callbacks set it.
@@ -224,6 +230,17 @@ export function CaseScreen(): JSX.Element {
       });
   };
 
+  const onLaneDecided = (response: LaneDecisionResponse): void => {
+    if (response.ready) {
+      setNotice({ key: 'review.decided.ready', params: {} });
+    } else if (response.decision === 'approve') {
+      setNotice({ key: 'review.decided.approve', params: {} });
+    } else {
+      setNotice({ key: 'review.decided.send_back', params: {} });
+    }
+    setReloadToken((n) => n + 1);
+  };
+
   return (
     <CaseScreenBody
       caseId={caseId}
@@ -236,6 +253,7 @@ export function CaseScreen(): JSX.Element {
       busy={busy}
       editorError={editorError}
       notice={notice}
+      session={sessionState.status === 'signed_in' ? sessionState.session : null}
       onSlotChange={onSlotChange}
       onSettingsChange={setPendingSettings}
       onSave={onSave}
@@ -249,6 +267,8 @@ export function CaseScreen(): JSX.Element {
       onDismissError={() => {
         setEditorError(null);
       }}
+      onLaneDecided={onLaneDecided}
+      onUnauthenticated={unauthenticated}
     />
   );
 }
@@ -264,6 +284,7 @@ interface BodyProps {
   busy: 'idle' | 'saving' | 'submitting';
   editorError: unknown;
   notice: Notice | null;
+  session: SessionInfo | null;
   onSlotChange: (slot: SlotNumber, next: SlotState, artifact: ArtifactRef | undefined) => void;
   onSettingsChange: (next: PendingSettings) => void;
   onSave: () => void;
@@ -271,6 +292,8 @@ interface BodyProps {
   onSubmit: () => void;
   onReload: () => void;
   onDismissError: () => void;
+  onLaneDecided: (response: LaneDecisionResponse) => void;
+  onUnauthenticated: (err: unknown) => boolean;
 }
 
 function BackToList(): JSX.Element {
@@ -337,7 +360,12 @@ function CaseScreenBody(props: BodyProps): JSX.Element {
                 pendingSettings={props.pendingSettings}
                 busy={props.busy}
                 error={props.editorError}
-                notice={props.notice}
+                notice={
+                  props.notice !== null &&
+                  (props.notice.key === 'pack.saved' || props.notice.key === 'pack.submitted')
+                    ? props.notice
+                    : null
+                }
                 onSlotChange={props.onSlotChange}
                 onSettingsChange={props.onSettingsChange}
                 onSave={props.onSave}
@@ -357,6 +385,17 @@ function CaseScreenBody(props: BodyProps): JSX.Element {
                 <p className={'notice notice-success'} role={'status'}>
                   {t(props.notice.key, props.notice.params)}
                 </p>
+              ) : null}
+              {props.session !== null ? (
+                <ReviewerWorkspace
+                  caseId={caseId}
+                  version={versionState.version}
+                  view={state.view}
+                  hasOpenDraft={state.draft !== null}
+                  session={props.session}
+                  onDecided={props.onLaneDecided}
+                  onUnauthenticated={props.onUnauthenticated}
+                />
               ) : null}
               <PackFrozen version={versionState.version} versions={state.versions} />
             </>

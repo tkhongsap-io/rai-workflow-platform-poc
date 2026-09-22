@@ -33,3 +33,14 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: W2-06 Ready predicate — not this session; Lane B UI (W2-07/W2-09) later.
 - Author: operator=ta session=w2-05 model=composer
 - Evidence: branch codex/w2-05-dispositions
+
+## 2026-09-22 14:55 — CLAIM Lane B
+- Author: operator=ta session=w2-07 model=composer
+- Takes over from: session=w2-05 (reason: W2-07 reviewer workspace)
+
+## 2026-09-22 14:55 — W2-07 reviewer workspace UI
+- What: Reviewer workspace on a submitted version: lane QC findings before approve/send-back; send-back dialog requires a named artifact slot; frozen version history unchanged after send-back; Admin/owner/wrong lane/stale versions get no decision controls. Keyboard-only substitute Playwright path; axe zero critical and zero serious. Locale keys in th.json and en.json for the new copy. Not the W2 exit; disposition UI is W2-09.
+- Why: Ticket W2-07 of the delivery pack; proves A09/A07 for the UI layer on the W2-10 substitute.
+- Next: W2-09 findings/disposition UI; W2-INT wires to the real server.
+- Author: operator=ta session=w2-07 model=composer
+- Evidence: branch codex/w2-07-reviewer-workspace

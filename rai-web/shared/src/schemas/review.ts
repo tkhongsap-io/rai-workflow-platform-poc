@@ -152,6 +152,8 @@ export const StoredFindingSummarySchema = Type.Object({
   ]),
   owningLane: LaneSchema,
   messageKey: Type.String(),
+  /** D12 message params from the QC finding; optional so older rows without them still type-check. */
+  messageParams: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()]))),
 });
 export type StoredFindingSummary = Static<typeof StoredFindingSummarySchema>;
 

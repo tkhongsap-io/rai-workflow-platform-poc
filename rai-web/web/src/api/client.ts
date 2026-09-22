@@ -30,6 +30,14 @@ import type {
   ConfigurationView,
 } from '@rai/shared/schemas/cases';
 import type { PackDraft, PackDraftUpdateRequest } from '@rai/shared/schemas/pack';
+import type {
+  ApproveLaneRequest,
+  LaneDecisionResponse,
+  LaneQcRunRequest,
+  LaneQcRunResponse,
+  SendBackLaneRequest,
+} from '@rai/shared/schemas/review';
+import type { Lane } from '@rai/shared/constants';
 import type { SubmitRequest, SubmittedVersion, VersionListResponse } from '@rai/shared/schemas/versions';
 
 export const API_PATHS = Object.freeze({
@@ -218,6 +226,39 @@ export function createApiClient(fetchImpl: FetchLike = (input, init) => fetch(in
         body,
         idempotencyKey,
       }),
+    /** Lane-QC run for the reviewer's lane before decision controls (W0-02 7.7; W2-07). */
+    runLaneQc: (caseId: string, versionId: string, lane: Lane, body: LaneQcRunRequest) =>
+      request<LaneQcRunResponse>(
+        'POST',
+        `${API_PATHS.cases}/${enc(caseId)}/versions/${enc(versionId)}/lanes/${enc(lane)}/qc-run`,
+        { body },
+      ),
+    /** Own-lane approve; carries the qcRunId the reviewer saw (W0-06 4.4). */
+    approveLane: (
+      caseId: string,
+      versionId: string,
+      lane: Lane,
+      body: ApproveLaneRequest,
+      idempotencyKey: string,
+    ) =>
+      request<LaneDecisionResponse>(
+        'POST',
+        `${API_PATHS.cases}/${enc(caseId)}/versions/${enc(versionId)}/lanes/${enc(lane)}/approve`,
+        { body, idempotencyKey },
+      ),
+    /** Own-lane send-back; feedback must name at least one artifact slot (A09). */
+    sendBackLane: (
+      caseId: string,
+      versionId: string,
+      lane: Lane,
+      body: SendBackLaneRequest,
+      idempotencyKey: string,
+    ) =>
+      request<LaneDecisionResponse>(
+        'POST',
+        `${API_PATHS.cases}/${enc(caseId)}/versions/${enc(versionId)}/lanes/${enc(lane)}/send-back`,
+        { body, idempotencyKey },
+      ),
   };
 }
 
