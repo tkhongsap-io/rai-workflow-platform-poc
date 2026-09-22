@@ -2,7 +2,7 @@
 
 ## W2-05: findings and dispositions (single-lane) — 2026-09-22
 
-A submitted version can record synthetic single-lane defect findings from the W1-10 QC substitute (lane QC run endpoint) and disposition them append-only under D05. Owning lane is assigned only via W0-06 §7.1 (`owningLaneForSlot`); slot 5, slot 9, pack-level and unavailable findings are not stored — agents do not invent a lane. Unavailable substitute results are refused as stored findings and are not written as a `qc_run` either (prefer not recording; an unavailable run must not look like a clean completed run). Ready (`ready_at` / desk_status ready) is not set here (W2-06). Issue #35 stays open for the §7.3 cases named in its done-when; this PR does not close it. This is not the W2 exit.
+A submitted version can record synthetic single-lane defect findings from the W1-10 QC substitute (lane QC run endpoint) and disposition them append-only under D05. Owning lane is assigned only via W0-06 §7.1 (`owningLaneForSlot`); slot 5, slot 9, pack-level and unavailable findings are not stored — agents do not invent a lane. An unavailable substitute result stores a `qc_run` with `status = unavailable` and zero `qc_finding` rows (W0-06 §7.4 blocks the unavailable finding only, not the run row); it is never treated as a clean completed run. Ready (`ready_at` / desk_status ready) is not set here (W2-06). Issue #35 stays open for the §7.3 cases named in its done-when. This is not the W2 exit.
 
 ## W1-10 on main — 2026-09-22
 

@@ -1,6 +1,7 @@
 // W2-05 routes: lane QC run (persist single-lane defects) and disposition append.
 // Disposition maps body.kind → finding.* action and authorizes the finding target after body validation
 // (W0-05: "resolves the body's kind to its action before authorize runs").
+// Lane QC uses lane.approve + target:lane (owning-lane reviewer only), same ownership gate as lane.approve.
 
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
@@ -152,11 +153,11 @@ export function registerFindingsRoutes(fastify: FastifyInstance, deps: FindingsR
     },
   );
 
-  // POST …/lanes/:lane/qc-run — version.view scope; persists storeable defects when a runner is injected.
+  // POST …/lanes/:lane/qc-run — owning-lane reviewer only (lane.approve); persists storeable defects.
   app.post(
     '/api/cases/:caseId/versions/:versionId/lanes/:lane/qc-run',
     {
-      config: { auth: { kind: 'action', action: 'version.view', target: 'case' } },
+      config: { auth: { kind: 'action', action: 'lane.approve', target: 'lane' } },
       schema: {
         params: LaneQcParams,
         body: LaneQcRunRequestSchema,
@@ -186,27 +187,24 @@ export function registerFindingsRoutes(fastify: FastifyInstance, deps: FindingsR
       );
       if (outcome.status === 'unavailable') {
         return {
-          runId: null,
+          runId: outcome.runId,
           status: 'unavailable' as const,
           reason: outcome.reason as 'timeout' | 'runner_error' | 'not_configured' | 'artifact_unreadable',
           findings: [],
         };
       }
-      if (outcome.status === 'completed') {
-        return {
-          runId: outcome.runId,
-          status: 'completed' as const,
-          findings: outcome.findings.map((f) => ({
-            findingId: f.findingId,
-            ruleId: f.ruleId,
-            slot: f.slot as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | null,
-            severity: f.severity as 'high' | 'medium' | 'low' | 'info',
-            owningLane: f.owningLane,
-            messageKey: f.messageKey,
-          })),
-        };
-      }
-      return { runId: null, status: 'unavailable' as const, reason: 'runner_error' as const, findings: [] };
+      return {
+        runId: outcome.runId,
+        status: 'completed' as const,
+        findings: outcome.findings.map((f) => ({
+          findingId: f.findingId,
+          ruleId: f.ruleId,
+          slot: f.slot as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | null,
+          severity: f.severity as 'high' | 'medium' | 'low' | 'info',
+          owningLane: f.owningLane,
+          messageKey: f.messageKey,
+        })),
+      };
     },
   );
 

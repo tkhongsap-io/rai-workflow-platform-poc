@@ -1,7 +1,7 @@
 // W2-05 Done when (A09 / D05 / W0-06 §7.4 single-lane only): synthetic single-lane defect from the W1-10
 // substitute can be dispositioned append-only. Reason required for waived/N/A; non-owning lane 403; owner's
 // fixed stays proposed until owning lane confirms; finding bytes unchanged after disposition; second event
-// appends; unavailable substitute result does not become a qc_finding row. #35 stays open (slot-5 / pack /
+// appends; unavailable stores qc_run status=unavailable with zero findings. #35 stays open (slot-5 / pack /
 // unavailable owning lane blocked until §7.3). Ready is W2-06. Fixture set slice1-synthetic@1.
 
 import { after, before, beforeEach, describe, it } from 'node:test';
@@ -50,6 +50,7 @@ const OWNER_A = 'fx-user-owner-cm';
 const DPO = 'fx-user-dpo';
 const AI_COE = 'fx-user-ai-coe';
 const ADMIN = 'fx-user-admin';
+const SPOC_CM = 'fx-user-spoc-cm';
 const VENDOR = findFixtureCase('fx-case-vendor')!;
 
 const fixtureCaseIdByRowId = new Map(FIXTURE_CASES.map((c) => [c.caseId, c.fixtureCaseId]));
@@ -185,14 +186,14 @@ async function runLaneQc(
   versionId: string,
   lane: string,
   revision: number,
-): Promise<{ statusCode: number; body: LaneQcRunResponse }> {
+): Promise<{ statusCode: number; body: LaneQcRunResponse | ErrorResponse }> {
   const res = await app.inject({
     method: 'POST',
     url: `/api/cases/${caseId}/versions/${versionId}/lanes/${lane}/qc-run`,
     headers: { 'content-type': 'application/json', ...asUser(session) },
     payload: { expectedVersion: { versionId, revision } },
   });
-  return { statusCode: res.statusCode, body: res.json<LaneQcRunResponse>() };
+  return { statusCode: res.statusCode, body: res.json() };
 }
 
 function dispose(
@@ -222,10 +223,11 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
     const ai = await signIn(AI_COE);
     const qc = await runLaneQc(ai, VENDOR.caseId, version.versionId, 'ai_coe', revision);
     assert.equal(qc.statusCode, 200, JSON.stringify(qc.body));
-    assert.equal(qc.body.status, 'completed');
-    assert.ok(qc.body.runId);
-    assert.ok(qc.body.findings.length >= 1);
-    const slot1 = qc.body.findings.find((f) => f.slot === 1);
+    const body = qc.body as LaneQcRunResponse;
+    assert.equal(body.status, 'completed');
+    assert.ok(body.runId);
+    assert.ok(body.findings.length >= 1);
+    const slot1 = body.findings.find((f) => f.slot === 1);
     assert.ok(slot1, 'slot 1 defect expected');
     assert.equal(slot1.owningLane, 'ai_coe');
 
@@ -246,7 +248,8 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
     const revision = await caseRevision(VENDOR.caseId);
     const ai = await signIn(AI_COE);
     const qc = await runLaneQc(ai, VENDOR.caseId, version.versionId, 'ai_coe', revision);
-    const findingId = qc.body.findings[0]!.findingId;
+    const body = qc.body as LaneQcRunResponse;
+    const findingId = body.findings[0]!.findingId;
 
     const before = await db.owner.execute(sql`SELECT * FROM qc_finding WHERE id = ${findingId}`);
     const waived = await dispose(ai, VENDOR.caseId, findingId, {
@@ -277,7 +280,8 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
     const revision = await caseRevision(VENDOR.caseId);
     const ai = await signIn(AI_COE);
     const qc = await runLaneQc(ai, VENDOR.caseId, version.versionId, 'ai_coe', revision);
-    const findingId = qc.body.findings.find((f) => f.owningLane === 'ai_coe')!.findingId;
+    const body = qc.body as LaneQcRunResponse;
+    const findingId = body.findings.find((f) => f.owningLane === 'ai_coe')!.findingId;
     const before = await db.owner.execute(sql`SELECT * FROM qc_finding WHERE id = ${findingId}`);
 
     const dpo = await signIn(DPO);
@@ -305,7 +309,8 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
     const revision = await caseRevision(VENDOR.caseId);
     const ai = await signIn(AI_COE);
     const qc = await runLaneQc(ai, VENDOR.caseId, version.versionId, 'ai_coe', revision);
-    const findingId = qc.body.findings[0]!.findingId;
+    const body = qc.body as LaneQcRunResponse;
+    const findingId = body.findings[0]!.findingId;
     const before = await db.owner.execute(sql`SELECT * FROM qc_finding WHERE id = ${findingId}`);
 
     const proposed = await dispose(owner, VENDOR.caseId, findingId, {
@@ -334,7 +339,43 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
     assert.deepEqual(after.rows, before.rows, 'finding row bytes must not change after disposition');
   });
 
-  it('unavailable substitute result does not become a qc_finding row', async () => {
+  it('latest disposition uses Postgres clock_timestamp when the application clock is frozen', async () => {
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, VENDOR.caseId);
+    const revision = await caseRevision(VENDOR.caseId);
+    const ai = await signIn(AI_COE);
+    const qc = await runLaneQc(ai, VENDOR.caseId, version.versionId, 'ai_coe', revision);
+    const findingId = (qc.body as LaneQcRunResponse).findings[0]!.findingId;
+
+    // Freeze the app clock across both inserts so uuidv7(appNow) would share a ms prefix.
+    clock = Date.parse('2026-09-22T07:00:00.000Z');
+    await rebuildApp();
+    const ownerFrozen = await signIn(OWNER_A);
+    const aiFrozen = await signIn(AI_COE);
+    const proposed = await dispose(ownerFrozen, VENDOR.caseId, findingId, {
+      expectedVersion: { versionId: version.versionId, revision },
+      kind: 'fixed_proposed',
+    });
+    assert.equal(proposed.statusCode, 201, proposed.body);
+
+    // Wall time still advances between requests; created_at comes from clock_timestamp().
+    await new Promise((r) => setTimeout(r, 5));
+    const confirmed = await dispose(aiFrozen, VENDOR.caseId, findingId, {
+      expectedVersion: { versionId: version.versionId, revision },
+      kind: 'fixed_confirmed',
+    });
+    assert.equal(confirmed.statusCode, 201, confirmed.body);
+
+    const latest = await db.owner.execute(sql`
+      SELECT kind FROM disposition_event
+      WHERE finding_id = ${findingId}
+      ORDER BY created_at DESC, id DESC
+      LIMIT 1
+    `);
+    assert.equal((latest.rows[0] as { kind: string }).kind, 'fixed_confirmed');
+  });
+
+  it('unavailable result stores qc_run status=unavailable with zero findings and returns runId', async () => {
     const owner = await signIn(OWNER_A);
     const version = await submitOk(owner, VENDOR.caseId);
     const revision = await caseRevision(VENDOR.caseId);
@@ -342,15 +383,138 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
     const ai = await signIn(AI_COE);
     const qc = await runLaneQc(ai, VENDOR.caseId, version.versionId, 'ai_coe', revision);
     assert.equal(qc.statusCode, 200, JSON.stringify(qc.body));
-    assert.equal(qc.body.status, 'unavailable');
-    assert.equal(qc.body.runId, null);
-    assert.equal(qc.body.findings.length, 0);
+    const body = qc.body as LaneQcRunResponse;
+    assert.equal(body.status, 'unavailable');
+    assert.ok(body.runId);
+    assert.equal(body.findings.length, 0);
 
     const findings = await db.owner.execute(
       sql`SELECT id FROM qc_finding WHERE version_id = ${version.versionId}`,
     );
     assert.equal(findings.rows.length, 0);
+    const runs = await db.owner.execute(
+      sql`SELECT id, status FROM qc_run WHERE version_id = ${version.versionId}`,
+    );
+    assert.equal(runs.rows.length, 1);
+    assert.equal((runs.rows[0] as { status: string }).status, 'unavailable');
+    assert.equal((runs.rows[0] as { id: string }).id, body.runId);
+  });
+
+  it('replaying a completed approve_attempt returns the same run and appends nothing', async () => {
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, VENDOR.caseId);
+    const revision = await caseRevision(VENDOR.caseId);
+    const ai = await signIn(AI_COE);
+    const first = await runLaneQc(ai, VENDOR.caseId, version.versionId, 'ai_coe', revision);
+    assert.equal(first.statusCode, 200);
+    const firstBody = first.body as LaneQcRunResponse;
+    assert.equal(firstBody.status, 'completed');
+
+    const second = await runLaneQc(ai, VENDOR.caseId, version.versionId, 'ai_coe', revision);
+    assert.equal(second.statusCode, 200);
+    const secondBody = second.body as LaneQcRunResponse;
+    assert.equal(secondBody.status, 'completed');
+    assert.equal(secondBody.runId, firstBody.runId);
+    assert.deepEqual(
+      secondBody.findings.map((f) => f.findingId).sort(),
+      firstBody.findings.map((f) => f.findingId).sort(),
+    );
+
+    const runs = await db.owner.execute(
+      sql`SELECT count(*)::int AS n FROM qc_run WHERE version_id = ${version.versionId}`,
+    );
+    assert.equal((runs.rows[0] as { n: number }).n, 1);
+    const findings = await db.owner.execute(
+      sql`SELECT count(*)::int AS n FROM qc_finding WHERE version_id = ${version.versionId}`,
+    );
+    assert.equal((findings.rows[0] as { n: number }).n, firstBody.findings.length);
+  });
+
+  it('unavailable run may be followed by a later completed run for the same input', async () => {
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, VENDOR.caseId);
+    const revision = await caseRevision(VENDOR.caseId);
+    runner.simulateError('runner_error');
+    const ai = await signIn(AI_COE);
+    const unavailable = await runLaneQc(ai, VENDOR.caseId, version.versionId, 'ai_coe', revision);
+    assert.equal((unavailable.body as LaneQcRunResponse).status, 'unavailable');
+
+    const completed = await runLaneQc(ai, VENDOR.caseId, version.versionId, 'ai_coe', revision);
+    assert.equal(completed.statusCode, 200);
+    const body = completed.body as LaneQcRunResponse;
+    assert.equal(body.status, 'completed');
+    assert.ok(body.runId);
+    assert.notEqual(body.runId, (unavailable.body as LaneQcRunResponse).runId);
+
+    const runs = await db.owner.execute(sql`
+      SELECT status FROM qc_run WHERE version_id = ${version.versionId} ORDER BY completed_at ASC, id ASC
+    `);
+    assert.deepEqual(
+      (runs.rows as Array<{ status: string }>).map((r) => r.status),
+      ['unavailable', 'completed'],
+    );
+  });
+
+  it('lane QC is forbidden for owner, BU SPOC, Admin, and a different lane; no rows written', async () => {
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, VENDOR.caseId);
+    const revision = await caseRevision(VENDOR.caseId);
+
+    for (const [userId, lane] of [
+      [OWNER_A, 'ai_coe'],
+      [SPOC_CM, 'ai_coe'],
+      [ADMIN, 'ai_coe'],
+      [DPO, 'ai_coe'],
+    ] as const) {
+      const session = await signIn(userId);
+      const qc = await runLaneQc(session, VENDOR.caseId, version.versionId, lane, revision);
+      assert.equal(qc.statusCode, 403, `${userId} ${lane}`);
+    }
+
     const runs = await db.owner.execute(sql`SELECT id FROM qc_run WHERE version_id = ${version.versionId}`);
-    assert.equal(runs.rows.length, 0, 'prefer not recording unavailable as a qc_run (W0-06 §7.4)');
+    assert.equal(runs.rows.length, 0);
+    const findings = await db.owner.execute(
+      sql`SELECT id FROM qc_finding WHERE version_id = ${version.versionId}`,
+    );
+    assert.equal(findings.rows.length, 0);
+  });
+
+  it('missing or unsubmitted target is not_found; Ready is version_closed', async () => {
+    const owner = await signIn(OWNER_A);
+    const draftRes = await app.inject({
+      method: 'GET',
+      url: `/api/cases/${VENDOR.caseId}/draft`,
+      headers: asUser(owner),
+    });
+    const draft = draftRes.json<PackDraft>();
+    const revision = await caseRevision(VENDOR.caseId);
+    const ai = await signIn(AI_COE);
+
+    const missing = await runLaneQc(ai, VENDOR.caseId, randomUUID(), 'ai_coe', revision);
+    assert.equal(missing.statusCode, 404);
+    assert.equal((missing.body as ErrorResponse).error.code, 'not_found');
+
+    const unsubmitted = await runLaneQc(ai, VENDOR.caseId, draft.draftId, 'ai_coe', revision);
+    assert.equal(unsubmitted.statusCode, 404);
+    assert.equal((unsubmitted.body as ErrorResponse).error.code, 'not_found');
+
+    const version = await submitOk(owner, VENDOR.caseId);
+    await db.owner.execute(sql`UPDATE pack_version SET ready_at = now() WHERE id = ${version.versionId}`);
+    const ready = await runLaneQc(
+      ai,
+      VENDOR.caseId,
+      version.versionId,
+      'ai_coe',
+      await caseRevision(VENDOR.caseId),
+    );
+    assert.equal(ready.statusCode, 409);
+    assert.equal((ready.body as ErrorResponse).error.code, 'stale_version');
+    assert.equal(
+      (ready.body as { error: { details: { reason: string } } }).error.details.reason,
+      'version_closed',
+    );
+
+    const runs = await db.owner.execute(sql`SELECT id FROM qc_run WHERE version_id = ${version.versionId}`);
+    assert.equal(runs.rows.length, 0);
   });
 });

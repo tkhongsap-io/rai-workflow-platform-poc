@@ -157,7 +157,7 @@ export async function recordDisposition(
           }
         }
 
-        const dispositionId = uuidv7(now.getTime());
+        const dispositionId = uuidv7();
         const evidenceRef =
           request.evidence === undefined
             ? null
@@ -168,7 +168,7 @@ export async function recordDisposition(
                   : { artifact_id: request.evidence.artifactId }),
               };
 
-        await insertDisposition(tx, {
+        const inserted = await insertDisposition(tx, {
           id: dispositionId,
           findingId: finding.id,
           kind: request.kind,
@@ -176,7 +176,6 @@ export async function recordDisposition(
           evidenceRef,
           actorSubjectId: ctx.actor.subjectId,
           actorRole: ctx.role,
-          createdAt: now,
           correlationId: ctx.correlationId,
         });
 
@@ -184,7 +183,7 @@ export async function recordDisposition(
           dispositionId,
           findingId: finding.id,
           kind: request.kind,
-          recordedAt: now.toISOString(),
+          recordedAt: inserted.createdAt.toISOString(),
           caseRevision: before.rowVersion,
         };
 

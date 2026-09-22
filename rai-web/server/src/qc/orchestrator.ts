@@ -1,9 +1,10 @@
 // W2-05 QC orchestrator: builds a request, calls the injected QcRunner, validates, and persists single-lane
-// defect findings only (W0-06 7.1 / 7.4). Unavailable results and rule_pending findings are not stored.
-// Production start leaves the runner unbound (no-op); tests inject the W1-10 substitute.
+// defect findings only (W0-06 7.1 / 7.4). Unavailable results store a qc_run with status unavailable and zero
+// findings (W0-07 3.4 / 3.6). Production start leaves the runner unbound (no-op); tests inject the W1-10 substitute.
 
 import { createHash } from 'node:crypto';
 import { LANE_MAPPINGS_BY_VERSION, owningLaneForSlot, type Lane, type Slot } from '@rai/shared/constants';
+import { NotFoundError, StaleVersionError } from '@rai/shared/errors';
 import { uuidv7 } from '@rai/shared/ids';
 import type {
   AuthorizedArtifactRef,
@@ -17,11 +18,18 @@ import type {
 import { checkOwningLane, validateQcFinding } from '@rai/shared/qc/validate';
 import type { CaseRow, PackVersionRow } from '../cases/repository.js';
 import { readCaseRow, readVersionRow } from '../cases/repository.js';
+import { staleDetails } from '../cases/service.js';
 import type { Db, Tx } from '../db/client.js';
 import { setWorkflowWrite, lockCase, withTransaction } from '../db/transaction.js';
 import { auditStore } from '../audit/store.js';
 import { readSlotsWithArtifacts } from '../versions/repository.js';
-import { insertQcFinding, insertQcRun, type InsertFindingInput } from './repository.js';
+import {
+  findLatestApproveAttemptRun,
+  insertQcFinding,
+  insertQcRun,
+  listFindingsForRun,
+  type InsertFindingInput,
+} from './repository.js';
 
 export const QC_TIMEOUT_MS = 10_000;
 
@@ -50,9 +58,7 @@ export interface StoredFindingView {
 
 export type PersistQcOutcome =
   | { status: 'completed'; runId: string; findings: StoredFindingView[] }
-  | { status: 'unavailable'; reason: string; runId: null; findings: [] }
-  | { status: 'late'; runId: null; findings: [] }
-  | { status: 'noop'; runId: null; findings: [] };
+  | { status: 'unavailable'; reason: string; runId: string; findings: [] };
 
 function runKeyOf(
   versionId: string,
@@ -73,6 +79,15 @@ function runKeyOf(
 function slotOfFinding(finding: QcFinding): Slot | null {
   if (finding.scope.kind === 'artifact' || finding.scope.kind === 'slot') return finding.scope.slot;
   return null;
+}
+
+function refreshPathFor(caseId: string, version: PackVersionRow): string {
+  return `/cases/${caseId}/versions/${version.id}`;
+}
+
+function ruleRevisionOf(version: PackVersionRow): string {
+  const frozen = (version.frozenConfiguration ?? {}) as Record<string, string>;
+  return frozen.qc_rules ?? version.configurationRevisionId ?? '';
 }
 
 /** Keep only defect findings whose slot maps to a real owning lane under the version's mapping. */
@@ -140,8 +155,7 @@ async function buildRequest(
       read: () => Promise.resolve(new ReadableStream()),
     });
   }
-  const frozen = (version.frozenConfiguration ?? {}) as Record<string, string>;
-  const ruleRevision = frozen.qc_rules ?? version.configurationRevisionId ?? '';
+  const ruleRevision = ruleRevisionOf(version);
   return {
     correlationId,
     runKey: runKeyOf(
@@ -185,7 +199,7 @@ async function persistCompleted(
     qcRulesRevision: request.qcRulesRevision,
     checklistTemplateVersion: request.checklistTemplateVersion,
   });
-  const runId = uuidv7(now.getTime());
+  const runId = uuidv7();
   await insertQcRun(tx, {
     id: runId,
     versionId: version.id,
@@ -202,7 +216,7 @@ async function persistCompleted(
 
   const findings: StoredFindingView[] = [];
   for (const finding of storeable) {
-    const findingId = uuidv7(now.getTime());
+    const findingId = uuidv7();
     const slot = slotOfFinding(finding);
     const row: InsertFindingInput = {
       id: findingId,
@@ -220,7 +234,6 @@ async function persistCompleted(
       threshold: finding.measure?.threshold ?? null,
       messageKey: finding.message.key,
       messageParams: finding.message.params,
-      createdAt: now,
     };
     await insertQcFinding(tx, row);
     findings.push({
@@ -252,9 +265,35 @@ async function persistCompleted(
   return { runId, findings };
 }
 
+async function persistUnavailable(
+  tx: Tx,
+  version: PackVersionRow,
+  request: QcRunRequest,
+  runner: QcRunner,
+  startedAt: Date,
+  finishedAt: Date,
+  correlationId: string,
+): Promise<string> {
+  const runId = uuidv7();
+  await insertQcRun(tx, {
+    id: runId,
+    versionId: version.id,
+    trigger: request.trigger,
+    slot: null,
+    lane: request.lane,
+    engineId: runner.identity.runner,
+    ruleRevision: request.qcRulesRevision,
+    status: 'unavailable',
+    requestedAt: startedAt,
+    completedAt: finishedAt,
+    correlationId,
+  });
+  return runId;
+}
+
 /**
- * Runs lane QC (approve_attempt) and persists storeable defect findings.
- * Unavailable: nothing written (W0-06 7.4 until §7.3; prefer not recording).
+ * Runs lane QC (approve_attempt) and persists storeable defect findings or an unavailable run row.
+ * Replay of a completed run for the same input returns the existing rows (W0-07 3.4 step 2 / 3.7).
  */
 export async function runAndPersistLaneQc(
   deps: QcOrchestratorDeps,
@@ -265,16 +304,52 @@ export async function runAndPersistLaneQc(
 
   return withTransaction(deps.db, async (tx) => {
     await setWorkflowWrite(tx);
-    if (!(await lockCase(tx, input.caseId))) return { status: 'noop', runId: null, findings: [] };
+    if (!(await lockCase(tx, input.caseId))) throw new NotFoundError('case');
     const caseRow = await readCaseRow(tx, input.caseId);
-    if (caseRow === undefined) return { status: 'noop', runId: null, findings: [] };
+    if (caseRow === undefined) throw new NotFoundError('case');
 
     const version = await readVersionRow(tx, input.versionId);
     if (version === undefined || version.caseId !== input.caseId) {
-      return { status: 'noop', runId: null, findings: [] };
+      throw new NotFoundError('version');
     }
-    if (version.readyAt != null) return { status: 'late', runId: null, findings: [] };
-    if (version.submittedAt === null) return { status: 'noop', runId: null, findings: [] };
+
+    const current =
+      caseRow.currentVersionId === null ? undefined : await readVersionRow(tx, caseRow.currentVersionId);
+    if (current === undefined) throw new NotFoundError('version');
+
+    // W0-06 4.4 preconditions for the lane-QC read: submitted, current, not Ready.
+    if (current.readyAt != null) {
+      throw new StaleVersionError(
+        staleDetails(
+          'version_closed',
+          'error.stale_version.guidance.ready',
+          current,
+          caseRow.rowVersion,
+          refreshPathFor(input.caseId, current),
+        ),
+      );
+    }
+    if (current.id !== version.id) {
+      throw new StaleVersionError(
+        staleDetails(
+          'version_superseded',
+          'error.stale_version.guidance.version_superseded',
+          current,
+          caseRow.rowVersion,
+          refreshPathFor(input.caseId, current),
+        ),
+      );
+    }
+    if (version.submittedAt === null) {
+      throw new NotFoundError('version');
+    }
+
+    const ruleRevision = ruleRevisionOf(version);
+    const prior = await findLatestApproveAttemptRun(tx, version.id, input.lane, ruleRevision);
+    if (prior !== undefined && prior.status === 'completed') {
+      const findings = await listFindingsForRun(tx, prior.id);
+      return { status: 'completed', runId: prior.id, findings };
+    }
 
     const request = await buildRequest(
       tx,
@@ -289,18 +364,37 @@ export async function runAndPersistLaneQc(
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     let result: QcRunResult;
+    const startedAt = now;
     try {
       result = await deps.runner.run(request, controller.signal);
     } catch {
       clearTimeout(timer);
-      // Prefer not recording unavailable (timeout / crash) as a qc_run or finding (W0-06 7.4).
-      return { status: 'unavailable', reason: 'timeout', runId: null, findings: [] };
+      const finishedAt = (deps.now ?? (() => new Date()))();
+      const runId = await persistUnavailable(
+        tx,
+        version,
+        request,
+        deps.runner,
+        startedAt,
+        finishedAt,
+        input.correlationId,
+      );
+      return { status: 'unavailable', reason: 'timeout', runId, findings: [] };
     } finally {
       clearTimeout(timer);
     }
 
     if (result.status === 'unavailable') {
-      return { status: 'unavailable', reason: result.reason, runId: null, findings: [] };
+      const runId = await persistUnavailable(
+        tx,
+        version,
+        request,
+        deps.runner,
+        new Date(result.startedAt),
+        new Date(result.finishedAt),
+        input.correlationId,
+      );
+      return { status: 'unavailable', reason: result.reason, runId, findings: [] };
     }
 
     const persisted = await persistCompleted(
