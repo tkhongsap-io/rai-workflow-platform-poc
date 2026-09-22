@@ -1,6 +1,6 @@
 # Delivery pack
 
-Status: **G0 closed 2026-09-21. W0-W3 authorized on synthetic data (D03). W0 tickets are Ready; W1-W3 tickets are blocked by W0 exit.** [BUILD_PLAN](../../BUILD_PLAN.md) stays the canonical plan. This pack is the work a team of 2-3 engineers plus AI agents picks up now.
+Status: **G0 and W0-W2 exits recorded; W3 synthetic engineering exit recorded 2026-09-23, with Ta’s package review pending. W4–W8 remain gated.** See the [W3 evidence](../../changes/2026-09-23-w3-exit/review.md) and linked issues for current status. [BUILD_PLAN](../../BUILD_PLAN.md) stays the canonical plan. This pack is the work a team of 2-3 engineers plus AI agents picks up now.
 
 ## Read in this order
 

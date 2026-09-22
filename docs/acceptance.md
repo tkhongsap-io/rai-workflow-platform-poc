@@ -1,6 +1,6 @@
-# Acceptance contract (planned tests)
+# Acceptance contract
 
-None of these product tests has run: no application exists yet; W0-W3 are authorized. Source: [v1 specification](product/source-spec.md). Edge-case semantics follow the recorded [decisions](product/decisions.md). Use synthetic fixtures first; retain actual test outputs when implementation begins.
+W0-W3 are authorized and have recorded synthetic engineering evidence. The [W3 exit](../changes/2026-09-23-w3-exit/review.md) maps executed checks and partial/future boundaries; this contract is not a claim that every acceptance ID is complete. Source: [v1 specification](product/source-spec.md). Edge-case semantics follow the recorded [decisions](product/decisions.md). Use synthetic fixtures first; retain actual test outputs when implementation begins.
 
 | Requirement | Test ID and observable proof |
 |---|---|

@@ -1,5 +1,7 @@
 # Playbook adoption
 
+**Current status, 2026-09-23:** W0–W3 now have implementation, independent code reviews, runtime/CI tests and a synthetic engineering exit. The tables below record the original planning adoption, not current implementation status. Production controls, operator acceptance and full baseline compliance are not implied. See the [W3 engineering exit](../../changes/2026-09-23-w3-exit/review.md).
+
 Pinned source: [tkhongsap-ai-engineering-playbook](https://github.com/tkhongsap-io/tkhongsap-ai-engineering-playbook/tree/b0ee7f088e0367d4690bfc30ea926da57913805b), commit `b0ee7f088e0367d4690bfc30ea926da57913805b`.
 
 Guidance inspected: README; handbook/philosophy.md and risk-tiers.md; playbooks/adopt-in-a-project.md; agents/agent-contract.md; standards/README.md, documentation.md, architecture.md, security-and-governance.md and testing-and-evaluation.md (relevant excerpts); templates/README.md, plan.md and review.md. This is scoped adoption, not a claim that every playbook control was audited.

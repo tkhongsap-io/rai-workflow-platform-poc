@@ -13,6 +13,6 @@ This repository contains product documentation, an authorized synthetic local de
 - For the authorized demo, use demo/README.md and TESTING.md. Production stack and release gates remain pending; never promote synthetic checks to production acceptance.
 - Keep product source snapshots immutable; record an approved successor and its provenance when requirements change.
 
-Before picking work, read docs/delivery/README.md and docs/board/README.md. Agents follow the may/may-not list in docs/delivery/team-and-roles.md: implement one ticket at a time from a task brief, never decide D04 or D07-D10 or reopen a recorded decision, never merge, publish or touch real data. Append a CLAIM to the lane's board stream before working it.
+Before picking work, read docs/delivery/README.md and docs/board/README.md. Agents follow the may/may-not list in docs/delivery/team-and-roles.md: implement one ticket at a time from a task brief, implement recorded D04, leave D07-D10 to their owners, and never reopen a recorded decision. Merge only through the authorized D03 reviewed-ticket flow; publication and real data remain gated. Append a CLAIM to the lane's board stream before working it.
 
 Future branches: codex/<ticket-id>-<topic> for ticket work and codex/<short-topic> for documentation; one ticket per branch and PR; use reviewed PRs for implementation. Human review remains authoritative.
