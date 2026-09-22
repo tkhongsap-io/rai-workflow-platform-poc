@@ -69,3 +69,9 @@ Existing CI does not automatically select the22 performance tests or standalone 
 Parent approval was recorded in plan.md before editing the manifest. Only existing rai-web/package.json test:unit and typecheck scripts changed: the performance test glob is included and TypeScript builds both the root and tests/performance projects. No dependencies, lockfile, runtime or CI job changes. Runbook preserves and clarifies the observed restricted-child canonical tmpdir requirement.
 
 Normal commands under standard Node24.21.0 passed: npm run typecheck; npm run test:unit (**558 passed, zero failures/skips**, including all22 performance names individually confirmed in regular output); npm run lint (full ESLint, Prettier and CSS check). Private logs: rai-web/.local/performance-normal-typecheck.log, performance-normal-unit.log, performance-normal-lint.log. Repository links/frozen-source and diff whitespace checks pass. No DB restart, application startup, browser or timing benchmark in this amendment. Commit is ready for Descartes review; merged INT and idle local tests remain required before measurements.
+
+## Collected verification-script independent review
+
+Parent relayed Descartes's CLEAN review of exact `357849164bf6c03ca17855b34eabd311afe57428`, with no findings. Reviewer independently ran the normal unit command:558 passed, zero skips; a typecheck dry run confirmed both root and performance projects are included. This records the independent evidence as reported, not a new local rerun or full reviewer typecheck execution.
+
+Code remains immutable while INT's browser-fix final verification runs. Timing remains held until the parent's explicit go after integration delivery. Owned54370 resources stay stopped and retained as documented; this append makes no code, resource or execution changes.
