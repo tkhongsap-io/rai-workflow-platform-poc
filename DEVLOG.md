@@ -1,5 +1,9 @@
 # Development log
 
+## Handoff after W3-05 — 2026-09-22
+
+`main` is `39bbf0a`. W3-05 (PR #104) and the QC case-lock fix (PR #103, `7382222`) are recorded in CHANGELOG.md and in the BUILD_PLAN status section. README build status no longer says the next step is W0. **Next ticket is W3-01** (role-scoped queue). It can use `LaneDue` / `SlaBreach`. Do not start W3-03 or W3-04 until the W1-11 mail sink is on `main`. Issue #35 and epic #53 stay open. W4–W8 are not authorized.
+
 ## W3-05: working-day SLA — 2026-09-22
 
 A lane's due date is computed from the version's `submitted_at` and the `sla` and `calendar` revisions frozen at submit (Asia/Bangkok, weekends and the frozen holiday list skipped, open date not counted). A later SLA revision does not move an already-frozen version. Resubmit starts a new clock. `listSlaBreaches` returns only pending lanes on the current review target whose due date is before the as-of Bangkok day. No SLA HTTP route, no mail send, no escalation. Issue #35 stays open.
