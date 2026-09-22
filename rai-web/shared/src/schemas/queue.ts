@@ -58,3 +58,6 @@ export interface QueueResponse {
   /** Counts apply to actor-visible cases before optional filters; all statuses are present. */
   statusCounts: Record<CaseStatus, number>;
 }
+
+// W0-10 names the W3 shapes surface; definitions live separately to keep queue consumers stable.
+export * from './observability.js';

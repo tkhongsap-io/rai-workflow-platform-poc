@@ -16,3 +16,4 @@ export * from './notification.js';
 export * from './session.js';
 export * from './fixture-set.js';
 export * from './registry-counter.js';
+export * from './operator-job-run.js';
