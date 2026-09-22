@@ -8,6 +8,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useLocale } from './i18n/locale-provider.js';
 import { useSession } from './session/session-provider.js';
 import { RETURN_TO_PARAM, ROUTES } from './routes.js';
+import { QueueScreen } from './screens/queue/queue-screen.js';
 import { CaseScreen } from './screens/case/case-screen.js';
 import { CaseListScreen } from './screens/cases/case-list-screen.js';
 import { NewCaseScreen } from './screens/cases/new-case-screen.js';
@@ -39,6 +40,14 @@ export function AppRoutes(): JSX.Element {
     <Routes>
       <Route path={ROUTES.root} element={<Navigate to={ROUTES.cases} replace={true} />} />
       <Route path={ROUTES.signIn} element={<SignInScreen />} />
+      <Route
+        path={ROUTES.queue}
+        element={
+          <RequireSession>
+            <QueueScreen />
+          </RequireSession>
+        }
+      />
       <Route
         path={ROUTES.cases}
         element={

@@ -98,7 +98,7 @@ export function AppShell({ children }: { children: ReactNode }): JSX.Element {
           {t('shell.skip_to_content')}
         </a>
         <div className={'shell-header'}>
-          <Link to={signedIn ? ROUTES.cases : ROUTES.signIn} className={'brand'}>
+          <Link to={signedIn ? ROUTES.queue : ROUTES.signIn} className={'brand'}>
             <span className={'brand-mark'} aria-hidden={true} />
             <span>{t('app.title')}</span>
           </Link>
@@ -122,6 +122,9 @@ export function AppShell({ children }: { children: ReactNode }): JSX.Element {
       </header>
       {signedIn ? (
         <nav className={'shell-nav'} aria-label={t('shell.nav_label')}>
+          <NavLink to={ROUTES.queue} end={true}>
+            {t('queue.title')}
+          </NavLink>
           <NavLink to={ROUTES.cases} end={true}>
             {t('shell.nav.cases')}
           </NavLink>
