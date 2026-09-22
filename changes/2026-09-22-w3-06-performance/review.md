@@ -62,3 +62,10 @@ Against the combined INT types:22 pure tests pass, zero failures/skips; focused 
 The lead's smoke-only amendment was recorded before execution. [Functional evidence](smoke.md) records guarded fresh setup, actual launcher/role identity proof, one enrolled real submission, settled QC/outbox, three approvals and Ready, clean shutdown, log privacy, retained initial failures and exact commands. No tracked code changed during attestation. Own Compose container is stopped and54370/60870 released. Functional proof does not authorize timing or claim merged INT acceptance.
 
 Existing CI does not automatically select the22 performance tests or standalone TypeScript project. The plan now proposes the minimal package-script exception; no manifest/CI edit has been made. Runtime/benchmark hold otherwise remains in force pending parent direction and merged INT.
+
+
+## Approved verification-script exception implemented
+
+Parent approval was recorded in plan.md before editing the manifest. Only existing rai-web/package.json test:unit and typecheck scripts changed: the performance test glob is included and TypeScript builds both the root and tests/performance projects. No dependencies, lockfile, runtime or CI job changes. Runbook preserves and clarifies the observed restricted-child canonical tmpdir requirement.
+
+Normal commands under standard Node24.21.0 passed: npm run typecheck; npm run test:unit (**558 passed, zero failures/skips**, including all22 performance names individually confirmed in regular output); npm run lint (full ESLint, Prettier and CSS check). Private logs: rai-web/.local/performance-normal-typecheck.log, performance-normal-unit.log, performance-normal-lint.log. Repository links/frozen-source and diff whitespace checks pass. No DB restart, application startup, browser or timing benchmark in this amendment. Commit is ready for Descartes review; merged INT and idle local tests remain required before measurements.
