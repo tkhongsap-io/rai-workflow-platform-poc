@@ -47,6 +47,7 @@ export interface ResolvedOptions {
   uploadMaxFileBytes: number;
   uploadMaxPackBytes: number;
   sessionAbsoluteHours: number;
+  qcTimeoutMs: number;
 }
 
 export interface RouteContext {
@@ -90,6 +91,7 @@ const DEFAULTS: ResolvedOptions = {
   uploadMaxFileBytes: 26_214_400, // .env.example UPLOAD_MAX_FILE_BYTES (W0-08 section 3)
   uploadMaxPackBytes: 157_286_400, // UPLOAD_MAX_PACK_BYTES
   sessionAbsoluteHours: 12, // RAI_SESSION_ABSOLUTE_HOURS
+  qcTimeoutMs: 10_000, // server QC_TIMEOUT_MS
 };
 
 interface CompiledRoute extends RouteDefinition {

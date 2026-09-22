@@ -39,6 +39,7 @@ import type { SubmittedVersion } from '@rai/shared/schemas/versions';
 import type { RouteContext, RouteDefinition } from './handler.js';
 import { authorizedCase } from './routes-cases.js';
 import type { StoredCase, StoredFinding, StoredLaneDecision, StoredQcRun } from './store.js';
+import { UNBOUND_ENGINE_ID } from './store.js';
 import { assertValid, json, parseJsonBody, UUID_PATTERN } from './support.js';
 import {
   actorOf,
@@ -196,21 +197,64 @@ async function runLaneQc(
 ): Promise<LaneQcRunResponse> {
   const key = ctx.store.qcRunKey(version.versionId, lane);
   const prior = ctx.store.qcRuns.get(key);
+  // Completed runs replay (W0-07 3.7). Unavailable replays only when unbound and still unbound
+  // (real orchestrator); runner_error / timeout fall through and re-run.
   if (prior !== undefined && prior.status === 'completed') {
     return { runId: prior.runId, status: 'completed', findings: prior.findings.map((f) => ({ ...f })) };
   }
-  if (prior !== undefined && prior.status === 'unavailable') {
+  if (
+    prior !== undefined &&
+    prior.status === 'unavailable' &&
+    prior.engineId === UNBOUND_ENGINE_ID &&
+    ctx.store.qcRunner === null
+  ) {
     return {
       runId: prior.runId,
       status: 'unavailable',
-      ...(prior.reason === undefined ? {} : { reason: prior.reason }),
+      reason: 'not_configured',
       findings: [],
     };
   }
 
   const request = buildLaneQcRequest(ctx, stored, version, lane);
-  const result = await ctx.store.qcRunner.run(request, new AbortController().signal);
   const runId = uuidv7(ctx.options.now().getTime());
+
+  if (ctx.store.qcRunner === null) {
+    const row: StoredQcRun = {
+      runId,
+      versionId: version.versionId,
+      lane,
+      status: 'unavailable',
+      engineId: UNBOUND_ENGINE_ID,
+      reason: 'not_configured',
+      findings: [],
+    };
+    ctx.store.qcRuns.set(key, row);
+    return { runId, status: 'unavailable', reason: 'not_configured', findings: [] };
+  }
+
+  const runner = ctx.store.qcRunner;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ctx.options.qcTimeoutMs);
+  let result: Awaited<ReturnType<typeof runner.run>>;
+  try {
+    result = await runner.run(request, controller.signal);
+  } catch {
+    clearTimeout(timer);
+    const row: StoredQcRun = {
+      runId,
+      versionId: version.versionId,
+      lane,
+      status: 'unavailable',
+      engineId: runner.identity.runner,
+      reason: 'timeout',
+      findings: [],
+    };
+    ctx.store.qcRuns.set(key, row);
+    return { runId, status: 'unavailable', reason: 'timeout', findings: [] };
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (result.status === 'unavailable') {
     const row: StoredQcRun = {
@@ -218,6 +262,7 @@ async function runLaneQc(
       versionId: version.versionId,
       lane,
       status: 'unavailable',
+      engineId: runner.identity.runner,
       reason: result.reason,
       findings: [],
     };
@@ -258,6 +303,7 @@ async function runLaneQc(
     versionId: version.versionId,
     lane,
     status: 'completed',
+    engineId: runner.identity.runner,
     findings: summaries,
   };
   ctx.store.qcRuns.set(key, row);
@@ -439,7 +485,6 @@ export function reviewRoutes(): RouteDefinition[] {
         assertValid(DispositionRequestSchema, body);
         const request = body as DispositionRequest;
         const action = KIND_TO_ACTION[request.kind];
-        const reason = requireReasonForDisposition(request.kind, request.reason);
 
         if (stored === undefined) {
           const probe = authorize(actorOf(ctx.principal), action, { kind: 'unresolved' });
@@ -474,6 +519,8 @@ export function reviewRoutes(): RouteDefinition[] {
         }
 
         const authz = authorizeFinding(ctx, action, stored, finding.owningLane);
+        // Reason after authorize: an unauthorized waived/N/A with no reason is 403, not 422.
+        const reason = requireReasonForDisposition(request.kind, request.reason);
         const digest = requestDigest('finding.disposition', ctx.path, ctx.request.body);
         const replay = replayFor(ctx, key, digest, stored.caseId);
         if (replay !== undefined) return replay;

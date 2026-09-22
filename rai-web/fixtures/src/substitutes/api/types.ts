@@ -38,6 +38,8 @@ export interface ApiSubstituteOptions {
   uploadMaxPackBytes?: number;
   /** Session absolute lifetime (W0-03; `.env.example` RAI_SESSION_ABSOLUTE_HOURS). */
   sessionAbsoluteHours?: number;
+  /** Lane-QC abort deadline (ms); mirrors server `QC_TIMEOUT_MS` so a hang resolves as unavailable:timeout. */
+  qcTimeoutMs?: number;
 }
 
 /** One `authz.denied` line the substitute recorded (W0-10 3.3 fields), so a test can assert the denial reason. */

@@ -73,9 +73,13 @@ export interface StoredQcRun {
   versionId: string;
   lane: Lane;
   status: 'completed' | 'unavailable';
+  /** `unbound` when no runner was bound; otherwise the runner identity (W2-05 / W0-07). */
+  engineId: string;
   reason?: 'timeout' | 'runner_error' | 'not_configured' | 'artifact_unreadable';
   findings: StoredFindingSummary[];
 }
+
+export const UNBOUND_ENGINE_ID = 'unbound' as const;
 
 /** The instant the fixture rows carry (`created_at`, `uploaded_at`); fixed so every read is reproducible. */
 export const FIXTURE_LOADED_AT = '2026-09-21T00:00:00.000Z';
@@ -130,8 +134,11 @@ export class SubstituteStore {
   findings = new Map<string, StoredFinding>();
   dispositions = new Map<string, StoredDisposition[]>(); // findingId → append-only list
   qcRuns = new Map<string, StoredQcRun>(); // `${versionId}\0${lane}` latest approve_attempt
-  /** W1-10 ScriptedQcRunner; tests may call simulateError / simulateTimeout for unavailable runs. */
-  qcRunner: ScriptedQcRunner;
+  /**
+   * W1-10 ScriptedQcRunner, or null when unbound (server `deps.runner === undefined`).
+   * Tests may call simulateError / simulateTimeout, or set null to exercise unbound replay.
+   */
+  qcRunner: ScriptedQcRunner | null;
   /** Every log line the substitute emitted (`authz.denied` and friends), for tests; never written anywhere. */
   logLines: RecordedLogLine[] = [];
   private registryCounter = 0;
@@ -146,12 +153,16 @@ export class SubstituteStore {
       slaWorkingDays: { ...CONFIGURATION_SEED.sla },
       timezone: APP_TIMEZONE,
     });
-    this.qcRunner = new ScriptedQcRunner({
+    this.qcRunner = null;
+    this.reset();
+  }
+
+  private bindDefaultQcRunner(): ScriptedQcRunner {
+    return new ScriptedQcRunner({
       fixtureCaseIdOf: (version) => this.cases.get(version.caseId)?.fixtureCaseId,
       onScriptMismatch: 'unavailable',
       now: () => new Date(),
     });
-    this.reset();
   }
 
   /** Rebuilds the fixture state; drops every session, upload, version, decision, finding and idempotency record. */
@@ -164,7 +175,7 @@ export class SubstituteStore {
     this.findings.clear();
     this.dispositions.clear();
     this.qcRuns.clear();
-    this.qcRunner.reset();
+    this.qcRunner = this.bindDefaultQcRunner();
     this.logLines = [];
     this.registryCounter = 0;
     for (const document of FIXTURE_DOCUMENTS)

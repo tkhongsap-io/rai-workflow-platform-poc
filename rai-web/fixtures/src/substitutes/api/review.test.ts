@@ -17,7 +17,16 @@ import { createApiSubstitute, type ApiSubstitute } from './handler.js';
 import { call, signIn, type CallResult } from './testing.js';
 
 interface Envelope {
-  error: { code: string; messageKey: string; correlationId: string; details?: unknown };
+  error: {
+    code: string;
+    messageKey: string;
+    correlationId: string;
+    details?: { reason?: string; fields?: unknown; [key: string]: unknown };
+  };
+}
+
+function staleReason(response: CallResult): string | undefined {
+  return response.json<Envelope>().error.details?.reason;
 }
 
 const nonvendor = findFixtureCase('fx-case-nonvendor')!;
@@ -28,7 +37,10 @@ describe('W2-10 substitute: W2 shapes (approve, send-back, qc-run, disposition)'
   const users: Record<string, string> = {};
 
   beforeEach(async () => {
-    substitute = createApiSubstitute({ now: () => new Date('2026-09-22T12:00:00Z') });
+    substitute = createApiSubstitute({
+      now: () => new Date('2026-09-22T12:00:00Z'),
+      qcTimeoutMs: 50,
+    });
     for (const id of [
       'fx-user-owner-cm',
       'fx-user-spoc-cm',
@@ -169,6 +181,7 @@ describe('W2-10 substitute: W2 shapes (approve, send-back, qc-run, disposition)'
       });
       assert.equal(response.status, 409, response.text());
       assert.equal(response.json<Envelope>().error.code, 'stale_version');
+      assert.equal(staleReason(response), 'version_closed');
       assert.equal(substitute.store.decisions.size, decisionsBefore);
     });
 
@@ -193,9 +206,10 @@ describe('W2-10 substitute: W2 shapes (approve, send-back, qc-run, disposition)'
         expectedVersion: { versionId: version.versionId, revision: 1 },
         qcRunId: randomUUID(),
       });
-      // lane already decided first — use a fresh case where Ready holds and a fourth mutate fails version_closed
-      // After Ready, lane_already_decided fires before we need another lane; assert the Ready case via qc-run below.
+      // Ready closes mutating approve as version_closed (checked before lane_already_decided).
       assert.equal(again.status, 409, again.text());
+      assert.equal(again.json<Envelope>().error.code, 'stale_version');
+      assert.equal(staleReason(again), 'version_closed');
     });
 
     it('missing idempotency key is 422; replay of the same key returns the original body', async () => {
@@ -346,6 +360,7 @@ describe('W2-10 substitute: W2 shapes (approve, send-back, qc-run, disposition)'
       });
       assert.equal(again.status, 409, again.text());
       assert.equal(again.json<Envelope>().error.code, 'stale_version');
+      assert.equal(staleReason(again), 'lane_already_decided');
     });
   });
 
@@ -368,8 +383,9 @@ describe('W2-10 substitute: W2 shapes (approve, send-back, qc-run, disposition)'
       }
     });
 
-    it('unavailable run returns a run id and zero findings; wrong lane is 403; stale is 409', async () => {
+    it('unavailable runner_error re-runs; hang becomes timeout; wrong lane 403; Ready is version_closed', async () => {
       const version = await submit(vendor);
+      assert.ok(substitute.store.qcRunner);
       substitute.store.qcRunner.simulateError('runner_error');
       const unavailable = await qcRun('fx-user-dpo', vendor.caseId, version.versionId, 'dpo', {
         expectedVersion: { versionId: version.versionId, revision: 1 },
@@ -382,12 +398,40 @@ describe('W2-10 substitute: W2 shapes (approve, send-back, qc-run, disposition)'
       assert.deepEqual(body.findings, []);
       assert.equal([...substitute.store.findings.values()].filter((f) => f.runId === body.runId).length, 0);
 
+      // runner_error is not permanently cached: next call (no simulation) can complete.
+      const retry = await qcRun('fx-user-dpo', vendor.caseId, version.versionId, 'dpo', {
+        expectedVersion: { versionId: version.versionId, revision: 1 },
+      });
+      assert.equal(retry.status, 200, retry.text());
+      assert.equal(retry.json<LaneQcRunResponse>().status, 'completed');
+
+      // Simulated hang is aborted by the route timeout → unavailable:timeout, not pending.
+      const runner = substitute.store.qcRunner;
+      assert.ok(runner);
+      runner.simulateTimeout('hang');
+      const hung = await qcRun('fx-user-ai-coe', vendor.caseId, version.versionId, 'ai_coe', {
+        expectedVersion: { versionId: version.versionId, revision: 1 },
+      });
+      assert.equal(hung.status, 200, hung.text());
+      const hungBody = hung.json<LaneQcRunResponse>();
+      assert.equal(hungBody.status, 'unavailable');
+      assert.equal(hungBody.reason, 'timeout');
+      assert.deepEqual(hungBody.findings, []);
+
+      // After the hang simulation is consumed, a later call can return completed.
+      const afterHang = await qcRun('fx-user-ai-coe', vendor.caseId, version.versionId, 'ai_coe', {
+        expectedVersion: { versionId: version.versionId, revision: 1 },
+      });
+      assert.equal(afterHang.status, 200, afterHang.text());
+      assert.equal(afterHang.json<LaneQcRunResponse>().status, 'completed');
+      assert.ok(afterHang.json<LaneQcRunResponse>().findings.length >= 1);
+
       const wrong = await qcRun('fx-user-dpo', vendor.caseId, version.versionId, 'ai_coe', {
         expectedVersion: { versionId: version.versionId, revision: 1 },
       });
       assert.equal(wrong.status, 403);
 
-      // Ready closes qc-run: three approvals on a clean case, then qc-run is version_closed.
+      // Ready closes qc-run as version_closed.
       const clean = await submit();
       for (const [user, lane] of [
         ['fx-user-dpo', 'dpo'],
@@ -409,6 +453,7 @@ describe('W2-10 substitute: W2 shapes (approve, send-back, qc-run, disposition)'
       });
       assert.equal(closed.status, 409, closed.text());
       assert.equal(closed.json<Envelope>().error.code, 'stale_version');
+      assert.equal(staleReason(closed), 'version_closed');
     });
   });
 
@@ -423,8 +468,15 @@ describe('W2-10 substitute: W2 shapes (approve, send-back, qc-run, disposition)'
       return { version, findingId };
     }
 
-    it('waived/N/A without reason is 422; non-owning lane is 403; owner fixed_proposed stays proposed', async () => {
+    it('authorize before reason: unauthorized waived without reason is 403; own-lane waived without reason is 422', async () => {
       const { version, findingId } = await findingOnVendor();
+      const unauthorized = await disposition('fx-user-dpo', vendor.caseId, findingId, {
+        expectedVersion: { versionId: version.versionId, revision: 1 },
+        kind: 'waived',
+      });
+      assert.equal(unauthorized.status, 403, unauthorized.text());
+      assert.equal(unauthorized.json<Envelope>().error.code, 'forbidden');
+
       const noReason = await disposition('fx-user-ai-coe', vendor.caseId, findingId, {
         expectedVersion: { versionId: version.versionId, revision: 1 },
         kind: 'waived',
@@ -459,7 +511,7 @@ describe('W2-10 substitute: W2 shapes (approve, send-back, qc-run, disposition)'
       assert.deepEqual(substitute.store.findings.get(findingId), frozen);
     });
 
-    it('stale expected version is 409 and appends nothing', async () => {
+    it('stale expected version is 409 version_superseded and appends nothing', async () => {
       const { findingId } = await findingOnVendor();
       const before = (substitute.store.dispositions.get(findingId) ?? []).length;
       const response = await disposition('fx-user-ai-coe', vendor.caseId, findingId, {
@@ -468,6 +520,7 @@ describe('W2-10 substitute: W2 shapes (approve, send-back, qc-run, disposition)'
       });
       assert.equal(response.status, 409, response.text());
       assert.equal(response.json<Envelope>().error.code, 'stale_version');
+      assert.equal(staleReason(response), 'version_superseded');
       assert.equal((substitute.store.dispositions.get(findingId) ?? []).length, before);
     });
   });
