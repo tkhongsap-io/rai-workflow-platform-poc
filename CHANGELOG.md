@@ -2,6 +2,8 @@
 
 ## 2026-09-22
 
+- W3-04: Persisted notification retry deadlines, four-attempt terminal failure and concurrent-worker exclusion. File-sink browser verification now isolates its outbox from the suite worker.
+
 - W3-03a: Committed-event lane-open, send-back and Ready notifications through the local mail sink; bilingual content, Gregorian Thai dates, protected links and bounded background shutdown. Daily digest, retries and the operator view remain later W3 tickets.
 
 - W3-02: Bilingual queue cards, URL filters/pagination, version and lane due dates, keyboard access and loading/error recovery. Both Reset paths clear draft filters. Real-server integrated acceptance remains W3-INT.

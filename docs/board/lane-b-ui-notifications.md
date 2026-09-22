@@ -106,3 +106,13 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - What: parent accepted proposal; isolated branch rebased onto W3-07a d931cea. Implemented shared mail union and synthetic sink validation only.
 - Evidence: changes/2026-09-22-w3-03b-provenance-proposal/review.md
 - Next: independent contract review; no consumer before parent coordinates W3-04 integration.
+## 2026-09-22 — CLAIM Lane B: W3-04 pure retry slice only
+- Author: operator=ta session=codex-w3-04-retries model=GPT-6
+- Takes over from: session=none for W3-04 (reason: explicit scoped assignment; Hypatia retains W3-03a)
+- What: Issue #45 pure retry policy/tests in `/tmp/rai-w3-retries` from main `5fe59ad`; no composition or worker integration until parent supplies committed W3-03a. No push/merge; no other worktree writes. Future isolated DB port 54365 only.
+- Evidence: [W3-04 plan](../../changes/2026-09-22-w3-04-retries/plan.md)
+
+## 2026-09-22 — W3-04 integration preparation
+- Author: operator=ta session=codex-w3-04-retries model=GPT-6
+- What: Parent supplied committed W3-03a `36dcee9`; integrate retry dispatch only in `/tmp/rai-w3-retries`, preserving Hypatia's composition. Review fixes and final dependency rebase remain parent-coordinated. Isolated DB 54365.
+- Evidence: [integration plan](../../changes/2026-09-22-w3-04-retries/plan.md)
