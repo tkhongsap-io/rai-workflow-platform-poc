@@ -1,4 +1,4 @@
-// W3-03a first attempt only. Reads committed outbox rows on its own connection; never called with a workflow Tx.
+// W3-04 bounded retry dispatcher; W3-03a committed composition remains unchanged. Reads committed outbox rows on its own connection; never called with a workflow Tx.
 import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import { Value } from 'typebox/value';
 import { LANES, type Lane } from '@rai/shared/constants';
@@ -16,6 +16,7 @@ import {
 } from '../db/schema/index.js';
 import { runWithContext } from '../observability/context.js';
 import type { Emitter } from '../observability/log.js';
+import { deliveryUpdate, nextAttempt, RETRY_BACKOFF_MS } from './retry.js';
 import { laneDueDates } from '../sla/due-dates.js';
 import {
   composeCaseMail,
@@ -42,6 +43,7 @@ export interface NotificationDeps {
   identities: readonly MailIdentity[];
   publicBaseUrl: URL;
   emitter: Emitter;
+  now?: () => Date;
 }
 export type NotificationRow = typeof notification.$inferSelect;
 
@@ -146,10 +148,11 @@ export async function loadCommittedCaseRequest(
 }
 
 export function createNotifications(deps: NotificationDeps) {
-  /** Row lock protects distinct workers; W1-11 dedup covers sink success followed by a DB commit failure. */
+  const now = deps.now ?? (() => new Date());
+  /** Compatibility name: dispatches one eligible attempt, including retries. A crash before commit can replay it. */
   async function deliverInitial(id: string, signal?: AbortSignal): Promise<DeliveryReceipt | undefined> {
     signal?.throwIfAborted();
-    return deps.db.transaction(async (tx) => {
+    const outcome = await deps.db.transaction(async (tx) => {
       const [row] = await tx
         .select()
         .from(notification)
@@ -157,74 +160,93 @@ export function createNotifications(deps: NotificationDeps) {
           and(
             eq(notification.id, id),
             eq(notification.status, 'queued'),
-            eq(notification.attempts, 0),
             inArray(notification.event, Object.keys(KINDS)),
           ),
         )
-        .for('update');
+        .for('update', { skipLocked: true });
+      signal?.throwIfAborted();
       if (!row) return undefined;
+      // Legacy W3-03a failure has no completion timestamp: adopt once, never infer from createdAt.
+      if (row.attempts === 1 && row.nextAttemptAt === null) {
+        await tx
+          .update(notification)
+          .set({ nextAttemptAt: new Date(now().getTime() + RETRY_BACKOFF_MS[0]) })
+          .where(eq(notification.id, id));
+        signal?.throwIfAborted();
+        return undefined;
+      }
+      const attempt = nextAttempt({ ...row, status: 'queued' }, now());
+      if (attempt === undefined) return undefined;
       let receipt: DeliveryReceipt;
       try {
         const request = await loadCommittedCaseRequest(tx, row, deps);
-        await runWithContext({ correlationId: row.correlationId, startedAt: performance.now() }, () => {
-          deps.emitter.log('mail.enqueued', {
-            notificationId: row.id,
-            eventType: row.event,
-            caseId: row.caseId,
-            versionId: row.versionId,
-            lane: row.lane,
-            recipientCount: 1,
-          });
-          return Promise.resolve();
-        });
         signal?.throwIfAborted();
-        receipt = await deps.sink.deliver(request);
+        receipt = await deps.sink.deliver({ ...request, attempt });
       } catch (err) {
         receipt = {
           dedupKey: '',
           status: 'failed',
-          attempt: 1,
-          at: new Date().toISOString(),
+          attempt,
+          at: now().toISOString(),
           sinkMessageId: null,
           error: {
             code: err instanceof CompositionError ? err.code : 'sink_failure',
-            message: 'initial composition or delivery failed',
+            message: 'composition or delivery failed',
           },
         };
       }
-      // Wait for the sink before cancellation rolls back: never unlock an active delivery.
+      // Cancellation waits for sink settlement before rollback; never unlock a pending sink call.
       signal?.throwIfAborted();
-      const success = receipt.status !== 'failed';
-      await tx
-        .update(notification)
-        .set({
-          status: success ? 'sent' : 'queued',
-          attempts: 1,
-          nextAttemptAt: null,
-          lastErrorCode: receipt.error?.code === 'duplicate' ? null : (receipt.error?.code ?? null),
-        })
-        .where(eq(notification.id, id));
-      await runWithContext({ correlationId: row.correlationId, startedAt: performance.now() }, () => {
-        if (success)
-          deps.emitter.log('mail.sent', {
-            notificationId: row.id,
-            attempt: 1,
-            sinkKind: deps.sink.identity.sink,
-          });
-        else
-          deps.emitter.log('mail.attempt_failed', {
-            notificationId: row.id,
-            attempt: 1,
-            nextAttemptAt: null,
-            errorCode: receipt.error?.code ?? 'sink_failure',
-          });
-        return Promise.resolve();
-      });
+      const update = deliveryUpdate(attempt, receipt, now());
+      await tx.update(notification).set(update).where(eq(notification.id, id));
       signal?.throwIfAborted();
-      return receipt;
+      return { row, receipt, update, attempt };
     });
+    if (outcome === undefined) return undefined;
+    const { row, receipt, update, attempt } = outcome;
+    // No outcome log until COMMIT succeeds. Logs themselves are not crash-atomic with the DB.
+    await runWithContext({ correlationId: row.correlationId, startedAt: performance.now() }, () => {
+      if (attempt === 1)
+        deps.emitter.log('mail.enqueued', {
+          notificationId: row.id,
+          eventType: row.event,
+          caseId: row.caseId,
+          versionId: row.versionId,
+          lane: row.lane,
+          recipientCount: 1,
+        });
+      if (receipt.status === 'duplicate')
+        deps.emitter.log('mail.deduplicated', {
+          eventType: row.event,
+          caseId: row.caseId,
+          versionId: row.versionId,
+          lane: row.lane,
+          existingNotificationId: row.id,
+        });
+      if (update.status === 'sent')
+        deps.emitter.log('mail.sent', {
+          notificationId: row.id,
+          attempt,
+          sinkKind: deps.sink.identity.sink,
+        });
+      else if (update.status === 'failed')
+        deps.emitter.log('mail.failed', {
+          notificationId: row.id,
+          attempts: attempt,
+          errorCode: update.lastErrorCode,
+        });
+      else
+        deps.emitter.log('mail.attempt_failed', {
+          notificationId: row.id,
+          attempt,
+          nextAttemptAt: update.nextAttemptAt!.toISOString(),
+          errorCode: receipt.error?.code ?? 'sink_failure',
+        });
+      return Promise.resolve();
+    });
+    return receipt;
   }
-  /** Initial backlog or the committed rows of one response; no retry selection and no digest. */
+  /** One bounded batch; polling revisits backlog. Digests remain W3-03b. */
   async function deliverPending(correlationId?: string, signal?: AbortSignal): Promise<void> {
     signal?.throwIfAborted();
     const rows = await deps.db
@@ -233,12 +255,14 @@ export function createNotifications(deps: NotificationDeps) {
       .where(
         and(
           eq(notification.status, 'queued'),
-          eq(notification.attempts, 0),
+          sql`${notification.attempts} >= 0 AND ${notification.attempts} < 4`,
+          sql`(${notification.nextAttemptAt} <= ${now()} OR (${notification.nextAttemptAt} IS NULL AND ${notification.attempts} <= 1))`,
           inArray(notification.event, Object.keys(KINDS)),
           correlationId === undefined ? undefined : eq(notification.correlationId, correlationId),
         ),
       )
-      .orderBy(asc(notification.createdAt), asc(notification.id));
+      .orderBy(asc(notification.createdAt), asc(notification.id))
+      .limit(25);
     for (const row of rows) await deliverInitial(row.id, signal);
   }
   return { deliverInitial, deliverPending };
