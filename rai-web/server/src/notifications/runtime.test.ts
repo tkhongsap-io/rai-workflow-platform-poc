@@ -6,12 +6,15 @@ import { createDrain } from '../shutdown.js';
 import type { Emitter } from '../observability/log.js';
 import { registerNotifications } from './runtime.js';
 
-for (const stalled of [false, true]) {
-  test(`post-response shutdown: ${stalled ? 'deadline rejects without abandoning delivery' : 'settled work drains'}`, async () => {
+for (const mode of ['request', 'request-stalled', 'poll', 'poll-stalled']) {
+  const polled = mode.startsWith('poll');
+  const stalled = mode.endsWith('stalled');
+  test(`${polled ? 'polled' : 'post-response'} shutdown: ${stalled ? 'deadline rejects without abandoning delivery' : 'settled work drains'}`, async () => {
     const app = Fastify();
     const drain = createDrain(app);
     const entered = Promise.withResolvers<void>();
     const release = Promise.withResolvers<void>();
+    let calls = 0;
     let active = false;
     let cancelled = false;
     registerNotifications(
@@ -19,7 +22,8 @@ for (const stalled of [false, true]) {
       {
         deliverInitial: () => Promise.resolve(undefined),
         deliverPending: async (correlation, signal) => {
-          if (!correlation) return;
+          calls += 1;
+          if (!correlation && (!polled || calls === 1)) return;
           active = true;
           entered.resolve();
           try {
@@ -35,12 +39,14 @@ for (const stalled of [false, true]) {
       { log: () => {} } as unknown as Emitter,
       drain,
     );
-    app.post('/', () => Promise.resolve({ ok: true }));
+    app.route({ method: ['GET', 'POST'], url: '/', handler: () => Promise.resolve({ ok: true }) });
     await app.listen({ host: '127.0.0.1', port: 0 });
     try {
       const address = app.server.address();
       assert.ok(address && typeof address !== 'string');
-      const response = await fetch(`http://127.0.0.1:${address.port}/`, { method: 'POST' });
+      const response = await fetch(`http://127.0.0.1:${address.port}/`, {
+        method: polled ? 'GET' : 'POST',
+      });
       assert.equal(response.status, 200);
       await response.text();
       await entered.promise;
@@ -62,6 +68,9 @@ for (const stalled of [false, true]) {
       await app.close();
       assert.equal(active, false);
       assert.equal(cancelled, true);
+      const stoppedAt = calls;
+      await delay(300);
+      assert.equal(calls, stoppedAt, 'closed runtime must not poll again');
     } finally {
       release.resolve();
       await app.close();
