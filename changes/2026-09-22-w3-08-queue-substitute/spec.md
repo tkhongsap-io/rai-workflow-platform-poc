@@ -1,6 +1,6 @@
-# W3-01 queue contract
+# W3-08 substitute implementation of the W3-01 queue contract
 
-GET /api/queue uses the existing case.list action and mandatory authenticated actor scope. Existing GET /api/cases remains compatible. No route is implemented by this contract PR.
+GET /api/queue uses the existing case.list action and mandatory authenticated actor scope. Existing GET /api/cases remains compatible. This specification inherits the merged W3-01 shared contract; W3-08 implements the dev/test substitute route, while W3-01 implements the real-server route.
 
 TypeBox query and TypeScript response: rai-web/shared/src/schemas/queue.ts. Defaults: page 1, pageSize 25, searchBy all. Unknown parameters, invalid enums and out-of-range integers are invalid_input. Filter predicates are ANDed. Search is trimmed, NFC-normalized, case-insensitive literal substring (escape SQL wildcard characters), empty means no search. all searches case name, registry ID, external ID/Unknown, status key, owner display name, owner subject ID and use-case group. Named searchBy limits to that field; owner searches both stored business_owner display name and owner_subject_id. Display names never determine authorization. Status filter uses the existing derived status, not the coarse stored desk_status. Owner/group filters are exact matches. Thai text must match.
 
