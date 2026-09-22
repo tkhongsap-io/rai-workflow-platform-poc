@@ -4,7 +4,10 @@ import { assertNoLeak } from './log-capture.js';
 import { RAI_WEB_ROOT } from './process.js';
 
 /** Fixed scenario only; callback waits for close, after both serialized streams finish. */
-export async function runObservedSubmitBinding(leakControl = false): Promise<void> {
+export async function runObservedSubmitBinding(
+  leakControl = false,
+  scenario: 'binding' | 'late' = 'binding',
+): Promise<void> {
   const childEnv = { ...process.env };
   delete childEnv.NODE_TEST_CONTEXT; // an independent node --test runner, not the parent's worker
 
@@ -27,6 +30,7 @@ export async function runObservedSubmitBinding(leakControl = false): Promise<voi
           NODE_ENV: 'test',
           RAI_IDENTITY_MODE: 'fixture',
           OBS_SUBMIT_CHILD_CANARY: leakControl ? '1' : '0',
+          OBS_SUBMIT_CHILD_SCENARIO: scenario,
         },
         timeout: 60000,
         killSignal: 'SIGKILL',
@@ -40,6 +44,28 @@ export async function runObservedSubmitBinding(leakControl = false): Promise<voi
   assertNoLeak({ text: () => result.stdout });
   assertNoLeak({ text: () => result.stderr });
   assert.equal(result.error === null, true, 'captured submit scenario failed or timed out');
+  if (scenario === 'late') {
+    const events = result.stdout
+      .split('\n')
+      .map((line) => (line.startsWith('# ') ? line.slice(2) : line))
+      .filter((line) => line.startsWith('{'))
+      .map(
+        (line) =>
+          JSON.parse(line) as {
+            event?: string;
+            correlationId?: string;
+            fields?: { trigger?: string; qcRunId?: string };
+          },
+      );
+    const late = events.filter((line) => line.event === 'qc.run.late');
+    const started = events.filter(
+      (line) => line.event === 'qc.run.started' && line.fields?.trigger === 'submit',
+    );
+    assert.equal(late.length, 1, 'one late-result domain event across restart');
+    assert.equal(started.length, 1);
+    assert.equal(late[0]?.correlationId, started[0]?.correlationId);
+    assert.equal(late[0]?.fields?.qcRunId, started[0]?.fields?.qcRunId);
+  }
   for (const [key, expected] of [
     ['tests', 1],
     ['pass', 1],

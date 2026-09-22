@@ -9,3 +9,7 @@ test('fresh committed HTTP submit alone starts QC; replay does not; failure pres
 test('captured startup child rejects a deliberate serialized log leak', async () => {
   await assert.rejects(runObservedSubmitBinding(true), /forbidden log canary/);
 });
+
+test('held submit QC cannot append evidence after HTTP lane approvals reach Ready; late diagnostic survives app restart', async () => {
+  await runObservedSubmitBinding(false, 'late');
+});

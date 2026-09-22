@@ -1,5 +1,6 @@
 // Real HTTP transaction boundary: no direct QC invocation and no fabricated business rows.
 import { test } from 'node:test';
+import { lateSubmitScenario } from './late-submit-scenario.js';
 import assert from 'node:assert/strict';
 import { setTimeout as delay } from 'node:timers/promises';
 import pg from 'pg';
@@ -21,6 +22,7 @@ async function until(check: () => Promise<boolean>) {
   assert.fail('persisted state was not reached');
 }
 test('committed submit boundary inside captured child', async () => {
+  if (process.env.OBS_SUBMIT_CHILD_SCENARIO === 'late') return lateSubmitScenario(startServer);
   await withIsolatedFixtureDatabase(async (env) => {
     const db = new pg.Client({ connectionString: env.DATABASE_OPERATOR_URL });
     await db.connect();
