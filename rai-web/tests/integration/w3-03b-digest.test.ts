@@ -13,6 +13,7 @@ import { createPgSessionStore } from '@rai/server/identity/session';
 import { createScopeFactsSource } from '@rai/server/authz/facts';
 import { laneOpenRecipientsFromIdentities } from '@rai/server/versions/open-lanes';
 import { createDigestProducer, loadCommittedDigestRequest } from '@rai/server/notifications/digest';
+import { createDailyDigestSchedule } from '@rai/server/notifications/digest-runtime';
 import { notification } from '@rai/server/db/schema/notification';
 import { operatorJobRun, operatorJobNotification } from '@rai/server/db/schema/operator-job-run';
 import { listSlaBreaches } from '@rai/server/sla/breach';
@@ -311,4 +312,75 @@ test('SQL link guard rejects correlation mismatch and leaves no orphan after rol
   );
   assert.equal((await digestRows()).length, 1);
   assert.equal((await db.owner.select().from(operatorJobRun)).length, 1);
+});
+
+test('local scheduler drives real startup/restart/day-change jobs without a delivery runner', async () => {
+  await submit();
+  const controller = new AbortController();
+  const tasks: Promise<void>[] = [];
+  let fire: (() => void) | undefined;
+  let delay = 0;
+  let cancelled = false;
+  const options = {
+    signal: controller.signal,
+    run: createDigestProducer(deps()),
+    track: (task: Promise<void>) => {
+      tasks.push(task);
+    },
+    onError: () => assert.fail('unexpected producer infrastructure failure'),
+    clock: {
+      now: () => clock,
+      schedule: (fn: () => void, ms: number) => {
+        fire = fn;
+        delay = ms;
+        return 1;
+      },
+      cancel: () => {
+        cancelled = true;
+      },
+    },
+  };
+  try {
+    await createDailyDigestSchedule(options).start();
+    assert.equal((await digestRows()).length, 1);
+    assert.equal(delay, 13 * 60 * 60 * 1000, '11am Bangkok schedules the next midnight');
+    await createDailyDigestSchedule(options).start();
+    assert.equal((await digestRows()).length, 1, 'restart preserves day/recipient identity');
+    clock = new Date('2026-10-01T17:00:00Z');
+    fire!();
+    await tasks.at(-1);
+    const rows = await digestRows();
+    assert.equal(rows.length, 2);
+    assert.ok(rows.every((row) => row.attempts === 0 && row.status === 'queued'));
+    const jobs = await db.owner.select().from(operatorJobRun);
+    assert.equal(jobs.length, 3);
+    assert.ok(jobs.every((job) => job.status === 'completed'));
+    assert.deepEqual([...new Set(jobs.map((job) => job.digestDay))].sort(), ['2026-10-01', '2026-10-02']);
+    controller.abort();
+    assert.equal(cancelled, true);
+    fire!();
+    await Promise.resolve();
+    assert.equal((await db.owner.select().from(operatorJobRun)).length, 3);
+  } finally {
+    controller.abort();
+  }
+});
+
+test('shutdown abort during enqueue rolls back notification and link before failing the job', async () => {
+  await submit();
+  const controller = new AbortController();
+  const result = await createDigestProducer({
+    ...deps(),
+    beforeStage: (stage) => {
+      if (stage === 'enqueue') controller.abort();
+    },
+  })(controller.signal);
+  assert.equal(result.status, 'failed');
+  assert.deepEqual(result.notificationIds, []);
+  assert.equal((await digestRows()).length, 0);
+  assert.equal((await db.owner.select().from(operatorJobNotification)).length, 0);
+  const [job] = await db.owner.select().from(operatorJobRun);
+  assert.equal(job!.status, 'failed');
+  assert.equal(job!.errorStage, 'enqueue');
+  assert.ok(job!.finishedAt);
 });
