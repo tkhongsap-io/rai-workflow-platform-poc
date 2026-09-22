@@ -1,0 +1,39 @@
+{
+  "fixtureCaseId": "fx-case-na-reasons",
+  "laneMappingVersion": "lane-mapping/v1",
+  "checklistTemplateVersion": "v1.0 Sheet3",
+  "entries": [
+    {
+      "trigger": "approve_attempt",
+      "lane": "ai_coe",
+      "findings": [
+        {
+          "ruleId": "ACC-BAND-V1-SHEET3",
+          "scope": { "kind": "artifact", "slot": 1, "fixtureArtifactId": "fx-doc-0004-01" },
+          "severity": "high",
+          "owningLane": "ai_coe",
+          "evidence": [
+            {
+              "fixtureArtifactId": "fx-doc-0004-01",
+              "slot": 1,
+              "locator": { "kind": "page", "page": 3 },
+              "excerptHash": "18d0cf0ba028e9ddc4434b6ccc7033efd7abe24bb471a91a4a9c8b91baf5c598"
+            }
+          ],
+          "measure": {
+            "metric": "hallucination_rate",
+            "value": 2.4,
+            "denominator": 500,
+            "threshold": 2,
+            "unit": "percent",
+            "thresholdSource": "v1.0 Sheet3"
+          },
+          "message": {
+            "key": "qc.finding.acc_band_v1_sheet3",
+            "params": { "slot": 1, "value": 2.4, "threshold": 2, "threshold_source": "v1.0 Sheet3" }
+          }
+        }
+      ]
+    }
+  ]
+}

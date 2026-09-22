@@ -57,3 +57,10 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: next ticket in the dependency map.
 - Author: operator=ta session=build-workflow model=claude-opus-5
 - Evidence: https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/79
+
+## 2026-09-22 13:40 — W1-10 substitute onto main
+- What: Copy the already-reviewed QC substitute from `codex/w1-00-qc-shared-contract` onto main. The fixture index keeps its current exports and adds `qcSubstitute`. Contract files from PR #74 were already on main and were not recopied.
+- Why: W2-05 depends on W1-10. PR #69 merged into the side branch only, so `main` had no runner to feed.
+- Next: W2-05 disposition contract for single-lane findings. §7.3 categories stay blocked.
+- Author: operator=ta session=w2 model=grok-4.7
+- Evidence: branch codex/w1-10-qc-substitute-on-main

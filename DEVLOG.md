@@ -1,5 +1,9 @@
 # Development log
 
+## W1-10 on main — 2026-09-22
+
+The QC substitute (scripted findings, unavailable, timeout, no write path) had merged only onto `codex/w1-00-qc-shared-contract` (PR #69), not `main`. This brings those files onto `main` so W2-05 can record single-lane findings through it. It is still a substitute. QC is not implemented. Slot 5, slot 9, pack-level and `unavailable` owning lanes stay unrecorded (W0-06 §7.3).
+
 ## W2-04: resubmit N+1 under D05 — 2026-09-22
 
 Resubmit is submit of a successor draft (`parent_version_id` set) on the existing POST `/api/cases/:caseId/draft/submit` route. Freezes N+1, opens all three lanes pending, writes `version.resubmitted` then `lane.opened` × 3, resets lane projections and `ai_readiness_status` to `not_ready`, stores idempotency action `case.resubmit`, and leaves N's lane decisions untouched. Approve/send-back naming N after resubmit is `409 version_superseded`. This is not the W2 exit; findings/dispositions (W2-05), Ready (W2-06), UI and mail delivery remain later tickets.
