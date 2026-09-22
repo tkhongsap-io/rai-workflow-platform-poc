@@ -1,5 +1,9 @@
 # Development log
 
+## W2-07 locale keys — 2026-09-22
+
+Reviewer-workspace copy (`review.*`, `finding.severity.*`) is in both catalogues so the Lane B screen can read keys without editing `shared/` in the UI PR. Not the W2 exit.
+
 ## W2-10: API substitute W2 shapes — 2026-09-22
 
 The W1-13 in-memory API substitute now answers the W2 HTTP shapes the real server already serves (lane approve / send-back, lane qc-run, finding dispositions), including forbidden and stale_version / 422 cases, so Lane B can build UI without editing the substitute. Ready is set only inside approve or disposition when three current-version approvals exist and no finding is undispositioned; there is no POST `/ready`. History remains the existing version read; send-back does not mutate version N and reuses one successor draft. Slot-5, pack-level and unavailable findings are not stored. Still absent from non-test builds (`check:substitute-absent`). This is not the W2 exit.
