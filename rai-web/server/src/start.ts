@@ -26,6 +26,7 @@ import type { Emitter } from './observability/log.js';
 import { noopUploadTrigger } from './pack/qc-trigger.js';
 import { startedFields } from './observability/started.js';
 import { WEB_DIST_DIR, webDistPresent } from './static.js';
+import type { QcRunner, VersionRef } from '@rai/shared/qc/types';
 import { laneOpenRecipientsFromIdentities } from './versions/open-lanes.js';
 import { sendBackRecipientsFromIdentities } from './workflow/send-back-notice.js';
 
@@ -74,6 +75,39 @@ export async function loadFixtureUsers(): Promise<readonly FixtureIdentity[] | u
   const users = (await loadFixtureUsersModule())?.FIXTURE_USERS;
   if (!Array.isArray(users)) return undefined;
   return users as readonly FixtureIdentity[]; // createFixtureIdentityProvider re-validates every invariant
+}
+
+/**
+ * W1-10 / W2-INT: the slice-1 QC substitute (`QC_MODE=substitute`) bound on the real server so W2 findings and
+ * dispositions work against the deployable. Dynamic import only — never a static `@rai/fixtures` import — so
+ * `check:substitute-absent` still passes and a production install without the fixtures package starts unbound.
+ */
+export async function loadQcSubstituteRunner(now?: () => Date): Promise<QcRunner | undefined> {
+  const qcSpecifier = '@rai/fixtures/substitutes/qc/index';
+  const casesSpecifier = '@rai/fixtures/data/cases/index';
+  try {
+    const qcMod = (await import(qcSpecifier)) as {
+      ScriptedQcRunner: new (options?: {
+        fixtureCaseIdOf?: (version: VersionRef) => string | undefined;
+        now?: () => Date;
+      }) => QcRunner;
+    };
+    const casesMod = (await import(casesSpecifier)) as Record<string, unknown>;
+    const rawCases = casesMod.FIXTURE_CASES;
+    if (!Array.isArray(rawCases)) return undefined;
+    const byCaseId = new Map<string, string>();
+    for (const entry of rawCases as unknown[]) {
+      const row = entry as { caseId?: unknown; fixtureCaseId?: unknown } | null;
+      if (typeof row?.caseId === 'string' && typeof row.fixtureCaseId === 'string')
+        byCaseId.set(row.caseId, row.fixtureCaseId);
+    }
+    return new qcMod.ScriptedQcRunner({
+      fixtureCaseIdOf: (version) => byCaseId.get(version.caseId),
+      ...(now === undefined ? {} : { now }),
+    });
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -154,6 +188,11 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
   ]);
   const store = createFilesystemBlobStore(path.resolve(config.blobDir));
   await store.init(); // root 0700, tmp/ emptied at process start (W0-08 section 6)
+  // Bind the QC substitute only outside production: a production process stays unbound even if fixtures can import.
+  const qcRunner =
+    config.qc.mode === 'substitute' && config.nodeEnv !== 'production'
+      ? await loadQcSubstituteRunner(overrides.now)
+      : undefined;
   const { fastify, emitter, drain } = buildApp({
     config,
     artifacts: { store, db: db.db, limits: config.upload },
@@ -192,13 +231,15 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
       knownIdentities,
       ...(overrides.now === undefined ? {} : { now: overrides.now }),
     },
-    // W2-05 / W2-06: disposition routes; Ready may fire inside disposition. Production keeps QC unbound.
+    // W2-05 / W2-06 / W2-INT: disposition + lane QC. QC_MODE=substitute binds ScriptedQcRunner outside
+    // production when fixtures are installed (slice-1 evidence path); production stays unbound.
     findings: {
       db: db.db,
       readyRecipientsForOwner: (ownerSubjectId) =>
         sendBackRecipientsFromIdentities(knownIdentities, ownerSubjectId),
       knownIdentities,
       ...(overrides.now === undefined ? {} : { now: overrides.now }),
+      ...(qcRunner === undefined ? {} : { qc: { runner: qcRunner } }),
     },
     ...(serveWeb ? { static: { root: webDistDir } } : {}),
   });

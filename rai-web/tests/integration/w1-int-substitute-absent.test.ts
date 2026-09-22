@@ -85,6 +85,10 @@ describe('W1-INT: no evidence test imports the substitute', () => {
     assert.ok(entries.some((f) => f.endsWith('w1-int-journey.spec.ts')));
     assert.ok(entries.some((f) => f.endsWith('w1-int-07-shell-sign-in-cases.spec.ts')));
     assert.ok(entries.some((f) => f.endsWith('w1-int-06-case-pack-versions.spec.ts')));
+    assert.ok(entries.some((f) => f.endsWith('w2-int-journey.spec.ts')));
+    assert.ok(entries.some((f) => f.endsWith('w2-int-07-reviewer-workspace.spec.ts')));
+    assert.ok(entries.some((f) => f.endsWith('w2-int-09-disposition.spec.ts')));
+    assert.ok(entries.some((f) => f.endsWith('w2-int-negatives.test.ts')));
     assert.ok(!entries.some((f) => /\.substitute\.spec\.ts$/.test(f)));
 
     const seen = new Set<string>();
@@ -116,7 +120,9 @@ describe('W1-INT: no evidence test imports the substitute', () => {
     const substituteSpecs = walk(path.join(TESTS_DIR, 'browser')).filter((f) =>
       /\.substitute\.spec\.ts$/.test(f),
     );
-    assert.ok(substituteSpecs.length >= 2, 'the Lane B development specs still exist');
+    assert.ok(substituteSpecs.length >= 4, 'the Lane B development specs still exist (W1 + W2)');
+    assert.ok(substituteSpecs.some((f) => f.endsWith('w2-07-reviewer-workspace.substitute.spec.ts')));
+    assert.ok(substituteSpecs.some((f) => f.endsWith('w2-09-disposition.substitute.spec.ts')));
     const server = path.join(TESTS_DIR, 'browser', 'support', 'substitute-server.ts');
     const serverImports = importsOf(server);
     assert.ok(
@@ -144,7 +150,7 @@ describe('W1-INT: the evidence configuration cannot load the substitute', () => 
     for (const name of Object.keys(env)) assert.doesNotMatch(name, /SUBSTITUTE/i, name);
     assert.equal(env.RAI_IDENTITY_MODE, 'fixture');
     assert.equal(env.NODE_ENV, 'test');
-    assert.equal(env.QC_MODE, 'substitute'); // the W1-10 QC substitute is the slice-1 QC implementation by design (section 1.1); it is not the W1-13 API substitute
+    assert.equal(env.QC_MODE, 'substitute'); // the W1-10 QC substitute is the slice-1 substitute stand-in (section 1.1); real QC is W4; it is not the W1-13 API substitute
     const source = readFileSync(path.join(TESTS_DIR, 'browser', 'playwright.config.ts'), 'utf8');
     assert.doesNotMatch(source, /substitute-server|substitutes\/api|VITE_API_SUBSTITUTE/);
     // The build the web server runs forces the product bundle: web/package.json's build script.

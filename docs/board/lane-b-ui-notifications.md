@@ -55,3 +55,15 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: W2-INT wires to the real server.
 - Author: operator=ta session=w2-09 model=composer
 - Evidence: branch codex/w2-09-disposition-ui
+
+## 2026-09-22 16:58 — CLAIM Lane B
+- Author: operator=ta session=w2-int model=composer
+- Takes over from: session=w2-09 (reason: handoff; W2-INT real-server journey)
+
+
+## 2026-09-22 16:58 — W2-INT real-server journey (Lane B half)
+- What: W2-07/W2-09 promoted to real-server evidence specs; W2 journey drives send-back, disposition and Ready through the UI (keyboard + axe, Thai, three widths). No Deploy control; no new ready route. Issue #35 stays open. Not the W2 exit.
+- Why: Ticket W2-INT (#40); proves A04, A07, A09 at the browser layer on the real server.
+- Next: W2-08 exit evidence (Lead) — not this session.
+- Author: operator=ta session=w2-int model=composer
+- Evidence: branch codex/w2-int-real-server-journey

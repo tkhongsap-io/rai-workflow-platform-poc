@@ -112,3 +112,15 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: W2-07 UI against these keys.
 - Author: operator=ta session=w2 model=grok-4.7
 - Evidence: branch codex/w2-07-review-locale-keys
+
+## 2026-09-22 16:58 — CLAIM Lane A
+- Author: operator=ta session=w2-int model=composer
+- Takes over from: session=w2-06 (reason: handoff; W2-INT real-server journey)
+
+
+## 2026-09-22 16:58 — W2-INT real-server journey (Lane A half)
+- What: W2-INT suite authored against the real server: journey + negatives (concurrent send-back, stale approval, undispositioned finding, Admin/self-approval). Substitute remains out of the evidence app path; W2-10 substitute specs kept for W3. Not the W2 exit.
+- Why: Ticket W2-INT (#40); proves A04, A07, A09 at the integration layer. Doc wins over issue wording.
+- Next: W2-08 exit evidence (Lead) runs this suite and records it — not this session.
+- Author: operator=ta session=w2-int model=composer
+- Evidence: branch codex/w2-int-real-server-journey
