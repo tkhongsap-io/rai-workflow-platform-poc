@@ -13,8 +13,13 @@ import {
   SLOT_STATE_ORDER,
   applySlotChange,
   decidableLane,
+  dispositionKindKey,
+  dispositionKindNeedsReason,
+  dispositionKindsForActor,
+  dispositionReasonIsValid,
   expectedVersionOf,
   findingMessageParams,
+  findingsLane,
   isSelfExcludedOnCase,
   laneKey,
   laneProjectionStatus,
@@ -39,7 +44,7 @@ import {
 } from './view-model.js';
 import type { CaseView } from '@rai/shared/schemas/cases';
 import type { RoleScope } from '@rai/shared/schemas/auth';
-import type { StoredFindingSummary } from '@rai/shared/schemas/review';
+import type { DispositionKind, StoredFindingSummary } from '@rai/shared/schemas/review';
 import type { SubmittedVersion } from '@rai/shared/schemas/versions';
 
 const allMissing = (): Record<SlotNumber, SlotState> => {
@@ -343,4 +348,153 @@ test('W2-07: findingMessageParams fills {threshold_source} so t() never leaves b
   const en = t('en', 'qc.finding.acc_classic_ml_metric', params);
   assert.equal(en.includes('{'), false, en);
   assert.ok(en.includes('v1.0 Sheet3'), en);
+});
+
+test('W2-09: findingsLane keeps the owning lane after decide; owner/Admin get none', () => {
+  const version = baseVersion();
+  assert.equal(
+    findingsLane({
+      roles: [aiCoe],
+      subjectId: 'fixture:fx-user-ai-coe',
+      view: baseView({ raiStatus: 'approved' }),
+      version,
+    }),
+    'ai_coe',
+  );
+  assert.equal(
+    findingsLane({
+      roles: [owner],
+      subjectId: 'fixture:fx-user-owner-cm',
+      view: baseView(),
+      version,
+    }),
+    null,
+  );
+  assert.equal(
+    findingsLane({
+      roles: [admin],
+      subjectId: 'fixture:fx-user-admin',
+      view: baseView(),
+      version,
+    }),
+    null,
+  );
+  assert.equal(
+    findingsLane({
+      roles: [aiCoe],
+      subjectId: 'fixture:fx-user-ai-coe',
+      view: baseView(),
+      version: baseVersion({ isLatest: false }),
+    }),
+    null,
+  );
+});
+
+test('W2-09: dispositionKindsForActor — lane kinds, confirm after propose, owner propose-fixed only', () => {
+  const view = baseView();
+  assert.deepEqual(
+    dispositionKindsForActor({
+      roles: [aiCoe],
+      subjectId: 'fixture:fx-user-ai-coe',
+      view,
+      findingOwningLane: 'ai_coe',
+      latestKind: null,
+      canSeeFindings: true,
+    }),
+    ['fixed', 'waived', 'not_applicable'],
+  );
+  assert.deepEqual(
+    dispositionKindsForActor({
+      roles: [aiCoe],
+      subjectId: 'fixture:fx-user-ai-coe',
+      view,
+      findingOwningLane: 'ai_coe',
+      latestKind: 'fixed_proposed',
+      canSeeFindings: true,
+    }),
+    ['fixed', 'waived', 'not_applicable', 'fixed_confirmed'],
+  );
+  assert.deepEqual(
+    dispositionKindsForActor({
+      roles: [aiCoe],
+      subjectId: 'fixture:fx-user-ai-coe',
+      view,
+      findingOwningLane: 'ai_coe',
+      latestKind: 'waived',
+      canSeeFindings: true,
+    }),
+    ['fixed', 'waived', 'not_applicable'],
+  );
+  assert.deepEqual(
+    dispositionKindsForActor({
+      roles: [dpo],
+      subjectId: 'fixture:fx-user-dpo',
+      view,
+      findingOwningLane: 'ai_coe',
+      latestKind: null,
+      canSeeFindings: true,
+    }),
+    [],
+  );
+  assert.deepEqual(
+    dispositionKindsForActor({
+      roles: [admin],
+      subjectId: 'fixture:fx-user-admin',
+      view,
+      findingOwningLane: 'ai_coe',
+      latestKind: null,
+      canSeeFindings: true,
+    }),
+    [],
+  );
+  // Owner cannot load qc-run (lane.approve 403) → no UI controls.
+  assert.deepEqual(
+    dispositionKindsForActor({
+      roles: [owner],
+      subjectId: 'fixture:fx-user-owner-cm',
+      view,
+      findingOwningLane: 'ai_coe',
+      latestKind: null,
+      canSeeFindings: false,
+    }),
+    [],
+  );
+  // Propose-fixed authority when the owner can already see the finding list (unit coverage; UI path is absent).
+  assert.deepEqual(
+    dispositionKindsForActor({
+      roles: [owner],
+      subjectId: 'fixture:fx-user-owner-cm',
+      view,
+      findingOwningLane: 'ai_coe',
+      latestKind: null,
+      canSeeFindings: true,
+    }),
+    ['fixed_proposed'],
+  );
+  assert.deepEqual(
+    dispositionKindsForActor({
+      roles: [owner],
+      subjectId: 'fixture:fx-user-owner-cm',
+      view,
+      findingOwningLane: 'ai_coe',
+      latestKind: 'fixed_proposed',
+      canSeeFindings: true,
+    }),
+    ['fixed_proposed'],
+  );
+  assert.equal(dispositionKindNeedsReason('waived'), true);
+  assert.equal(dispositionKindNeedsReason('not_applicable'), true);
+  assert.equal(dispositionKindNeedsReason('fixed'), false);
+  assert.equal(dispositionReasonIsValid(''), false);
+  assert.equal(dispositionReasonIsValid('   '), false);
+  assert.equal(dispositionReasonIsValid('accepted risk'), true);
+  for (const kind of [
+    'fixed_proposed',
+    'fixed',
+    'fixed_confirmed',
+    'waived',
+    'not_applicable',
+  ] as DispositionKind[]) {
+    assert.ok(isLocaleKey(dispositionKindKey(kind)), kind);
+  }
 });

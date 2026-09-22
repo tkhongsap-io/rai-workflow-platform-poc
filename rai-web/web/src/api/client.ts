@@ -32,6 +32,8 @@ import type {
 import type { PackDraft, PackDraftUpdateRequest } from '@rai/shared/schemas/pack';
 import type {
   ApproveLaneRequest,
+  DispositionRequest,
+  DispositionResponse,
   LaneDecisionResponse,
   LaneQcRunRequest,
   LaneQcRunResponse,
@@ -257,6 +259,18 @@ export function createApiClient(fetchImpl: FetchLike = (input, init) => fetch(in
       request<LaneDecisionResponse>(
         'POST',
         `${API_PATHS.cases}/${enc(caseId)}/versions/${enc(versionId)}/lanes/${enc(lane)}/send-back`,
+        { body, idempotencyKey },
+      ),
+    /** Append a disposition event on a finding (W0-06 4.7); Idempotency-Key per user action. */
+    recordDisposition: (
+      caseId: string,
+      findingId: string,
+      body: DispositionRequest,
+      idempotencyKey: string,
+    ) =>
+      request<DispositionResponse>(
+        'POST',
+        `${API_PATHS.cases}/${enc(caseId)}/findings/${enc(findingId)}/dispositions`,
         { body, idempotencyKey },
       ),
   };

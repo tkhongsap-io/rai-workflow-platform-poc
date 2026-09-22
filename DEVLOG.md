@@ -1,5 +1,9 @@
 # Development log
 
+## W2-09: findings and disposition UI — 2026-09-22
+
+On a current submitted version the owning-lane reviewer sees disposition buttons (fixed, waived, not_applicable; fixed_confirmed only when this visit's overlay is fixed_proposed) on each finding from `POST …/qc-run`. Waived and N/A open the shared reason dialog. The finding row stays; status text comes from an in-session overlay of the disposition POST response because qc-run does not return the latest kind — a reload still shows the finding without that kind. Reading the latest disposition event is a follow-up for W2-INT; not built here. Owner and BU SPOC cannot load qc-run (`lane.approve` auth → 403), so the UI does not show propose-fixed; that kind is covered by the view-model unit test and one substitute API path. Ready on the disposition response shows the existing `review.decided.ready` notice. No Deploy control. Single-lane findings only; issue #35 stays open. This is not the W2 exit.
+
 ## W2-07: reviewer workspace UI — 2026-09-22
 
 On a current submitted version the owning-lane reviewer sees that lane's QC findings (from `POST …/qc-run`) above approve / send-back. Controls wait for the run, including an unavailable run (still has a run id). Send-back reuses the shared dialog and cannot submit without naming a slot. Admin, owner, wrong lane and stale/superseded versions never draw the buttons. History keeps frozen N readable after send-back. Substitute Playwright path is keyboard-only with axe zero critical / zero serious. Copy comes from the catalogue keys in the W2-07 contract PR. This is not the W2 exit; disposition UI remains W2-09.

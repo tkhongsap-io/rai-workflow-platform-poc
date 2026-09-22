@@ -337,6 +337,24 @@
   margin: 4px 0 0;
 }
 
+.disposition-controls {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.disposition-status {
+  margin: 0;
+}
+
+.disposition-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
 .review-qc-unavailable {
   display: flex;
   flex-direction: column;

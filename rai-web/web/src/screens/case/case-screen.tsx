@@ -11,7 +11,7 @@ import type { SessionInfo } from '@rai/shared/schemas/auth';
 import type { ArtifactRef } from '@rai/shared/schemas/artifacts';
 import type { CaseView, ConfigurationView } from '@rai/shared/schemas/cases';
 import type { PackDraft, PackDraftUpdateRequest, SlotNumber, SlotState } from '@rai/shared/schemas/pack';
-import type { LaneDecisionResponse } from '@rai/shared/schemas/review';
+import type { LaneDecisionResponse, DispositionResponse } from '@rai/shared/schemas/review';
 import type { SubmittedVersion, VersionSummary } from '@rai/shared/schemas/versions';
 import { ApiError, api } from '../../api/client.js';
 import { ErrorNotice } from '../../components/error-notice.js';
@@ -241,6 +241,12 @@ export function CaseScreen(): JSX.Element {
     setReloadToken((n) => n + 1);
   };
 
+  const onDispositionRecorded = (response: DispositionResponse): void => {
+    if (response.ready) {
+      setNotice({ key: 'review.decided.ready', params: {} });
+    }
+  };
+
   return (
     <CaseScreenBody
       caseId={caseId}
@@ -268,6 +274,7 @@ export function CaseScreen(): JSX.Element {
         setEditorError(null);
       }}
       onLaneDecided={onLaneDecided}
+      onDispositionRecorded={onDispositionRecorded}
       onUnauthenticated={unauthenticated}
     />
   );
@@ -293,6 +300,7 @@ interface BodyProps {
   onReload: () => void;
   onDismissError: () => void;
   onLaneDecided: (response: LaneDecisionResponse) => void;
+  onDispositionRecorded: (response: DispositionResponse) => void;
   onUnauthenticated: (err: unknown) => boolean;
 }
 
@@ -394,6 +402,7 @@ function CaseScreenBody(props: BodyProps): JSX.Element {
                   hasOpenDraft={state.draft !== null}
                   session={props.session}
                   onDecided={props.onLaneDecided}
+                  onDispositionRecorded={props.onDispositionRecorded}
                   onUnauthenticated={props.onUnauthenticated}
                 />
               ) : null}

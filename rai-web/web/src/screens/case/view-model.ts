@@ -9,7 +9,7 @@ import type { LocaleKey } from '@rai/shared/locales/keys';
 import type { RoleScope } from '@rai/shared/schemas/auth';
 import type { CaseView, LaneProjectionStatus } from '@rai/shared/schemas/cases';
 import type { NotApplicableReason, SlotNumber, SlotState } from '@rai/shared/schemas/pack';
-import type { StoredFindingSummary } from '@rai/shared/schemas/review';
+import type { DispositionKind, StoredFindingSummary } from '@rai/shared/schemas/review';
 import type { ExpectedVersion, FrozenSlot, SubmittedVersion } from '@rai/shared/schemas/versions';
 import { NON_VENDOR_DEFAULT_REASON_KEY } from '@rai/shared/schemas/pack';
 
@@ -183,6 +183,24 @@ export function laneProjectionStatus(view: CaseView, lane: Lane): LaneProjection
 }
 
 /**
+ * The lane whose QC findings this actor may load on this version (qc-run is authorized as lane.approve).
+ * Null for Admin, owner/SPOC self-exclusion (403 on qc-run), or a non-current submitted version.
+ * Remains after the lane is decided so disposition controls can still appear (W2-09 / A09).
+ */
+export function findingsLane(args: {
+  roles: readonly RoleScope[];
+  subjectId: string;
+  view: CaseView;
+  version: SubmittedVersion;
+}): Lane | null {
+  const lane = reviewerLaneOf(args.roles);
+  if (lane === null) return null;
+  if (isSelfExcludedOnCase(args.roles, args.subjectId, args.view)) return null;
+  if (!args.version.isLatest) return null;
+  return lane;
+}
+
+/**
  * The lane the signed-in reviewer may decide on this version, or null when the UI must not draw controls
  * (wrong role, Admin, owner/SPOC self-exclusion, stale/superseded version, or lane already decided).
  * Mirrors the server deny cases so the SPA does not offer a button the API would 403 (W0-05 UI convenience).
@@ -194,12 +212,54 @@ export function decidableLane(args: {
   version: SubmittedVersion;
   hasOpenDraft: boolean;
 }): Lane | null {
-  const lane = reviewerLaneOf(args.roles);
+  const lane = findingsLane(args);
   if (lane === null) return null;
-  if (isSelfExcludedOnCase(args.roles, args.subjectId, args.view)) return null;
-  if (!args.version.isLatest || args.hasOpenDraft) return null;
+  if (args.hasOpenDraft) return null;
   if (laneProjectionStatus(args.view, lane) !== 'pending') return null;
   return lane;
+}
+
+/**
+ * Disposition kinds this actor may offer on a finding the UI already shows.
+ * Owner/BU SPOC → fixed_proposed only (when they can see the finding list). Owning-lane reviewer who is not
+ * owner/SPOC → fixed, waived, not_applicable, plus fixed_confirmed when this visit's overlay says the latest
+ * kind is fixed_proposed. Admin and the wrong lane → none. When canSeeFindings is false (qc-run 403 for the
+ * owner), returns [] — propose-fixed is covered by unit tests and a substitute API path (W2-09).
+ */
+export function dispositionKindsForActor(args: {
+  roles: readonly RoleScope[];
+  subjectId: string;
+  view: Pick<CaseView, 'businessOwner' | 'businessUnitId'>;
+  findingOwningLane: Lane;
+  latestKind: DispositionKind | null;
+  canSeeFindings: boolean;
+}): DispositionKind[] {
+  if (!args.canSeeFindings) return [];
+  if (isSelfExcludedOnCase(args.roles, args.subjectId, args.view)) {
+    return ['fixed_proposed'];
+  }
+  const lane = reviewerLaneOf(args.roles);
+  if (lane === null || lane !== args.findingOwningLane) return [];
+  const kinds: DispositionKind[] = ['fixed', 'waived', 'not_applicable'];
+  if (args.latestKind === 'fixed_proposed') kinds.push('fixed_confirmed');
+  return kinds;
+}
+
+export function dispositionKindKey(kind: DispositionKind): LocaleKey {
+  return `review.disposition.${kind}` as LocaleKey;
+}
+
+/** Disposition reason: one non-empty field, same one-item pattern as send-back (W2-09). Schema max 2000. */
+export const DISPOSITION_REASON_MAX_LENGTH = 2000;
+
+export function dispositionReasonIsValid(text: string): boolean {
+  const trimmed = text.trim();
+  return trimmed.length >= 1 && trimmed.length <= DISPOSITION_REASON_MAX_LENGTH;
+}
+
+/** Kinds that open the reason dialog before POST (server 422 validation.reason_required otherwise). */
+export function dispositionKindNeedsReason(kind: DispositionKind): boolean {
+  return kind === 'waived' || kind === 'not_applicable';
 }
 
 /** Submitted versions carry a frozen revision of 1 for ExpectedVersion (W0-06 5.1 / 5.2). */
