@@ -105,3 +105,10 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: W2-08 exit evidence / remaining W2 — not this session.
 - Author: operator=ta session=w2-06 model=composer
 - Evidence: branch codex/w2-06-ready
+
+## 2026-09-22 14:40 — W2-07 review locale keys
+- What: Contract-only additions to both catalogues for the reviewer workspace (`review.*`, `finding.severity.*`). No workflow change.
+- Why: shared locales are Lane A; the W2-07 screen PR must not carry them.
+- Next: W2-07 UI against these keys.
+- Author: operator=ta session=w2 model=grok-4.7
+- Evidence: branch codex/w2-07-review-locale-keys
