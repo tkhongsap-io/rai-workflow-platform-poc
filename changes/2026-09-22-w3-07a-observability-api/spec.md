@@ -11,3 +11,16 @@ HTTP capture classifies the six reachable synchronous contract failures (401/403
 The shared schema's canonical input surfaces replace illustrative nested field paths; detailed request paths stay in HTTP validation responses. Internal errors retain only relative module coordinates present in the local source/build inventory. Neither error name/message nor function names, external frames, provider codes or absolute paths are retained. Stack hashes are over sanitized frames. The operator response exposes nine bounded category aggregates since process start, as specified by DeskHealthReport; per-stack correlation is available through stackHash on the log event, not a new API field.
 
 Store probes compare ordered migration hashes, not just counts, and never apply migrations. A missing journal means pending; a changed or ahead journal means unknown. Read-only short-lived connections have bounded connection/query/statement lifetimes and are closed at the deadline; blob checks use stat/access without creating files. Readiness calls coalesce and cache for five seconds. Configured mail uses W3-04 ConfiguredMailSink.health(); configured QC uses probe(), because its health() method is a setter. Neither dependency is constructed by observability.
+
+### Independent review corrections
+
+Health routes bypass session resolution even when the caller supplies a cookie: liveness is independent of the session store and readiness reports probe failures as 503. Other public/session/action routes retain their existing identity behavior. Per W0-10 section 3.3, health.readiness emits the first observed status and subsequent status changes, not every poll; request.completed remains per readiness request.
+
+
+### Runtime assembly semantics
+
+The existing notification worker retains domain events and commits before terminal capture. Terminal mail_delivery_failed is a job classification (502 metadata), not a synchronous HTTP response; unexpected worker load/DB and producer infrastructure failures use sanitized internal_error. Persisted digest stage failures retain sla.digest.failed plus their job row and correlation. Readiness observes the same configured mail sink and QC runner; use sink.health() and runner.probe(), never the substitute health setter. main.ts startup surprises emit sanitized internal error fields without raw exception names/messages. W3-INT binds the server-local submit-QC API after the actual submission commit, with its originating correlation; this API alone does not claim the trigger is wired.
+
+### Response completion and readiness severity
+
+request.completed is registered before background delivery hooks and uses Fastify's elapsedTime frozen at response finish. Delivery stalls cannot delay that log or inflate HTTP latency. health.readiness retains transition-only emission, with warn for not_ready and info for ready so dependency failures remain visible at a warn threshold.

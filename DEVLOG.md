@@ -1,5 +1,9 @@
 # Development log
 
+## W3-07a: operator runtime and correlation — 2026-09-23
+
+Health/readiness and Admin-only desk-health routes use the actual configured dependencies. Safe error capture, mail failure and QC diagnostics preserve correlation without logging submitted content. Independent reviews are clean after fixes for health-cookie isolation, readiness transition severity/frequency and response timing. Full combined verification passed; remaining package-level OBS and journey proof stays with W3-INT.
+
 ## W3-03b: daily SLA digest — 2026-09-22
 
 The local daily producer freezes its Bangkok day, persists job provenance and queues each configured recipient once per day. Empty results send no mail. The existing retry worker delivers the digest, with recovery retaining original provenance. Core and binding reviews are clean; integrated operator/journey evidence remains pending.
@@ -191,3 +195,7 @@ W2-07/W2-09 wired to the real server: promoted evidence browser specs, the autom
 ## W3-07a prerequisite contract — 2026-09-22
 
 Isolated branch from 5fe59ad; shared observability schemas and additive migration 0007 only. [Plan](changes/2026-09-22-w3-07a-observability-contract/plan.md) and [contract](changes/2026-09-22-w3-07a-observability-contract/spec.md). No consumer implementation or OBS acceptance claimed; parent reviews before any publication.
+
+## W3-07a runtime-only assembly — 2026-09-23
+
+Assembled against actual main e37fb4f; complete rai-web tree equals reviewed c98ad3e (528 unit / 256 integration / 126 real browser / 123 substitute, zero skips). Runtime-only diff excludes merged prerequisite implementations; parent assesses its bounded size before publication. No PR/push from this worker, no new runner or owning lane. W3-INT owns trigger binding; see changes/2026-09-22-w3-07a-observability-api/review.md for focused checks and remaining acceptance boundaries.

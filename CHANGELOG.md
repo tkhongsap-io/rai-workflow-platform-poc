@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-23
+
+- W3-07a: Dependency-aware health/readiness, Admin desk-health API, safe correlated errors and durable unavailable/late-QC diagnostics. Notification delivery remains on the existing worker.
+
 ## 2026-09-22
 
 - W3-03b: Local daily SLA digests with persisted job provenance, configured-recipient deduplication and partial-failure recovery through the existing retry worker.
@@ -94,3 +98,7 @@ No application or operational capability is implemented.
 ## 2026-09-22 — W3-07a prerequisite contract
 
 Added shared observability shapes and additive persistence for digest provenance/dedup, truthful QC unavailable reasons and durable late-QC refusals. Reconciled HTTP/job error capture and synthetic integration gates. Runtime consumers remain separate work.
+
+## 2026-09-23 — W3-07a runtime candidate
+
+Added health/operator routes, safe HTTP/job capture and correlated QC diagnostics through the existing runtime. Actual-main assembly preserves the independently reviewed and fully tested c98ad3e application tree. W3-INT submit binding and remaining acceptance boundaries stay explicit; parent scope approval and publication are pending.

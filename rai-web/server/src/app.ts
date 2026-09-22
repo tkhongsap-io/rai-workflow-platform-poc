@@ -34,6 +34,13 @@ import { cookieNames, type SessionStore } from './identity/session.js';
 import type { IdentityAdapter } from './identity/types.js';
 import { mintCorrelationId, runWithContext } from './observability/context.js';
 import { createEmitter, loggerOptions, type Emitter } from './observability/log.js';
+import type { ErrorCategory } from '@rai/shared/schemas/observability';
+import { createErrorCapture, type ErrorCapture } from './observability/errors.js';
+import {
+  registerHealthRoutes,
+  registerOperatorRoutes,
+  type ObservabilityDeps,
+} from './observability/routes.js';
 
 export interface IdentityDeps {
   adapter: IdentityAdapter; // started (start() succeeded) before buildApp is called
@@ -44,10 +51,11 @@ export interface IdentityDeps {
 }
 
 export interface AppDeps {
+  observability?: ObservabilityDeps;
   /** Local daily producer; uses the same drain and single notification dispatcher. */
   digest?: Omit<DigestDeps, 'emitter'>;
   /** W3-03a initial post-commit notifications; retries and digest remain separate. */
-  notifications?: Omit<NotificationDeps, 'emitter'>;
+  notifications?: Omit<NotificationDeps, 'emitter' | 'errors'>;
   config: Pick<AppConfig, 'nodeEnv' | 'log' | 'trustProxy' | 'publicBaseUrl'>;
   /** Absent only in substrate-level tests that register no route; main.ts always passes it. */
   identity?: IdentityDeps;
@@ -71,6 +79,7 @@ export interface AppDeps {
 }
 
 export interface App {
+  errors: ErrorCapture;
   fastify: FastifyInstance;
   emitter: Emitter;
   /** W0-04 graceful shutdown (shutdown.ts): the bounded close start.ts and main.ts run instead of `fastify.close()`. */
@@ -114,15 +123,9 @@ export function buildApp(deps: AppDeps): App {
     ajv: { customOptions: { removeAdditional: false } }, // a key an `additionalProperties: false` shape does not list is 422, never stripped
   });
   const emitter = createEmitter(fastify.log, { strict: deps.config.nodeEnv === 'test' });
+  const errors = createErrorCapture(emitter);
+  const requestErrors = new WeakMap<object, ErrorCategory>();
   const drain = createDrain(fastify); // first hook: every accepted request is counted (shutdown.ts)
-  if (deps.digest !== undefined)
-    registerDailyDigest(fastify, { ...deps.digest, emitter }, drain, () => {
-      // W3-07a replaces this fixed safe fallback with its app-owned errors.internal.
-      emitter.log('error.captured', { category: 'internal_error', code: 'internal_error', httpStatus: 500 });
-    });
-  if (deps.notifications !== undefined)
-    registerNotifications(fastify, createNotifications({ ...deps.notifications, emitter }), emitter, drain);
-
   fastify.addHook('onRequest', (request, reply, done) => {
     void reply.header('X-Correlation-Id', request.id);
     void reply.header('Cache-Control', 'no-store');
@@ -138,14 +141,59 @@ export function buildApp(deps: AppDeps): App {
     );
   });
 
+  fastify.addHook('onResponse', (request, reply, done) => {
+    if (
+      request.routeOptions.url === '/healthz' ||
+      (request.routeOptions.config.observability?.staticAsset === true && reply.statusCode < 400)
+    ) {
+      done();
+      return;
+    }
+    const errorCode = requestErrors.get(request);
+    emitter.log(
+      'request.completed',
+      {
+        method: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'].includes(request.method)
+          ? request.method
+          : 'OTHER',
+        route: request.routeOptions.url ?? 'unmatched',
+        status: reply.statusCode,
+        ...(errorCode === undefined ? {} : { errorCode }),
+        durationMs: reply.elapsedTime, // Fastify freezes this at response finish, before onResponse hooks.
+      },
+      reply.statusCode >= 500
+        ? 'error'
+        : errorCode === 'forbidden' || errorCode === 'unsafe_upload'
+          ? 'warn'
+          : 'info',
+    );
+    done();
+  });
+
+  // Completion logging must precede hooks that await background delivery.
+  if (deps.digest !== undefined)
+    registerDailyDigest(fastify, { ...deps.digest, emitter }, drain, (error) => {
+      errors.internal(error);
+    });
+  if (deps.notifications !== undefined)
+    registerNotifications(
+      fastify,
+      createNotifications({ ...deps.notifications, emitter, errors }),
+      emitter,
+      drain,
+      errors,
+    );
+
   fastify.setErrorHandler((error, request, reply) => {
     const correlationId = request.id as CorrelationId;
-    if (isContractError(error)) {
+    if (isContractError(error) && error.code !== 'mail_delivery_failed' && error.code !== 'qc_unavailable') {
+      requestErrors.set(request, errors.http(error, request.routeOptions.url).category);
       void reply.status(error.status).send(error.toResponse(correlationId));
       return;
     }
     if ((error as FastifyError).validation !== undefined) {
       const invalid = validationToInvalidInput(error as FastifyError);
+      requestErrors.set(request, errors.http(invalid, request.routeOptions.url).category);
       void reply.status(invalid.status).send(invalid.toResponse(correlationId));
       return;
     }
@@ -154,14 +202,16 @@ export function buildApp(deps: AppDeps): App {
     const code = (error as FastifyError).code;
     if (typeof code === 'string' && code.startsWith('FST_ERR_CTP_')) {
       const invalid = new InvalidInputError([{ path: 'body', messageKey: 'validation.required' }]);
+      requestErrors.set(request, errors.http(invalid, request.routeOptions.url).category);
       void reply.status(invalid.status).send(invalid.toResponse(correlationId));
       return;
     }
-    request.log.error({ err: { name: (error as Error).name, message: 'redacted' } }, 'internal_error');
+    requestErrors.set(request, errors.internal(error, request.routeOptions.url).category);
     void reply.status(500).send(internalErrorResponse(correlationId));
   });
 
   fastify.setNotFoundHandler((request, reply) => {
+    requestErrors.set(request, errors.notFound().category);
     void reply.status(404).send({
       error: { code: 'not_found', messageKey: 'error.not_found', correlationId: request.id },
     });
@@ -171,6 +221,9 @@ export function buildApp(deps: AppDeps): App {
   // plugin adds to the root is copied into the children created after it). Its `/*` fallback never shadows an
   // API route: find-my-way prefers the static and parametric routes whatever the registration order.
   if (deps.static !== undefined) void fastify.register(staticPlugin(deps.static));
+
+  const observability = deps.observability;
+  if (observability !== undefined) registerHealthRoutes(fastify, () => observability.readiness(), emitter);
 
   if (deps.identity !== undefined) {
     const identity = deps.identity;
@@ -194,6 +247,7 @@ export function buildApp(deps: AppDeps): App {
       });
       done();
     });
+    if (deps.observability !== undefined) registerOperatorRoutes(fastify, deps.observability, errors);
     const caseDeps = deps.cases;
     if (caseDeps !== undefined) {
       void fastify.register((instance, _opts, done) => {
@@ -206,7 +260,7 @@ export function buildApp(deps: AppDeps): App {
     const packDeps = deps.pack;
     if (packDeps !== undefined) {
       void fastify.register((instance, _opts, done) => {
-        registerPackRoutes(instance, { ...packDeps, emitter });
+        registerPackRoutes(instance, { ...packDeps, emitter, errors });
         done();
       });
     }
@@ -227,11 +281,11 @@ export function buildApp(deps: AppDeps): App {
     const findingsDeps = deps.findings;
     if (findingsDeps !== undefined) {
       void fastify.register((instance, _opts, done) => {
-        registerFindingsRoutes(instance, { ...findingsDeps, emitter });
+        registerFindingsRoutes(instance, { ...findingsDeps, emitter, errors });
         done();
       });
     }
   }
 
-  return { fastify, emitter, drain };
+  return { fastify, emitter, errors, drain };
 }

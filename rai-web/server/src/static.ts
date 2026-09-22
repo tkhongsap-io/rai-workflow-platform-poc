@@ -72,6 +72,12 @@ export function listFiles(root: string): string[] {
   return out.sort();
 }
 
+declare module 'fastify' {
+  interface FastifyContextConfig {
+    observability?: { staticAsset: boolean };
+  }
+}
+
 export interface StaticOptions {
   /** The built SPA directory; defaults to WEB_DIST_DIR. Must contain index.html (webDistPresent). */
   root?: string;
@@ -114,17 +120,27 @@ export function staticPlugin(options: StaticOptions = {}): (fastify: FastifyInst
 
     const files = listFiles(root);
     for (const file of files) {
-      fastify.get(`/${file}`, { config: { auth: PUBLIC } }, (_request, reply) => reply.sendFile(file, root));
+      fastify.get(
+        `/${file}`,
+        { config: { auth: PUBLIC, observability: { staticAsset: true } } },
+        (_request, reply) => reply.sendFile(file, root),
+      );
     }
-    fastify.get('/', { config: { auth: PUBLIC } }, (_request, reply) => reply.sendFile(INDEX_FILE, root));
+    fastify.get('/', { config: { auth: PUBLIC, observability: { staticAsset: true } } }, (_request, reply) =>
+      reply.sendFile(INDEX_FILE, root),
+    );
 
     // History fallback: the SPA owns every GET outside /api and /auth. A miss under those prefixes goes to the
     // W0-06 not-found handler (app.ts), unchanged.
-    fastify.get('/*', { config: { auth: PUBLIC } }, (request, reply) => {
-      const pathname = request.url.split('?', 1)[0] ?? request.url;
-      if (isApiPath(pathname)) return reply.callNotFound();
-      return reply.sendFile(INDEX_FILE, root);
-    });
+    fastify.get(
+      '/*',
+      { config: { auth: PUBLIC, observability: { staticAsset: true } } },
+      (request, reply) => {
+        const pathname = request.url.split('?', 1)[0] ?? request.url;
+        if (isApiPath(pathname)) return reply.callNotFound();
+        return reply.sendFile(INDEX_FILE, root);
+      },
+    );
   };
   Object.defineProperty(plugin, Symbol.for('skip-override'), { value: true });
   return plugin;

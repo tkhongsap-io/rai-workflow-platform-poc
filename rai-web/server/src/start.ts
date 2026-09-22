@@ -2,6 +2,9 @@
 // exit function: config → identity adapter start() (never listens on a refusal, exit 78) → app → listen → post-listen
 // loopback check (S16: close and exit 78 when the bound address is not loopback). main.ts never migrates (W0-04).
 
+import { createReadinessReader, computeReadiness } from './observability/health.js';
+import { createStoreProbes } from './observability/probes.js';
+import { isLoopbackHost } from './config.js';
 import { loadMailSink } from './notifications/runtime.js';
 import type { AddressInfo } from 'node:net';
 import path from 'node:path';
@@ -83,7 +86,8 @@ export async function loadFixtureUsers(): Promise<readonly FixtureIdentity[] | u
  * dispositions work against the deployable. Dynamic import only — never a static `@rai/fixtures` import — so
  * `check:substitute-absent` still passes and a production install without the fixtures package starts unbound.
  */
-export async function loadQcSubstituteRunner(now?: () => Date): Promise<QcRunner | undefined> {
+type ConfiguredQcRunner = QcRunner & { probe(): Promise<'ok' | 'unavailable' | 'disabled'> };
+export async function loadQcSubstituteRunner(now?: () => Date): Promise<ConfiguredQcRunner | undefined> {
   const qcSpecifier = '@rai/fixtures/substitutes/qc/index';
   const casesSpecifier = '@rai/fixtures/data/cases/index';
   try {
@@ -91,7 +95,7 @@ export async function loadQcSubstituteRunner(now?: () => Date): Promise<QcRunner
       ScriptedQcRunner: new (options?: {
         fixtureCaseIdOf?: (version: VersionRef) => string | undefined;
         now?: () => Date;
-      }) => QcRunner;
+      }) => ConfiguredQcRunner;
     };
     const casesMod = (await import(casesSpecifier)) as Record<string, unknown>;
     const rawCases = casesMod.FIXTURE_CASES;
@@ -196,7 +200,25 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
       : undefined;
   // Only fixture identities can be synthetic mail recipients in this slice. No live directory or transport.
   const mailSink = config.identity.mode === 'fixture' ? await loadMailSink(config) : undefined;
+  // Readiness observes the exact runner and sink injected into the existing consumers.
+  const readiness = createReadinessReader(() =>
+    computeReadiness(
+      {
+        identity: () => adapter.health(),
+        loopbackBind: isLoopbackHost(config.host),
+        mailKind: config.mail.mode === 'sink-memory' ? 'memory' : 'file',
+        qcKind: 'substitute',
+        build: { commit: config.buildCommit, schemaVersion: 'unknown' },
+      },
+      {
+        ...createStoreProbes(config.database.url, path.resolve(config.blobDir)),
+        mailSink: () => mailSink?.health() ?? Promise.resolve('unavailable'),
+        qc: () => qcRunner?.probe() ?? Promise.resolve('disabled'),
+      },
+    ),
+  );
   const { fastify, emitter, drain } = buildApp({
+    observability: { db: db.db, readiness },
     ...(mailSink === undefined
       ? {}
       : {

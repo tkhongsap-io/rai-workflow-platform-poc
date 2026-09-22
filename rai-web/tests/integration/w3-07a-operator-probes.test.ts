@@ -1,3 +1,4 @@
+import { createLogCapture, assertNoLeak } from '../support/log-capture.js';
 // Query/probe integration only: notification producer/retry and HTTP acceptance remain separate gates.
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -99,4 +100,17 @@ test('operator SQL preserves unknown QC and unscheduled failures, derives termin
   assert.deepEqual(report.slaDigest.lastRun?.notificationIds, []);
   assert.equal(report.slaDigest.recentFailures[0]?.correlationId, correlation);
   assert.equal(report.slaDigest.recentFailures[0]?.stage, 'query');
+});
+
+test('no-PII guard detects a Thai filename split across UTF-8 stream chunks', () => {
+  const capture = createLogCapture();
+  const canary = 'เอกสารประกอบ_ผู้ให้บริการ_2569.pdf';
+  const bytes = Buffer.from(canary);
+  for (let offset = 0; offset < bytes.length; offset++)
+    capture.stream.write(bytes.subarray(offset, offset + 1));
+  assert.equal(capture.text(), canary);
+  assert.throws(() => assertNoLeak(capture), /forbidden log canary/);
+  capture.clear();
+  capture.stream.write('safe');
+  assertNoLeak(capture);
 });

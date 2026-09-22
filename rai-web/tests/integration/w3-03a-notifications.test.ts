@@ -1,3 +1,8 @@
+import { setTimeout as delay } from 'node:timers/promises';
+import type { ErrorCapture } from '@rai/server/observability/errors';
+import { computeReadiness } from '@rai/server/observability/health';
+import { createStoreProbes } from '@rai/server/observability/probes';
+import type { DeskHealthReport } from '@rai/shared/schemas/observability';
 import { after, before, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -46,6 +51,7 @@ let app: FastifyInstance;
 let sink: MemoryMailSink;
 let notifications: Notifications;
 let emitter: Emitter;
+let errors: ErrorCapture;
 let scratch: string;
 const logs: string[] = [];
 
@@ -62,6 +68,24 @@ async function build(options: { auto?: boolean; rollback?: boolean } = {}) {
   await adapter.start({ host: '127.0.0.1', port: 8787, publicBaseUrl: base, trustProxy: false });
   const deps = { db: db.app, sink, identities: FIXTURE_USERS, publicBaseUrl: base };
   const built = buildApp({
+    observability: {
+      db: db.app,
+      readiness: () =>
+        computeReadiness(
+          {
+            identity: () => adapter.health(),
+            loopbackBind: true,
+            mailKind: 'memory',
+            qcKind: 'substitute',
+            build: { commit: 'dev', schemaVersion: 'unknown' },
+          },
+          {
+            ...createStoreProbes(db.urls.app, path.join(scratch, 'blobs')),
+            mailSink: () => sink.health(),
+            qc: () => Promise.resolve('disabled'),
+          },
+        ),
+    },
     config: {
       nodeEnv: 'test',
       log: { level: 'info', pretty: false },
@@ -103,7 +127,8 @@ async function build(options: { auto?: boolean; rollback?: boolean } = {}) {
     ...(options.auto === false ? {} : { notifications: deps }),
   });
   emitter = built.emitter;
-  notifications = createNotifications({ ...deps, emitter });
+  errors = built.errors;
+  notifications = createNotifications({ ...deps, emitter, errors });
   app = built.fastify;
   await app.ready();
 }
@@ -445,6 +470,7 @@ const retryWorker = (mail: MailSink, clock: () => Date, database = db.app) =>
     db: database,
     sink: mail,
     now: clock,
+    errors,
     identities: FIXTURE_USERS,
     publicBaseUrl: base,
     emitter,
@@ -490,6 +516,29 @@ test('W3-04 four failed results persist deadlines and leave Ready decisions unch
     .filter((e) => e.fields?.notificationId === row!.id);
   assert.equal(events.filter((e) => e.event === 'mail.attempt_failed').length, 3);
   assert.equal(events.filter((e) => e.event === 'mail.failed').length, 1);
+  const failures = events.filter((e) => e.event === 'error.captured');
+  assert.equal(failures.length, 1);
+  assert.deepEqual(failures[0]!.fields, {
+    category: 'mail_delivery_failed',
+    notificationId: row!.id,
+    attempts: 4,
+    errorCode: stored!.lastErrorCode,
+    code: 'mail_delivery_failed',
+    httpStatus: 502,
+  });
+  const admin = await signIn('fx-user-admin');
+  const view = await app.inject({ url: '/api/operator/desk-health', headers: asUser(admin) });
+  assert.equal(view.statusCode, 200);
+  const report = view.json<DeskHealthReport>();
+  assert.ok(JSON.stringify(report).includes(row!.id));
+  assert.ok(
+    report.errorCounters.some((counter) => counter.code === 'mail_delivery_failed' && counter.count === 1),
+  );
+  for (const user of FIXTURE_USERS) {
+    assert.equal(logs.join('').includes(user.email), false);
+    assert.equal(logs.join('').includes(user.displayName), false);
+  }
+
   assert.ok(events.every((e) => e.correlationId === row!.correlationId));
 });
 
@@ -659,4 +708,55 @@ test('shutdown cancellation keeps the notification lock until the sink settles, 
   assert.equal(sink.sent.length, 1, 'sink may have accepted before rollback; replay remains explicit');
   await consumer.deliverInitial(row!.id);
   assert.equal(sink.sent.length, 1, 'same live sink deduplicates the replay');
+});
+
+test('request completion and response latency do not wait for a stalled notification sink', async () => {
+  const entered = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  const originalDeliver = sink.deliver.bind(sink);
+  sink.deliver = async (request) => {
+    entered.resolve();
+    await release.promise;
+    return originalDeliver(request);
+  };
+  const started = performance.now();
+  const submitted = submit();
+  try {
+    await entered.promise;
+    const completion = () =>
+      logs
+        .join('')
+        .split('\n')
+        .filter(Boolean)
+        .map(
+          (raw) =>
+            JSON.parse(raw) as {
+              event: string;
+              fields: { route?: string; durationMs?: number; status?: number };
+            },
+        )
+        .filter(
+          (line) =>
+            line.event === 'request.completed' && line.fields.route === '/api/cases/:caseId/draft/submit',
+        );
+    assert.equal(completion().length, 1, 'completion must be logged before delivery settles');
+    const duration = completion()[0]!.fields.durationMs!;
+    assert.equal(completion()[0]!.fields.status, 201);
+    // A deadline is only a hang guard; the correctness assertions precede releasing the sink.
+    const response = await Promise.race([
+      submitted,
+      delay(2000).then(() => {
+        throw new Error('response waited for sink');
+      }),
+    ]);
+    assert.equal(response.response.statusCode, 201);
+    await delay(100);
+    assert.ok(duration < performance.now() - started);
+    assert.equal(completion().length, 1);
+    assert.equal(completion()[0]!.fields.durationMs, duration);
+  } finally {
+    release.resolve();
+    await submitted;
+    await app.close();
+  }
 });

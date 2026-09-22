@@ -28,6 +28,7 @@ import { staleDetails } from '../cases/service.js';
 import { currentBody } from '../configuration/store.js';
 import type { Db, Executor, Tx } from '../db/client.js';
 import { lockCase, withTransaction } from '../db/transaction.js';
+import { createErrorCapture, type ErrorCapture } from '../observability/errors.js';
 import type { Emitter } from '../observability/log.js';
 import { noopUploadTrigger, type UploadTrigger, type UploadTriggerEvent } from './qc-trigger.js';
 import {
@@ -46,6 +47,7 @@ export interface PackServiceDeps {
   db: Db;
   limits: Pick<UploadLimits, 'maxPackBytes'>;
   emitter: Emitter;
+  errors?: ErrorCapture;
   uploadTrigger?: UploadTrigger; // the W0-07 hook point; the no-op until an orchestrator is bound
   now?: () => Date;
 }
@@ -264,11 +266,7 @@ function fireUploadTriggers(deps: PackServiceDeps, events: UploadTriggerEvent[])
     void Promise.resolve()
       .then(() => trigger(event))
       .catch((err: unknown) => {
-        deps.emitter.log('error.captured', {
-          category: 'qc_upload_trigger',
-          code: err instanceof Error ? err.name : 'unknown',
-          route: 'PUT /api/cases/:caseId/draft',
-        });
+        (deps.errors ?? createErrorCapture(deps.emitter)).internal(err);
       });
   }
 }

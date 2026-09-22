@@ -1,3 +1,5 @@
+import { Writable } from 'node:stream';
+import { buildApp } from '../app.js';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -77,3 +79,47 @@ for (const mode of ['request', 'request-stalled', 'poll', 'poll-stalled']) {
     }
   });
 }
+
+test('unexpected dispatcher query failure is captured once as safe internal_error', async () => {
+  let output = '';
+  const built = buildApp({
+    config: {
+      nodeEnv: 'test',
+      log: { level: 'info', pretty: false },
+      trustProxy: false,
+      publicBaseUrl: new URL('http://127.0.0.1:18788'),
+    },
+    logStream: new Writable({
+      write(chunk: Buffer, _encoding, done) {
+        output += chunk.toString();
+        done();
+      },
+    }),
+  });
+  const canary = 'RAI-DESK-SYNTHETIC-FIXTURE';
+  registerNotifications(
+    built.fastify,
+    {
+      deliverInitial: () => Promise.resolve(undefined),
+      deliverPending: () => Promise.reject(new Error(canary)),
+    },
+    built.emitter,
+    built.drain,
+    built.errors,
+  );
+  try {
+    await built.fastify.ready();
+    const lines = output
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as { event: string; fields: { category: string } });
+    assert.equal(lines.length, 1);
+    assert.equal(lines[0]!.event, 'error.captured');
+    assert.equal(lines[0]!.fields.category, 'internal_error');
+    assert.equal(output.includes(canary), false);
+    assert.equal(output.includes('mail_delivery_failed'), false);
+    assert.equal(built.errors.counters()[0]!.count, 1);
+  } finally {
+    await built.fastify.close();
+  }
+});

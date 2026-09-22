@@ -1,7 +1,7 @@
 // W2-05 store helpers for qc_run / qc_finding (append-only inserts).
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull } from 'drizzle-orm';
 import type { Lane } from '@rai/shared/constants';
-import type { QcTrigger } from '@rai/shared/qc/types';
+import type { QcTrigger, QcUnavailableReason } from '@rai/shared/qc/types';
 import type { Executor, Tx } from '../db/client.js';
 import { qcFinding } from '../db/schema/qc-finding.js';
 import { qcRun } from '../db/schema/qc-run.js';
@@ -15,6 +15,7 @@ export interface InsertRunInput {
   engineId: string;
   ruleRevision: string;
   status: 'completed' | 'unavailable';
+  unavailableReason?: QcUnavailableReason;
   requestedAt: Date;
   completedAt: Date;
   correlationId: string;
@@ -49,6 +50,7 @@ export async function insertQcRun(tx: Tx, input: InsertRunInput): Promise<void> 
     engineId: input.engineId,
     ruleRevision: input.ruleRevision,
     status: input.status,
+    unavailableReason: input.unavailableReason ?? null,
     requestedAt: input.requestedAt,
     completedAt: input.completedAt,
     correlationId: input.correlationId,
@@ -77,20 +79,39 @@ export async function insertQcFinding(tx: Tx, input: InsertFindingInput): Promis
 }
 
 /** Latest approve_attempt run for the frozen input identity (W0-07 §3.7); order by monotonic requested_at. */
-export async function findLatestApproveAttemptRun(
+export function findLatestApproveAttemptRun(
   exec: Executor,
   versionId: string,
   lane: Lane,
   ruleRevision: string,
-): Promise<{ id: string; status: string; engineId: string } | undefined> {
+) {
+  return findLatestQcRun(exec, versionId, 'approve_attempt', lane, ruleRevision);
+}
+
+export function findLatestSubmitRun(exec: Executor, versionId: string, ruleRevision: string) {
+  return findLatestQcRun(exec, versionId, 'submit', null, ruleRevision);
+}
+
+async function findLatestQcRun(
+  exec: Executor,
+  versionId: string,
+  trigger: QcTrigger,
+  lane: Lane | null,
+  ruleRevision: string,
+) {
   const [row] = await exec
-    .select({ id: qcRun.id, status: qcRun.status, engineId: qcRun.engineId })
+    .select({
+      id: qcRun.id,
+      status: qcRun.status,
+      engineId: qcRun.engineId,
+      unavailableReason: qcRun.unavailableReason,
+    })
     .from(qcRun)
     .where(
       and(
         eq(qcRun.versionId, versionId),
-        eq(qcRun.trigger, 'approve_attempt'),
-        eq(qcRun.lane, lane),
+        eq(qcRun.trigger, trigger),
+        lane === null ? isNull(qcRun.lane) : eq(qcRun.lane, lane),
         eq(qcRun.ruleRevision, ruleRevision),
       ),
     )
