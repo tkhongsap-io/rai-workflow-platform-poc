@@ -119,6 +119,7 @@ export function caseRoutes(): RouteDefinition[] {
         const caseId = crypto.randomUUID() as CaseId; // server-generated, non-guessable (W0-05 section 4)
         const stored: StoredCase = {
           caseId,
+          fixtureCaseId: '', // not a W1-09 fixture; lane QC yields unscripted (zero findings) or unavailable
           registryId: ctx.store.nextRegistryId(now),
           fields: structuredClone(request),
           status: 'draft',
@@ -133,6 +134,7 @@ export function caseRoutes(): RouteDefinition[] {
           updatedAt: at,
           draft: newDraft(caseId, request, ctx.store.configuration.checklistTemplateVersions[0] ?? '', at),
           versions: [],
+          readyAtByVersionId: new Map(),
         };
         ctx.store.cases.set(caseId, stored);
         const response = json(201, ctx.correlationId, caseView(stored));

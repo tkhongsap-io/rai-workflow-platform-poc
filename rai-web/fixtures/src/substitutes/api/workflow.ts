@@ -7,15 +7,19 @@ import { authorize, type Actor, type CaseScopeFacts } from '@rai/server/authz/po
 import {
   ForbiddenError,
   InvalidInputError,
+  NotFoundError,
   StaleVersionError,
   type FieldError,
   type StaleReason,
 } from '@rai/shared/errors';
+import { LANES, type Lane } from '@rai/shared/constants';
 import type { CaseId } from '@rai/shared/ids';
+import { uuidv7 } from '@rai/shared/ids';
 import type { Principal } from '@rai/shared/schemas/auth';
 import type { CaseSummary, CaseView, CaseWritableFields } from '@rai/shared/schemas/cases';
 import type { PackDraft, SlotNumber, SlotState } from '@rai/shared/schemas/pack';
-import { uuidv7 } from '@rai/shared/ids';
+import type { SendBackFeedback } from '@rai/shared/schemas/review';
+import type { FrozenSlot, SubmittedVersion } from '@rai/shared/schemas/versions';
 import type { RouteContext } from './handler.js';
 import { baseHeaders } from './support.js';
 import type { IdempotencyRecord, StoredCase, SubstituteStore } from './store.js';
@@ -289,4 +293,170 @@ export function storeReplay(
   if (ctx.principal === undefined || response.body === undefined) return;
   const record: IdempotencyRecord = { digest, status: response.status, body: response.body };
   ctx.store.idempotency.set(`${ctx.principal.subjectId}\0${key}`, record);
+}
+
+/** W0-04 / W0-06 4.10: which case projection column a lane writes. */
+export function projectionColumnForLane(lane: Lane): 'privacyStatus' | 'securityStatus' | 'raiStatus' {
+  switch (lane) {
+    case 'dpo':
+      return 'privacyStatus';
+    case 'it_security':
+      return 'securityStatus';
+    case 'ai_coe':
+      return 'raiStatus';
+  }
+}
+
+export function writeLaneProjection(
+  stored: StoredCase,
+  lane: Lane,
+  value: 'pending' | 'approved' | 'sent_back',
+  nowIso: string,
+): void {
+  stored[projectionColumnForLane(lane)] = value;
+  stored.updatedAt = nowIso;
+}
+
+/** Reject approve without a qc_run_id (W0-06 4.4 `lane_qc_not_run`). */
+export function requireQcRunId(qcRunId: string | undefined): string {
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (typeof qcRunId !== 'string' || qcRunId.trim() === '' || !UUID.test(qcRunId.trim())) {
+    throw new InvalidInputError([
+      { path: 'body.qcRunId', messageKey: 'error.invalid_input.lane_qc_not_run' },
+    ]);
+  }
+  return qcRunId.trim();
+}
+
+/** A09: send-back feedback must name at least one artifact (slot). */
+export function requireNamedArtifactFeedback(feedback: SendBackFeedback | undefined): SendBackFeedback {
+  if (feedback === undefined || !Array.isArray(feedback.items) || feedback.items.length === 0) {
+    throw new InvalidInputError([
+      { path: 'body.feedback.items', messageKey: 'error.invalid_input.send_back_artifact_required' },
+    ]);
+  }
+  for (let i = 0; i < feedback.items.length; i += 1) {
+    const item = feedback.items[i]!;
+    if (item.slot === undefined || item.deficiency === undefined || item.deficiency.trim() === '') {
+      throw new InvalidInputError([
+        { path: `body.feedback.items[${i}]`, messageKey: 'error.invalid_input.send_back_artifact_required' },
+      ]);
+    }
+  }
+  return feedback;
+}
+
+function unfreezeSlots(slots: Record<SlotNumber, FrozenSlot>): Record<SlotNumber, SlotState> {
+  const out = {} as Record<SlotNumber, SlotState>;
+  for (const slot of SLOT_NUMBERS) {
+    const state = slots[slot];
+    if (state.state === 'attached') out[slot] = { state: 'attached', artifactId: state.artifact.artifactId };
+    else out[slot] = structuredClone(state);
+  }
+  return out;
+}
+
+/**
+ * D05 / W0-06 4.5: create N+1 once; a second send-back reuses the open draft. Version N is never mutated.
+ */
+export function ensureSuccessorDraft(
+  stored: StoredCase,
+  parent: SubmittedVersion,
+  createdBy: string,
+  nowIso: string,
+): { draftId: string; created: boolean } {
+  if (stored.draft !== null) return { draftId: stored.draft.draftId, created: false };
+  const draft: PackDraft = {
+    draftId: uuidv7(),
+    caseId: stored.caseId,
+    versionNumber: parent.versionNumber + 1,
+    parentVersionId: parent.versionId,
+    checklistTemplateVersion: parent.checklistTemplateVersion,
+    stageContext: parent.stageContext,
+    slots: unfreezeSlots(parent.slots),
+    draftRevision: 1,
+    updatedAt: nowIso,
+  };
+  stored.draft = draft;
+  stored.status = 'sent_back';
+  stored.updatedAt = nowIso;
+  void createdBy;
+  return { draftId: draft.draftId, created: true };
+}
+
+/**
+ * Current submitted version for decide / qc-run / disposition expected-version checks (W0-06 5.2).
+ * `requireNoSuccessor`: approve only — an open successor draft closes the version for further approvals.
+ */
+export function assertSubmittedCurrent(
+  stored: StoredCase,
+  expectedVersionId: string,
+  opts: { requireNoSuccessor: boolean },
+): SubmittedVersion {
+  const named = stored.versions.find((v) => v.versionId === expectedVersionId);
+  if (named === undefined) throw new NotFoundError('version');
+
+  const current = stored.versions.find((v) => v.isLatest) ?? stored.versions.at(-1);
+  if (current === undefined) throw new NotFoundError('version');
+
+  if (stored.readyAtByVersionId.has(current.versionId)) throw staleVersion(stored, 'version_closed');
+
+  if (current.versionId !== named.versionId) throw staleVersion(stored, 'version_superseded');
+
+  if (opts.requireNoSuccessor && stored.draft !== null) throw staleVersion(stored, 'version_closed');
+
+  return named;
+}
+
+export function assertLanePending(
+  ctx: RouteContext,
+  versionId: string,
+  lane: Lane,
+  stored: StoredCase,
+): void {
+  if (ctx.store.decisions.has(ctx.store.decisionKey(versionId, lane)))
+    throw staleVersion(stored, 'lane_already_decided');
+}
+
+/**
+ * W2-06 Ready inside approve/disposition: three current-version approvals and no undispositioned finding.
+ * `fixed_proposed` alone leaves a finding undispositioned. No POST /ready.
+ */
+export function applyReadyIfHeld(
+  ctx: RouteContext,
+  stored: StoredCase,
+  versionId: string,
+  nowIso: string,
+): boolean {
+  if (stored.readyAtByVersionId.has(versionId)) return false;
+  const current = stored.versions.find((v) => v.isLatest);
+  if (current === undefined || current.versionId !== versionId) return false;
+
+  for (const lane of LANES) {
+    const decision = ctx.store.decisions.get(ctx.store.decisionKey(versionId, lane));
+    if (decision === undefined || decision.decision !== 'approve') return false;
+  }
+
+  for (const finding of ctx.store.findings.values()) {
+    if (finding.versionId !== versionId) continue;
+    const list = ctx.store.dispositions.get(finding.findingId) ?? [];
+    const latest = list.at(-1);
+    if (latest === undefined || latest.kind === 'fixed_proposed') return false;
+  }
+
+  stored.readyAtByVersionId.set(versionId, nowIso);
+  stored.aiReadinessStatus = 'ready';
+  stored.status = 'ready_for_launch';
+  stored.updatedAt = nowIso;
+  return true;
+}
+
+export function requireReasonForDisposition(kind: string, reason: string | undefined): string | null {
+  if (kind === 'waived' || kind === 'not_applicable') {
+    if (typeof reason !== 'string' || reason.trim() === '') {
+      throw new InvalidInputError([{ path: 'body.reason', messageKey: 'validation.reason_required' }]);
+    }
+    return reason.trim();
+  }
+  return typeof reason === 'string' && reason.trim() !== '' ? reason.trim() : null;
 }

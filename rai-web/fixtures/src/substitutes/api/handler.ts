@@ -40,12 +40,14 @@ import { caseRoutes } from './routes-cases.js';
 import { artifactRoutes } from './routes-artifacts.js';
 import { packRoutes } from './routes-pack.js';
 import { versionRoutes } from './routes-versions.js';
+import { reviewRoutes } from './routes-review.js';
 
 export interface ResolvedOptions {
   now: () => Date;
   uploadMaxFileBytes: number;
   uploadMaxPackBytes: number;
   sessionAbsoluteHours: number;
+  qcTimeoutMs: number;
 }
 
 export interface RouteContext {
@@ -89,6 +91,7 @@ const DEFAULTS: ResolvedOptions = {
   uploadMaxFileBytes: 26_214_400, // .env.example UPLOAD_MAX_FILE_BYTES (W0-08 section 3)
   uploadMaxPackBytes: 157_286_400, // UPLOAD_MAX_PACK_BYTES
   sessionAbsoluteHours: 12, // RAI_SESSION_ABSOLUTE_HOURS
+  qcTimeoutMs: 10_000, // server QC_TIMEOUT_MS
 };
 
 interface CompiledRoute extends RouteDefinition {
@@ -113,7 +116,14 @@ function compile(route: RouteDefinition): CompiledRoute {
 
 /** The route table, specific paths before parametric ones so `/versions/latest` never binds `:versionId`. */
 export function routeTable(): RouteDefinition[] {
-  return [...authRoutes(), ...caseRoutes(), ...artifactRoutes(), ...packRoutes(), ...versionRoutes()];
+  return [
+    ...authRoutes(),
+    ...caseRoutes(),
+    ...artifactRoutes(),
+    ...packRoutes(),
+    ...versionRoutes(),
+    ...reviewRoutes(),
+  ];
 }
 
 export function createApiSubstitute(options: ApiSubstituteOptions = {}): ApiSubstitute {
@@ -204,9 +214,10 @@ export function createApiSubstitute(options: ApiSubstituteOptions = {}): ApiSubs
 
       // 2-3. Authorization then existence, through the one helper the real server uses (W0-05 section 6).
       if (matched.auth.kind === 'action' && ctx.principal !== undefined) {
-        const ids: { caseId?: string; artifactId?: string } = {};
+        const ids: { caseId?: string; artifactId?: string; lane?: string } = {};
         if (params.caseId !== undefined) ids.caseId = params.caseId;
         if (params.artifactId !== undefined) ids.artifactId = params.artifactId;
+        if (params.lane !== undefined) ids.lane = params.lane;
         ctx.authz = await authorizeRequest({ facts, emitter }, ctx.principal, matched.auth, ids);
       }
 
