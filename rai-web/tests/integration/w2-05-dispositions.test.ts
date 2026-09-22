@@ -34,7 +34,7 @@ import { loadFixtures } from '@rai/fixtures/load';
 import { fixtureSetLabel, readManifest } from '@rai/fixtures/manifest';
 import { ScriptedQcRunner } from '@rai/fixtures/substitutes/qc/index';
 import type { QcRunner, VersionRef } from '@rai/shared/qc/types';
-import { runAndPersistLaneQc } from '@rai/server/qc/orchestrator';
+import { runAndPersistLaneQc, runAndPersistSubmitQc } from '@rai/server/qc/orchestrator';
 import { computeReadiness } from '@rai/server/observability/health';
 import { createStoreProbes } from '@rai/server/observability/probes';
 import type { DeskHealthReport } from '@rai/shared/schemas/observability';
@@ -61,6 +61,7 @@ const fixtureCaseIdByRowId = new Map(FIXTURE_CASES.map((c) => [c.caseId, c.fixtu
 
 let db: TestDatabase;
 let app: FastifyInstance;
+let diagnostics: Pick<ReturnType<typeof buildApp>, 'emitter' | 'errors'>;
 let store: FilesystemBlobStore;
 let blobDir: string;
 let outputDir: string;
@@ -139,6 +140,7 @@ async function rebuildApp(runnerOverride?: QcRunner): Promise<void> {
       knownIdentities: FIXTURE_USERS,
     },
   });
+  diagnostics = built;
   app = built.fastify;
   await app.ready();
 }
@@ -264,6 +266,124 @@ function dispose(
 }
 
 describe(`W2-05 findings and dispositions — ${SET}`, () => {
+  it('submit API coalesces concurrent calls and replays one unavailable outcome with original audit correlation', async () => {
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, VENDOR.caseId);
+    const submitted = await db.owner.execute(
+      sql`SELECT correlation_id FROM audit_event WHERE action = 'version.submitted' AND target_version_id = ${version.versionId}`,
+    );
+    const correlationId = String(submitted.rows[0]!.correlation_id);
+    const input = { caseId: VENDOR.caseId, versionId: version.versionId, correlationId };
+    let calls = 0;
+    const runner: QcRunner = {
+      identity: { runner: 'submit-probe', runnerVersion: '1' },
+      run(request) {
+        calls++;
+        assert.equal(request.trigger, 'submit');
+        assert.equal(request.lane, null);
+        assert.equal(request.correlationId, correlationId);
+        return Promise.resolve({
+          status: 'unavailable',
+          reason: 'timeout',
+          detail: null,
+          startedAt: now().toISOString(),
+          finishedAt: now().toISOString(),
+        });
+      },
+    };
+    const deps = { db: db.app, runner, now, ...diagnostics };
+    const [first, concurrent] = await Promise.all([
+      runAndPersistSubmitQc(deps, input),
+      runAndPersistSubmitQc(deps, input),
+    ]);
+    assert.deepEqual(concurrent, first);
+    assert.deepEqual(await runAndPersistSubmitQc(deps, input), first);
+    assert.equal(calls, 1);
+    assert.equal(first.status, 'unavailable');
+    assert.deepEqual(first.findings, []);
+    const rows = await db.owner.execute(
+      sql`SELECT trigger, lane, unavailable_reason, correlation_id FROM qc_run WHERE id = ${first.runId}`,
+    );
+    assert.deepEqual(rows.rows, [
+      { trigger: 'submit', lane: null, unavailable_reason: 'timeout', correlation_id: correlationId },
+    ]);
+    const audits = await db.owner.execute(
+      sql`SELECT correlation_id FROM audit_event WHERE action = 'qc.run_recorded' AND target_ref->>'run_id' = ${first.runId}`,
+    );
+    assert.deepEqual(audits.rows, [{ correlation_id: correlationId }]);
+    const logs = capture.lines().filter((line) => line.fields?.qcRunId === first.runId);
+    assert.equal(logs.filter((line) => line.event === 'qc.run.unavailable').length, 1);
+    assert.equal(logs.filter((line) => line.event === 'error.captured').length, 1);
+    assert.ok(logs.every((line) => line.correlationId === correlationId));
+  });
+
+  it('submit API refuses a result that arrives after Ready without a QC run, finding or audit', async () => {
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, VENDOR.caseId);
+    let enter!: () => void;
+    let release!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      enter = resolve;
+    });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const correlationId = randomUUID();
+    const before = await db.owner.execute(sql`SELECT count(*)::int AS n FROM audit_event`);
+    const pending = runAndPersistSubmitQc(
+      {
+        db: db.app,
+        now,
+        ...diagnostics,
+        runner: {
+          identity: { runner: 'submit-late', runnerVersion: '1' },
+          async run() {
+            enter();
+            await gate;
+            return {
+              status: 'completed',
+              rulesEvaluated: [],
+              findings: [],
+              startedAt: now().toISOString(),
+              finishedAt: now().toISOString(),
+            };
+          },
+        },
+      },
+      { caseId: VENDOR.caseId, versionId: version.versionId, correlationId },
+    );
+    const rejected = assert.rejects(pending, { code: 'stale_version' });
+    await entered;
+    try {
+      await db.owner.execute(sql`UPDATE pack_version SET ready_at=now() WHERE id=${version.versionId}`);
+    } finally {
+      release();
+    }
+    await rejected;
+    const late = await db.owner.execute(
+      sql`SELECT trigger, lane, correlation_id FROM qc_late_result WHERE version_id=${version.versionId}`,
+    );
+    assert.deepEqual(late.rows, [{ trigger: 'submit', lane: null, correlation_id: correlationId }]);
+    assert.equal(
+      (await db.owner.execute(sql`SELECT id FROM qc_run WHERE version_id=${version.versionId}`)).rows.length,
+      0,
+    );
+    assert.equal(
+      (await db.owner.execute(sql`SELECT id FROM qc_finding WHERE version_id=${version.versionId}`)).rows
+        .length,
+      0,
+    );
+    assert.deepEqual(
+      (await db.owner.execute(sql`SELECT count(*)::int AS n FROM audit_event`)).rows,
+      before.rows,
+    );
+    assert.equal(
+      capture.lines().filter((line) => line.event === 'qc.run.late' && line.correlationId === correlationId)
+        .length,
+      1,
+    );
+  });
+
   it('releases the case row lock before the QC runner returns', async () => {
     const owner = await signIn(OWNER_A);
     const version = await submitOk(owner, VENDOR.caseId);
@@ -619,6 +739,7 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
       },
       findings: { db: db.app, now, knownIdentities: FIXTURE_USERS },
     });
+    diagnostics = built;
     app = built.fastify;
     await app.ready();
 

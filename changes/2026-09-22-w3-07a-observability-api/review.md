@@ -54,3 +54,7 @@ Parent approved the minimal notification seams and direct coordination with Hypa
 ### Confucius checkpoint corrections
 
 Addressed both reported defects: the two public health routes bypass cookie session resolution; readiness logs its initial status and subsequent status transitions only. Added HTTP regressions with a throwing session resolver and protected-route control, plus ready/not-ready/recovered repeated polls. Focused HTTP/auth middleware suite: 13 passed. Typecheck and targeted ESLint/Prettier passed. These are focused correction checks; combined full verification and notification integration remain pending. Submit-QC implementation changes are excluded from this correction commit.
+
+### Server-local submit-QC API checkpoint
+
+Added runAndPersistSubmitQc(deps, {caseId, versionId, correlationId}) using the existing orchestrator, runner, unlocked wait and locked persistence recheck. Submit trigger has lane null; same-process concurrent calls coalesce and stored terminal outcomes replay. Historical null unavailable reasons replay as unknown. No trigger binding, invented lane or new runner. Focused database suite: 18 passed, including submit concurrency/replay and post-Ready refusal with durable diagnostics but no QC run, finding or audit. Typecheck and targeted lint passed. W3-INT owns the after-commit trigger and restart acceptance; issue 35 remains open. Independent review remains required.
