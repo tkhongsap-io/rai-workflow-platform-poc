@@ -173,7 +173,7 @@ test.describe('W2-07 reviewer workspace on the W2-10 substitute (fx-case-nonvend
     expect(asked).toHaveLength(2);
     await expect(sendBackButton).toBeFocused();
 
-    // Valid keyboard send-back: name slot 5 (BRD) via ArrowDown on the focused native select, then type and submit.
+    // Valid keyboard send-back: name slot 5 (BRD) by native select typeahead, then type and submit.
     await page.keyboard.press('Enter');
     await expect(dialog).toBeVisible();
     await expectFocusInsideDialog(page);
@@ -183,14 +183,8 @@ test.describe('W2-07 reviewer workspace on the W2-10 substitute (fx-case-nonvend
       number: 5,
       name: t('th', 'slot.s5.name'),
     });
-    for (let step = 0; step < 12; step += 1) {
-      const selectedLabel = await slotSelect.evaluate((el) => {
-        const select = el as HTMLSelectElement;
-        return select.options[select.selectedIndex]?.textContent?.trim() ?? '';
-      });
-      if (selectedLabel === slotFiveLabel) break;
-      await page.keyboard.press('ArrowDown');
-    }
+    // Typeahead: option labels start with the slot number so keyboard.type('5') selects slot 5 natively.
+    await page.keyboard.type('5');
     await expect(slotSelect.locator('option:checked')).toHaveText(slotFiveLabel);
     await expect(slotSelect).toHaveValue('5');
     await pressTab(page);
