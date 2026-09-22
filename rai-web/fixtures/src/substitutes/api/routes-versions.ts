@@ -4,7 +4,9 @@
 // A submitted version is never mutated: every read returns a deep copy of the same frozen object.
 
 import { InvalidInputError, NotFoundError, type FieldError } from '@rai/shared/errors';
-import { CURRENT_LANE_MAPPING } from '@rai/shared/constants';
+import { CURRENT_LANE_MAPPING, LANES } from '@rai/shared/constants';
+import { dueOn } from '@rai/shared/sla/working-days';
+import { CONFIGURATION_SEED } from '@rai/server/configuration/seed';
 import type { SlotNumber } from '@rai/shared/schemas/pack';
 import {
   SubmitRequestSchema,
@@ -100,6 +102,16 @@ export function versionRoutes(): RouteDefinition[] {
           isLatest: true,
         };
         stored.versions.push(version);
+        ctx.store.laneDueByVersion.set(
+          version.versionId,
+          LANES.map((lane) => ({
+            lane,
+            openedAt: version.submittedAt,
+            dueOn: dueOn(new Date(version.submittedAt), ctx.store.configuration.slaWorkingDays[lane], [
+              ...CONFIGURATION_SEED.calendar.holidays,
+            ]),
+          })),
+        );
         stored.draft = null;
         stored.status = 'in_review';
         stored.privacyStatus = 'pending';

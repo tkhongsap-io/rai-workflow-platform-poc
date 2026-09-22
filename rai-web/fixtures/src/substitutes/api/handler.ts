@@ -41,6 +41,7 @@ import { artifactRoutes } from './routes-artifacts.js';
 import { packRoutes } from './routes-pack.js';
 import { versionRoutes } from './routes-versions.js';
 import { reviewRoutes } from './routes-review.js';
+import { queueRoutes } from './routes-queue.js';
 
 export interface ResolvedOptions {
   now: () => Date;
@@ -119,6 +120,7 @@ export function routeTable(): RouteDefinition[] {
   return [
     ...authRoutes(),
     ...caseRoutes(),
+    ...queueRoutes(),
     ...artifactRoutes(),
     ...packRoutes(),
     ...versionRoutes(),

@@ -86,3 +86,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Why: PR #68 merged into `codex/w1-00-mail-dedup`; W3-03 needs the sink on main. Shared dedup/types already exist on main.
 - Next: Local validation and commit; parent arranges independent review and PR. No push or merge.
 - Evidence: [promotion plan](../../changes/2026-09-22-w1-11-main-promotion/plan.md)
+
+## 2026-09-22 — CLAIM Lane C W3-08
+- Author: operator=ta session=codex-w3-queue-substitute model=GPT-6
+- Takes over from: session=w2-10-w2-shapes (reason: handoff; scoped queue substitute, separate worktree from mail promotion)
+- Evidence: changes/2026-09-22-w3-08-queue-substitute/plan.md
