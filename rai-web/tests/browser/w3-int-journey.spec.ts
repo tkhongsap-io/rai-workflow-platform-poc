@@ -1,5 +1,5 @@
 // Real HTTP/SQL and file-sink journey. Keyboard controls; native file chooser is bridged after Enter.
-import { test, expect, type Page, type Locator } from '@playwright/test';
+import { test, expect, type Page, type Locator, type Request } from '@playwright/test';
 import { randomUUID, createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -286,6 +286,58 @@ test('one keyboard case: create/upload/submit/restart/queue/mail/send-back/v2/di
       await expect(
         page.locator(`[data-finding-id="${findingId}"] [data-disposition-kind="fixed_confirmed"]`),
       ).toBeVisible();
+      // Arm synchronously at the exact final approval response, before React can rerender.
+      // Requests initiated before that boundary are legitimate preapproval QC.
+      let finalApprovalSucceeded = false;
+      let readyFindingsGets = 0;
+      const readyFindingsRequests = new WeakSet<Request>();
+      const qcPostsAfterReady: string[] = [];
+      const apiVersionPath = `/api/cases/${caseId}/versions/${v2}`;
+      page.on('response', (response) => {
+        const request = response.request();
+        const pathname = new URL(response.url()).pathname;
+        if (
+          request.method() === 'POST' &&
+          pathname === `${apiVersionPath}/lanes/it_security/approve` &&
+          response.status() === 201
+        )
+          finalApprovalSucceeded = true;
+        if (
+          readyFindingsRequests.has(request) &&
+          request.method() === 'GET' &&
+          pathname === `${apiVersionPath}/findings` &&
+          response.status() === 200
+        )
+          readyFindingsGets += 1;
+      });
+      page.on('request', (request) => {
+        const pathname = new URL(request.url()).pathname;
+        if (finalApprovalSucceeded && request.method() === 'GET' && pathname === `${apiVersionPath}/findings`)
+          readyFindingsRequests.add(request);
+        if (
+          finalApprovalSucceeded &&
+          request.method() === 'POST' &&
+          pathname.startsWith(`${apiVersionPath}/lanes/`) &&
+          pathname.endsWith('/qc-run')
+        )
+          qcPostsAfterReady.push(pathname);
+      });
+      const expectReadyReadOnly = async (priorFindingsGets: number) => {
+        await expect.poll(() => readyFindingsGets).toBeGreaterThan(priorFindingsGets);
+        await expect(page.locator('[data-status="ready_for_launch"]').first()).toBeVisible();
+        await expect(page.locator('[data-review-qc="loading"]')).toHaveCount(0);
+        await expect(
+          page.locator(`[data-finding-id="${findingId}"] [data-disposition-kind="fixed_confirmed"]`),
+        ).toBeVisible();
+        await expect(page.locator(`[data-finding-id="${findingId}"]`)).toContainText(
+          t('th', 'review.findings.slot', { number: 1, name: label('slot.s1.name') }),
+        );
+        await expect(page.getByRole('alert')).toHaveCount(0);
+        await expect(page.locator('[data-disposition-kind-action]')).toHaveCount(0);
+        await expect(button(page, 'review.action.approve')).toHaveCount(0);
+        await expect(button(page, 'review.action.send_back')).toHaveCount(0);
+        expect(qcPostsAfterReady).toEqual([]);
+      };
       for (const [user, lane, ready] of [
         ['fx-user-dpo', 'dpo', false],
         ['fx-user-ai-coe', 'ai_coe', false],
@@ -305,6 +357,8 @@ test('one keyboard case: create/upload/submit/restart/queue/mail/send-back/v2/di
         expect(((await response.json()) as { ready: boolean }).ready).toBe(ready);
       }
       await expect(page.locator('[data-status="ready_for_launch"]').first()).toBeVisible();
+      expect(finalApprovalSucceeded).toBe(true);
+      await expectReadyReadOnly(0);
       await expectAccessible(page, info, { name: 'combined-ready-th', lang: 'th' });
       await expect
         .poll(async () =>
@@ -339,7 +393,10 @@ test('one keyboard case: create/upload/submit/restart/queue/mail/send-back/v2/di
       }
       await signOut(page);
       const readyMail = delivered.find((m) => m.event.kind === 'ready_for_launch')!;
+      expect(readyMail.recipient.recipientId).toBe('fixture:fx-user-owner-cm');
+      const priorFindingsGets = readyFindingsGets;
       await signIn(page, origin, 'fx-user-owner-cm', new URL(readyMail.deepLinks[0]!.url).pathname);
+      await expectReadyReadOnly(priorFindingsGets);
       await expect(page.locator('[data-status="ready_for_launch"]').first()).toBeVisible();
       await activate(page, page.getByRole('link', { name: label('queue.title'), exact: true }));
       await expect(page.getByTestId('queue-count')).toBeVisible();
@@ -352,6 +409,7 @@ test('one keyboard case: create/upload/submit/restart/queue/mail/send-back/v2/di
         parsed.slots,
       );
       await expect(page.getByRole('button', { name: /deploy|เปิดใช้/i })).toHaveCount(0);
+      expect(qcPostsAfterReady).toEqual([]);
       const video = page.video();
       await page.close();
       if (video)
