@@ -4,7 +4,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isLocaleKey } from '@rai/shared/locales/keys';
+import { isLocaleKey, t } from '@rai/shared/locales/keys';
 import type { SlotNumber, SlotState } from '@rai/shared/schemas/pack';
 import { NEXT_ACTION_KEY } from '../cases/case-list.view-model.js';
 import { STATUS_LABEL_KEY } from '../../components/status-badge.js';
@@ -14,6 +14,7 @@ import {
   applySlotChange,
   decidableLane,
   expectedVersionOf,
+  findingMessageParams,
   isSelfExcludedOnCase,
   laneKey,
   laneProjectionStatus,
@@ -38,6 +39,7 @@ import {
 } from './view-model.js';
 import type { CaseView } from '@rai/shared/schemas/cases';
 import type { RoleScope } from '@rai/shared/schemas/auth';
+import type { StoredFindingSummary } from '@rai/shared/schemas/review';
 import type { SubmittedVersion } from '@rai/shared/schemas/versions';
 
 const allMissing = (): Record<SlotNumber, SlotState> => {
@@ -320,4 +322,25 @@ test('W2-07: send-back feedback requires a named slot; severity and qc reason ke
   ] as const) {
     assert.ok(isLocaleKey(qcUnavailableReasonKey(reason)), String(reason));
   }
+});
+
+test('W2-07: findingMessageParams fills {threshold_source} so t() never leaves braces', () => {
+  const finding: StoredFindingSummary = {
+    findingId: 'f1',
+    ruleId: 'ACC-CLASSIC-ML-METRIC',
+    slot: 1,
+    severity: 'medium',
+    owningLane: 'ai_coe',
+    messageKey: 'qc.finding.acc_classic_ml_metric',
+    messageParams: { threshold_source: 'v1.0 Sheet3' },
+  };
+  const params = findingMessageParams(finding);
+  assert.equal(params.threshold_source, 'v1.0 Sheet3');
+  assert.equal(params.slot, 1);
+  const text = t('th', 'qc.finding.acc_classic_ml_metric', params);
+  assert.equal(text.includes('{'), false, `rendered text still has braces: ${text}`);
+  assert.ok(text.includes('v1.0 Sheet3'), text);
+  const en = t('en', 'qc.finding.acc_classic_ml_metric', params);
+  assert.equal(en.includes('{'), false, en);
+  assert.ok(en.includes('v1.0 Sheet3'), en);
 });

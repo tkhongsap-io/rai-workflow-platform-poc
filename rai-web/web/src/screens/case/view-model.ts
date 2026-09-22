@@ -211,9 +211,11 @@ export function severityKey(severity: StoredFindingSummary['severity']): LocaleK
   return `finding.severity.${severity}` as LocaleKey;
 }
 
-/** Params the SPA can fill from the finding summary (W2 shapes omit message params; slot is enough for many keys). */
+/** Params for t(): messageParams from the QC run, with slot filled from the finding when absent. */
 export function findingMessageParams(finding: StoredFindingSummary): Record<string, string | number> {
-  return finding.slot === null ? {} : { slot: finding.slot };
+  const params: Record<string, string | number> = { ...(finding.messageParams ?? {}) };
+  if (finding.slot !== null && params.slot === undefined) params.slot = finding.slot;
+  return params;
 }
 
 /** One draft feedback row before the API cast (SlotNumberSchema Static is `never` under the map() construction). */
