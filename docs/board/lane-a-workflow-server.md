@@ -94,3 +94,14 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: W2-05 dispositions — not this session.
 - Author: operator=ta session=w2-04 model=composer
 - Evidence: branch codex/w2-04-resubmit
+
+## 2026-09-22 13:36 — CLAIM Lane A
+- Author: operator=ta session=w2-06 model=composer
+- Takes over from: session=w2-04 (reason: handoff; W2-05 landed on main)
+
+## 2026-09-22 13:36 — W2-06 Ready predicate
+- What: Ready inside approve/disposition under the case lock (three current-version approvals + zero undispositioned findings); pack_version.ready_at, desk_status/ai_readiness_status ready, case.ready_for_launch audit, ready notification (lane `-`); no POST /ready; version_closed after Ready on approve and disposition. Not the W2 exit; UI and mail delivery remain later.
+- Why: Ticket W2-06 (#36); proves A09 Ready half; decisions D05. Completes W0-06 §4.9 / §6 / persistence Ready row.
+- Next: W2-08 exit evidence / remaining W2 — not this session.
+- Author: operator=ta session=w2-06 model=composer
+- Evidence: branch codex/w2-06-ready

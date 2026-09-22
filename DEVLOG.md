@@ -1,5 +1,9 @@
 # Development log
 
+## W2-06: Ready predicate — 2026-09-22
+
+Ready is a system transition inside `lane.approved` and disposition (same transaction, under the case row lock): three current-version approvals and zero undispositioned findings set `pack_version.ready_at`, `desk_status` / `ai_readiness_status` to `ready`, one `case.ready_for_launch` audit (`triggered_by` the triggering event), and one `ready` notification outbox row (lane `-`). No POST `/ready`. An open finding or a prior-version approval blocks it; `fixed_proposed` alone does not count; mutating approve/disposition after Ready is `409 version_closed`. This is not the W2 exit; UI and mail delivery remain later tickets.
+
 ## W2-05: findings and dispositions (single-lane) — 2026-09-22
 
 A submitted version can record synthetic single-lane defect findings from the W1-10 QC substitute (lane QC run endpoint) and disposition them append-only under D05. Owning lane is assigned only via W0-06 §7.1 (`owningLaneForSlot`); slot 5, slot 9, pack-level and unavailable findings are not stored — agents do not invent a lane. An unavailable substitute result stores a `qc_run` with `status = unavailable` and zero `qc_finding` rows (W0-06 §7.4 blocks the unavailable finding only, not the run row); it is never treated as a clean completed run. Ready (`ready_at` / desk_status ready) is not set here (W2-06). Issue #35 stays open for the §7.3 cases named in its done-when. This is not the W2 exit.
