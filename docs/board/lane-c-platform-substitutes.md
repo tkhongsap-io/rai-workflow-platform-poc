@@ -78,3 +78,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: Human review PR; W2-07 / W2-09 consume; W2-INT removes the extension from the app path.
 - Author: operator=agent session=w2-10-w2-shapes model=composer
 - Evidence: branch codex/w2-10-w2-shapes; `fixtures/src/substitutes/api/review.test.ts`
+
+## 2026-09-22 — CLAIM Lane C W3-08
+- Author: operator=ta session=codex-w3-queue-substitute model=GPT-6
+- Takes over from: session=w2-10-w2-shapes (reason: handoff; scoped queue substitute, separate worktree from mail promotion)
+- Evidence: changes/2026-09-22-w3-08-queue-substitute/plan.md
