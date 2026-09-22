@@ -94,3 +94,5 @@ Added shared observability shapes and additive persistence for digest provenance
 ### W3-07a local API checkpoint — 2026-09-22
 
 - Added health/operator assembly, typed safe HTTP diagnostics and correlated lane-QC refusal visibility on the isolated consumer branch. Full local suite passed; startup and notification integration remain pending. The Admin-only operator policy is a separately reviewed prerequisite, not a consumer scope change.
+
+W3-07a local runtime candidate adds safe capture to the existing notification dispatcher and configured readiness probes, exposes the correlated submit-QC persistence API for W3-INT, and verifies persisted digest faults in the operator read model. Local combined verification passed; independent runtime review and publication remain gated. No second worker or invented QC owning lane.
