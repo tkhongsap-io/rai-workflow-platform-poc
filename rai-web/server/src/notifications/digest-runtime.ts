@@ -1,4 +1,7 @@
 // A producer clock only; never dispatches mail or retries. Bind to the shared drain at composition root.
+import type { FastifyInstance } from 'fastify';
+import type { Drain } from '../shutdown.js';
+import { createDigestProducer, type DigestDeps } from './digest.js';
 import { bangkokDate } from '@rai/shared/sla/working-days';
 
 export function untilNextBangkokDay(now: Date): number {
@@ -22,7 +25,7 @@ const systemClock: DigestClock = {
 export function createDailyDigestSchedule(options: {
   run: (signal: AbortSignal) => Promise<unknown>;
   track: (task: Promise<void>) => void;
-  onError: () => void;
+  onError: (error: unknown) => void;
   signal: AbortSignal;
   clock?: DigestClock;
 }) {
@@ -41,8 +44,8 @@ export function createDailyDigestSchedule(options: {
       })
       .then(
         () => {},
-        () => {
-          if (!options.signal.aborted) options.onError();
+        (error: unknown) => {
+          if (!options.signal.aborted) options.onError(error);
         },
       );
     active = task;
@@ -73,4 +76,30 @@ export function createDailyDigestSchedule(options: {
       return tick();
     },
   };
+}
+
+/** Startup producer runs before the existing dispatcher hook. No sink/retry loop here. */
+export function registerDailyDigest(
+  app: FastifyInstance,
+  deps: DigestDeps,
+  drain: Drain,
+  onError: (error: unknown) => void,
+): void {
+  const stopping = new AbortController();
+  const active = new Set<Promise<void>>();
+  const schedule = createDailyDigestSchedule({
+    run: createDigestProducer(deps),
+    signal: AbortSignal.any([drain.signal, stopping.signal]),
+    track: (task) => {
+      active.add(task);
+      drain.track(task);
+      void task.finally(() => active.delete(task));
+    },
+    onError,
+  });
+  app.addHook('onReady', () => schedule.start());
+  app.addHook('onClose', async () => {
+    stopping.abort();
+    await Promise.all(active);
+  });
 }

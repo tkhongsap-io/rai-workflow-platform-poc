@@ -6,7 +6,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Writable } from 'node:stream';
 import { eq, sql } from 'drizzle-orm';
-import { buildApp } from '@rai/server/app';
+import { buildApp, type AppDeps } from '@rai/server/app';
+import { createNotifications } from '@rai/server/notifications/service';
 import { createIdentityAdapter } from '@rai/server/identity/adapter';
 import { createFixtureIdentityProvider } from '@rai/server/identity/fixture';
 import { createPgSessionStore } from '@rai/server/identity/session';
@@ -31,6 +32,7 @@ const opened = new Date('2026-09-22T04:00:00Z');
 let clock = new Date('2026-10-01T04:00:00Z');
 let db: TestDatabase;
 let app: ReturnType<typeof buildApp>;
+let appDeps: AppDeps;
 let scratch: string;
 const logs: string[] = [];
 const caseId = findFixtureCase('fx-case-nonvendor')!.caseId;
@@ -58,7 +60,7 @@ beforeEach(async () => {
     now: () => opened,
   });
   await adapter.start({ host: '127.0.0.1', port: 8787, publicBaseUrl: base, trustProxy: false });
-  app = buildApp({
+  appDeps = {
     config: {
       nodeEnv: 'test',
       log: { level: 'info', pretty: false },
@@ -84,7 +86,8 @@ beforeEach(async () => {
       now: () => opened,
       laneOpenRecipients: laneOpenRecipientsFromIdentities(FIXTURE_USERS),
     },
-  });
+  };
+  app = buildApp(appDeps);
   await app.fastify.ready();
   logs.length = 0;
   clock = new Date('2026-10-01T04:00:00Z');
@@ -383,4 +386,127 @@ test('shutdown abort during enqueue rolls back notification and link before fail
   assert.equal(job!.status, 'failed');
   assert.equal(job!.errorStage, 'enqueue');
   assert.ok(job!.finishedAt);
+});
+
+test('bound app startup produces then uses the single dispatcher; restart does not resend', async () => {
+  await submit();
+  const sink = new MemoryMailSink({ publicBaseUrl: base });
+  const start = async () => {
+    await app.fastify.close();
+    app = buildApp({
+      ...appDeps,
+      digest: { db: db.app, publicBaseUrl: base, now: () => clock },
+      notifications: { db: db.app, publicBaseUrl: base, identities: FIXTURE_USERS, sink, now: () => clock },
+    });
+    await app.fastify.ready();
+  };
+  await start();
+  const digests = sink.sent.filter((request) => request.event.kind === 'sla_breach_digest');
+  assert.equal(digests.length, 1);
+  assert.equal(sink.sent.filter((request) => request.event.kind === 'lane_opened').length, 4);
+  const [row] = await digestRows();
+  assert.equal(row!.status, 'sent');
+  assert.equal(row!.attempts, 1);
+  await start();
+  assert.equal(sink.sent.filter((request) => request.event.kind === 'sla_breach_digest').length, 1);
+  assert.equal((await db.owner.select().from(operatorJobRun)).length, 2);
+  await app.drain.close(1000);
+});
+
+test('digest attempts use W3-04 four-result policy and retain original persisted provenance', async () => {
+  await submit();
+  const produced = await createDigestProducer(deps())();
+  const sink = new MemoryMailSink({ publicBaseUrl: base });
+  sink.failAlways(true);
+  const seen: unknown[] = [];
+  const dispatcher = createNotifications({
+    ...deps(),
+    identities: FIXTURE_USERS,
+    sink: {
+      identity: sink.identity,
+      deliver: (request) => {
+        seen.push(request.event);
+        return sink.deliver(request);
+      },
+    },
+  });
+  const id = produced.notificationIds[0]!;
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    const result = await dispatcher.deliverInitial(id);
+    assert.equal(result!.attempt, attempt);
+    const [row] = await db.owner.select().from(notification).where(eq(notification.id, id));
+    assert.equal(row!.attempts, attempt);
+    if (attempt < 4) {
+      assert.equal(row!.status, 'queued');
+      assert.equal(await dispatcher.deliverInitial(id), undefined, 'not due yet');
+      clock = row!.nextAttemptAt!;
+    } else {
+      assert.equal(row!.status, 'failed');
+      assert.equal(row!.nextAttemptAt, null);
+    }
+  }
+  assert.equal(await dispatcher.deliverInitial(id), undefined);
+  assert.equal(seen.length, 4);
+  assert.ok(seen.every((event) => JSON.stringify(event) === JSON.stringify(seen[0])));
+  const terminal = logs
+    .map((line) => JSON.parse(line) as { event: string; correlationId: string })
+    .filter((line) => line.event === 'mail.failed');
+  assert.equal(terminal.length, 1);
+  const [job] = await db.owner.select().from(operatorJobRun);
+  assert.equal(terminal[0]!.correlationId, job!.correlationId);
+  assert.equal(job!.status, 'completed', 'delivery failures do not rewrite the producer result');
+});
+
+test('two recipients recover a partial enqueue failure without stealing the first job provenance', async () => {
+  await submit();
+  const addresses = ['first@rai-desk.example', 'second@rai-desk.example'];
+  await db.app.transaction((tx) =>
+    publishRevision(tx, {
+      kind: 'operator_recipients',
+      body: { addresses },
+      publishedBy: 'fx-user-admin',
+      publishedRole: 'admin',
+      correlationId: randomUUID(),
+      publishedAt: new Date('2026-09-30T00:00:00Z'),
+    }),
+  );
+  let enqueues = 0;
+  const first = await createDigestProducer({
+    ...deps(),
+    beforeStage: (stage) => {
+      if (stage === 'enqueue' && ++enqueues === 2) throw new Error('synthetic second-recipient failure');
+    },
+  })();
+  assert.equal(first.status, 'failed');
+  assert.equal(first.notificationIds.length, 1);
+  const partialRows = await digestRows();
+  assert.equal(partialRows.length, 1);
+  assert.equal(partialRows[0]!.recipient, addresses[0]);
+  const original = await requestFor(first.notificationIds[0]!);
+  const second = await createDigestProducer(deps())();
+  assert.equal(second.status, 'completed');
+  assert.equal(second.notificationIds.length, 1);
+  assert.notEqual(first.notificationIds[0], second.notificationIds[0]);
+  const rows = await digestRows();
+  assert.equal(rows.length, 2);
+  assert.deepEqual(rows.map((row) => row.recipient).sort(), addresses);
+  const links = await db.owner.select().from(operatorJobNotification);
+  assert.equal(links.length, 2);
+  assert.equal(
+    links.find((link) => link.notificationId === first.notificationIds[0])!.jobRunId,
+    first.jobRunId,
+  );
+  assert.equal(
+    links.find((link) => link.notificationId === second.notificationIds[0])!.jobRunId,
+    second.jobRunId,
+  );
+  assert.deepEqual((await requestFor(first.notificationIds[0]!)).event, original.event);
+  const sink = new MemoryMailSink({ publicBaseUrl: base });
+  const dispatcher = createNotifications({ ...deps(), sink, identities: FIXTURE_USERS });
+  for (const row of rows) await dispatcher.deliverInitial(row.id);
+  assert.equal(sink.sent.length, 2);
+  assert.deepEqual(sink.sent.map((request) => request.recipient.address).sort(), addresses);
+  assert.equal(new Set(sink.sent.map((request) => request.event.correlationId)).size, 2);
+  for (const row of rows) assert.equal(await dispatcher.deliverInitial(row.id), undefined);
+  assert.equal(sink.sent.length, 2);
 });
