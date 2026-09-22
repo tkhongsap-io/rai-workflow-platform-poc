@@ -109,7 +109,9 @@ function renderText(request: DeliveryRequest): string {
     `X-RAI-Locale: ${recipient.locale}`,
     `X-RAI-Event: ${event.kind}`,
     `X-RAI-Correlation-Id: ${event.correlationId}`,
-    `X-RAI-Audit-Event-Id: ${event.auditEventId}`,
+    ...(event.kind === 'sla_breach_digest'
+      ? [`X-RAI-Job-Run-Id: ${event.provenance.jobRunId}`, `X-RAI-Digest-Day: ${event.digestDay}`]
+      : [`X-RAI-Audit-Event-Id: ${event.auditEventId}`]),
     `X-RAI-Attempt: ${request.attempt}`,
     'X-RAI-Sink: file (substitute; nothing was sent)',
   ];

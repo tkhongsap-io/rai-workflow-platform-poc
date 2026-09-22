@@ -49,7 +49,7 @@ test('the digest key takes the day from event.digestDay and from nothing else (c
 
 test('an incomplete identity throws a RangeError naming the field; no key containing null is ever built', () => {
   assert.throws(
-    () => buildDedupKey(digestEvent({ digestDay: null }), AI_COE_RECIPIENT),
+    () => buildDedupKey(digestEvent({ digestDay: null as unknown as string }), AI_COE_RECIPIENT),
     (err: unknown) => err instanceof RangeError && err.message === 'event.digestDay',
   );
   assert.throws(

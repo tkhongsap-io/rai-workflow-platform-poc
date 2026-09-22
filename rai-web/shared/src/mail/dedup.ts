@@ -4,9 +4,9 @@
 // (W0-07 section 9 places this file with W1-00; it lands as the W1-00 contract amendment codex/w1-00-mail-dedup.
 // W3-03 builds the key with it; W1-11 tests assert on it.)
 
-import { NOTIFICATION_EVENT_BY_KIND, type AuthorizedRecipient, type CommittedEvent } from './types.js';
+import { NOTIFICATION_EVENT_BY_KIND, type AuthorizedRecipient, type MailDeliveryEvent } from './types.js';
 
-export function buildDedupKey(event: CommittedEvent, recipient: AuthorizedRecipient): string {
+export function buildDedupKey(event: MailDeliveryEvent, recipient: AuthorizedRecipient): string {
   const version = event.kind === 'sla_breach_digest' ? event.digestDay : event.versionId;
   if (version === null || version === '') {
     // never emit a key containing 'null': the sink's 4.3 check is the defensive copy of this rule

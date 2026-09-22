@@ -903,3 +903,7 @@ The W3-03a prerequisite adds `mail.lane_opened.body`, `mail.sent_back.body` and 
 ## W3-07a prerequisite amendment — 2026-09-22
 
 Section 7.8 adds `ReadinessReport`, `DeskHealthReport` (including mandatory `lateQc`), `SafeErrorFields` and `DigestJobProvenance` under shared `schemas/observability.ts`, re-exported from `schemas/queue.ts`. The [engineering reconciliation](../../changes/2026-09-22-w3-07a-observability-contract/spec.md) owns exact fields and OBS semantics. W3-07a adds migration `0007_w3_07a_observability`; W3-03b consumes job/linkage persistence only after the coordinated mail provenance/sink contract. W3-INT proves submit-trigger timeout and late-QC refusal with the synthetic runner. No consumer code is part of this prerequisite.
+
+### W3-03b mail provenance prerequisite
+
+Before the digest consumer, shared mail types expose CaseMailEvent | CommittedDigestEvent as DeliveryRequest.event; the original CommittedEvent still requires auditEventId. Digest requires W3-07a DigestJobProvenance, real calendar day and matching correlation, without business audit provenance. Shared mail helper, both sink validators/fixtures/tests and file text provenance evolve together. No migration or observability schema edit. The server loader, not a sink, must prove the persisted run/link. Empty breaches complete count 0 with no mail; day is Bangkok job-start day and recipients are configured operators. Consumer follows independent prerequisite review and coordination with W3-04's single dispatcher.

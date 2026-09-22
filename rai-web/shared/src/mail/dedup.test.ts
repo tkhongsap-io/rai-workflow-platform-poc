@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { buildDedupKey } from './dedup.js';
-import type { AuthorizedRecipient, CommittedEvent } from './types.js';
+import type { AuthorizedRecipient, CaseMailEvent, MailDeliveryEvent } from './types.js';
 
 const recipient = (address: string, recipientId = 'fx-user-ai-coe'): AuthorizedRecipient => ({
   recipientId,
@@ -16,7 +16,7 @@ const recipient = (address: string, recipientId = 'fx-user-ai-coe'): AuthorizedR
   basis: 'case_view_scope',
 });
 
-const event = (overrides: Partial<CommittedEvent>): CommittedEvent => ({
+const event = (overrides: Partial<CaseMailEvent>): CaseMailEvent => ({
   kind: 'lane_opened',
   caseId: 'RAI-2026-0001',
   versionId: 'V',
@@ -51,14 +51,22 @@ test("ready_for_launch and the digest carry '-' for the lane; the digest day com
   );
   assert.equal(
     buildDedupKey(
-      event({
+      {
         kind: 'sla_breach_digest',
         caseId: null,
         versionId: null,
         versionNumber: null,
         lane: null,
         digestDay: '2026-09-21',
-      }),
+        committedAt: '2026-09-21T00:00:00Z',
+        correlationId: 'job-correlation',
+        provenance: {
+          kind: 'sla_digest_job',
+          jobRunId: 'job',
+          digestDay: '2026-09-21',
+          correlationId: 'job-correlation',
+        },
+      },
       recipient('operator-digest@rai-desk.example', 'operator_recipients:1'),
     ),
     'sla_breach_digest:2026-09-21:-:operator-digest@rai-desk.example',
@@ -73,7 +81,7 @@ test('an incomplete identity throws a RangeError naming the field; no key contai
   assert.throws(
     () =>
       buildDedupKey(
-        event({ kind: 'sla_breach_digest', lane: null, digestDay: null }),
+        { kind: 'sla_breach_digest', lane: null, digestDay: null } as unknown as MailDeliveryEvent,
         recipient('dpo@rai-desk.example'),
       ),
     (err: unknown) => err instanceof RangeError && err.message === 'event.digestDay',
