@@ -16,6 +16,7 @@ import {
 } from '../db/schema/index.js';
 import { runWithContext } from '../observability/context.js';
 import type { Emitter } from '../observability/log.js';
+import { loadCommittedDigestRequest, DigestCompositionError } from './digest.js';
 import { deliveryUpdate, nextAttempt, RETRY_BACKOFF_MS } from './retry.js';
 import { laneDueDates } from '../sla/due-dates.js';
 import {
@@ -32,6 +33,7 @@ const KINDS: Record<string, CaseMailKind> = {
   send_back: 'sent_back',
   ready: 'ready_for_launch',
 };
+const DELIVERABLE_EVENTS = [...Object.keys(KINDS), 'sla_breach_digest'];
 const ACTIONS = {
   lane_opened: 'lane.opened',
   sent_back: 'lane.sent_back',
@@ -160,7 +162,7 @@ export function createNotifications(deps: NotificationDeps) {
           and(
             eq(notification.id, id),
             eq(notification.status, 'queued'),
-            inArray(notification.event, Object.keys(KINDS)),
+            inArray(notification.event, DELIVERABLE_EVENTS),
           ),
         )
         .for('update', { skipLocked: true });
@@ -179,7 +181,10 @@ export function createNotifications(deps: NotificationDeps) {
       if (attempt === undefined) return undefined;
       let receipt: DeliveryReceipt;
       try {
-        const request = await loadCommittedCaseRequest(tx, row, deps);
+        const request =
+          row.event === 'sla_breach_digest'
+            ? await loadCommittedDigestRequest(tx, row, deps)
+            : await loadCommittedCaseRequest(tx, row, deps);
         signal?.throwIfAborted();
         receipt = await deps.sink.deliver({ ...request, attempt });
       } catch (err) {
@@ -190,7 +195,10 @@ export function createNotifications(deps: NotificationDeps) {
           at: now().toISOString(),
           sinkMessageId: null,
           error: {
-            code: err instanceof CompositionError ? err.code : 'sink_failure',
+            code:
+              err instanceof CompositionError || err instanceof DigestCompositionError
+                ? err.code
+                : 'sink_failure',
             message: 'composition or delivery failed',
           },
         };
@@ -246,7 +254,7 @@ export function createNotifications(deps: NotificationDeps) {
     });
     return receipt;
   }
-  /** One bounded batch; polling revisits backlog. Digests remain W3-03b. */
+  /** One bounded batch for case and digest mail; polling revisits backlog. */
   async function deliverPending(correlationId?: string, signal?: AbortSignal): Promise<void> {
     signal?.throwIfAborted();
     const rows = await deps.db
@@ -257,7 +265,7 @@ export function createNotifications(deps: NotificationDeps) {
           eq(notification.status, 'queued'),
           sql`${notification.attempts} >= 0 AND ${notification.attempts} < 4`,
           sql`(${notification.nextAttemptAt} <= ${now()} OR (${notification.nextAttemptAt} IS NULL AND ${notification.attempts} <= 1))`,
-          inArray(notification.event, Object.keys(KINDS)),
+          inArray(notification.event, DELIVERABLE_EVENTS),
           correlationId === undefined ? undefined : eq(notification.correlationId, correlationId),
         ),
       )

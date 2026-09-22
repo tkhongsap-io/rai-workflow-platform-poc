@@ -1,6 +1,6 @@
 # W3-03b independent consumer module review
 
-Implemented on codex/w3-03b-digest-consumer from fadc39e, in /tmp/rai-w3-digest-consumer. Plan preceded code. Producer, committed-row loader and standalone schedule adapter are implemented; live app/start and W3-04 dispatcher wiring is deliberately pending parent interface confirmation. No claim of complete end-to-end W3 acceptance.
+Initial module checkpoint (superseded by approved binding section below): implemented on codex/w3-03b-digest-consumer from fadc39e, in /tmp/rai-w3-digest-consumer. Plan preceded code. Producer, committed-row loader and standalone schedule adapter are implemented; live app/start and W3-04 dispatcher wiring is deliberately pending parent interface confirmation. No claim of complete end-to-end W3 acceptance.
 
 ## Changed paths and behavior
 
@@ -39,3 +39,21 @@ Parent owns the provenance branch/PR115. No further edits there. PR113's parent-
 ## Merged prerequisite rebase
 
 After parent confirmed PR115 merged, rebased the two consumer commits onto f5c17fc. Consumer implementation is now bcc7809 and added scheduler/abort tests 29d3e36. The only conflicts were adjacent locale entries; preserved all existing 03a body keys and the two digest keys. No duplicate prerequisite commits. Rebased-head typecheck passed; 6 scheduler/locale tests and all 17 focused DB tests passed (54367, 13.1s). Logs: /tmp/rai-w3-digest-consumer-rebase.log and /tmp/rai-w3-digest-consumer-rebase-db.log. Parent's retry worktree and busy54365 untouched. Live dispatcher/app bindings remain unmodified pending confirmation and merged composer/retry prerequisites.
+
+## Approved single-dispatcher binding preparation
+
+Parent approved the minimal binding and named retry d96ba24 as preparation base. Rebased the consumer onto d96ba24 plus the separately extracted locale prerequisite (a8f40e4, identical preparation cherry-pick4bfdfbf). Consumer diff against4bfdfbf contains no locale changes. Parent owns locale publication and actual-main prerequisite merges. The ~925-line core exception is documented in plan.md; minimal bindings and final recovery proof bring the preparation to roughly1,140 added lines, with294-line producer/loader and512-line integration proof kept together to review atomic linkage and recovery.
+
+app.ts registers the tracked daily producer before the existing W3-04 startup dispatcher; start.ts enables both alongside the same configured fixture sink. service.ts adds only digest selection, loader routing and safe DigestCompositionError mapping within the existing SKIP LOCKED attempt. Attempt/backoff policy, existing notification runtime polling, terminal outcome logs and sink instance are unchanged. The former digest-exclusion assertion now proves the case-only loader refuses a valid linked digest without modifying its row; the general dispatcher has positive digest delivery/retry proof in the new suite.
+
+Direct coordination with Descartes confirmed ownership. W3-07a owns NotificationDeps.errors, post-COMMIT terminal errors.job, existing runtime errors.internal, app-owned ErrorCapture and same configured sink/QC probes. The new registerDailyDigest(app,deps,drain,onError) passes unexpected infrastructure errors to a callback once. Preparation on d96ba24 uses a fixed internal_error/code/httpStatus callback with no raw exception text; actual assembly replaces it with `(err) => { errors.internal(err); }`. Known producer query/render/enqueue failures retain only their persisted failed job and one sla.digest.failed under the original correlation; OBS11 can call the unchanged producer fault seam directly. No second scheduler for observability.
+
+Validation on this prepared binding:
+- Typecheck passed.
+- 503 unit tests passed; full ESLint/Prettier/CSS passed.
+- 40 combined case/digest integration tests passed before the added multi-recipient regression.
+- Full integration:246 total,245 passed,1 opt-in migration-upgrade test skipped,0 failed (146.4s), exclusively54367.
+- Then added the independent-review gap test: first recipient commits, second fails/rolls back, subsequent run skips first and creates only second, original job/correlation remains attached to each row, and the single dispatcher delivers each once. Final focused digest suite20 passed; typecheck and focused lint/format passed afterward. No production code changed after the full integration run.
+- Build passed;527 server output files scanned with zero substitute markers.
+
+Logs: /tmp/rai-w3-digest-consumer-bound-{unit,lint,integration,build}.log, /tmp/rai-w3-digest-consumer-binding-tests.log and /tmp/rai-w3-digest-consumer-final-focused.log. The core-only Carver review on1bad092 does not certify this binding or locale extraction. Parent must independently review the new delta and rebase onto actual merged main before consumer PR; final composed observability/browser acceptance remains pending. No other worktree edited; no push/PR/migration/schema/root-log changes.54367 is idle for review.
