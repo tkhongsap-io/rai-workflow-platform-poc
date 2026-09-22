@@ -42,3 +42,11 @@ Logs: `/tmp/rai-w3-ui-contract-check.log`, `/tmp/rai-w3-ui-unit.log`, `/tmp/rai-
 ## Handoff boundary
 
 Parent is reviewing/publishing the first contract commit separately, without modifying this worktree. Consumer delivery still requires the contract prerequisite and W3-08 to be merged; parent owns independent review, PRs and merge gates. No push, PR, merge or external publication performed here. Real-server wiring, integration/browser evidence and acceptance belong to W3-INT; no production permission is claimed.
+
+## Independent review P2: reset unapplied filters
+
+The reviewer reproduced an unapplied search surviving Reset on bare `/queue`: clearing an already-empty URL did not change the filter component key, so local drafts survived. Reset now explicitly restores search/status/owner/group to empty, searchBy to all, and page size to 25 before clearing the URL. The regression changes all six controls without applying, clicks Reset, checks every restored control, then applies and verifies the API request has only default searchBy/page/pageSize and all expected scoped cards return.
+
+Validation on Node 24.21.0 with isolated substitute ports 58789/55175 and no database: focused queue browser **30 passed**; full substitute browser **120 passed** (90 existing + 30 queue), including the new regression at 1440/834/390; full unit **418 passed**, no failures/skips; lint and typecheck passed. Repository link check (157 files/694 links), frozen-source check and git diff --check passed. Logs: `/tmp/rai-w3-ui-reset-focused.log`, `/tmp/rai-w3-ui-reset-browser-full.log`, `/tmp/rai-w3-ui-reset-unit.log`, `/tmp/rai-w3-ui-reset-lint.log`, `/tmp/rai-w3-ui-reset-typecheck.log`.
+
+The own plan records the reviewer-recommended, user-authorized bounded engineering exception before consumer PR: keep the cohesive queue flow and its browser/unit tests together. No shared contract change, push, PR, merge, root log edit or digest implementation. Digest preparation is paused. These remain synthetic substitute results, not A06 real acceptance; W3-INT retains real-server verification and acceptance.

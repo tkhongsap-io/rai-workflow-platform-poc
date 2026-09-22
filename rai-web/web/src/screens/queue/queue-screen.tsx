@@ -151,6 +151,15 @@ function QueueFilters({
   const [owner, setOwner] = useState(query.owner ?? '');
   const [group, setGroup] = useState(query.useCaseGroup ?? '');
   const [pageSize, setPageSize] = useState(query.pageSize ?? 25);
+  const resetDrafts = () => {
+    setSearch('');
+    setSearchBy('all');
+    setStatus('');
+    setOwner('');
+    setGroup('');
+    setPageSize(25);
+    reset();
+  };
   const submit = (event: FormEvent) => {
     event.preventDefault();
     apply({
@@ -245,7 +254,7 @@ function QueueFilters({
         <button className={'btn btn-primary'} type={'submit'}>
           {t('queue.apply')}
         </button>
-        <button className={'btn btn-secondary'} type={'button'} onClick={reset}>
+        <button className={'btn btn-secondary'} type={'button'} onClick={resetDrafts}>
           {t('queue.reset')}
         </button>
       </div>
