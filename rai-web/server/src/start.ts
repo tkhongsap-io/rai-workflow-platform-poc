@@ -27,6 +27,7 @@ import { noopUploadTrigger } from './pack/qc-trigger.js';
 import { startedFields } from './observability/started.js';
 import { WEB_DIST_DIR, webDistPresent } from './static.js';
 import { laneOpenRecipientsFromIdentities } from './versions/open-lanes.js';
+import { sendBackRecipientsFromIdentities } from './workflow/send-back-notice.js';
 
 export interface StartOverrides {
   /** S16 seam: what the adapter reads after listen; defaults to fastify.server.address(). */
@@ -181,6 +182,13 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
     versions: {
       db: db.db,
       laneOpenRecipients: laneOpenRecipientsFromIdentities(knownIdentities),
+      ...(overrides.now === undefined ? {} : { now: overrides.now }),
+    },
+    // W2-02: lane approve / send-back; owner email for send_back notices from identity data.
+    decide: {
+      db: db.db,
+      sendBackRecipientsForOwner: (ownerSubjectId) =>
+        sendBackRecipientsFromIdentities(knownIdentities, ownerSubjectId),
       ...(overrides.now === undefined ? {} : { now: overrides.now }),
     },
     ...(serveWeb ? { static: { root: webDistDir } } : {}),

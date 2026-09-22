@@ -99,6 +99,36 @@ function rows(action: Action, pairs: ReadonlyArray<[Role, ScopeRule]>): PolicyRo
  * The W0-05 matrix rows W1-00 owns (sections 3.1 and 3.2). Everything not listed is denied.
  * Ready for launch and the four projection writes are not actions of any actor and have no row (W0-05 sections 3.2, 5).
  */
+const REVIEWER_LANES: ReadonlyArray<[Role, Lane]> = [
+  ['ai_coe', 'ai_coe'],
+  ['dpo', 'dpo'],
+  ['it_security', 'it_security'],
+];
+
+/** W2-02 D05: own-lane decision with no self-approval (owner or BU SPOC on the case). */
+function laneDecisionRows(action: 'lane.approve' | 'lane.send_back'): PolicyRow[] {
+  return REVIEWER_LANES.map(([role]) => ({
+    action,
+    role,
+    scope: 'all_cases' as const,
+    laneRule: 'own_lane' as const,
+    excludeOwnerOrSpoc: true as const,
+  }));
+}
+
+/** W2-02 D05: owning-lane disposition; provisional self-exclusion (W0-05 section 8). */
+function owningLaneFindingRows(
+  action: 'finding.mark_fixed' | 'finding.confirm_fixed' | 'finding.waive' | 'finding.mark_na',
+): PolicyRow[] {
+  return REVIEWER_LANES.map(([role]) => ({
+    action,
+    role,
+    scope: 'all_cases' as const,
+    laneRule: 'owning_lane' as const,
+    excludeOwnerOrSpoc: true as const,
+  }));
+}
+
 export const POLICY_ROWS: readonly PolicyRow[] = Object.freeze([
   ...rows('case.view', VIEW_ROLES), // View case, files, history: Own / BU / All / All / All / All
   ...rows('case.list', VIEW_ROLES), // scoped query; scope enforced by caseScopeWhere (W1-02)
@@ -113,6 +143,15 @@ export const POLICY_ROWS: readonly PolicyRow[] = Object.freeze([
   ...rows('config.read_revisions', ADMIN_ONLY), // D06: operator_recipients holds addresses; Admin only
   ...rows('config.publish', ADMIN_ONLY), // W6; exists so W1-00 can test that nobody else has it
   ...rows('audit.read', ADMIN_ONLY), // W0-04: Admin (the slice-1 operator audience, W0-05 section 8)
+  // W2-02 contract: D05 lane decision, resubmit, disposition authority (W2-05 consumes finding.*)
+  ...laneDecisionRows('lane.approve'),
+  ...laneDecisionRows('lane.send_back'),
+  ...rows('case.resubmit', WRITE_ROLES),
+  ...rows('finding.propose_fixed', WRITE_ROLES),
+  ...owningLaneFindingRows('finding.mark_fixed'),
+  ...owningLaneFindingRows('finding.confirm_fixed'),
+  ...owningLaneFindingRows('finding.waive'),
+  ...owningLaneFindingRows('finding.mark_na'),
 ]);
 
 const ROLE_SET: ReadonlySet<string> = new Set(ROLES);
