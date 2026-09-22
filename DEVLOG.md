@@ -1,5 +1,9 @@
 # Development log
 
+## W3-03b: daily SLA digest — 2026-09-22
+
+The local daily producer freezes its Bangkok day, persists job provenance and queues each configured recipient once per day. Empty results send no mail. The existing retry worker delivers the digest, with recovery retaining original provenance. Core and binding reviews are clean; integrated operator/journey evidence remains pending.
+
 ## W3-04: bounded notification retries — 2026-09-22
 
 One notification dispatcher records up to four committed attempts with persisted backoff, preserves committed workflow decisions and drains safely. Independent review is clean after a full-run discovery led to isolated file-sink browser databases. Admin visibility and the integrated journey remain W3-07/W3-INT gates.

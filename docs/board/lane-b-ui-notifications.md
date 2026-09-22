@@ -116,3 +116,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=codex-w3-04-retries model=GPT-6
 - What: Parent supplied committed W3-03a `36dcee9`; integrate retry dispatch only in `/tmp/rai-w3-retries`, preserving Hypatia's composition. Review fixes and final dependency rebase remain parent-coordinated. Isolated DB 54365.
 - Evidence: [integration plan](../../changes/2026-09-22-w3-04-retries/plan.md)
+
+## 2026-09-22 (time not recorded) — CLAIM W3-03b digest consumer
+- Author: operator=ta session=w3-03b-digest-consumer model=codex
+- Scope: producer, persisted-provenance loader, standalone local scheduling hook and tests; dispatcher binding awaits parent confirmation. No other lane takeover.
+- Evidence: changes/2026-09-22-w3-03b-digest-consumer/plan.md
