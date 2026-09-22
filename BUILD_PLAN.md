@@ -169,7 +169,7 @@ A dated read, not a rewrite. Packages above stay as written. DEVLOG.md is the li
 | W0 | **Exit recorded 2026-09-21** | changes/2026-09-21-w0-exit/review.md; docs/delivery/w0-technical-contract.md exit checklist | — |
 | W1 | **Exit recorded 2026-09-22 (Google loopback sign-in pending Ta)** | changes/2026-09-22-w1-exit/review.md (347 unit, 135 integration, 108 evidence browser tests; exit negatives and restart by hand; fixture set slice1-synthetic@1 7c80ccd43663) | Ta's manual `local-google` sign-in (TESTING.md runbook); not a W2 blocker |
 | M1 (W1) | **Reached** (2026-09-22) | changes/2026-09-22-w1-exit/review.md | — |
-| W2 | **Exit recorded 2026-09-22** | changes/2026-09-22-w2-exit/review.md (lint, typecheck; 15 W2-INT evidence browser tests; 6 W2-INT negatives; check:substitute-absent 544/0; fixture set slice1-synthetic@1 7c80ccd43663) | — |
+| W2 | **Exit recorded 2026-09-22** | changes/2026-09-22-w2-exit/review.md (lint, typecheck; 15 W2-INT evidence browser tests; 6 W2-INT negatives; check:substitute-absent 463/0; fixture set slice1-synthetic@1 7c80ccd43663) | — |
 | M2 (W2) | **Reached** (2026-09-22) | changes/2026-09-22-w2-exit/review.md | — |
 | M3 (W3, slice 1) | Authorized (D03), **unblocked** by W2 exit; next package | BUILD_PLAN W3; docs/delivery/slice-1-work-breakdown.md | W3-01 / W3 contract path |
 | W4-W8 | **Not authorized** | — | D07-D10 and package gate entries |

@@ -50,7 +50,7 @@ $ npm run typecheck
 
 ```text
 $ npx playwright test -c tests/browser/playwright.config.ts w2-int-journey.spec.ts w2-int-07-reviewer-workspace.spec.ts w2-int-09-disposition.spec.ts
-[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] [plugin builtin:vite-reporter]
 [WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
 [WebServer] - Using dynamic import() to code-split the application
 [WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
@@ -113,15 +113,36 @@ $ NODE_ENV=test RAI_IDENTITY_MODE=fixture node --import tsx --conditions=rai-sou
 
 ### 2.5 Substitute absent from the build
 
-A build was already present (`web/dist`, `server/dist`); no rebuild was required.
-
 ```text
-$ npm run check:substitute-absent
+$ npm run build && npm run check:substitute-absent
+
+> @rai/root@0.0.0 build
+> npm run build -w shared && npm run build -w web && npm run build -w server
+
+> @rai/shared@0.0.0 build
+> tsc -b
+
+> @rai/web@0.0.0 build
+> tsc -b && VITE_API_SUBSTITUTE=false vite build
+
+vite v8.3.0 building client environment for production...
+transforming...
+✓ 437 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.50 kB │ gzip:   0.32 kB
+dist/assets/index-CINCcq8x.css   13.09 kB │ gzip:   3.22 kB
+dist/assets/index-D2sv-UeZ.js   425.60 kB │ gzip: 124.65 kB
+
+✓ built in 79ms
+
+> @rai/server@0.0.0 build
+> tsc -b
 
 > @rai/root@0.0.0 check:substitute-absent
 > node scripts/check-substitute-absent.mjs
 
-check-substitute-absent: scanned 544 files, 0 with the marker
+check-substitute-absent: scanned 463 files, 0 with the marker
 ```
 
 ## 3. A-ID evidence table
@@ -142,8 +163,27 @@ The W2 exit evidence, clause by clause, as [BUILD_PLAN W2](../../BUILD_PLAN.md#w
 
 ### 3.1 A11
 
-- **Immutability of audit rows:** `tests/integration/w1-00-audit.test.ts` proves a direct SQL `UPDATE` or `DELETE` on `audit_event` fails for `rai_app` (missing grant) and for `rai_owner` (append-only trigger). This exit does not add an audit subsystem.
-- **Reconstruction:** the W2 journey's audit events are the reconstruction. The journey already asserts the audit action `lane.opened` (three lanes on the resubmitted version via `SELECT … FROM audit_event WHERE action = 'lane.opened' …`). The negatives do not assert additional audit action strings; they prove the concurrency, Ready and D05 negatives over HTTP and table state.
+This exit does not add an audit subsystem. The pass output below is from this fix round (not claimed in the first exit commit).
+
+```text
+$ NODE_ENV=test RAI_IDENTITY_MODE=fixture node --import tsx --conditions=rai-source --test --test-concurrency=1 tests/integration/w1-00-audit.test.ts
+✔ append writes one row with actor, action, refs and correlation id; read returns rows in seq order (63.497333ms)
+✔ append is rejected before any write when a ref carries text instead of references (27.121292ms)
+✔ a direct SQL UPDATE or DELETE on audit_event is rejected as rai_app (grant) and as rai_owner (trigger) (55.994042ms)
+✔ rai_app cannot DELETE from any business table; rai_operator may delete idempotency keys only (86.197125ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 518.618334
+```
+
+- **Immutability of audit rows:** the third test above (`UPDATE` / `DELETE` on `audit_event` refused for `rai_app` and `rai_owner`) is the A11 refusal evidence.
+- **Reconstruction:** the W2 journey's audit events are the reconstruction. Reading `rai-web/tests/browser/w2-int-journey.spec.ts`, the journey **only asserts one audit action string: `lane.opened`** (SQL `WHERE action = 'lane.opened'` on the resubmitted version). It does not assert any other `audit_event.action` value. The W2-INT negatives assert none.
+- **Related audit action strings asserted elsewhere in this repo** (not by the journey; cited so reconstruction is not limited to inventing a query result): `lane.approved` and `lane.sent_back` and `draft.successor_created` in `tests/integration/w2-02-lane-decision.test.ts` (and `lane.sent_back` / `draft.successor_created` also in `w2-03-successor-draft.test.ts`); `version.resubmitted` (and `lane.opened` / `version.submitted`) in `tests/integration/w2-04-resubmit.test.ts`; `disposition.confirmed` and `qc.run_recorded` in `tests/integration/w2-05-dispositions.test.ts`; `case.ready_for_launch` in `tests/integration/w2-06-ready.test.ts`.
 
 ## 4. Known limitations — what W2 does not claim
 
@@ -160,7 +200,7 @@ The W2 exit evidence, clause by clause, as [BUILD_PLAN W2](../../BUILD_PLAN.md#w
 | Document | Change |
 |---|---|
 | `changes/2026-09-22-w2-exit/review.md` | this record |
-| `BUILD_PLAN.md` | status table cells only (dated 2026-09-22 after the W2 exit): W2 → exit recorded; M2 → Reached; M3 → unblocked, next is W3; W4–W8 not authorized; closing paragraph no longer says the next action is W0-01. Package definitions above the table unchanged |
+| `BUILD_PLAN.md` | dated status section (2026-09-22 after the W2 exit): status table cells (W2 exit recorded; M2 Reached; M3 unblocked, next is W3; W4–W8 not authorized) **and** the two sentences under "Where the build diverged from the plan" (authorization scope / next is W3; no longer says the next action is W0-01). Package definitions above the table unchanged |
 | `DEVLOG.md` | short M2 / W2 exit entry near the top |
 | `docs/board/lane-a-workflow-server.md` | CLAIM + done entry for this session |
 
