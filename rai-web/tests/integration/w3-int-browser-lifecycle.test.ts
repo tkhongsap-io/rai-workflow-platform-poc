@@ -11,6 +11,7 @@ import { findFixtureCase } from '@rai/fixtures/data/cases/index';
 import type { PackDraft } from '@rai/shared/schemas/pack';
 import { createRealServerLifecycle, realServerOptions } from '../browser/support/real-server-lifecycle.js';
 import { resetToFixtureSet } from '../browser/support/database.js';
+import buildReal from '../browser/support/build-real.js';
 import {
   attachCapture,
   RAI_WEB_ROOT,
@@ -199,6 +200,7 @@ test(
   'actual busy built child drains before original shared reset/load and restarts with a new PID',
   { timeout: 60000 },
   async () => {
+    await buildReal(); // A clean integration checkout has no prebuilt server or fixture output.
     const env = readEnv();
     const port = await freeLoopbackPort();
     const baseURL = `http://127.0.0.1:${port}`;
