@@ -205,7 +205,7 @@
   "review.send_back.deficiency_label": "What must be fixed",
   "review.send_back.intro": "Name at least one document slot and describe the deficiency.",
   "review.send_back.slot_label": "Document slot",
-  "review.send_back.slot_option": "{number}: {name}",
+  "review.send_back.slot_option": "Slot {number}: {name}",
   "review.send_back.slot_required": "Choose a document slot and describe the deficiency before sending back",
   "review.send_back.submit": "Send back",
   "review.send_back.submitting": "Sending back…",

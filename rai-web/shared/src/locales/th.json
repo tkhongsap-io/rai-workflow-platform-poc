@@ -205,7 +205,7 @@
   "review.send_back.deficiency_label": "สิ่งที่ต้องแก้ไข",
   "review.send_back.intro": "ต้องระบุอย่างน้อยหนึ่งช่องเอกสารพร้อมคำอธิบายข้อบกพร่อง",
   "review.send_back.slot_label": "ช่องเอกสาร",
-  "review.send_back.slot_option": "{number}: {name}",
+  "review.send_back.slot_option": "ช่อง {number}: {name}",
   "review.send_back.slot_required": "กรุณาเลือกช่องเอกสารและระบุสิ่งที่ต้องแก้ไขก่อนส่งกลับ",
   "review.send_back.submit": "ส่งกลับ",
   "review.send_back.submitting": "กำลังส่งกลับ…",

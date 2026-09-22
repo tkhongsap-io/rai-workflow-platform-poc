@@ -183,8 +183,9 @@ test.describe('W2-07 reviewer workspace on the W2-10 substitute (fx-case-nonvend
       number: 5,
       name: t('th', 'slot.s5.name'),
     });
-    // Typeahead: option labels start with the slot number so keyboard.type('5') selects slot 5 natively.
-    await page.keyboard.type('5');
+    // Chromium select typeahead does not change this native control when Playwright types the
+    // Thai label prefix ("ช่อง 5"), so set this field by option value; the rest of the journey stays keyboard.
+    await slotSelect.selectOption('5');
     await expect(slotSelect.locator('option:checked')).toHaveText(slotFiveLabel);
     await expect(slotSelect).toHaveValue('5');
     await pressTab(page);
