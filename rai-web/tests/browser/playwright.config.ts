@@ -1,11 +1,12 @@
 // Playwright configuration (W0-02 sections 3.5 and 9): the EVIDENCE configuration. W1-00 created the file; W1-12
 // wires the runner and the CI check and adds the harness spec and support helpers (axe audit, keyboard, fixture
 // sign-in); W1-INT promotes the W1-07 and W1-06 journeys here and adds the W1 journey and the evidence-configuration
-// check. The web server is the one deployable (`node server/dist/main.js`, which serves the built SPA from
-// web/dist through server/src/static.ts) started in test mode with the fixture identity provider on
-// PLAYWRIGHT_BASE_URL (loopback only) against the real Postgres that `.env` names; no external service is reached
-// and nothing here can start the W1-13 substitute (`tests/integration/w1-int-substitute-absent.test.ts` proves it).
-// The specs reset the database and reload fixture set slice1-synthetic@1 themselves (support/database.ts).
+// check; W2-INT promotes the W2-07 and W2-09 journeys and adds the W2 journey. The web server is the one deployable
+// (`node server/dist/main.js`, which serves the built SPA from web/dist through server/src/static.ts) started in
+// test mode with the fixture identity provider on PLAYWRIGHT_BASE_URL (loopback only) against the real Postgres
+// that `.env` names; no external service is reached and nothing here can start the W1-13/W2-10 substitute
+// (`tests/integration/w1-int-substitute-absent.test.ts` proves it). The specs reset the database and reload
+// fixture set slice1-synthetic@1 themselves (support/database.ts).
 import { defineConfig, devices } from '@playwright/test';
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:8788';

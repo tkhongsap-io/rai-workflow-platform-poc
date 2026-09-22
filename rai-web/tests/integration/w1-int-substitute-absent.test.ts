@@ -85,6 +85,10 @@ describe('W1-INT: no evidence test imports the substitute', () => {
     assert.ok(entries.some((f) => f.endsWith('w1-int-journey.spec.ts')));
     assert.ok(entries.some((f) => f.endsWith('w1-int-07-shell-sign-in-cases.spec.ts')));
     assert.ok(entries.some((f) => f.endsWith('w1-int-06-case-pack-versions.spec.ts')));
+    assert.ok(entries.some((f) => f.endsWith('w2-int-journey.spec.ts')));
+    assert.ok(entries.some((f) => f.endsWith('w2-int-07-reviewer-workspace.spec.ts')));
+    assert.ok(entries.some((f) => f.endsWith('w2-int-09-disposition.spec.ts')));
+    assert.ok(entries.some((f) => f.endsWith('w2-int-negatives.test.ts')));
     assert.ok(!entries.some((f) => /\.substitute\.spec\.ts$/.test(f)));
 
     const seen = new Set<string>();
@@ -116,7 +120,9 @@ describe('W1-INT: no evidence test imports the substitute', () => {
     const substituteSpecs = walk(path.join(TESTS_DIR, 'browser')).filter((f) =>
       /\.substitute\.spec\.ts$/.test(f),
     );
-    assert.ok(substituteSpecs.length >= 2, 'the Lane B development specs still exist');
+    assert.ok(substituteSpecs.length >= 4, 'the Lane B development specs still exist (W1 + W2)');
+    assert.ok(substituteSpecs.some((f) => f.endsWith('w2-07-reviewer-workspace.substitute.spec.ts')));
+    assert.ok(substituteSpecs.some((f) => f.endsWith('w2-09-disposition.substitute.spec.ts')));
     const server = path.join(TESTS_DIR, 'browser', 'support', 'substitute-server.ts');
     const serverImports = importsOf(server);
     assert.ok(
