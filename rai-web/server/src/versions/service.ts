@@ -17,8 +17,8 @@
 //                     `lane.opened` × 3 and lane_open notification rows for each fixture holder of each lane
 //                     (W2-01 (d)+(f); no SLA columns), store the key with the 201 body (idempotency action
 //                     `case.resubmit` when the locked draft had a parent), commit. A failure while opening any
-//                     lane rolls everything back. Pack QC after commit (W0-07 3.4) is not bound in slice 1; the
-//                     response never waits.
+//                     lane rolls everything back. The route schedules pack QC only after this promise resolves
+//                     with a fresh commit; the response never waits.
 
 import { createHash } from 'node:crypto';
 import { CURRENT_LANE_MAPPING } from '@rai/shared/constants';

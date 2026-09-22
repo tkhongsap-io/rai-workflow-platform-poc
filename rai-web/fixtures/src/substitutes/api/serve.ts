@@ -1,7 +1,7 @@
 // W1-13 CLI: runs the in-memory API substitute on loopback for a Lane B development session or a Playwright
 // `webServer` command. From rai-web/:
-//   NODE_ENV=development npx tsx --conditions=rai-source fixtures/src/substitutes/api/serve.ts --port 8787
-// then `VITE_API_SUBSTITUTE=true npm run dev -w web` proxies /api and /auth to it (W0-02 section 3.4). The
+//   NODE_ENV=development npx tsx --conditions=rai-source fixtures/src/substitutes/api/serve.ts --port 8789
+// The test-only Vite configuration under tests/browser/support/ proxies /api and /auth to that port. The
 // process prints one JSON line when it listens and refuses (exit 78, like the server) outside test/development
 // or off loopback. Never evidence.
 

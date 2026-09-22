@@ -23,7 +23,7 @@ import {
 } from '@rai/shared/constants';
 import type { SubmitRequest, SubmittedVersion } from '@rai/shared/schemas/versions';
 import type { PackDraft } from '@rai/shared/schemas/pack';
-import { buildApp } from '@rai/server/app';
+import { buildApp } from '../support/observed-app.js';
 import { createFilesystemBlobStore, type FilesystemBlobStore } from '@rai/server/artifacts/blob-store';
 import { auditStore } from '@rai/server/audit/store';
 import { createScopeFactsSource } from '@rai/server/authz/facts';

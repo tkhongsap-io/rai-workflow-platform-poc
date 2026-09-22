@@ -10,7 +10,7 @@
 // hard-coded string. Proves A01 (browser layer, W0-02 8.2). Fixture ids: the eight W0-03 users and the five W0-08
 // cases of fixture set slice1-synthetic@1.
 
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './support/real-test.js';
 import th from '@rai/shared/locales/th.json' with { type: 'json' };
 import en from '@rai/shared/locales/en.json' with { type: 'json' };
 import { expectAccessible, expectStatusElementsHaveText } from './support/axe.js';
@@ -22,7 +22,7 @@ import {
   expectMainFocused,
 } from './support/keyboard.js';
 import { signInAsFixture, signOut } from './support/sign-in.js';
-import { FIXTURE_SET, resetToFixtureSet } from './support/database.js';
+import { FIXTURE_SET } from './support/database.js';
 
 const ALL_CASES = ['RAI-2000-0001', 'RAI-2000-0002', 'RAI-2000-0003', 'RAI-2000-0004', 'RAI-2000-0005'];
 const CM_CASES = ['RAI-2000-0001', 'RAI-2000-0003'];
@@ -117,9 +117,6 @@ async function expectNoHorizontalScroll(page: Page): Promise<void> {
 }
 
 // Every test starts from the fixture set: the real database keeps what a test created.
-test.beforeEach(async () => {
-  await resetToFixtureSet();
-});
 
 test.describe(`W1-INT (W1-07) sign-in and scoped list on the real server (fx-user-*, fx-case-* of ${FIXTURE_SET})`, () => {
   test('a signed-out visitor sees the sign-in screen with the fixture picker and the audit passes', async ({
@@ -129,7 +126,7 @@ test.describe(`W1-INT (W1-07) sign-in and scoped list on the real server (fx-use
     await expect(page).toHaveURL(/\/sign-in/);
     await expect(page.getByRole('heading', { level: 1, name: th['sign_in.title'] })).toBeVisible();
     // The real server, not the substitute: the product bundle carries no substitute banner
-    // (VITE_API_SUBSTITUTE is forced off by `npm run build`) and no answer is marked as a substitute's.
+    // (application configuration has no API-substitute selector) and no answer is marked as a substitute's.
     await expect(page.getByText(th['shell.substitute_banner'])).toHaveCount(0);
     await expect(page.getByTestId('substitute-banner')).toHaveCount(0);
     const probe = await page.request.get('/auth/fixture/users');

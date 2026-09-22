@@ -3,7 +3,7 @@
 // `/__substitute/reset`: a spec that saves, uploads or submits starts each test from fixture set
 // slice1-synthetic@1 by emptying the business tables (tests/support/db.ts, as rai_owner) and reloading the set
 // through the same loader `npm run fixtures:load` runs, into the blob directory the server process was started
-// with (playwright.config.ts: BLOB_DIR=./.local/test/blobs). Sessions and the registry counter are emptied too, so
+// with (real-server-lifecycle.ts: BLOB_DIR=./.local/test/blobs). Sessions and the registry counter are emptied too, so
 // a created case is RAI-<year>-0001 again. The database is the one `.env` names; nothing here is a substitute.
 
 import path from 'node:path';
@@ -13,7 +13,7 @@ import { fixtureSetLabel, readManifest } from '@rai/fixtures/manifest';
 import { openTestDatabase, type TestDatabase } from '../../support/db.js';
 import { RAI_WEB_ROOT } from '../../support/process.js';
 
-/** What playwright.config.ts hands the server as BLOB_DIR (relative to rai-web/), resolved. */
+/** What real-server-lifecycle.ts hands the server as BLOB_DIR (relative to rai-web/), resolved. */
 export const SERVER_BLOB_DIR = path.join(RAI_WEB_ROOT, '.local', 'test', 'blobs');
 
 /** `fixture set <name>@<version> <sha256[0:12]>`, for spec titles and the evidence record (section 8.3). */
@@ -29,7 +29,8 @@ export async function withDatabase<T>(fn: (db: TestDatabase) => Promise<T>): Pro
   }
 }
 
-/** Empties every business table plus sessions and the registry counter, then loads the fixture set. */
+/** Lifecycle-owned: child must be stopped before any reset. Specs import real-test, never this reset.
+ * Ownership is enforced by w3-int-browser-lifecycle.test.ts. */
 export async function resetToFixtureSet(): Promise<LoadResult> {
   return withDatabase(async (db) => {
     await db.reset();

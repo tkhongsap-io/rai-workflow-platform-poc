@@ -116,11 +116,6 @@ export function AppShell({ children }: { children: ReactNode }): JSX.Element {
             ) : null}
           </div>
         </div>
-        {import.meta.env.VITE_API_SUBSTITUTE ? (
-          <p className={'banner-substitute'} data-testid={'substitute-banner'}>
-            {t('shell.substitute_banner')}
-          </p>
-        ) : null}
       </header>
       {signedIn ? (
         <nav className={'shell-nav'} aria-label={t('shell.nav_label')}>

@@ -6,9 +6,8 @@ import { StringDecoder } from 'node:string_decoder';
 // `server/dist/main.js` that `npm start` runs, which W1-INT's journey restarts) in test mode on a free loopback
 // port (or the `port` the caller names, so a restarted process keeps its origin) with the fixture identity
 // provider, the in-memory mail sink and the QC substitute, captures every JSON line the process writes to stdout
-// and stderr, waits for `process.started`, and stops it with SIGTERM — escalating to SIGKILL and rejecting with the
-// captured lines when the process has not exited within the grace period, so a shutdown hang fails the test with
-// the server's last log lines instead of the runner's timeout. Nothing here reaches an external service:
+// and stderr, waits for `process.started`, and stops it with SIGTERM — escalating to SIGKILL and rejecting with
+// a generic diagnostic when the process/stdio have not closed within the grace period. Nothing here reaches an external service:
 // the database is the local Postgres that `.env` or the shell names, and the identity mode is `fixture`, which
 // config.ts accepts only under NODE_ENV=test on a loopback bind (W0-03 S13, S14).
 
@@ -40,9 +39,9 @@ export interface TestServerProcess {
   /** Lines whose `event` matches, for assertions after the fact. */
   linesFor(event: string): CapturedLine[];
   /**
-   * SIGTERM and wait for exit; resolves with the exit code and signal. Idempotent. When the process is still
-   * running after `graceMs` (default STOP_GRACE_MS) it is SIGKILLed and the promise rejects with the captured
-   * lines: a graceful shutdown that does not complete is a failure, never a wait.
+   * SIGTERM and wait through stdio close; resolves with exit code and signal. Idempotent.
+   * After `graceMs` (default STOP_GRACE_MS), kill the still-running owned child and reject
+   * generically. Missing close is also a bounded failure; captured values are never printed.
    */
   stop(graceMs?: number): Promise<{ code: number | null; signal: NodeJS.Signals | null }>;
 }
@@ -107,7 +106,7 @@ export class BuiltServerMissingError extends Error {
   }
 }
 
-/** Starts the server and resolves once it logged `process.started`; rejects with the captured lines otherwise. */
+/** Starts the server and resolves once it logged `process.started`; rejects with a safe diagnostic otherwise. */
 export async function startTestServer(options: StartOptions = {}): Promise<TestServerProcess> {
   const port = options.port ?? (await freeLoopbackPort());
   const env = testServerEnv(port, options.env);
@@ -140,7 +139,7 @@ export async function startTestServer(options: StartOptions = {}): Promise<TestS
         finish();
         reject(
           new Error(
-            `no process.started line within ${timeoutMs} ms; captured ${JSON.stringify(capture.lines)}`,
+            `no process.started line within ${timeoutMs} ms; captured line count ${capture.lines.length}`,
           ),
         );
       }, timeoutMs);
@@ -169,7 +168,7 @@ export async function startTestServer(options: StartOptions = {}): Promise<TestS
   return server;
 }
 
-function attachCapture(child: ChildProcess) {
+export function attachCapture(child: ChildProcess) {
   const lines: CapturedLine[] = [];
   const waiters: { event: string; resolve: (line: CapturedLine) => void }[] = [];
   const listeners = new Set<(line: CapturedLine) => void>();
@@ -202,7 +201,8 @@ function attachCapture(child: ChildProcess) {
   child.stdout?.on('data', onData('stdout'));
   child.stderr?.on('data', onData('stderr'));
   const exited = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve) => {
-    child.once('exit', (code, signal) => {
+    // close follows exit and both stdio streams; only then finalize split UTF-8 tails.
+    child.once('close', (code, signal) => {
       for (const stream of ['stdout', 'stderr'] as const) {
         buffers[stream] += decoders[stream].end();
         if (buffers[stream] !== '') push(stream, buffers[stream]);
@@ -217,7 +217,7 @@ function attachCapture(child: ChildProcess) {
       const timer = setTimeout(() => {
         const index = waiters.findIndex((w) => w.resolve === settle);
         if (index !== -1) waiters.splice(index, 1);
-        reject(new Error(`no ${event} line within ${timeoutMs} ms; captured ${JSON.stringify(lines)}`));
+        reject(new Error(`no ${event} line within ${timeoutMs} ms; captured line count ${lines.length}`));
       }, timeoutMs);
       const settle = (line: CapturedLine) => {
         clearTimeout(timer);
@@ -231,20 +231,13 @@ function attachCapture(child: ChildProcess) {
     if (stopping === undefined) {
       if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
       stopping = new Promise((resolve, reject) => {
-        let killed = false;
         const timer = setTimeout(() => {
-          killed = true;
-          child.kill('SIGKILL');
+          if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+          reject(new Error(`test server did not close within ${graceMs} ms after stop; capture incomplete`));
         }, graceMs);
         void exited.then((exit) => {
           clearTimeout(timer);
-          if (killed)
-            reject(
-              new Error(
-                `test server (pid ${child.pid}) did not exit within ${graceMs} ms of SIGTERM; killed. Captured lines: ${JSON.stringify(lines)}`,
-              ),
-            );
-          else resolve(exit);
+          resolve(exit);
         });
       });
     }

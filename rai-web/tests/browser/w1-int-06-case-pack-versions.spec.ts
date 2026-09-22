@@ -9,7 +9,7 @@
 // stale-version case. Fixture ids: fx-case-missing-slot (RAI-2000-0003), fx-case-nonvendor (RAI-2000-0001),
 // fx-case-na-reasons (RAI-2000-0004); users fx-user-owner-cm, fx-user-owner-cm-2.
 
-import { test, expect, type Locator, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from './support/real-test.js';
 import type { CaseListResponse } from '@rai/shared/schemas/cases';
 import type { PackDraft } from '@rai/shared/schemas/pack';
 import type { VersionListResponse } from '@rai/shared/schemas/versions';
@@ -17,7 +17,7 @@ import { t, type LocaleKey } from '@rai/shared/locales/keys';
 import { expectAccessible, expectStatusElementsHaveText } from './support/axe.js';
 import { expectVisibleFocus, focusedElement, pressTab, tabUntil } from './support/keyboard.js';
 import { signInAsFixture, signOut } from './support/sign-in.js';
-import { FIXTURE_SET, resetToFixtureSet } from './support/database.js';
+import { FIXTURE_SET } from './support/database.js';
 
 const OWNER = 'fx-user-owner-cm';
 const OTHER_OWNER = 'fx-user-owner-cm-2';
@@ -89,10 +89,6 @@ async function expectFocusInsideDialog(page: Page): Promise<void> {
 }
 
 test.describe(`W1-INT (W1-06) case flow on the real server (fx-case-missing-slot, fx-case-nonvendor, fx-case-na-reasons of ${FIXTURE_SET})`, () => {
-  test.beforeEach(async () => {
-    await resetToFixtureSet();
-  });
-
   test('the overview shows identity, submission, status as text, the next action and the nine slot rows', async ({
     page,
   }, testInfo) => {

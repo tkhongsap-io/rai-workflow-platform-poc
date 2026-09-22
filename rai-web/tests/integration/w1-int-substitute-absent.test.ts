@@ -65,8 +65,11 @@ function resolveRelative(from: string, specifier: string): string {
 
 function isSubstituteSpecifier(specifier: string, resolved: string | undefined): boolean {
   if (/substitutes\/api(\/|$)/.test(specifier) || /substitute-marker/.test(specifier)) return true;
-  if (/support\/substitute-server/.test(specifier)) return true;
-  return resolved !== undefined && /tests\/browser\/support\/substitute-server\.ts$/.test(resolved);
+  if (/support\/(substitute-server|vite\.substitute\.config)/.test(specifier)) return true;
+  return (
+    resolved !== undefined &&
+    /tests\/browser\/support\/(substitute-server|vite\.substitute\.config)\.ts$/.test(resolved)
+  );
 }
 
 /** The evidence tests: real-server browser specs and every integration test. */
@@ -89,6 +92,7 @@ describe('W1-INT: no evidence test imports the substitute', () => {
     assert.ok(entries.some((f) => f.endsWith('w2-int-07-reviewer-workspace.spec.ts')));
     assert.ok(entries.some((f) => f.endsWith('w2-int-09-disposition.spec.ts')));
     assert.ok(entries.some((f) => f.endsWith('w2-int-negatives.test.ts')));
+    assert.ok(entries.some((f) => f.endsWith('w3-int-02-queue.spec.ts')));
     assert.ok(!entries.some((f) => /\.substitute\.spec\.ts$/.test(f)));
 
     const seen = new Set<string>();
@@ -114,6 +118,7 @@ describe('W1-INT: no evidence test imports the substitute', () => {
     assert.ok([...seen].some((f) => f.endsWith(path.join('tests', 'support', 'db.ts'))));
     assert.ok([...seen].some((f) => f.endsWith(path.join('tests', 'browser', 'support', 'database.ts'))));
     assert.ok(![...seen].some((f) => f.endsWith('substitute-server.ts')));
+    assert.ok(![...seen].some((f) => f.endsWith('vite.substitute.config.ts')));
   });
 
   it('the substitute-side files are exactly the ones the substitute configuration owns (a control for the scan)', () => {
@@ -123,6 +128,7 @@ describe('W1-INT: no evidence test imports the substitute', () => {
     assert.ok(substituteSpecs.length >= 4, 'the Lane B development specs still exist (W1 + W2)');
     assert.ok(substituteSpecs.some((f) => f.endsWith('w2-07-reviewer-workspace.substitute.spec.ts')));
     assert.ok(substituteSpecs.some((f) => f.endsWith('w2-09-disposition.substitute.spec.ts')));
+    assert.ok(isSubstituteSpecifier('./support/vite.substitute.config.js', undefined));
     const server = path.join(TESTS_DIR, 'browser', 'support', 'substitute-server.ts');
     const serverImports = importsOf(server);
     assert.ok(
@@ -140,24 +146,22 @@ describe('W1-INT: the evidence configuration cannot load the substitute', () => 
     assert.equal(ignore.test('tests/browser/w1-int-journey.spec.ts'), false);
     assert.equal(evidenceConfig.workers, 1);
     assert.equal(evidenceConfig.forbidOnly, true);
-    const webServer = evidenceConfig.webServer;
-    assert.ok(webServer !== undefined && !Array.isArray(webServer), 'one web server: the deployable');
-    const command = webServer.command;
-    assert.match(command, /node server\/dist\/main\.js/);
-    assert.doesNotMatch(command, /substitute/i);
-    assert.doesNotMatch(command, /vite(?!\s+build)/); // no dev server, no proxy
-    const env = webServer.env ?? {};
-    for (const name of Object.keys(env)) assert.doesNotMatch(name, /SUBSTITUTE/i, name);
-    assert.equal(env.RAI_IDENTITY_MODE, 'fixture');
-    assert.equal(env.NODE_ENV, 'test');
-    assert.equal(env.QC_MODE, 'substitute'); // the W1-10 QC substitute is the slice-1 substitute stand-in (section 1.1); real QC is W4; it is not the W1-13 API substitute
+    assert.equal(evidenceConfig.webServer, undefined, 'no persistent child may outlive a reset');
+    assert.equal(evidenceConfig.globalSetup, './support/build-real.ts');
+    const lifecycle = readFileSync(path.join(TESTS_DIR, 'browser/support/real-server-lifecycle.ts'), 'utf8');
+    assert.match(lifecycle, /built: true/);
+    assert.match(lifecycle, /startTestServer/);
+    assert.doesNotMatch(lifecycle, /substitute-server|vite\.substitute\.config|substitutes\/api/);
     const source = readFileSync(path.join(TESTS_DIR, 'browser', 'playwright.config.ts'), 'utf8');
-    assert.doesNotMatch(source, /substitute-server|substitutes\/api|VITE_API_SUBSTITUTE/);
-    // The build the web server runs forces the product bundle: web/package.json's build script.
+    assert.doesNotMatch(
+      source,
+      /substitute-server|vite\.substitute\.config|substitutes\/api|VITE_API_SUBSTITUTE/,
+    );
+    // Application build configuration has no API-substitute selection.
     const webPackage = JSON.parse(readFileSync(path.join(RAI_WEB_ROOT, 'web', 'package.json'), 'utf8')) as {
       scripts: { build: string };
     };
-    assert.match(webPackage.scripts.build, /VITE_API_SUBSTITUTE=false vite build/);
+    assert.equal(webPackage.scripts.build, 'tsc -b && vite build');
   });
 
   it('the product source reads no substitute variable and imports no substitute module', () => {
@@ -171,11 +175,17 @@ describe('W1-INT: the evidence configuration cannot load the substitute', () => 
     for (const file of product) {
       const text = readFileSync(file, 'utf8');
       if (text.includes(MARKER)) offenders.push(`${path.relative(RAI_WEB_ROOT, file)}: marker`);
+      if (/VITE_API_SUBSTITUTE|API_PROXY_TARGET/.test(text))
+        offenders.push(`${path.relative(RAI_WEB_ROOT, file)}: API-substitute selector`);
       for (const specifier of importsOf(file))
-        if (/substitutes\/api(\/|$)|substitute-marker|substitute-server/.test(specifier))
+        if (
+          /substitutes\/api(\/|$)|substitute-marker|substitute-server|vite\.substitute\.config/.test(
+            specifier,
+          )
+        )
           offenders.push(`${path.relative(RAI_WEB_ROOT, file)} imports ${specifier}`);
       // config.ts is the only process.env reader (section 1.1); it must not know the substitute flag, and
-      // web/src only ever sees the build-time boolean vite.config.ts defines from VITE_API_SUBSTITUTE.
+      // the web application has no API-substitute selector.
       if (
         file.endsWith(path.join('server', 'src', 'config.ts')) &&
         /SUBSTITUTE/.test(text.replace(/'substitute'/g, ''))

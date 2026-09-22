@@ -92,3 +92,9 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: next ticket in the dependency map.
 - Author: operator=ta session=build-workflow model=claude-opus-5
 - Evidence: https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/88
+
+## 2026-09-22 — CLAIM W3-INT planning only
+- Author: operator=ta session=codex-w3-int model=GPT-6
+- Takes over from: none (reason: parent-delegated #49 planning only; parent retains lead/exit authority)
+- What: Isolated `/tmp/rai-w3-integration`, `codex/w3-int` at `fe65fc1`; no code or other agents' ownership taken. W3-06/performance and 03b/04/07a/07b remain separately owned.
+- Next: Lead review of [file-level plan](../../changes/2026-09-22-w3-int/plan.md) before implementation; separate final reviewer due to queue UI authorship.

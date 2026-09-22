@@ -25,7 +25,7 @@ import type {
 } from '@rai/shared/schemas/cases';
 import type { ErrorDetails, ErrorResponse } from '@rai/shared/errors';
 import { NON_VENDOR_DEFAULT_REASON_KEY } from '@rai/shared/schemas/pack';
-import { buildApp } from '@rai/server/app';
+import { buildApp } from '../support/observed-app.js';
 import { auditStore } from '@rai/server/audit/store';
 import { createScopeFactsSource } from '@rai/server/authz/facts';
 import { businessUnitsFromGrants, createBusinessUnitDirectory } from '@rai/server/cases/business-units';

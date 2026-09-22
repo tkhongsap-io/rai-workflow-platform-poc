@@ -35,6 +35,8 @@ import { laneOpenRecipientsFromIdentities } from './versions/open-lanes.js';
 import { sendBackRecipientsFromIdentities } from './workflow/send-back-notice.js';
 
 export interface StartOverrides {
+  /** Synthetic journey only; shared runner instance, never a runtime configuration option. */
+  qcRunner?: QcRunner & { probe(): Promise<'ok' | 'disabled' | 'unavailable'> };
   /** S16 seam: what the adapter reads after listen; defaults to fastify.server.address(). */
   addressOf?: (fastify: FastifyInstance) => AddressInfo | string | null;
   /** Exit seam for tests; defaults to process.exit. Must not return. */
@@ -139,6 +141,11 @@ function refuse(reason: string, exit: (code: number) => never): never {
 
 export async function startServer(env: Env, overrides: StartOverrides = {}): Promise<StartedServer> {
   const exit = overrides.exit ?? ((code: number): never => process.exit(code));
+  if (
+    overrides.qcRunner !== undefined &&
+    (env.NODE_ENV !== 'test' || env.RAI_IDENTITY_MODE !== 'fixture' || !isLoopbackHost(env.HOST ?? ''))
+  )
+    return refuse('test_qc_override_forbidden', exit);
   let config;
   try {
     config = parseConfig(env);
@@ -196,7 +203,7 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
   // Bind the QC substitute only outside production: a production process stays unbound even if fixtures can import.
   const qcRunner =
     config.qc.mode === 'substitute' && config.nodeEnv !== 'production'
-      ? await loadQcSubstituteRunner(overrides.now)
+      ? (overrides.qcRunner ?? (await loadQcSubstituteRunner(overrides.now)))
       : undefined;
   // Only fixture identities can be synthetic mail recipients in this slice. No live directory or transport.
   const mailSink = config.identity.mode === 'fixture' ? await loadMailSink(config) : undefined;
@@ -232,6 +239,7 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
             sink: mailSink,
             identities: knownIdentities,
             publicBaseUrl: config.publicBaseUrl,
+            ...(overrides.now === undefined ? {} : { now: overrides.now }),
           },
         }),
     config,
@@ -261,6 +269,7 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
     versions: {
       db: db.db,
       laneOpenRecipients: laneOpenRecipientsFromIdentities(knownIdentities),
+      qc: qcRunner === undefined ? {} : { runner: qcRunner },
       ...(overrides.now === undefined ? {} : { now: overrides.now }),
     },
     // W2-02: lane approve / send-back; owner email for send_back notices from identity data.

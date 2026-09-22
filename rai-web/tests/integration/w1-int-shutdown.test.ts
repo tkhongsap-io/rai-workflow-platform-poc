@@ -65,17 +65,18 @@ describe('W1-INT graceful shutdown is bounded', () => {
     assert.match(answer, /"identityMode":"fixture"/);
   });
 
-  it('stop() escalates to SIGKILL after the grace period and rejects with the captured lines', async () => {
+  it('stop() escalates to SIGKILL after the grace period and rejects with a generic safe timeout', async () => {
     const server = await startTestServer();
     process.kill(server.pid, 'SIGSTOP'); // frozen: the SIGTERM handler cannot run, as a hung shutdown would look
     try {
       await assert.rejects(
         server.stop(500),
         (err: Error) =>
-          err.message.includes('did not exit within 500 ms of SIGTERM; killed') &&
-          err.message.includes('process.started'),
+          err.message === 'test server did not close within 500 ms after stop; capture incomplete',
       );
-      await assert.rejects(server.stop(), /did not exit within 500 ms/); // idempotent: the same settled promise
+      await assert.rejects(server.stop(), {
+        message: 'test server did not close within 500 ms after stop; capture incomplete',
+      }); // idempotent: the same settled promise
     } finally {
       try {
         process.kill(server.pid, 'SIGKILL');

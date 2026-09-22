@@ -26,6 +26,7 @@ import {
   expectedVersionOf,
   findingsLane,
   laneKey,
+  reviewerFindingsLoadMode,
 } from './view-model.js';
 
 type LoadResult =
@@ -77,7 +78,9 @@ function ReviewerWorkspaceBody({
 }: ReviewerWorkspaceProps & { lane: Lane | null }): JSX.Element | null {
   const { t } = useLocale();
   const isPropose = lane === null;
-  const loadKey = `${caseId}/${version.versionId}/${lane ?? 'propose'}`;
+  const loadMode = reviewerFindingsLoadMode(view, lane);
+  const isReady = view.aiReadinessStatus === 'ready';
+  const loadKey = `${caseId}/${version.versionId}/${lane ?? 'propose'}/${loadMode}`;
   const [stored, setStored] = useState<{ key: string; result: LoadResult } | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const [overlay, setOverlay] = useState<ReadonlyMap<string, DispositionKind>>(new Map());
@@ -99,7 +102,7 @@ function ReviewerWorkspaceBody({
     let cancelled = false;
     const key = `${loadKey}#${reloadToken}`;
     const load = async (): Promise<LoadResult> => {
-      if (lane !== null) {
+      if (loadMode === 'lane_qc' && lane !== null) {
         const run = await api.runLaneQc(caseId, version.versionId, lane, {
           expectedVersion: { versionId: version.versionId, revision: 1 },
         });
@@ -119,7 +122,9 @@ function ReviewerWorkspaceBody({
       return {
         kind: 'ready',
         run: null,
-        findings: listed.findings.map(({ latestDisposition: _ld, ...summary }) => summary),
+        findings: listed.findings
+          .filter((finding) => lane === null || finding.owningLane === lane)
+          .map(({ latestDisposition: _ld, ...summary }) => summary),
         latestKinds,
       };
     };
@@ -134,7 +139,7 @@ function ReviewerWorkspaceBody({
     return () => {
       cancelled = true;
     };
-  }, [caseId, version.versionId, lane, loadKey, reloadToken, onUnauthenticated]);
+  }, [caseId, version.versionId, lane, loadMode, loadKey, reloadToken, onUnauthenticated]);
 
   const onDisposition = useCallback(
     (response: DispositionResponse): void => {
@@ -208,14 +213,14 @@ function ReviewerWorkspaceBody({
           {lane === null ? (
             <>
               <h2 id={'reviewer-findings-heading'}>{t('review.disposition.owner_heading')}</h2>
-              <p className={'muted'}>{t('review.disposition.owner_intro')}</p>
+              {!isReady ? <p className={'muted'}>{t('review.disposition.owner_intro')}</p> : null}
             </>
           ) : (
             <>
               <h2 id={'reviewer-findings-heading'}>
                 {t('review.findings.heading', { lane: t(laneKey(lane)) })}
               </h2>
-              <p className={'muted'}>{t('review.findings.intro')}</p>
+              {!isReady ? <p className={'muted'}>{t('review.findings.intro')}</p> : null}
             </>
           )}
         </div>

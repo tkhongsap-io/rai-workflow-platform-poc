@@ -18,7 +18,7 @@
 // specs drive every other control by keyboard); axe (th) on every screen state reached; three widths. Fixture
 // set slice1-synthetic@1 (support/database.ts) reloaded before each test; fixture ids in the describe titles.
 
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './support/real-test.js';
 import { createHash, randomUUID } from 'node:crypto';
 import th from '@rai/shared/locales/th.json' with { type: 'json' };
 import { t, type LocaleKey } from '@rai/shared/locales/keys';
@@ -29,7 +29,7 @@ import { buildPdf } from '@rai/fixtures/generate/pdf';
 import { FIXTURE_THAI_LINE } from '@rai/fixtures/data/documents/index';
 import { expectAccessible, expectStatusElementsHaveText } from './support/axe.js';
 import { expectVisibleFocus, tabUntil } from './support/keyboard.js';
-import { FIXTURE_SET, queryRows, resetToFixtureSet } from './support/database.js';
+import { FIXTURE_SET, queryRows } from './support/database.js';
 import { freeLoopbackPort, startTestServer, type TestServerProcess } from '../support/process.js';
 
 const OWNER = 'fx-user-owner-cm';
@@ -132,11 +132,8 @@ async function storedRows(caseId: string, versionId: string) {
   return { c: c as Row, v: v as Row, slots, artifacts, audit };
 }
 
-test.beforeEach(async () => {
-  await resetToFixtureSet();
-});
-
 test.describe(`W1-INT journey on the real server: create → attach → submit → restart → reopen (${FIXTURE_SET}; fx-user-owner-cm)`, () => {
+  test.use({ serverMode: 'reset-only' });
   test('the owner creates, attaches and submits through the UI; the API process is stopped and restarted; the case, the version and the artifact bytes reopen unchanged', async ({
     page,
   }, testInfo) => {

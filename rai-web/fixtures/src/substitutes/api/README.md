@@ -2,7 +2,7 @@
 
 Dev/test-only stand-in for the W1/W2 server: it answers every request/response shape of the [W0-02 plan section 7](../../../../../docs/engineering/implementation-plan-w1-w3.md#7-w1-interface-shapes) (7.2–7.6 from W1-13; 7.7 lane decision, send-back, lane QC and disposition from W2-10) from the W1-09 fixture set (`fixture set slice1-synthetic@1`), with the [W0-06 8.2](../../../../../docs/engineering/workflow-transition-and-error-contract.md#82-response-envelope) error envelope for every 401, 403, 404, 409 and 422 the section names. Lane B (W1-06, W1-07, W2-07, W2-09) builds against it; W3-08 extends it further. **This is not the W2 exit.**
 
-**Never deployed, never evidence.** Every module here references `SUBSTITUTE_MARKER` (`../../substitute-marker.ts`); `npm run check:substitute-absent` fails if the marker reaches `web/dist` or `server/dist`, `npm run build` forces `VITE_API_SUBSTITUTE=false`, `startApiSubstitute()` refuses any `NODE_ENV` but `test` or `development` and any bind that is not loopback, and no file under `server/src` or `web/src` imports it (`absence.test.ts`). A Lane B ticket's Proves IDs are realised only when Wx-INT runs the same spec against the real server ([section 8.1](../../../../../docs/engineering/implementation-plan-w1-w3.md#81-layers)).
+**Never deployed, never evidence.** Every module here references `SUBSTITUTE_MARKER` (`../../substitute-marker.ts`); `npm run check:substitute-absent` fails if the marker reaches `web/dist` or `server/dist`, application configuration has no API-substitute selector, `startApiSubstitute()` refuses any `NODE_ENV` but `test` or `development` and any bind that is not loopback, and no file under `server/src` or `web/src` imports it (`absence.test.ts`). A Lane B ticket's Proves IDs are realised only when Wx-INT runs the same spec against the real server ([section 8.1](../../../../../docs/engineering/implementation-plan-w1-w3.md#81-layers)).
 
 **Never a client-side permission rule.** The substitute is the stand-in _server_: it calls W1-01's `authorizeRequest`, which calls the W1-00 policy rows and `authorize` from `server/src/authz/`, so a request the W0-05 matrix denies gets the same 403 (and the same 404 for an `all_cases` holder on an unresolvable id) as from the real server, and the substitute never adds a row of its own ([W0-05 section 6, "Substitute (W1-13)"](../../../../../docs/engineering/authorization-policy-matrix.md#substitute-w1-13)). The SPA only ever sees the responses.
 
@@ -18,9 +18,9 @@ const fetch = createSubstituteFetch(substitute);   // fetch-shaped, keeps the se
 import { startApiSubstitute } from '@rai/fixtures/substitutes/api/index';
 const running = await startApiSubstitute({ port: 8787 });   // { baseUrl, close() }; NODE_ENV must be test|development
 
-# the CLI, from rai-web/ (what a Playwright `webServer.command` or `npm run dev -w web` points at)
-NODE_ENV=development npx tsx --conditions=rai-source fixtures/src/substitutes/api/serve.ts --port 8787
-VITE_API_SUBSTITUTE=true npm run dev -w web        # the Vite dev server proxies /api and /auth to 127.0.0.1:8787
+# Historical Lane B browser rehearsal only, from rai-web/ (not application config):
+SUBSTITUTE_PORT=8789 SUBSTITUTE_WEB_PORT=5175 npm run test:browser:substitute
+# The harness owns the proxy and warning; NODE_ENV=test, loopback only, no build mode.
 ```
 
 Sign in with `POST /auth/fixture/sign-in { fixtureUserId }` (the eight identities of `data/users.ts`); the session cookie is `rai_session`. `X-Correlation-Id` is minted per request; every answer carries `Cache-Control: no-store` and `X-RAI-Substitute: <marker>` so a response from the substitute can never be mistaken for one from the server.

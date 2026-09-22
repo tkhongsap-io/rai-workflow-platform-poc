@@ -1,12 +1,13 @@
 // W1-13 done-when "the substitute is absent from non-test configuration": the product sources never import it,
-// the web workspace only knows the fixtures package as a devDependency, the production build forces
-// VITE_API_SUBSTITUTE=false, every substitute module is reachable only through the marked handler, and the
+// the web workspace only knows the fixtures package as a devDependency, the application has no substitute
+// selector, every substitute module is reachable only through the marked handler, and the
 // marker `npm run check:substitute-absent` greps for is referenced from the substitute's entry points.
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { SUBSTITUTE_MARKER } from '../../substitute-marker.js';
 
@@ -40,7 +41,7 @@ describe('W1-13 substitute: absent from non-test configuration', () => {
     }
   });
 
-  it('web knows @rai/fixtures only as a devDependency and its build forces VITE_API_SUBSTITUTE=false', () => {
+  it('web keeps fixtures dev-only and application configuration has no substitute selection', () => {
     const pkg = JSON.parse(readFileSync(path.join(raiWebRoot, 'web', 'package.json'), 'utf8')) as {
       dependencies?: Record<string, string>;
       devDependencies?: Record<string, string>;
@@ -48,11 +49,50 @@ describe('W1-13 substitute: absent from non-test configuration', () => {
     };
     assert.equal(pkg.dependencies?.['@rai/fixtures'], undefined);
     assert.equal(pkg.devDependencies?.['@rai/fixtures'], '0.0.0');
-    assert.ok(pkg.scripts.build?.includes('VITE_API_SUBSTITUTE=false'));
+    assert.equal(pkg.scripts.build, 'tsc -b && vite build');
+    for (const file of [
+      'web/vite.config.ts',
+      '.env.example',
+      'web/src/vite-env.d.ts',
+      'web/src/screens/shell/app-shell.tsx',
+    ]) {
+      assert.doesNotMatch(
+        readFileSync(path.join(raiWebRoot, file), 'utf8'),
+        /VITE_API_SUBSTITUTE|API_PROXY_TARGET|SUBSTITUTE_PORT/,
+      );
+    }
     const server = JSON.parse(readFileSync(path.join(raiWebRoot, 'server', 'package.json'), 'utf8')) as {
       dependencies?: Record<string, string>;
     };
     assert.equal(server.dependencies?.['@rai/fixtures'], undefined);
+  });
+
+  it('test-owned UI config accepts test loopback only and refuses production, non-loopback and builds', () => {
+    for (const [nodeEnv, command, host, accepted] of [
+      ['test', 'serve', '127.0.0.1', true],
+      ['production', 'serve', '127.0.0.1', false],
+      ['development', 'serve', '127.0.0.1', false],
+      ['test', 'serve', '0.0.0.0', false],
+      ['test', 'build', '127.0.0.1', false],
+    ] as const) {
+      const result = spawnSync(
+        process.execPath,
+        [
+          '--input-type=module',
+          '-e',
+          `
+        import { resolveConfig } from 'vite';
+        await resolveConfig({
+          configFile: 'tests/browser/support/vite.substitute.config.ts',
+          server: { host: ${JSON.stringify(host)} },
+        }, ${JSON.stringify(command)}, 'test', ${JSON.stringify(nodeEnv)});
+      `,
+        ],
+        { cwd: raiWebRoot, env: { ...process.env, NODE_ENV: nodeEnv }, encoding: 'utf8' },
+      );
+      assert.equal(result.status === 0, accepted, `${nodeEnv}/${command}/${host}: ${result.stderr}`);
+      if (!accepted) assert.match(result.stderr, /API substitute UI requires/);
+    }
   });
 
   it('the substitute entry points reference SUBSTITUTE_MARKER so check-substitute-absent can find a leaked bundle', () => {

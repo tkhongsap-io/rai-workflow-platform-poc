@@ -10,7 +10,7 @@
 // submit; axe (th) on the states reached; three widths from playwright.config.ts. Fixture set slice1-synthetic@1
 // reloaded before each test. Users: fx-user-owner-cm, fx-user-ai-coe, fx-user-dpo, fx-user-it-security.
 
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './support/real-test.js';
 import type { CaseListResponse, CaseView } from '@rai/shared/schemas/cases';
 import type { SubmittedVersion } from '@rai/shared/schemas/versions';
 import type { LaneDecisionResponse } from '@rai/shared/schemas/review';
@@ -18,7 +18,7 @@ import { t, type LocaleKey } from '@rai/shared/locales/keys';
 import { expectAccessible, expectStatusElementsHaveText } from './support/axe.js';
 import { expectVisibleFocus, pressTab, tabUntil } from './support/keyboard.js';
 import { signInAsFixture, signOut } from './support/sign-in.js';
-import { FIXTURE_SET, queryRows, resetToFixtureSet } from './support/database.js';
+import { FIXTURE_SET, queryRows } from './support/database.js';
 
 const OWNER = 'fx-user-owner-cm';
 const AI_COE = 'fx-user-ai-coe';
@@ -85,10 +85,6 @@ async function keyboardApprove(page: Page, lane: string): Promise<LaneDecisionRe
   expect(response.status()).toBe(201);
   return (await response.json()) as LaneDecisionResponse;
 }
-
-test.beforeEach(async () => {
-  await resetToFixtureSet();
-});
 
 test.describe(`W2-INT journey on the real server: v1 → send-back → v2 → dispositions → three approvals → Ready (${FIXTURE_SET}; fx-case-nonvendor)`, () => {
   test('owner submits; AI/COE send-back names a slot; owner resubmits v2; dispose then three approvals reach Ready', async ({

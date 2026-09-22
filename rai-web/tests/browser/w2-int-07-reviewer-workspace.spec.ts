@@ -4,14 +4,14 @@
 // support/database.ts before every test. Proves A09/A07 at the browser layer. Fixture ids: fx-case-nonvendor
 // (RAI-2000-0001); users fx-user-owner-cm, fx-user-ai-coe, fx-user-admin.
 
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './support/real-test.js';
 import type { CaseListResponse } from '@rai/shared/schemas/cases';
 import type { PackDraft } from '@rai/shared/schemas/pack';
 import { t } from '@rai/shared/locales/keys';
 import { expectAccessible, expectStatusElementsHaveText } from './support/axe.js';
 import { expectVisibleFocus, pressTab, tabUntil } from './support/keyboard.js';
 import { signInAsFixture, signOut } from './support/sign-in.js';
-import { FIXTURE_SET, resetToFixtureSet } from './support/database.js';
+import { FIXTURE_SET } from './support/database.js';
 
 const OWNER = 'fx-user-owner-cm';
 const AI_COE = 'fx-user-ai-coe';
@@ -70,10 +70,6 @@ async function expectFocusInsideDialog(page: Page): Promise<void> {
 function frozenPack(page: Page) {
   return page.locator('section.card').filter({ hasText: t('th', 'version.frozen_note') });
 }
-
-test.beforeEach(async () => {
-  await resetToFixtureSet();
-});
 
 test.describe(`W2-INT reviewer workspace on the real server (${FIXTURE_SET}; fx-case-nonvendor)`, () => {
   test('keyboard send-back: findings before controls, dialog focus, frozen N unchanged, axe th+en', async ({

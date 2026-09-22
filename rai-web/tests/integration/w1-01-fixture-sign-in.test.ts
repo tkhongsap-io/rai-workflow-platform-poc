@@ -10,7 +10,7 @@ import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { FIXTURE_USERS, DUAL_ROLE_FIXTURE_USER_ID } from '@rai/fixtures/data/users';
 import type { Principal, SessionInfo } from '@rai/shared/schemas/auth';
-import { buildApp } from '@rai/server/app';
+import { buildApp } from '../support/observed-app.js';
 import { auditStore } from '@rai/server/audit/store';
 import { createScopeFactsSource } from '@rai/server/authz/facts';
 import { createIdentityAdapter } from '@rai/server/identity/adapter';

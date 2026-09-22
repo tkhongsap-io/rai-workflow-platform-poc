@@ -1,0 +1,7 @@
+# Behavior and evidence contract
+
+Use the server's CaseView.aiReadinessStatus=ready projection; never infer Ready from three approvals, finding counts or an optimistic notice. For an already authorized workspace on a Ready case, load stored findings/latest dispositions with GET only. Preserve reviewer lane presentation and owner/SPOC scope; no new visibility grant. Render recorded dispositions without mutation actions. Hide QC/decision/disposition actions immediately when the completed state is known.
+
+Both final approval and a disposition response with ready=true refresh authoritative case/version state. Direct navigation and reload behave identically. Genuine GET/auth/transport failures remain errors with existing handling; never swallow stale-version errors globally or reinterpret a failed QC POST as success. Server refusal and immutable Ready semantics stay intact. Non-Ready in-review behavior, including approved lanes awaiting dispositions, stays unchanged. No policy/owning-lane change; issue35 remains open.
+
+Proof must cover final-approval and disposition-triggered Ready, reviewer and owner direct navigation/reload, retained finding/disposition contents, no unsolicited mutation requests or mutation controls, no false error, and unchanged persisted evidence during viewing. New UI source invalidates the prior full-proof fingerprint. Fresh affected browser evidence and a new parent-controlled walkthrough/full assembly are required.
