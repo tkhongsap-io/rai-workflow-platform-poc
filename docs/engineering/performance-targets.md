@@ -46,7 +46,7 @@ These are the numbers the W0 specs asked W0-09 to record (W0-06 section 11, W0-0
 | QC orchestrator deadline | 10,000 ms (`deadlineMs`; tests pass 100 ms); expiry is `unavailable:timeout` | `server/src/qc/` orchestrator option, module constant | W0-07 3.4 step 1, section 6 |
 | Mail retry backoff | 1 s, 5 s, 25 s between attempts 1-4 (D06: one send plus three retries) | W3-04 dispatcher, module constant | W0-07 4.5 |
 | Readiness probe ceiling | 2,000 ms per probe, in parallel; report cached 5 s | `server/src/observability/health.ts` (W3-07) | W0-10 5.5 |
-| Graceful shutdown | 10 s for in-flight transactions after `SIGTERM` | `server/src/main.ts` (W1-00) | W0-04 "Restart proof" |
+| Graceful shutdown | 10 s for in-flight transactions after `SIGTERM`; then every remaining socket is destroyed (a socket that never sent a byte, such as a browser's speculative pre-connect, is not swept by Node's `server.close()` and would otherwise hold the process open) and a 15 s hard deadline exits 1 | `server/src/shutdown.ts` `SHUTDOWN_DRAIN_MS` and `server/src/main.ts` (W1-00; bounded at W1-INT) | W0-04 "Restart proof" |
 | Session lifetime | 12 h absolute, 120 min idle (`RAI_SESSION_ABSOLUTE_HOURS`, `RAI_SESSION_IDLE_MINUTES`) | Identity adapter (W1-01) | W0-03 6.3 (a security default, listed here because it bounds a session, not performance) |
 | Idempotency record retention | 72 h (`IDEMPOTENCY_TTL_HOURS`) | `db:cleanup` | W0-04 |
 

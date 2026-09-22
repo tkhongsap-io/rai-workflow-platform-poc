@@ -25,6 +25,7 @@ import { IdentityStartupError } from './identity/types.js';
 import type { Emitter } from './observability/log.js';
 import { noopUploadTrigger } from './pack/qc-trigger.js';
 import { startedFields } from './observability/started.js';
+import { WEB_DIST_DIR, webDistPresent } from './static.js';
 
 export interface StartOverrides {
   /** S16 seam: what the adapter reads after listen; defaults to fastify.server.address(). */
@@ -37,6 +38,10 @@ export interface StartOverrides {
   fixtureBusinessUnits?: readonly string[];
   discovery?: Discovery;
   now?: () => Date;
+  /** The built SPA directory to serve (W1-INT static.ts); defaults to rai-web/web/dist. */
+  webDistDir?: string;
+  /** W0-04 graceful shutdown: how long in-flight requests get after close() before their sockets are destroyed. */
+  drainMs?: number;
 }
 
 export interface StartedServer {
@@ -44,6 +49,11 @@ export interface StartedServer {
   emitter: Emitter;
   /** The configured BU keys the case routes accept (W0-04 `case.business_unit_id`), observable by tests. */
   businessUnits: BusinessUnitDirectory;
+  /**
+   * W0-04 graceful shutdown (shutdown.ts): no new connections, in-flight requests answered within `drainMs`
+   * (SHUTDOWN_DRAIN_MS, 10 s), every remaining socket destroyed, then the database pool closed. Bounded: a socket
+   * that never sent a byte (a browser's speculative pre-connect) cannot hold the process open.
+   */
   close(): Promise<void>;
 }
 
@@ -96,6 +106,13 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
     throw err;
   }
 
+  // W1-INT: the one deployable serves web/dist (W0-02 section 1, static.ts). Without a web build the process
+  // serves the API alone (the integration suites spawn main.ts through tsx); in production a missing bundle is
+  // a misconfiguration and the process refuses to start rather than answer 404 on every page.
+  const webDistDir = overrides.webDistDir ?? WEB_DIST_DIR;
+  const serveWeb = webDistPresent(webDistDir);
+  if (!serveWeb && config.nodeEnv === 'production') return refuse('missing:web/dist', exit);
+
   const db: DbHandle = createDb(config.database.url);
   const groupMappingSource: GroupMappingSource = async () =>
     (await currentRevision(db.db, 'group_role_mapping'))?.body ?? null;
@@ -135,7 +152,7 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
   ]);
   const store = createFilesystemBlobStore(path.resolve(config.blobDir));
   await store.init(); // root 0700, tmp/ emptied at process start (W0-08 section 6)
-  const { fastify, emitter } = buildApp({
+  const { fastify, emitter, drain } = buildApp({
     config,
     artifacts: { store, db: db.db, limits: config.upload },
     identity: {
@@ -163,9 +180,10 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
       db: db.db,
       ...(overrides.now === undefined ? {} : { now: overrides.now }),
     },
+    ...(serveWeb ? { static: { root: webDistDir } } : {}),
   });
   const close = async () => {
-    await fastify.close();
+    await drain.close(overrides.drainMs);
     await db.close();
   };
   await fastify.listen({ host: config.host, port: config.port });

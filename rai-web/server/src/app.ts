@@ -6,10 +6,12 @@
 // 422 invalid_input with field paths (W0-06 8.2). Routes arrive with W1-02 onwards and declare `config.auth`;
 // W1-02 registers the case routes (cases/routes.ts) when `cases` deps are given; W1-04 the pack draft routes
 // (pack/routes.ts) when `pack` deps are given; W1-05 the submit and version routes (versions/routes.ts) when
-// `versions` deps are given.
+// `versions` deps are given. W1-INT registers the SPA (static.ts: web/dist, helmet headers, history fallback)
+// when `static` is given; the API routes and the JSON not-found handler are unchanged by it.
 
 import Fastify, { LogController, type FastifyError, type FastifyInstance } from 'fastify';
 import cookie from '@fastify/cookie';
+import { createDrain, type Drain } from './shutdown.js';
 import { InvalidInputError, isContractError, internalErrorResponse } from '@rai/shared/errors';
 import type { CorrelationId } from '@rai/shared/ids';
 import type { AppConfig } from './config.js';
@@ -18,6 +20,7 @@ import { registerAuthorization, type ScopeFactsSource } from './authz/middleware
 import { registerCaseRoutes, type CaseRouteDeps } from './cases/routes.js';
 import { registerPackRoutes, type PackRouteDeps } from './pack/routes.js';
 import { registerVersionRoutes, type VersionRouteDeps } from './versions/routes.js';
+import { staticPlugin, type StaticOptions } from './static.js';
 import type { FixtureIdentityProvider } from './identity/fixture.js';
 import { registerAuthRoutes } from './identity/routes.js';
 import { cookieNames, type SessionStore } from './identity/session.js';
@@ -45,6 +48,8 @@ export interface AppDeps {
   pack?: Omit<PackRouteDeps, 'emitter'>;
   /** W1-05: the submit and version-navigation routes' dependencies (database). Needs `identity`. */
   versions?: VersionRouteDeps;
+  /** W1-INT: the built SPA to serve from web/dist (static.ts); absent when there is no web build (API only). */
+  static?: StaticOptions;
   /** Test seam: where the pino lines go instead of stdout, so a suite can assert on emitted events. */
   logStream?: NodeJS.WritableStream;
 }
@@ -52,6 +57,8 @@ export interface AppDeps {
 export interface App {
   fastify: FastifyInstance;
   emitter: Emitter;
+  /** W0-04 graceful shutdown (shutdown.ts): the bounded close start.ts and main.ts run instead of `fastify.close()`. */
+  drain: Drain;
 }
 
 /**
@@ -91,6 +98,7 @@ export function buildApp(deps: AppDeps): App {
     ajv: { customOptions: { removeAdditional: false } }, // a key an `additionalProperties: false` shape does not list is 422, never stripped
   });
   const emitter = createEmitter(fastify.log, { strict: deps.config.nodeEnv === 'test' });
+  const drain = createDrain(fastify); // first hook: every accepted request is counted (shutdown.ts)
 
   fastify.addHook('onRequest', (request, reply, done) => {
     void reply.header('X-Correlation-Id', request.id);
@@ -135,6 +143,11 @@ export function buildApp(deps: AppDeps): App {
       error: { code: 'not_found', messageKey: 'error.not_found', correlationId: request.id },
     });
   });
+
+  // W1-INT: the SPA plugin loads first so helmet's headers are inherited by every route scope below (a hook a
+  // plugin adds to the root is copied into the children created after it). Its `/*` fallback never shadows an
+  // API route: find-my-way prefers the static and parametric routes whatever the registration order.
+  if (deps.static !== undefined) void fastify.register(staticPlugin(deps.static));
 
   if (deps.identity !== undefined) {
     const identity = deps.identity;
@@ -182,5 +195,5 @@ export function buildApp(deps: AppDeps): App {
     }
   }
 
-  return { fastify, emitter };
+  return { fastify, emitter, drain };
 }
