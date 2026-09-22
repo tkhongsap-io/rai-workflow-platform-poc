@@ -1,5 +1,9 @@
 # Plan recorded before code
 
+## QC prerequisite correction before execution
+
+Parent/INT confirmed that the default substitute maps only canonical fixture IDs; newly created IDs return unavailable. Correct spec, runbook and review to require INT's separately implemented, approved and guarded test-only single qcRunner override, with an explicit completed/no-findings scenario for new synthetic IDs and the same instance for run/probe. Require startup identity and actual server DB-boundary evidence before seeding. Preserve all QC/approval assertions. This correction is documentation-only: the current harness has no override configuration to validate, so a pure test cannot prove runtime injection or its guard. No DB actions or benchmark; execution waits for merged final W3-INT and parent authorization.
+
 1. Append a scoped lead-lane claim; preserve every other worktree.
 2. Add one harness module under rai-web/tests/performance/: core.ts (pure guard/percentile/queue validation and typed HTTP client), queue-seed.ts (real API workflow and manifest), queue-measure.ts (sampling and optional duration join), core.test.ts and local tsconfig.json. Exports only: no import-time network or database work; manual existing tsx invocation, no command registration.
 3. Use canonical loader only as an external prerequisite; require its five exact draft IDs before adding 995 cases. Real create/save/submit/send-back/QC/approve endpoints create all states. A partial seed fails and requires a separately authorized isolated reset; no destructive recovery hidden in the harness.

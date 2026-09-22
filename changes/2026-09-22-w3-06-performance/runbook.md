@@ -1,12 +1,23 @@
 # Manual execution after parent authorization only
 
-Preparation has not touched a database or measured latency. Parent must first identify the final built W3-INT commit, authorize execution, allocate unused loopback server/DB ports and a dedicated Compose project/database named `rai_perf_<suffix>`. Start the actual built server in test/fixture mode with the configured synthetic QC and mail sink. Keep normal workers enabled. Do not run against the held retry environment or a shared test database.
+Preparation has not touched a database or measured latency. Parent must first identify the final built W3-INT commit, authorize execution, allocate unused loopback server/DB ports and a dedicated Compose project/database named `rai_perf_<suffix>`. Start the actual built server in test/fixture mode with the approved INT synthetic QC override described below and the configured synthetic mail sink. Keep normal workers enabled. Do not run against the held retry environment or a shared test database.
 
 The harness does not migrate, reset, truncate, load fixtures, ANALYZE or start a process. Parent separately prepares an empty isolated DB with the canonical fixture loader and all final migrations, using the correct migration/admin credentials for that head. Every destructive helper requires its own reviewed guard. This module's guard checks the three supplied role URLs against explicit host/port/database/role values before HTTP; it cannot attest which database an already running HTTP process uses. Parent must verify the actual server launch environment uses those exact URLs. Do not reuse the general integration reset helper without this check.
 
 From `rai-web`, prepare ignored `.local/performance-config.json` (mode 0600) with `baseUrl`, `target: {host: "127.0.0.1", port, database}`, `urls: {app, owner, operator}`, the full 40-character `finalHead`, and `authorization: "parent-authorized-final-head"`. Use explicit PostgreSQL URLs with rai_app/rai_owner/rai_operator credentials, no URL query parameters. No port is allocated by this document. Record machine/CPU/RAM, OS, Node and PostgreSQL versions, Docker resource limits, pool size, final server/harness commits, log destination, and startup configuration without passwords.
 
-After authorization, invoke the existing tsx runtime manually; these commands are examples, not an execution record:
+## Required QC override and startup evidence
+
+The default substitute maps only seeded fixture IDs; a newly API-created case receives unavailable QC. It cannot seed the 150 new Ready cases. Before running either command below, require all of the following:
+
+- Merged final W3-INT provides a separately reviewed and explicitly approved, guarded test-only override for the single configured qcRunner. Record the implementing commit, approved scenario and actual launch configuration; do not invent an environment flag or silently fall back to the default substitute.
+- The explicit scenario returns synthetic completed/no-findings results for the new performance-case IDs. It supplies the same configured runner instance to both run and probe, preserving ordinary QC persistence, correlation and lane decisions. It introduces no external provider or approval shortcut.
+- Assert the launched process is the recorded final build, NODE_ENV=test, fixture identity mode, and bound to the allocated loopback address/port. Verify the startup configuration uses the exact guarded app/owner/operator URLs and dedicated rai_perf_<suffix> database; the harness's URL check alone cannot prove which DB an existing server uses. Record sanitized evidence without credentials.
+- Require evidence that INT's override guard rejects use outside its approved test/fixture/isolated boundary. Readiness/probe success alone does not prove the new-ID scenario. Before the full seed, prove a newly created synthetic ID returns completed QC with a runId and zero findings through the actual API in the separately authorized scratch workflow.
+
+If any prerequisite is missing, stop before seeding. Never skip override approval, weaken queue-seed.ts's QC assertion, bypass findings, fake Ready, disable triggers, or skip any of the three reviewer approvals. INT owns implementing and testing this seam; this harness does not add a runner or an override switch. Neither this correction nor the example commands authorize execution.
+
+After these prerequisites and parent execution authorization, invoke the existing tsx runtime manually; these commands are examples, not an execution record:
 
 ```sh
 node --import tsx --conditions=rai-source --input-type=module <<'JS'
@@ -19,7 +30,7 @@ JS
 
 Seeding requires exactly the five canonical draft IDs and adds 995 cases through real APIs. It reserves the output file with exclusive creation; failure leaves an INCOMPLETE marker and may leave partial server writes. It never retries/reseeds/resets silently. Diagnose and obtain a separately authorized isolated reset before a fresh attempt. The canonical fixture hash and the expanded manifest hash are distinct evidence.
 
-On the final authorized run, first prove a small workflow smoke in a separately reset scratch DB if needed; then seed the clean target. No claim is made yet that the 995-case API sequence has run. Setup cost is outside the benchmark: approximately 995 creates, 850 saves/submits, 200 send-backs and 450 QC/approval pairs, plus reads. The default substitute has no finding scripts for newly created IDs. This is a lane/SLA-heavy queue dataset, not a dense-QC or artifact workload. The first/last page mix is determined by actual updatedAt/id ordering and is retained in the manifest.
+On the final authorized run, first prove a small workflow smoke in a separately reset scratch DB if needed; then seed the clean target. No claim is made yet that the 995-case API sequence has run. Setup cost is outside the benchmark: approximately 995 creates, 850 saves/submits, 200 send-backs and 450 QC/approval pairs, plus reads. The approved override must explicitly supply the completed/no-findings scenario for newly created IDs; the default substitute instead returns unavailable. This is a lane/SLA-heavy queue dataset, not a dense-QC or artifact workload. The first/last page mix is determined by actual updatedAt/id ordering and is retained in the manifest.
 
 Wait for setup notifications to settle; document pending jobs, run ANALYZE on the isolated dataset if authorized, then leave the dataset unchanged. Do not run other suites/load generators concurrently. A server restart does not make this a cold-DB run. Login and warmup are excluded; cold-start timings, UI rendering and 10-user concurrency are separate protocols.
 
