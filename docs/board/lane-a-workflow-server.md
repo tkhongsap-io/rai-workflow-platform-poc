@@ -83,3 +83,14 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: W2-04 resubmit — not this session.
 - Author: operator=ta session=w2-03 model=composer
 - Evidence: branch codex/w2-03-successor-draft
+
+## 2026-09-22 12:25 — CLAIM Lane A
+- Author: operator=ta session=w2-04 model=composer
+- Takes over from: session=w2-03 (reason: handoff)
+
+## 2026-09-22 12:25 — W2-04 resubmit N+1 under D05
+- What: Resubmit via existing draft/submit: freeze N+1, version.resubmitted + lane.opened × 3, projections pending and ai_readiness_status not_ready, idempotency action case.resubmit; N stays readable; decide on N after resubmit is 409 version_superseded. Not the W2 exit.
+- Why: Ticket W2-04 (#34); proves A07; decision D05. Completes W0-06 §4.6 / persistence Resubmit row.
+- Next: W2-05 dispositions — not this session.
+- Author: operator=ta session=w2-04 model=composer
+- Evidence: branch codex/w2-04-resubmit

@@ -1,5 +1,9 @@
 # Development log
 
+## W2-04: resubmit N+1 under D05 — 2026-09-22
+
+Resubmit is submit of a successor draft (`parent_version_id` set) on the existing POST `/api/cases/:caseId/draft/submit` route. Freezes N+1, opens all three lanes pending, writes `version.resubmitted` then `lane.opened` × 3, resets lane projections and `ai_readiness_status` to `not_ready`, stores idempotency action `case.resubmit`, and leaves N's lane decisions untouched. Approve/send-back naming N after resubmit is `409 version_superseded`. This is not the W2 exit; findings/dispositions (W2-05), Ready (W2-06), UI and mail delivery remain later tickets.
+
 ## W2-03: successor draft concurrency — 2026-09-22
 
 Concurrent send-backs on the same submitted version share one editable N+1 draft because the case row lock serialises decide and `ensureSuccessorDraft` reuses `case.draft_version_id` when set; version N stays readable and frozen; stale actions return 409 with refresh guidance and write nothing. This is not the W2 exit; resubmit (W2-04), findings/dispositions, Ready, UI and mail delivery remain later tickets.
