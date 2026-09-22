@@ -6,8 +6,8 @@ import { StringDecoder } from 'node:string_decoder';
 // `server/dist/main.js` that `npm start` runs, which W1-INT's journey restarts) in test mode on a free loopback
 // port (or the `port` the caller names, so a restarted process keeps its origin) with the fixture identity
 // provider, the in-memory mail sink and the QC substitute, captures every JSON line the process writes to stdout
-// and stderr, waits for `process.started`, and stops it with SIGTERM — escalating to SIGKILL and rejecting with the
-// a generic diagnostic when the process/stdio have not closed within the grace period, so a shutdown or stdio-close hang fails with a bounded generic diagnostic. Nothing here reaches an external service:
+// and stderr, waits for `process.started`, and stops it with SIGTERM — escalating to SIGKILL and rejecting with
+// a generic diagnostic when the process/stdio have not closed within the grace period. Nothing here reaches an external service:
 // the database is the local Postgres that `.env` or the shell names, and the identity mode is `fixture`, which
 // config.ts accepts only under NODE_ENV=test on a loopback bind (W0-03 S13, S14).
 
@@ -106,7 +106,7 @@ export class BuiltServerMissingError extends Error {
   }
 }
 
-/** Starts the server and resolves once it logged `process.started`; rejects with the captured lines otherwise. */
+/** Starts the server and resolves once it logged `process.started`; rejects with a safe diagnostic otherwise. */
 export async function startTestServer(options: StartOptions = {}): Promise<TestServerProcess> {
   const port = options.port ?? (await freeLoopbackPort());
   const env = testServerEnv(port, options.env);
