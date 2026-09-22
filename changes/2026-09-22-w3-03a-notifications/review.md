@@ -2,13 +2,13 @@
 
 ## Independent contract review and parent verification
 
-PR #111: independent reviewer Carver reported no high-confidence findings on `50a319c`, rendered all six body templates through `t()`, verified bilingual parameter parity and source-table content, and checked whitespace. Parent verification passed `npm run lint`, `npm run typecheck` and all 457 unit tests. Full final-head CI remains required before merge. Composer behavior, digest and retries are separate consumer work.
+PR #111: independent reviewer Carver reported no high-confidence findings on `50a319c`, rendered all six body templates through `t()`, verified bilingual parameter parity and source-table content, and checked whitespace. Parent verification passed `npm run lint`, `npm run typecheck` and all 457 unit tests. Contract PR #111 passed final CI and merged as `e5bee77`. Composer behavior, digest and retries are separate consumer work.
 
 ## Result and prerequisites
 
 Implemented the approved composer/templates split of issue #44 on `codex/w3-03a-notifications` in `/tmp/rai-w3-notifications`. Started at `44c5517`, then rebased onto the parent-requested mail promotion merge `5fe59ad`. The rebase preserved main's queue contract documentation; no queue implementation is copied or changed. Mail promotion history is not duplicated.
 
-Shared locale contract is separate commit `ec25131` (previously `c577b86` before rebase): three additive body keys, existing subject/persisted template keys retained. Parent is cherry-picking this prerequisite for its own review/PR. The consumer must follow that merge; no further shared mail, HTTP, authorization or persistence contract changes are needed. No migration, dependency, root changelog/devlog or external delivery added.
+Shared locale contract is separate commit `ec25131` (previously `c577b86` before rebase): three additive body keys, existing subject/persisted template keys retained. This prerequisite merged in PR #111 (`e5bee77`); the consumer branch was subsequently rebased onto main `a2392c9`. no further shared mail, HTTP, authorization or persistence contract changes are needed. No migration, dependency or external delivery added. The parent records the consumer outcome in root CHANGELOG and DEVLOG.
 
 ## Implemented scope
 
@@ -58,3 +58,7 @@ Parent baseline full suite on `36dcee9` completed exit 0 (`/tmp/rai-w3-notificat
 Fixed with tracked background tasks and cancellation in the existing drain. Shutdown rejects at its deadline if a sink is still active; main.ts already exits 1 on close rejection. The DB pool-close line is not reached on rejection. No transaction race releases the lock: cancellation waits for sink settlement, then rolls back; a sink acceptance before rollback may replay as already documented. New tasks and subsequent rows stop. Thai dates explicitly use Gregorian calendar, with Thai text/year 2026 asserted.
 
 Focused composer/runtime/shutdown: 16 passed. Real Postgres notification suite: 16 passed, including SKIP LOCKED proof that an aborted but active sink retains its notification lock, rollback leaves attempts=0, and live-sink replay deduplicates. Full unit suite: 469 passed. Typecheck and full ESLint/Prettier/CSS checks passed; the final runtime-only rerun passed both tests. These runs used the parent-released 54363 database; no Compose lifecycle changes. Parent will rerun final full suite and independent review on the fix commit. W3-03b planning remains paused.
+
+## Parent final verification and independent re-review
+
+Confucius re-reviewed `4aa19a3` after both fixes, independently ran 16 composer/runtime/shutdown tests and reported no remaining actionable findings. Parent `npm run verify:full` on that implementation exited 0: lint, typecheck, 469 unit, 214 integration, 126 real-server browser and 90 substitute browser tests, build and production substitute-absence. Log: `/tmp/rai-w3-notifications-fixed-full.log`. Rebase onto current main retained the independent contract record and existing queue wiring. Final combined-head CI remains required before merge; this does not claim digest, retries or M3 acceptance.
