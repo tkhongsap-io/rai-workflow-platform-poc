@@ -1,5 +1,9 @@
 # Development log
 
+## Milestone M2 / W2 exit: 2026-09-22
+
+W2 exit recorded from `origin/main` at `2f919eb` ([review](changes/2026-09-22-w2-exit/review.md), ticket W2-08 / issue #41). Fixture set `slice1-synthetic@1 7c80ccd43663`. From `rai-web/`: `npm run lint` and `npm run typecheck` green; W2-INT Playwright evidence `15 passed (31.0s)` (journey + reviewer workspace + disposition at three widths); W2-INT negatives `6 pass / 0 fail` (concurrent send-back one draft, stale approval, undispositioned finding blocks Ready, Admin 403, owner 403, BU SPOC self-approval 403); `npm run build && npm run check:substitute-absent` scanned 463 files, 0 with the marker; `w1-00-audit.test.ts` 4 pass / 0 fail (A11 UPDATE/DELETE refusal). Journey: v1 → one send-back → v2 → three approvals → Ready after disposition. A11: journey asserts only `lane.opened`; related types cited from W2 ticket tests. QC remains the slice-1 substitute stand-in; real QC is W4; issue #35 stays open. Google loopback sign-in stays the W1 pending item (not a W2 blocker). M2 reached; M3 unblocked; next is W3. W4–W8 not authorized. Epic #53 not closed by this record.
+
 ## W2-09: findings and disposition UI — 2026-09-22
 
 On a current submitted version the owning-lane reviewer runs `POST …/qc-run` then enriches each finding with `latestDisposition` from `GET …/versions/:versionId/findings` (authorized as `version.view`; does not insert a `qc_run`). Owner/BU SPOC load that GET only and may propose fixed; qc-run auth is unchanged. After every disposition POST the GET is refetched so a reload shows the kind. Waived and N/A open the shared reason dialog. Every disposition kind is reachable on the W2-10 substitute (owner propose → lane confirm; waive with reason). Ready on the disposition response shows the existing `review.decided.ready` notice. Single-lane findings only; issue #35 stays open. This is not the W2 exit.

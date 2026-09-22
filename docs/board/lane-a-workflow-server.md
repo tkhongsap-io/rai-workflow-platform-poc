@@ -124,3 +124,14 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: W2-08 exit evidence (Lead) runs this suite and records it — not this session.
 - Author: operator=ta session=w2-int model=composer
 - Evidence: branch codex/w2-int-real-server-journey
+
+## 2026-09-22 17:29 — CLAIM Lane A
+- Author: operator=ta session=w2-08 model=composer
+- Takes over from: session=w2-int (reason: handoff)
+
+## 2026-09-22 17:29 — W2-08 W2 exit recorded
+- What: W2 exit evidence only — no product code. Ran lint, typecheck, W2-INT Playwright (15 passed), W2-INT negatives (6 pass), `npm run build && npm run check:substitute-absent` (463/0), `w1-00-audit.test.ts` (4 pass). Recorded under changes/2026-09-22-w2-exit/review.md; BUILD_PLAN status table and divergence sentences flipped (M2 reached, M3 unblocked, next W3); DEVLOG updated. Issue #35 stays open; epic #53 remains open; W4–W8 not authorized.
+- Why: Ticket W2-08 (#41); proves A04, A07, A09, A11 at the package exit.
+- Next: W3 (after Ta accepts this exit) — not this session.
+- Author: operator=ta session=w2-08 model=composer
+- Evidence: branch codex/w2-08-w2-exit; changes/2026-09-22-w2-exit/review.md
