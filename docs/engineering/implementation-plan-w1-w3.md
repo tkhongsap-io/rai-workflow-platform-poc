@@ -891,3 +891,7 @@ Closed at W0 exit (W0-09), recorded here so the list stays honest: upload types 
 - W3-07 page split (W0-10 section 7.4: W3-07a API in Lane A, W3-07b page in Lane B): listed in 11.1 for the lead.
 - Risk-tier labels (`RiskTier` in 7.3 is an opaque `string` and `riskTier` is `null` throughout slice 1): **D07** records the questionnaire, rubric version and labels before W5; W5's contract PR replaces the placeholder type.
 - D07-D10 stay open at their gates; nothing in this plan pre-empts them (no rubric, no retention rule, no model, no host).
+
+### W3-01 queue contract amendment — 2026-09-22
+
+`GET /api/queue` uses `case.list`, with `QueueQuerySchema` and `QueueResponse` in `rai-web/shared/src/schemas/queue.ts`. The existing `/api/cases` contract remains unchanged. Search, filters, counts, options, current lane due dates and deterministic pagination follow the [queue contract](../../changes/2026-09-22-w3-01-queue-contract/spec.md). This is a shared-contract PR before W3-01 server, W3-08 substitute and W3-02 UI consumers; it does not close #42.
