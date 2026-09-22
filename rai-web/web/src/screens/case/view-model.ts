@@ -6,9 +6,11 @@
 
 import { LANE_MAPPING_V1, lanesForSlot, type Lane, type LaneMapping } from '@rai/shared/constants';
 import type { LocaleKey } from '@rai/shared/locales/keys';
-import type { CaseView } from '@rai/shared/schemas/cases';
+import type { RoleScope } from '@rai/shared/schemas/auth';
+import type { CaseView, LaneProjectionStatus } from '@rai/shared/schemas/cases';
 import type { NotApplicableReason, SlotNumber, SlotState } from '@rai/shared/schemas/pack';
-import type { FrozenSlot } from '@rai/shared/schemas/versions';
+import type { StoredFindingSummary } from '@rai/shared/schemas/review';
+import type { ExpectedVersion, FrozenSlot, SubmittedVersion } from '@rai/shared/schemas/versions';
 import { NON_VENDOR_DEFAULT_REASON_KEY } from '@rai/shared/schemas/pack';
 
 export const SLOT_NUMBERS: readonly SlotNumber[] = Object.freeze([1, 2, 3, 4, 5, 6, 7, 8, 9]);
@@ -138,4 +140,106 @@ export function slotOfFieldPath(path: string): SlotNumber | null {
   if (match === null) return null;
   const n = Number(match[1]);
   return (SLOT_NUMBERS as readonly number[]).includes(n) ? (n as SlotNumber) : null;
+}
+
+/** The reviewer's own lane from the session grants, or null when the principal has no lane role. */
+export function reviewerLaneOf(roles: readonly RoleScope[]): Lane | null {
+  for (const grant of roles) {
+    if (
+      (grant.role === 'ai_coe' || grant.role === 'dpo' || grant.role === 'it_security') &&
+      grant.scope.kind === 'all_cases' &&
+      'lane' in grant.scope
+    ) {
+      return grant.scope.lane;
+    }
+  }
+  return null;
+}
+
+/** D05: owner of the case, or BU SPOC of the case's business unit, must not decide that lane. */
+export function isSelfExcludedOnCase(
+  roles: readonly RoleScope[],
+  subjectId: string,
+  view: Pick<CaseView, 'businessOwner' | 'businessUnitId'>,
+): boolean {
+  if (view.businessOwner === subjectId) return true;
+  return roles.some(
+    (grant) =>
+      grant.role === 'bu_spoc' &&
+      grant.scope.kind === 'business_unit' &&
+      grant.scope.businessUnit === view.businessUnitId,
+  );
+}
+
+export function laneProjectionStatus(view: CaseView, lane: Lane): LaneProjectionStatus {
+  switch (lane) {
+    case 'ai_coe':
+      return view.raiStatus;
+    case 'dpo':
+      return view.privacyStatus;
+    case 'it_security':
+      return view.securityStatus;
+  }
+}
+
+/**
+ * The lane the signed-in reviewer may decide on this version, or null when the UI must not draw controls
+ * (wrong role, Admin, owner/SPOC self-exclusion, stale/superseded version, or lane already decided).
+ * Mirrors the server deny cases so the SPA does not offer a button the API would 403 (W0-05 UI convenience).
+ */
+export function decidableLane(args: {
+  roles: readonly RoleScope[];
+  subjectId: string;
+  view: CaseView;
+  version: SubmittedVersion;
+  hasOpenDraft: boolean;
+}): Lane | null {
+  const lane = reviewerLaneOf(args.roles);
+  if (lane === null) return null;
+  if (isSelfExcludedOnCase(args.roles, args.subjectId, args.view)) return null;
+  if (!args.version.isLatest || args.hasOpenDraft) return null;
+  if (laneProjectionStatus(args.view, lane) !== 'pending') return null;
+  return lane;
+}
+
+/** Submitted versions carry a frozen revision of 1 for ExpectedVersion (W0-06 5.1 / 5.2). */
+export function expectedVersionOf(version: Pick<SubmittedVersion, 'versionId'>): ExpectedVersion {
+  return { versionId: version.versionId, revision: 1 };
+}
+
+export function severityKey(severity: StoredFindingSummary['severity']): LocaleKey {
+  return `finding.severity.${severity}` as LocaleKey;
+}
+
+/** Params the SPA can fill from the finding summary (W2 shapes omit message params; slot is enough for many keys). */
+export function findingMessageParams(finding: StoredFindingSummary): Record<string, string | number> {
+  return finding.slot === null ? {} : { slot: finding.slot };
+}
+
+/** One draft feedback row before the API cast (SlotNumberSchema Static is `never` under the map() construction). */
+export interface SendBackFeedbackDraftItem {
+  slot: SlotNumber;
+  deficiency: string;
+  artifactId?: string;
+}
+
+/** A09 / W2-07: at least one item must name a slot; deficiency text is required per item. */
+export function sendBackFeedbackIsValid(items: readonly SendBackFeedbackDraftItem[]): boolean {
+  return items.some((item) => SLOT_NUMBERS.includes(item.slot) && item.deficiency.trim().length >= 1);
+}
+
+export function qcUnavailableReasonKey(
+  reason: 'timeout' | 'runner_error' | 'not_configured' | 'artifact_unreadable' | undefined,
+): LocaleKey {
+  switch (reason) {
+    case 'timeout':
+      return 'review.qc.reason.timeout';
+    case 'runner_error':
+      return 'review.qc.reason.runner_error';
+    case 'artifact_unreadable':
+      return 'review.qc.reason.artifact_unreadable';
+    case 'not_configured':
+    case undefined:
+      return 'review.qc.reason.not_configured';
+  }
 }

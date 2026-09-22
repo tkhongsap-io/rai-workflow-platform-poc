@@ -287,3 +287,65 @@
   color: var(--color-muted);
   font-size: 12.5px;
 }
+
+/* W2-07 reviewer workspace: findings above decision controls */
+.reviewer-workspace {
+  margin-bottom: 16px;
+}
+
+.reviewer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.findings-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.finding-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px 12px;
+  align-items: start;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+}
+
+.finding-row:first-child {
+  border-top: none;
+}
+
+.finding-row:nth-child(even) {
+  background: var(--surface-page);
+}
+
+.finding-message {
+  margin: 0;
+}
+
+.finding-meta {
+  margin: 4px 0 0;
+}
+
+.review-qc-unavailable {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--surface-alt);
+  border-radius: 8px;
+}
+
+.review-qc-unavailable p {
+  margin: 0;
+}
