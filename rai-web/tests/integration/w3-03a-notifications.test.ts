@@ -1,3 +1,4 @@
+import { setTimeout as delay } from 'node:timers/promises';
 import type { ErrorCapture } from '@rai/server/observability/errors';
 import { computeReadiness } from '@rai/server/observability/health';
 import { createStoreProbes } from '@rai/server/observability/probes';
@@ -707,4 +708,55 @@ test('shutdown cancellation keeps the notification lock until the sink settles, 
   assert.equal(sink.sent.length, 1, 'sink may have accepted before rollback; replay remains explicit');
   await consumer.deliverInitial(row!.id);
   assert.equal(sink.sent.length, 1, 'same live sink deduplicates the replay');
+});
+
+test('request completion and response latency do not wait for a stalled notification sink', async () => {
+  const entered = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  const originalDeliver = sink.deliver.bind(sink);
+  sink.deliver = async (request) => {
+    entered.resolve();
+    await release.promise;
+    return originalDeliver(request);
+  };
+  const started = performance.now();
+  const submitted = submit();
+  try {
+    await entered.promise;
+    const completion = () =>
+      logs
+        .join('')
+        .split('\n')
+        .filter(Boolean)
+        .map(
+          (raw) =>
+            JSON.parse(raw) as {
+              event: string;
+              fields: { route?: string; durationMs?: number; status?: number };
+            },
+        )
+        .filter(
+          (line) =>
+            line.event === 'request.completed' && line.fields.route === '/api/cases/:caseId/draft/submit',
+        );
+    assert.equal(completion().length, 1, 'completion must be logged before delivery settles');
+    const duration = completion()[0]!.fields.durationMs!;
+    assert.equal(completion()[0]!.fields.status, 201);
+    // A deadline is only a hang guard; the correctness assertions precede releasing the sink.
+    const response = await Promise.race([
+      submitted,
+      delay(2000).then(() => {
+        throw new Error('response waited for sink');
+      }),
+    ]);
+    assert.equal(response.response.statusCode, 201);
+    await delay(100);
+    assert.ok(duration < performance.now() - started);
+    assert.equal(completion().length, 1);
+    assert.equal(completion()[0]!.fields.durationMs, duration);
+  } finally {
+    release.resolve();
+    await submitted;
+    await app.close();
+  }
 });

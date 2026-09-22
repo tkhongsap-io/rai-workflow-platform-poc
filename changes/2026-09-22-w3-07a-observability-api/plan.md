@@ -39,3 +39,7 @@ Direct coordination: Hypatia owns digest filter/loader/daily-producer wiring; re
 ### Confucius review correction scope
 
 Update authz/middleware.ts to bypass session lookup only for the two public health routes. Update observability/routes.ts with per-app last-status tracking. Add actual HTTP regressions in observability/http.test.ts for a cookie plus throwing session resolver (including a protected-route control), and repeated readiness statuses with recovery. Keep this fix commit separate from the in-progress submit-QC adapter.
+
+### Parfit runtime corrections
+
+Move background producer/notification registration after request-completed logging in app.ts; use Fastify's response-finish elapsedTime rather than measuring hook execution time. Add a stalled actual sink regression with response/log assertions before release. Set explicit readiness transition levels (warn for not_ready, info for ready) and test both emitted levels and visibility at a warn threshold. Run focused checks and final full verification; send the fix commit for independent re-review.

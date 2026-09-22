@@ -20,3 +20,7 @@ Health routes bypass session resolution even when the caller supplies a cookie: 
 ### Runtime assembly semantics
 
 The existing notification worker retains domain events and commits before terminal capture. Terminal mail_delivery_failed is a job classification (502 metadata), not a synchronous HTTP response; unexpected worker load/DB and producer infrastructure failures use sanitized internal_error. Persisted digest stage failures retain sla.digest.failed plus their job row and correlation. Readiness observes the same configured mail sink and QC runner; use sink.health() and runner.probe(), never the substitute health setter. main.ts startup surprises emit sanitized internal error fields without raw exception names/messages. W3-INT binds the server-local submit-QC API after the actual submission commit, with its originating correlation; this API alone does not claim the trigger is wired.
+
+### Response completion and readiness severity
+
+request.completed is registered before background delivery hooks and uses Fastify's elapsedTime frozen at response finish. Delivery stalls cannot delay that log or inflate HTTP latency. health.readiness retains transition-only emission, with warn for not_ready and info for ready so dependency failures remain visible at a warn threshold.

@@ -34,7 +34,11 @@ export function registerHealthRoutes(
       const report = await read();
       if (report.status !== lastStatus) {
         lastStatus = report.status;
-        emitter.log('health.readiness', { status: report.status, report });
+        emitter.log(
+          'health.readiness',
+          { status: report.status, report },
+          report.status === 'ready' ? 'info' : 'warn',
+        );
       }
       return reply.code(report.status === 'ready' ? 200 : 503).send(report);
     },

@@ -32,7 +32,7 @@ import type { FixtureIdentityProvider } from './identity/fixture.js';
 import { registerAuthRoutes } from './identity/routes.js';
 import { cookieNames, type SessionStore } from './identity/session.js';
 import type { IdentityAdapter } from './identity/types.js';
-import { mintCorrelationId, runWithContext, maybeContext } from './observability/context.js';
+import { mintCorrelationId, runWithContext } from './observability/context.js';
 import { createEmitter, loggerOptions, type Emitter } from './observability/log.js';
 import type { ErrorCategory } from '@rai/shared/schemas/observability';
 import { createErrorCapture, type ErrorCapture } from './observability/errors.js';
@@ -126,19 +126,6 @@ export function buildApp(deps: AppDeps): App {
   const errors = createErrorCapture(emitter);
   const requestErrors = new WeakMap<object, ErrorCategory>();
   const drain = createDrain(fastify); // first hook: every accepted request is counted (shutdown.ts)
-  if (deps.digest !== undefined)
-    registerDailyDigest(fastify, { ...deps.digest, emitter }, drain, (error) => {
-      errors.internal(error);
-    });
-  if (deps.notifications !== undefined)
-    registerNotifications(
-      fastify,
-      createNotifications({ ...deps.notifications, emitter, errors }),
-      emitter,
-      drain,
-      errors,
-    );
-
   fastify.addHook('onRequest', (request, reply, done) => {
     void reply.header('X-Correlation-Id', request.id);
     void reply.header('Cache-Control', 'no-store');
@@ -162,7 +149,6 @@ export function buildApp(deps: AppDeps): App {
       done();
       return;
     }
-    const context = maybeContext();
     const errorCode = requestErrors.get(request);
     emitter.log(
       'request.completed',
@@ -173,7 +159,7 @@ export function buildApp(deps: AppDeps): App {
         route: request.routeOptions.url ?? 'unmatched',
         status: reply.statusCode,
         ...(errorCode === undefined ? {} : { errorCode }),
-        durationMs: Math.max(0, performance.now() - (context?.startedAt ?? performance.now())),
+        durationMs: reply.elapsedTime, // Fastify freezes this at response finish, before onResponse hooks.
       },
       reply.statusCode >= 500
         ? 'error'
@@ -183,6 +169,20 @@ export function buildApp(deps: AppDeps): App {
     );
     done();
   });
+
+  // Completion logging must precede hooks that await background delivery.
+  if (deps.digest !== undefined)
+    registerDailyDigest(fastify, { ...deps.digest, emitter }, drain, (error) => {
+      errors.internal(error);
+    });
+  if (deps.notifications !== undefined)
+    registerNotifications(
+      fastify,
+      createNotifications({ ...deps.notifications, emitter, errors }),
+      emitter,
+      drain,
+      errors,
+    );
 
   fastify.setErrorHandler((error, request, reply) => {
     const correlationId = request.id as CorrelationId;

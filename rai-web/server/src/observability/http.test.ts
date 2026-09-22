@@ -18,7 +18,11 @@ import { createStoreProbes } from './probes.js';
 
 const canary = 'RAI-DESK-SYNTHETIC-FIXTURE';
 const id = '11111111-1111-4111-8111-111111111111';
-function setup(identity?: IdentityDeps, readiness?: () => Promise<ReadinessReport>) {
+function setup(
+  identity?: IdentityDeps,
+  readiness?: () => Promise<ReadinessReport>,
+  level: 'info' | 'warn' = 'info',
+) {
   let text = '';
   const logStream = new Writable({
     write(chunk: Buffer, _encoding, done) {
@@ -29,7 +33,7 @@ function setup(identity?: IdentityDeps, readiness?: () => Promise<ReadinessRepor
   const app = buildApp({
     config: {
       nodeEnv: 'test',
-      log: { level: 'info', pretty: false },
+      log: { level, pretty: false },
       trustProxy: false,
       publicBaseUrl: new URL('http://127.0.0.1:18788'),
     },
@@ -71,7 +75,12 @@ function setup(identity?: IdentityDeps, readiness?: () => Promise<ReadinessRepor
         .filter(Boolean)
         .map(
           (line) =>
-            JSON.parse(line) as { event: string; correlationId: string; fields: Record<string, unknown> },
+            JSON.parse(line) as {
+              level: number;
+              event: string;
+              correlationId: string;
+              fields: Record<string, unknown>;
+            },
         ),
   };
 }
@@ -264,6 +273,23 @@ test('readiness emits its first status and transitions, not repeated polls', asy
       events.map((line) => line.fields.status),
       ['ready', 'not_ready', 'ready'],
     );
+    assert.deepEqual(
+      events.map((line) => line.level),
+      [30, 40, 30],
+    );
+  } finally {
+    await app.fastify.close();
+  }
+});
+
+test('readiness outage remains visible at the warn log threshold', async () => {
+  const app = setup(undefined, undefined, 'warn');
+  try {
+    assert.equal((await app.fastify.inject('/readyz')).statusCode, 503);
+    const events = app.lines().filter((line) => line.event === 'health.readiness');
+    assert.equal(events.length, 1);
+    assert.equal(events[0]!.level, 40);
+    assert.equal(events[0]!.fields.status, 'not_ready');
   } finally {
     await app.fastify.close();
   }
