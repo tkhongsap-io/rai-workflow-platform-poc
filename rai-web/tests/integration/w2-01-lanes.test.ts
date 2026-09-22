@@ -1,8 +1,9 @@
-// W2-01 Done when: submit opens exactly three lanes (D02 slots via CURRENT_LANE_MAPPING / slotsForLane) and three
-// lane_open notification rows in the same transaction as the freeze; an injected failure on the third lane rolls
-// the whole submit back (draft unsubmitted, zero lane.opened, zero notification); risk_tier = high still opens all
-// three (no routing); Idempotency-Key replay returns the original 201 and writes no second set. Fixture set
-// slice1-synthetic@1; identities from W0-03 section 7.
+// W2-01 Done when: submit opens exactly three lanes (D02 slots via the version's recorded lane_mapping_version /
+// LANE_MAPPINGS_BY_VERSION / slotsForLane) and lane_open notification rows for every fixture identity that holds
+// the lane (including the dual-role DPO) in the same transaction as the freeze; an injected failure after the first
+// notification insert rolls the whole submit back (draft unsubmitted, zero lane.opened, zero notification);
+// risk_tier = high still opens all three (no routing); Idempotency-Key replay returns the original 201 and writes
+// no second set. Fixture set slice1-synthetic@1; identities from W0-03 section 7.
 
 import { after, before, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,7 +14,13 @@ import path from 'node:path';
 import { Writable } from 'node:stream';
 import { sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
-import { CURRENT_LANE_MAPPING, LANES, slotsForLane, type Lane } from '@rai/shared/constants';
+import {
+  CURRENT_LANE_MAPPING,
+  LANES,
+  LANE_MAPPINGS_BY_VERSION,
+  slotsForLane,
+  type Lane,
+} from '@rai/shared/constants';
 import type { SubmitRequest, SubmittedVersion } from '@rai/shared/schemas/versions';
 import type { PackDraft } from '@rai/shared/schemas/pack';
 import { buildApp } from '@rai/server/app';
@@ -26,10 +33,7 @@ import { UPLOAD_LIMIT_DEFAULTS } from '@rai/server/config';
 import { createIdentityAdapter } from '@rai/server/identity/adapter';
 import { createFixtureIdentityProvider } from '@rai/server/identity/fixture';
 import { createPgSessionStore } from '@rai/server/identity/session';
-import {
-  LANE_OPEN_RECIPIENTS,
-  laneOpenDeepLinkPath,
-} from '@rai/server/versions/open-lanes';
+import { laneOpenDeepLinkPath, laneOpenRecipientsFromIdentities } from '@rai/server/versions/open-lanes';
 import { FIXTURE_USERS, findFixtureUser } from '@rai/fixtures/data/users';
 import { findFixtureCase } from '@rai/fixtures/data/cases/index';
 import { loadFixtures } from '@rai/fixtures/load';
@@ -44,6 +48,9 @@ const LIMITS = {
   maxPackBytes: UPLOAD_LIMIT_DEFAULTS.UPLOAD_MAX_PACK_BYTES,
   maxImagePixels: UPLOAD_LIMIT_DEFAULTS.UPLOAD_MAX_IMAGE_PIXELS,
 };
+const LANE_OPEN_RECIPIENTS = laneOpenRecipientsFromIdentities(FIXTURE_USERS);
+/** One AI/COE + two DPO (single-role and dual-role) + one IT/Security. */
+const EXPECTED_NOTIFICATION_COUNT = LANES.reduce((n, lane) => n + LANE_OPEN_RECIPIENTS[lane].length, 0);
 
 const OWNER_A = 'fx-user-owner-cm';
 const NONVENDOR = findFixtureCase('fx-case-nonvendor')!;
@@ -56,8 +63,8 @@ let blobDir: string;
 let outputDir: string;
 let clock = Date.parse('2026-09-22T03:00:00Z');
 const now = () => new Date(clock);
-/** Test-only: when set, the next submit throws inside the transaction before the third lane.opened. */
-let failBeforeThirdLaneOpen: (() => void) | undefined;
+/** Test-only: when set, the next submit throws after the first lane_open notification insert. */
+let failAfterFirstLaneOpenNotification: (() => void) | undefined;
 
 async function rebuildApp(): Promise<void> {
   if (app !== undefined) await app.close();
@@ -98,7 +105,8 @@ async function rebuildApp(): Promise<void> {
     versions: {
       db: db.app,
       now,
-      ...(failBeforeThirdLaneOpen === undefined ? {} : { failBeforeThirdLaneOpen }),
+      laneOpenRecipients: LANE_OPEN_RECIPIENTS,
+      ...(failAfterFirstLaneOpenNotification === undefined ? {} : { failAfterFirstLaneOpenNotification }),
     },
   });
   app = built.fastify;
@@ -115,7 +123,7 @@ before(async () => {
 });
 beforeEach(async () => {
   clock = Date.parse('2026-09-22T03:00:00Z');
-  failBeforeThirdLaneOpen = undefined;
+  failAfterFirstLaneOpenNotification = undefined;
   await db.reset();
   await db.owner.execute(sql.raw('TRUNCATE TABLE "session", "registry_counter"'));
   await rm(path.join(blobDir, 'sha256'), { recursive: true, force: true });
@@ -184,7 +192,7 @@ async function notificationsFor(caseId: string) {
   const r = await db.owner.execute(
     sql`SELECT event, version_id, case_id, lane, recipient, deep_link_path, template_key, template_params,
                status, attempts, correlation_id
-        FROM notification WHERE case_id = ${caseId} ORDER BY lane`,
+        FROM notification WHERE case_id = ${caseId} ORDER BY lane, recipient`,
   );
   return r.rows as Array<{
     event: string;
@@ -206,9 +214,15 @@ async function caseRow(caseId: string) {
 }
 
 describe(`W2-01 submit opens three lanes atomically — ${SET}, fx-case-nonvendor`, () => {
-  it('writes exactly three lane.opened audits (ai_coe, dpo, it_security) with slotsForLane and three lane_open notifications to the single-role recipients', async () => {
+  it('writes three lane.opened audits and lane_open notifications for every fixture holder of each lane (two DPO)', async () => {
+    assert.equal(EXPECTED_NOTIFICATION_COUNT, 4);
+    assert.equal(LANE_OPEN_RECIPIENTS.dpo.length, 2);
+    assert.equal(LANE_OPEN_RECIPIENTS.ai_coe.length, 1);
+    assert.equal(LANE_OPEN_RECIPIENTS.it_security.length, 1);
+
     const owner = await signIn(OWNER_A);
     const { version, key, res } = await submitOk(owner, NONVENDOR.caseId);
+    const mapping = LANE_MAPPINGS_BY_VERSION[version.laneMappingVersion] ?? CURRENT_LANE_MAPPING;
     const opened = await audit('lane.opened');
     assert.equal(opened.length, 3);
     assert.deepEqual(
@@ -226,36 +240,35 @@ describe(`W2-01 submit opens three lanes atomically — ${SET}, fx-case-nonvendo
         idempotency_key: string;
         lane_mapping_version: string;
       };
-      assert.deepEqual(ref.slots, slotsForLane(ref.lane, CURRENT_LANE_MAPPING));
+      assert.deepEqual(ref.slots, slotsForLane(ref.lane, mapping));
       assert.equal(ref.idempotency_key, key);
-      assert.equal(ref.lane_mapping_version, CURRENT_LANE_MAPPING.version);
+      assert.equal(ref.lane_mapping_version, version.laneMappingVersion);
     }
     const submitted = await audit('version.submitted');
     assert.equal(submitted.length, 1);
     assert.ok(submitted[0]!.seq < opened[0]!.seq, 'version.submitted precedes lane.opened');
 
     const rows = await notificationsFor(NONVENDOR.caseId);
-    assert.equal(rows.length, 3);
-    assert.deepEqual(
-      rows.map((r) => r.lane),
-      [...LANES].sort(), // SQL ORDER BY lane
-    );
+    assert.equal(rows.length, EXPECTED_NOTIFICATION_COUNT);
     for (const lane of LANES) {
-      const row = rows.find((r) => r.lane === lane)!;
-      assert.equal(row.event, 'lane_open');
-      assert.equal(row.recipient, LANE_OPEN_RECIPIENTS[lane]);
-      assert.equal(row.status, 'queued');
-      assert.equal(row.attempts, 0);
-      assert.equal(row.template_key, 'mail.lane_opened');
-      assert.equal(row.version_id, version.versionId);
-      assert.equal(row.deep_link_path, laneOpenDeepLinkPath(NONVENDOR.caseId, version.versionId));
-      assert.deepEqual(row.template_params, { lane, version_id: version.versionId });
-      assert.equal(row.correlation_id, res.headers['x-correlation-id']);
+      const laneRows = rows.filter((r) => r.lane === lane);
+      assert.deepEqual(laneRows.map((r) => r.recipient).sort(), [...LANE_OPEN_RECIPIENTS[lane]].sort());
+      for (const row of laneRows) {
+        assert.equal(row.event, 'lane_open');
+        assert.equal(row.status, 'queued');
+        assert.equal(row.attempts, 0);
+        assert.equal(row.template_key, 'mail.lane_opened');
+        assert.equal(row.version_id, version.versionId);
+        assert.equal(row.deep_link_path, laneOpenDeepLinkPath(NONVENDOR.caseId, version.versionId));
+        assert.deepEqual(row.template_params, { lane, version_id: version.versionId });
+        assert.equal(row.correlation_id, res.headers['x-correlation-id']);
+      }
     }
-    // Dual-role, owners, SPOC and admin are never recipients of these three rows.
+    // Dual-role DPO is included; owners, SPOC-only and admin are not.
+    assert.ok(rows.some((r) => r.recipient === findFixtureUser('fx-user-dpo-spoc-hr')!.email));
     assert.equal(
       rows.filter((r) =>
-        ['dpo.spoc.hr@rai-desk.example', 'owner.cm@rai-desk.example', 'spoc.cm@rai-desk.example', 'admin@rai-desk.example'].includes(
+        ['owner.cm@rai-desk.example', 'spoc.cm@rai-desk.example', 'admin@rai-desk.example'].includes(
           r.recipient,
         ),
       ).length,
@@ -263,9 +276,9 @@ describe(`W2-01 submit opens three lanes atomically — ${SET}, fx-case-nonvendo
     );
   });
 
-  it('injected failure on the third lane rolls back the submit: draft stays open, zero lane.opened, zero notification', async () => {
-    failBeforeThirdLaneOpen = () => {
-      throw new Error('w2-01 injected failure before third lane.opened');
+  it('injected failure after the first notification insert rolls back the submit: draft stays open, zero rows', async () => {
+    failAfterFirstLaneOpenNotification = () => {
+      throw new Error('w2-01 injected failure after first lane_open notification');
     };
     await rebuildApp();
     const owner = await signIn(OWNER_A);
@@ -303,7 +316,7 @@ describe(`W2-01 submit opens three lanes atomically — ${SET}, fx-case-nonvendo
       opened.map((e) => (e.targetRef as { lane: Lane }).lane),
       [...LANES],
     );
-    assert.equal((await notificationsFor(NONVENDOR.caseId)).length, 3);
+    assert.equal((await notificationsFor(NONVENDOR.caseId)).length, EXPECTED_NOTIFICATION_COUNT);
     assert.equal((await caseRow(NONVENDOR.caseId)).risk_tier, 'high');
   });
 
@@ -311,13 +324,13 @@ describe(`W2-01 submit opens three lanes atomically — ${SET}, fx-case-nonvendo
     const owner = await signIn(OWNER_A);
     const { body, key, res } = await submitOk(owner, NONVENDOR.caseId);
     assert.equal((await audit('lane.opened')).length, 3);
-    assert.equal((await notificationsFor(NONVENDOR.caseId)).length, 3);
+    assert.equal((await notificationsFor(NONVENDOR.caseId)).length, EXPECTED_NOTIFICATION_COUNT);
     clock += 5_000;
     const replay = await submit(owner, NONVENDOR.caseId, body, key);
     assert.equal(replay.statusCode, 201, replay.body);
     assert.equal(replay.body, res.body);
     assert.equal((await audit('lane.opened')).length, 3);
     assert.equal((await audit('version.submitted')).length, 1);
-    assert.equal((await notificationsFor(NONVENDOR.caseId)).length, 3);
+    assert.equal((await notificationsFor(NONVENDOR.caseId)).length, EXPECTED_NOTIFICATION_COUNT);
   });
 });

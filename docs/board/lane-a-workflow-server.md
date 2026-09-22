@@ -47,3 +47,10 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: W2-02a/W2-02 (decisions) — not this session.
 - Author: operator=ta session=w2-01 model=grok-4.7
 - Evidence: branch codex/w2-01-open-lanes (commit pending land)
+
+## 2026-09-22 11:15 — W2-01 review fixes (recipients from fixture lane holders)
+- What: Lane-open notices go to every fixture identity that holds the lane (including dual-role DPO); failure injection after the first notification insert; notification immutability tests; mail.lane_opened locale keys; slots from the recorded lane_mapping_version.
+- Why: Independent review — addresses must come from identity data, and a failed open must leave no notice behind.
+- Next: W2-02a/W2-02 (decisions) — not this session.
+- Author: operator=ta session=w2-01 model=grok-4.7
+- Evidence: https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/90

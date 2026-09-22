@@ -12,9 +12,10 @@
 //                     version = CURRENT_LANE_MAPPING.version with its content, manifest_hash, submit_correlation_id),
 //                     close the draft on the case (current_version_id, draft_version_id NULL, desk_status in_review,
 //                     three lane projections pending, row_version + 1), audit `version.submitted` then
-//                     `lane.opened` × 3 and three `lane_open` notification rows (W2-01 (d)+(f); no SLA columns),
-//                     store the key with the 201 body, commit. A failure while opening any lane rolls everything
-//                     back. Pack QC after commit (W0-07 3.4) is not bound in slice 1; the response never waits.
+//                     `lane.opened` × 3 and lane_open notification rows for each fixture holder of each lane
+//                     (W2-01 (d)+(f); no SLA columns), store the key with the 201 body, commit. A failure while
+//                     opening any lane rolls everything back. Pack QC after commit (W0-07 3.4) is not bound in
+//                     slice 1; the response never waits.
 
 import { createHash } from 'node:crypto';
 import { CURRENT_LANE_MAPPING } from '@rai/shared/constants';
@@ -44,7 +45,7 @@ import {
   type RevisionInForce,
 } from './freeze.js';
 import { manifestHash } from './manifest.js';
-import { openLanesOnSubmit } from './open-lanes.js';
+import { openLanesOnSubmit, EMPTY_LANE_OPEN_RECIPIENTS, type LaneOpenRecipients } from './open-lanes.js';
 import {
   closeDraftOnCase,
   freezeDraft,
@@ -57,8 +58,13 @@ import { withWorkflowTransaction, type WorkflowResult } from './transaction.js';
 export interface VersionServiceDeps {
   db: Db;
   now?: () => Date;
-  /** Test-only failure injection (W2-01): throws inside the submit transaction before the third lane.opened. */
-  failBeforeThirdLaneOpen?: () => void;
+  /** Slice-1: fixture reviewers who hold each lane (from identity data). Empty until W8 AD resolution otherwise. */
+  laneOpenRecipients?: LaneOpenRecipients;
+  /**
+   * Test-only failure injection (W2-01): throws after the first lane_open notification insert inside the
+   * submit transaction. Ignored unless NODE_ENV is `test`; unset in production wiring.
+   */
+  failAfterFirstLaneOpenNotification?: () => void;
 }
 
 /** Who acts, as which role (the policy row that allowed), under which correlation id (W0-10). */
@@ -227,18 +233,23 @@ export async function submitDraft(
           afterRef: caseRef(after),
           occurredAt: now,
         });
-        // W2-01 (d)+(f): three lane.opened audits then three lane_open notification rows; same correlation id.
+        // W2-01 (d)+(f): three lane.opened audits then lane_open notification rows; same correlation id.
+        if (version.laneMappingVersion === null) {
+          throw new Error('submit freeze left lane_mapping_version null');
+        }
         await openLanesOnSubmit({
           tx,
           audit,
           caseId: before.id,
           versionId: version.id,
+          laneMappingVersion: version.laneMappingVersion,
           correlationId: ctx.correlationId,
           idempotencyKeyRef: idempotencyKeyReference,
           occurredAt: now,
-          ...(deps.failBeforeThirdLaneOpen === undefined
+          recipients: deps.laneOpenRecipients ?? EMPTY_LANE_OPEN_RECIPIENTS,
+          ...(deps.failAfterFirstLaneOpenNotification === undefined
             ? {}
-            : { failBeforeThirdLaneOpen: deps.failBeforeThirdLaneOpen }),
+            : { failAfterFirstLaneOpenNotification: deps.failAfterFirstLaneOpenNotification }),
         });
         return { status: 201, body };
       },

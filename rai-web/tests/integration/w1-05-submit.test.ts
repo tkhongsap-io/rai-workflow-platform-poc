@@ -47,6 +47,7 @@ import { createIdentityAdapter } from '@rai/server/identity/adapter';
 import { createFixtureIdentityProvider } from '@rai/server/identity/fixture';
 import { createPgSessionStore } from '@rai/server/identity/session';
 import { manifestHash } from '@rai/server/versions/manifest';
+import { laneOpenRecipientsFromIdentities } from '@rai/server/versions/open-lanes';
 import { AuditEventMissing, withWorkflowTransaction } from '@rai/server/versions/transaction';
 import { FIXTURE_CASES, findFixtureCase } from '@rai/fixtures/data/cases/index';
 import { FIXTURE_USERS, findFixtureUser } from '@rai/fixtures/data/users';
@@ -130,7 +131,7 @@ before(async () => {
     },
     artifacts: { store, db: db.app, limits: LIMITS },
     pack: { db: db.app, limits: { maxPackBytes: LIMITS.maxPackBytes }, now },
-    versions: { db: db.app, now },
+    versions: { db: db.app, now, laneOpenRecipients: laneOpenRecipientsFromIdentities(FIXTURE_USERS) },
   });
   app = built.fastify;
   const original = built.emitter.log.bind(built.emitter);
