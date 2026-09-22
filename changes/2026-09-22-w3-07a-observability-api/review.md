@@ -1,8 +1,8 @@
 # Review and evidence
 
-Current review candidate includes actual main 848f89e, reviewed retry preparation d96ba24 plus isolated browser harness fix fecffd4 (local e6868f5), and reviewed digest binding 9e17851. Actual retry and producer fault paths are now tested; the chronological checkpoint notes below retain their original evidence boundaries. Pending publication merges are not represented as merged acceptance.
+Current assembly includes actual main e37fb4f (core121, retry120, locale118 and digest122). The complete rai-web tree is identical to independently reviewed c98ad3e, including both Parfit fixes. Historical checkpoints below retain their original evidence boundaries; the final assembly record supersedes their pending-dependency statements.
 
-Submit-QC API is available at 1bf72b8; W3-INT owns after-commit binding and restart acceptance. Issue 35 owning-lane decisions remain unresolved. Combined verify:full is running against this assembled tree; independent review remains required before a PR. No push or PR is authorized here.
+Submit-QC API remains server-local: W3-INT owns the after-commit binding, guarded test-only runner injection and restart acceptance. Issue 35 owning-lane decisions remain unresolved. Parent approval of the actual runtime-only size and publication remains required; no PR or push by this worker.
 
 ## Independent module checkpoint — 2026-09-22
 
@@ -81,3 +81,16 @@ Publication split recorded by parent: core PR121 at 4a08ea2 selects 20391e5+4a8f
 ### Parfit two-P2 correction checkpoint
 
 Completion logging now precedes notification dispatch and uses Fastify's response-finish elapsedTime, rather than hook execution time. A real PostgreSQL/MemoryMailSink regression holds delivery open and proves one completion log plus the 201 response before releasing the sink, with unchanged recorded latency. Readiness transitions explicitly log not_ready at warn and ready at info; tests assert transition levels and visibility under a warn threshold. Focused HTTP/runtime tests: 11 passed; notification database suite: 22 passed. Typecheck and targeted ESLint/Prettier passed. Final full verification and independent re-review remain pending for this correction; the prior full proof applies to 5383047 only.
+
+
+### Actual-main runtime-only assembly — 2026-09-23
+
+Merged actual main e37fb4f into the isolated API branch. Kept main's final retry/digest/locale records and lane-B stream; retained both core-publication and runtime records. Resolved squashed-history conflicts to preserve the reviewed runtime exactly. No edits to published prerequisite worktrees.
+
+Both c98ad3e and the assembled rai-web tree hash to 2ab4a42327587a8296f7452d077af7ab44279a8b. Therefore the c98ad3e full proof (528 unit / 256 integration / 126 real browser / 123 substitute, zero skips) and clean Parfit re-review cover identical application/test files; this is tree-equivalence evidence, not a claim that a new full command ran after the merge. Focused assembly checks are recorded below after completion.
+
+Runtime-only scope versus e37fb4f: 14 runtime files, 11 test/support files and five documentation files; no migrations, shared schemas, locale messages, manifest/lock changes, copied core probe/operator modules, digest producer or retry policy implementation. The only later core-module changes are six lines in errors.ts (dedicated internal/notFound entry points) and one in log.ts (remove host/pid base metadata), already reviewed as runtime scope. Notifications retain the reviewed existing dispatcher/producer and only receive safe capture; startup shares their configured instances.
+
+Size assessment: 547 changed runtime lines (468 added / 79 removed), 939 test/support lines (906 / 33), plus the exact documentation count reported at handoff. This exceeds the working rule after the core split. Recommend a bounded runtime exception for this reviewed activation/correlation slice: its route, existing-worker capture, QC persistence diagnostics and negative regression evidence are coupled. No exception is assumed; parent decides scope approval and publication from the final diff. No new product decision or owning-lane assignment is made.
+
+Focused checks on the actual-main assembly passed: 32 unit tests (observability, startup and worker lifecycle) and 63 PostgreSQL/integration tests (QC, actual notifications/retries, actual digest faults and operator projections), zero failures/skips. Full lint and typecheck passed. Evidence: /tmp/rai-w3-api-main-focused-unit.log and /tmp/rai-w3-api-main-focused-db.log. Repository links and frozen-source checks passed; final diff has no unresolved merge markers or whitespace errors. Application tree remains identical to c98ad3e after these checks.

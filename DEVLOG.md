@@ -1,5 +1,13 @@
 # Development log
 
+## W3-03b: daily SLA digest — 2026-09-22
+
+The local daily producer freezes its Bangkok day, persists job provenance and queues each configured recipient once per day. Empty results send no mail. The existing retry worker delivers the digest, with recovery retaining original provenance. Core and binding reviews are clean; integrated operator/journey evidence remains pending.
+
+## W3-04: bounded notification retries — 2026-09-22
+
+One notification dispatcher records up to four committed attempts with persisted backoff, preserves committed workflow decisions and drains safely. Independent review is clean after a full-run discovery led to isolated file-sink browser databases. Admin visibility and the integrated journey remain W3-07/W3-INT gates.
+
 ## W3-03a: committed case notifications — 2026-09-22
 
 Lane-open, send-back and Ready messages are composed from committed outbox/audit records with scoped synthetic recipients, protected version links and bilingual templates. Thai dates use Gregorian years. Initial delivery cannot undo a committed decision; background shutdown is bounded and retains active transaction locks until settlement or process exit. Independent review is clean after both fixes. Digest, retries and operator visibility remain separate tickets.
@@ -184,8 +192,6 @@ W2-07/W2-09 wired to the real server: promoted evidence browser specs, the autom
 
 Isolated branch from 5fe59ad; shared observability schemas and additive migration 0007 only. [Plan](changes/2026-09-22-w3-07a-observability-contract/plan.md) and [contract](changes/2026-09-22-w3-07a-observability-contract/spec.md). No consumer implementation or OBS acceptance claimed; parent reviews before any publication.
 
-## W3-07a API checkpoint — 2026-09-22
+## W3-07a runtime-only assembly — 2026-09-23
 
-Independent observability modules and app wiring now support readiness/operator reads, safe HTTP capture and correlated lane-QC diagnostics, including durable late-result refusal without new evidence or audit. Local full verification passed 484 unit / 211 integration / 123 real-server browser / 90 substitute browser tests. This is not issue48 completion: separate operator-policy prerequisite PR117, actual-main dependency integration, startup readiness handles, actual notification/retry/digest acceptance, whole-suite noPII proof and W3-INT synthetic submit triggering remain explicit gates. No owning lane or real QC is invented. See changes/2026-09-22-w3-07a-observability-api/review.md. No consumer push or PR.
-
-W3-07a runtime review candidate 5383047: existing-worker terminal/internal capture, configured-instance readiness, server-local submit-QC API and actual digest fault/operator correlation verified. Combined local full passed 527 unit / 255 integration / 126 real browser / 123 substitute browser (DB54368). Parent owns split core PR121; runtime independent review and actual merged-dependency/publication gates remain open. See changes/2026-09-22-w3-07a-observability-api/review.md for scope and remaining acceptance; no W3-INT trigger or real QC completion claim.
+Assembled against actual main e37fb4f; complete rai-web tree equals reviewed c98ad3e (528 unit / 256 integration / 126 real browser / 123 substitute, zero skips). Runtime-only diff excludes merged prerequisite implementations; parent assesses its bounded size before publication. No PR/push from this worker, no new runner or owning lane. W3-INT owns trigger binding; see changes/2026-09-22-w3-07a-observability-api/review.md for focused checks and remaining acceptance boundaries.

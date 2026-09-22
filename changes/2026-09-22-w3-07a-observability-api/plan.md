@@ -43,3 +43,7 @@ Update authz/middleware.ts to bypass session lookup only for the two public heal
 ### Parfit runtime corrections
 
 Move background producer/notification registration after request-completed logging in app.ts; use Fastify's response-finish elapsedTime rather than measuring hook execution time. Add a stalled actual sink regression with response/log assertions before release. Set explicit readiness transition levels (warn for not_ready, info for ready) and test both emitted levels and visibility at a warn threshold. Run focused checks and final full verification; send the fix commit for independent re-review.
+
+## Publication split
+
+The lead separates the independent observability modules from HTTP/QC/notification runtime activation. This first PR contains only the original planned health predicate, store probes, safe error projection, operator query and their tests. No route or worker is activated. The roughly 930-line bounded exception includes the recorded plan and 317 test lines; the related predicate/projection rules stay together. The later runtime PR has its own review and size assessment.

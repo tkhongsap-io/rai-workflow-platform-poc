@@ -2,6 +2,10 @@
 
 ## 2026-09-22
 
+- W3-03b: Local daily SLA digests with persisted job provenance, configured-recipient deduplication and partial-failure recovery through the existing retry worker.
+
+- W3-04: Persisted notification retry deadlines, four-attempt terminal failure and concurrent-worker exclusion. File-sink browser verification now isolates its outbox from the suite worker.
+
 - W3-03a: Committed-event lane-open, send-back and Ready notifications through the local mail sink; bilingual content, Gregorian Thai dates, protected links and bounded background shutdown. Daily digest, retries and the operator view remain later W3 tickets.
 
 - W3-02: Bilingual queue cards, URL filters/pagination, version and lane due dates, keyboard access and loading/error recovery. Both Reset paths clear draft filters. Real-server integrated acceptance remains W3-INT.
@@ -91,8 +95,6 @@ No application or operational capability is implemented.
 
 Added shared observability shapes and additive persistence for digest provenance/dedup, truthful QC unavailable reasons and durable late-QC refusals. Reconciled HTTP/job error capture and synthetic integration gates. Runtime consumers remain separate work.
 
-### W3-07a local API checkpoint — 2026-09-22
+## 2026-09-23 — W3-07a runtime candidate
 
-- Added health/operator assembly, typed safe HTTP diagnostics and correlated lane-QC refusal visibility on the isolated consumer branch. Full local suite passed; startup and notification integration remain pending. The Admin-only operator policy is a separately reviewed prerequisite, not a consumer scope change.
-
-W3-07a local runtime candidate adds safe capture to the existing notification dispatcher and configured readiness probes, exposes the correlated submit-QC persistence API for W3-INT, and verifies persisted digest faults in the operator read model. Local combined verification passed; independent runtime review and publication remain gated. No second worker or invented QC owning lane.
+Added health/operator routes, safe HTTP/job capture and correlated QC diagnostics through the existing runtime. Actual-main assembly preserves the independently reviewed and fully tested c98ad3e application tree. W3-INT submit binding and remaining acceptance boundaries stay explicit; parent scope approval and publication are pending.
