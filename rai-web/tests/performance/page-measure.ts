@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { checkControls, type Controls } from './server-contract.js';
 import { chromium, expect } from '@playwright/test';
 import { baseline, guardPlan, routePath, type Plan } from './profiles.js';
 
@@ -19,8 +20,10 @@ export interface PagePlan extends Plan {
     absent: string[];
   }[];
 }
-export async function measurePages(plan: PagePlan) {
+export async function measurePages(plan: PagePlan, controls: { queue: Controls; mutation: Controls }) {
   guardPlan(plan);
+  checkControls(plan.queue, controls.queue);
+  checkControls(plan.mutation, controls.mutation);
   assert.deepEqual(plan.pages.map((p) => p.kind).sort(), Object.keys(SCREENS).sort());
   const browser = await chromium.launch();
   try {
@@ -30,6 +33,7 @@ export async function measurePages(plan: PagePlan) {
       const path = routePath(screen.path, selection.ids);
       const target = selection.kind === 'queue' ? 'queue' : 'mutation';
       const origin = plan[target].baseUrl;
+      await controls[target].settled();
       const context = await browser.newContext({
         baseURL: origin,
         viewport: { width: 1440, height: 900 },
@@ -73,6 +77,7 @@ export async function measurePages(plan: PagePlan) {
             );
             return { wallMs: performance.now() - started };
           },
+          () => controls[target].settled(),
         );
       } finally {
         await context.close();

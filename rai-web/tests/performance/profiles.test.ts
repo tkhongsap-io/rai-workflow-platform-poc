@@ -84,3 +84,37 @@ test('journal retains failures and refuses successful-only summary without netwo
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('post-response settlement failure retains HTTP wall and correlation, never a passing summary', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'rai-perf-after-'));
+  try {
+    const local = { ...plan, outputPrefix: path.join(dir, 'evidence') };
+    await assert.rejects(
+      baseline(
+        local,
+        'settle',
+        true,
+        'mutation',
+        undefined,
+        201,
+        1000,
+        () => () => ({ wallMs: 7, correlationId: 'synthetic-correlation' }),
+        (_sample, index) =>
+          index === 1 ? Promise.reject(new Error('settlement failed')) : Promise.resolve(),
+      ),
+      /failed samples retained/,
+    );
+    const rows = (await readFile(`${local.outputPrefix}-settle.jsonl`, 'utf8'))
+      .trim()
+      .split('\n')
+      .map(
+        (s) => JSON.parse(s) as { index?: number; wallMs?: number; correlationId?: string; error?: string },
+      );
+    const failed = rows.find((r) => r.index === 1)!;
+    assert.equal(failed.wallMs, 7);
+    assert.equal(failed.correlationId, 'synthetic-correlation');
+    assert.equal(failed.error, 'settlement failed');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

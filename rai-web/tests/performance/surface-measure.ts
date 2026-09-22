@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { checkControls, type Controls } from './server-contract.js';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { buildPdf } from '@rai/fixtures/generate/pdf';
@@ -64,8 +65,12 @@ export function exactPdf(seed: string): Uint8Array {
   assert.equal(result.length, BYTES);
   return result;
 }
-export async function measureSurfaces(plan: SurfacePlan) {
+export async function measureSurfaces(plan: SurfacePlan, controls: { queue: Controls; mutation: Controls }) {
   guardPlan(plan);
+  checkControls(plan.queue, controls.queue);
+  checkControls(plan.mutation, controls.mutation);
+  await controls.queue.settled();
+  await controls.mutation.settled();
   assert(plan.reads.length && new Set(plan.reads.map((s) => s.name)).size === plan.reads.length);
   assert.equal(plan.submissions.length, 45);
   assert.equal(new Set(plan.submissions.map((s) => s.caseId)).size, 45);
@@ -124,6 +129,12 @@ export async function measureSurfaces(plan: SurfacePlan) {
           assert(version.submittedAt);
         });
     },
+    (sample, index) =>
+      controls.mutation.submit({
+        caseId: plan.submissions[index + 5]!.caseId,
+        versionId: plan.submissions[index + 5]!.versionId,
+        correlationId: sample.correlationId!,
+      }),
   );
   const artifacts: { id: string; hash: string }[] = [];
   const runId = randomUUID();

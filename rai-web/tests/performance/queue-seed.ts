@@ -1,3 +1,4 @@
+import { checkControls, type Controls } from './server-contract.js';
 import { Value } from 'typebox/value';
 import { SendBackLaneRequestSchema } from '@rai/shared/schemas/review';
 import assert from 'node:assert/strict';
@@ -26,31 +27,12 @@ import {
   type RunConfig,
 } from './core.js';
 
-export const ACTORS = [
-  'fx-user-owner-cm',
-  'fx-user-owner-cm-2',
-  'fx-user-spoc-cm',
-  'fx-user-dpo',
-  'fx-user-admin',
-] as const;
-export function recipe(index: number) {
-  assert(Number.isInteger(index) && index >= 0 && index < 995);
-  const rank = (index * 37) % 995;
-  const status =
-    rank < 195 ? 'draft' : rank < 695 ? 'in_review' : rank < 845 ? 'sent_back' : 'ready_for_launch';
-  return {
-    rank,
-    sourceRecordId: { kind: 'known' as const, value: `TPM-SYNTHETIC-PERF-${rank}` },
-    status,
-    resubmit: rank >= 195 && rank < 245,
-    owner: ACTORS[rank % 2]!,
-    bu: rank % 3 === 0 ? 'HR' : 'CM',
-    name: `SYNTHETIC-PERF-${rank} ทดสอบ ${rank % 2 ? 'cafe\u0301' : 'café'}${rank % 10 === 0 ? ' %_!\\' : ''}`,
-  };
-}
+export { recipe } from './seed-recipe.js';
+import { ACTORS, recipe } from './seed-recipe.js';
 /** No DB helper calls. Prerequisite: parent starts the built server on a dedicated, loaded fixture DB. */
-export async function seed(config: RunConfig, manifestPath: string): Promise<Manifest> {
+export async function seed(config: RunConfig, manifestPath: string, controls: Controls): Promise<Manifest> {
   guard(config);
+  checkControls(config, controls);
   // Reserve output before mutation; a partial run leaves a visible marker and is never resumed silently.
   await writeFile(manifestPath, 'INCOMPLETE: seeding not finished\n', { flag: 'wx', mode: 0o600 });
   const sessions = new Map<string, Api>();
@@ -86,6 +68,7 @@ export async function seed(config: RunConfig, manifestPath: string): Promise<Man
     };
     const created = await owner.json<CaseView>('/api/cases', 'POST', body);
     const root = `/api/cases/${created.caseId}`;
+    await controls.enroll(i, created.caseId);
     planned.set(created.caseId, plan);
     if (plan.status === 'draft') continue;
     async function submit(): Promise<SubmittedVersion> {
@@ -99,9 +82,18 @@ export async function seed(config: RunConfig, manifestPath: string): Promise<Man
       };
       assert(Value.Check(PackDraftUpdateRequestSchema, patch));
       const saved = await owner.json<PackDraft>(`${root}/draft`, 'PUT', patch);
-      return owner.json(`${root}/draft/submit`, 'POST', {
+      const response = await owner.raw(`${root}/draft/submit`, 'POST', {
         expectedVersion: { versionId: saved.draftId, revision: saved.draftRevision },
       });
+      assert.equal(response.status, 201);
+      assert(response.correlationId);
+      const committed = JSON.parse(response.text) as SubmittedVersion;
+      await controls.submit({
+        caseId: created.caseId,
+        versionId: committed.versionId,
+        correlationId: response.correlationId,
+      });
+      return committed;
     }
     let version = await submit();
     if (plan.status === 'sent_back' || plan.resubmit) {
@@ -134,12 +126,17 @@ export async function seed(config: RunConfig, manifestPath: string): Promise<Man
           qc.status === 'completed' && qc.runId && qc.findings.length === 0,
           'unexpected QC; never bypass findings',
         );
-        const approval: ApproveLaneRequest = { expectedVersion, qcRunId: qc.runId };
+        const refreshed = await owner.json<CaseView>(root);
+        const approval: ApproveLaneRequest = {
+          expectedVersion: { versionId: version.versionId, revision: refreshed.caseRevision },
+          qcRunId: qc.runId,
+        };
         const result = await actor.json<LaneDecisionResponse>(`${endpoint}/approve`, 'POST', approval);
         if (lane === 'it_security') assert.equal(result.ready, true);
       }
     }
   }
+  await controls.settled();
   const rows: QueueResponse['items'] = [];
   for (let page = 1; page <= 10; page++) {
     const response = await admin.json<unknown>(queuePath({ page, pageSize: 100 }));

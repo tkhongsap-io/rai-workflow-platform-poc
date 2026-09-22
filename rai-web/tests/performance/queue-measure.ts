@@ -1,3 +1,4 @@
+import { checkControls, type Controls } from './server-contract.js';
 import { Value } from 'typebox/value';
 import { QueueQuerySchema } from '@rai/shared/schemas/queue';
 import assert from 'node:assert/strict';
@@ -26,9 +27,12 @@ export async function measure(
   manifest: Manifest,
   selections: Selection[],
   output: string,
-  readServerLog?: () => Promise<string>,
+  readServerLog: (() => Promise<string>) | undefined,
+  controls: Controls,
 ) {
   guard(config);
+  checkControls(config, controls);
+  await controls.settled();
   validateManifest(manifest, config.finalHead);
   assert(selections.length > 0);
   for (const s of selections) {

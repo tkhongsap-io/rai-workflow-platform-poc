@@ -154,6 +154,7 @@ export async function baseline(
   status: number,
   budgetMs: number,
   prepare: (index: number) => (() => Sample | Promise<Sample>) | Promise<() => Sample | Promise<Sample>>,
+  after?: (sample: Sample, index: number) => Promise<void>,
 ) {
   guardPlan(plan);
   assert(/^[a-z0-9_-]+$/.test(name));
@@ -187,10 +188,11 @@ export async function baseline(
       sample = await action();
       assert(Number.isFinite(sample.wallMs) && sample.wallMs >= 0);
       if (route) assert(sample.correlationId, 'missing correlation');
+      if (!sample.error) await after?.(sample, index);
     } catch (error) {
       sample = {
         ...sample,
-        wallMs: started === undefined ? 0 : performance.now() - started,
+        wallMs: sample.wallMs > 0 ? sample.wallMs : started === undefined ? 0 : performance.now() - started,
         error: error instanceof Error ? error.message : 'measurement failed',
       };
     }
