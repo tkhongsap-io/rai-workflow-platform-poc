@@ -80,3 +80,7 @@ The lead accepts this 864-line prerequisite as one coherent bilingual DTO/client
 Parent received prerequisite `ede6cc2`, isolated it at `/tmp/rai-w3-operator-contract` for review/publication, and authorized the separate consumer. Shared locale keys/maps, paths and client stay unchanged. The consumer adds the planned page/sections/style/view-model, router registration and Admin navigation, plus controlled browser rehearsals. A browser-only `tests/browser/support/operator-session-harness.js` mounts the actual provider/page through Vite for first-commit DOM inspection; it is never imported by the product or bundled.
 
 The page uses the existing typed maps rather than duplicating enum mapping in its view-model. The view-model owns only presentation access and synchronous session/generation visibility. Manual refresh removes prior rows and preserves keyboard focus with aria-disabled plus an activation guard while loading. No polling, database, endpoint, permission or shared-state changes. Parent still controls dependency readiness, independent review and publication. Real-server OBS17 remains INT work.
+
+## Consumer publication exception
+
+The lead accepts the bounded 897-line consumer: approximately 435 implementation lines form one page, with its session-privacy and accessibility regressions. Independent review recommends keeping those guarantees together. This exception is separate from the prerequisite exception. The PR may open as a draft for CI; merge waits for the real operator API dependency and final review.

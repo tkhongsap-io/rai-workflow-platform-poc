@@ -72,3 +72,7 @@ Node 24.21.0, isolated worktree, substitute 60789/web 60175; no DB or integratio
 Rehearsal covers all seven non-Admin fixture identities including the dual-role identity, absent/zero/unscheduled values, localized statuses, 401/403/500/network/invalid-schema/invalid-JSON recovery, first-commit data clearance and obsolete delivery. Synthetic recipient data does not appear in console, browser storage or URL. No server authorization, actual failure persistence/correlation provenance, OBS17 or acceptance is inferred. Logs: `/tmp/rai-w3-07b-consumer-{lint,typecheck,unit,browser,build,repo}.log`.
 
 No root delivery logs changed (parent owns them). No push/PR/merge. Before consumer publication, parent must verify both the shared UI contract and W3-07a API dependency readiness, obtain independent review, and resolve the consumer's own >600-line PR scope through an explicit exception or publication split; the prerequisite exception is not inherited. The consumer implementation remains a separate local commit as requested. Real API acceptance remains W3-INT.
+
+## Independent review and current-main preparation
+
+Independent review of 8b8e94b against ede6cc2 was clean; the reviewer reran 2 unit and all 48 three-width browser rehearsal tests. The consumer was rebased onto merged prerequisite main 848f89e. Router conflict resolution retains both QueueScreen and DeskHealthScreen, and the change records retain both accepted scope histories. Final rebase verification is pending. The draft PR does not close issue #48 or claim real-server OBS17.
