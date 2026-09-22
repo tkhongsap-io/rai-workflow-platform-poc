@@ -159,3 +159,9 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Takes over from: session=w3-05 (reason: handoff; owner requests W3 completion)
 - What: Queue contract first, then server implementation; separate PRs, independent review and green verification before merge.
 - Evidence: changes/2026-09-22-w3-01-queue-contract/plan.md
+
+## 2026-09-22 — CLAIM W3-07a prerequisite contract
+- Author: operator=ta session=codex-w3-07a-observability-contract model=GPT-6
+- Takes over from: session=none (reason: parent-assigned isolated prerequisite; other ticket owners retain their modules)
+- What: Shared observability shapes and additive persistence only, based on 5fe59ad.
+- Evidence: changes/2026-09-22-w3-07a-observability-contract/plan.md

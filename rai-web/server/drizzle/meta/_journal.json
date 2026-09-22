@@ -50,6 +50,13 @@
       "when": 1790055000000,
       "tag": "0006_w2_05_findings_dispositions",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790090215761,
+      "tag": "0007_w3_07a_observability",
+      "breakpoints": true
     }
   ]
 }

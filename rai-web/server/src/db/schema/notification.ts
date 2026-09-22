@@ -49,6 +49,7 @@ export const notification = pgTable(
     ),
     index('notification_status_next_attempt_at_idx').on(t.status, t.nextAttemptAt),
     index('notification_correlation_id_idx').on(t.correlationId),
+    index('notification_status_attempts_created_idx').on(t.status, t.attempts, t.createdAt),
     check(
       'notification_event_check',
       sql`${t.event} IN ('lane_open', 'send_back', 'ready', 'sla_breach_digest')`,

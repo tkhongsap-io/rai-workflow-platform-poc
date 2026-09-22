@@ -28,6 +28,8 @@ export const qcRun = pgTable(
     engineId: text('engine_id').notNull(),
     ruleRevision: text('rule_revision').notNull(),
     status: text('status').notNull(),
+    // NULL preserves historical uncertainty; new unavailable writers supply the bounded reason.
+    unavailableReason: text('unavailable_reason'),
     requestedAt: timestamp('requested_at', { withTimezone: true }).notNull(),
     completedAt: timestamp('completed_at', { withTimezone: true }).notNull(),
     correlationId: text('correlation_id').notNull(),
@@ -35,6 +37,11 @@ export const qcRun = pgTable(
   (t) => [
     index('qc_run_version_id_trigger_idx').on(t.versionId, t.trigger),
     index('qc_run_correlation_id_idx').on(t.correlationId),
+    index('qc_run_status_requested_idx').on(t.status, t.requestedAt),
+    check(
+      'qc_run_unavailable_reason_check',
+      sql`${t.unavailableReason} IS NULL OR (${t.status} = 'unavailable' AND ${t.unavailableReason} IN ('timeout', 'runner_error', 'not_configured', 'artifact_unreadable'))`,
+    ),
     check('qc_run_trigger_check', sql`${t.trigger} IN ('upload', 'submit', 'approve_attempt')`),
     check('qc_run_lane_check', sql`${t.lane} IS NULL OR ${t.lane} IN ('ai_coe', 'dpo', 'it_security')`),
     check('qc_run_status_check', sql`${t.status} IN ('completed', 'unavailable')`),
