@@ -80,3 +80,9 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - What: W3-03a issue #44 approved split, on `codex/w3-03a-notifications` from `44c5517`; queue UI and other Lane B tickets outside claim.
 - Next: Shared locale prerequisite, composer and initial local sink attempt, tests, local commit; parent arranges independent review and PR.
 - Evidence: [plan](../../changes/2026-09-22-w3-03a-notifications/plan.md)
+
+## 2026-09-22 — CLAIM Lane B: W3-04 pure retry slice only
+- Author: operator=ta session=codex-w3-04-retries model=GPT-6
+- Takes over from: session=none for W3-04 (reason: explicit scoped assignment; Hypatia retains W3-03a)
+- What: Issue #45 pure retry policy/tests in `/tmp/rai-w3-retries` from main `5fe59ad`; no composition or worker integration until parent supplies committed W3-03a. No push/merge; no other worktree writes. Future isolated DB port 54365 only.
+- Evidence: [W3-04 plan](../../changes/2026-09-22-w3-04-retries/plan.md)
