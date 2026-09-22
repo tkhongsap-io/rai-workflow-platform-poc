@@ -29,6 +29,13 @@
       "when": 1790013058690,
       "tag": "0003_w1_02_registry_counter",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790049719882,
+      "tag": "0004_w2_01_notification",
+      "breakpoints": true
     }
   ]
 }

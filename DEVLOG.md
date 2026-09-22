@@ -1,5 +1,9 @@
 # Development log
 
+## W2-01: lane open on submit — 2026-09-22
+
+Submit now opens the three review lanes (`lane.opened` × 3 + `lane_open` notification rows) in the same transaction as the freeze. This is not the W2 exit; decisions, send-back, Ready, UI and mail delivery remain later W2/W3 tickets.
+
 ## W0 and W1 build closed: 2026-09-22
 
 32 PRs (#57-#88) through the reviewed ticket flow. W0 exit and Milestone M1 recorded; W2 ready. [Change review](changes/2026-09-21-w0-w1-build/review.md) records what the gate caught and the process fixes for W2.

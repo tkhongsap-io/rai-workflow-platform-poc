@@ -27,6 +27,7 @@ export interface TestDatabase {
 /** Every business table (W1-00 substrate plus W1-09's fixture_set), in truncation order (TRUNCATE ... CASCADE handles the FKs). */
 export const BUSINESS_TABLES = [
   'fixture_set',
+  'notification', // W2-01 (0004_w2_01_notification)
   'audit_event',
   'idempotency_key',
   'artifact_slot',

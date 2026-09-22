@@ -36,3 +36,14 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: next ticket in the dependency map.
 - Author: operator=ta session=build-workflow model=claude-opus-5
 - Evidence: https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/86
+
+## 2026-09-22 11:01 — CLAIM Lane A
+- Author: operator=ta session=w2-01 model=grok-4.7
+- Takes over from: session=none (reason: new)
+
+## 2026-09-22 11:01 — W2-01 open three lanes on submit
+- What: Submit opens ai_coe, dpo and it_security in one transaction (lane.opened × 3 with D02 slotsForLane, three lane_open notification rows to the single-role fixture reviewers); failure on any lane rolls back the whole submit; high risk still opens all three; notification table migration 0004.
+- Why: A partial lane open must not commit; W0-06 4.3 (d)+(f) belong in the same freeze transaction as W1-05.
+- Next: W2-02a/W2-02 (decisions) — not this session.
+- Author: operator=ta session=w2-01 model=grok-4.7
+- Evidence: branch codex/w2-01-open-lanes (commit pending land)
