@@ -173,3 +173,19 @@ test('terminal delivery category is derived without losing the bounded cause', (
     true,
   );
 });
+
+test('queued initial failure may remain unscheduled until W3-04 owns retry scheduling', () => {
+  const unscheduled = {
+    notificationId: id,
+    eventType: 'send_back',
+    recipient: 'operator@rai-desk.example',
+    correlationId: id,
+    status: 'queued',
+    attempts: 1,
+    lastErrorCode: 'sink_failure',
+  };
+  assert.equal(Value.Check(FailureReportSchema, unscheduled), true);
+  assert.equal('nextAttemptAt' in unscheduled, false);
+  assert.equal(Value.Check(FailureReportSchema, { ...unscheduled, nextAttemptAt: at }), true);
+  assert.equal(Value.Check(FailureReportSchema, { ...unscheduled, nextAttemptAt: 'unknown' }), false);
+});

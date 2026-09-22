@@ -26,6 +26,9 @@ export interface TestDatabase {
 
 /** Every business table (W1-00 substrate plus W1-09's fixture_set), in truncation order (TRUNCATE ... CASCADE handles the FKs). */
 export const BUSINESS_TABLES = [
+  'operator_job_notification', // W3-07a: reset links before job history
+  'operator_job_run', // no FK from this table to a business table; reset explicitly
+  'qc_late_result', // W3-07a
   'fixture_set',
   'notification', // W2-01 (0004_w2_01_notification)
   'disposition_event', // W2-05 (0006_w2_05_findings_dispositions)

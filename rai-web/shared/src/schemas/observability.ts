@@ -123,7 +123,7 @@ export const FailureReportSchema = Type.Union([
     ...mailIdentity,
     status: Type.Literal('queued'),
     attempts: Type.Integer({ minimum: 1, maximum: 3 }),
-    nextAttemptAt: timestamp,
+    nextAttemptAt: Type.Optional(timestamp),
     lastErrorCode: deliveryError,
   }),
   object({

@@ -43,7 +43,7 @@ test('migrations apply from an empty database and a rerun applies nothing', asyn
   assert.deepEqual(third, second);
 });
 
-test('the schema holds the W0-04 tables (plus W1-01 session, W1-09 fixture_set, W1-02 registry_counter, W2-01 notification, W2-02 lane_decision and W2-05 qc/disposition tables), triggers and grants', async () => {
+test('the schema holds the W0-04 tables (plus W1-01 session, W1-09 fixture_set, W1-02 registry_counter, W2-01 notification, W2-02 lane_decision, W2-05 qc/disposition and W3-07a operational tables), triggers and grants', async () => {
   const tables = await db.raw('owner', (c) =>
     c.query<{ tablename: string }>(
       `SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename`,
@@ -62,8 +62,11 @@ test('the schema holds the W0-04 tables (plus W1-01 session, W1-09 fixture_set, 
       'idempotency_key',
       'lane_decision', // W2-02 (0005_w2_02_lane_decision)
       'notification', // W2-01 (0004_w2_01_notification)
+      'operator_job_notification', // W3-07a: digest provenance/daily dedup
+      'operator_job_run', // W3-07a: operational job lifecycle
       'pack_version',
       'qc_finding', // W2-05
+      'qc_late_result', // W3-07a: durable refused append, not a QC run
       'qc_run', // W2-05
       'registry_counter', // W1-02 (0003_w1_02_registry_counter; W0-04 case.registry_id per-year sequence)
       'session', // W1-01 (0001_w1_01_session; W0-03 section 6.3)
@@ -83,11 +86,15 @@ test('the schema holds the W0-04 tables (plus W1-01 session, W1-09 fixture_set, 
       'audit_event.audit_event_append_only',
       'case.case_projection_gate',
       'configuration_revision.configuration_revision_frozen',
+      'notification.digest_requires_job', // W3-07a: deferred, new digest INSERT only
       'disposition_event.disposition_event_append_only', // W2-05
       'lane_decision.lane_decision_append_only', // W2-02
       'notification.notification_delivery_only', // W2-01: delivery columns only
+      'operator_job_run.operator_job_guard', // W3-07a
+      'operator_job_notification.operator_job_link_guard', // W3-07a
       'pack_version.pack_version_frozen',
       'qc_finding.qc_finding_append_only', // W2-05
+      'qc_late_result.qc_late_guard', // W3-07a
       'qc_run.qc_run_append_only', // W2-05
     ],
   );
@@ -126,11 +133,17 @@ test('the schema holds the W0-04 tables (plus W1-01 session, W1-09 fixture_set, 
     'notification:INSERT', // W2-01: outbox insert in the business transaction; UPDATE is delivery columns only
     'notification:SELECT',
     'notification:UPDATE',
+    'operator_job_notification:INSERT',
+    'operator_job_notification:SELECT',
+    'operator_job_run:INSERT',
+    'operator_job_run:SELECT', // UPDATE is limited to lifecycle columns below
     'pack_version:INSERT',
     'pack_version:SELECT',
     'pack_version:UPDATE',
     'qc_finding:INSERT', // W2-05: append-only
     'qc_finding:SELECT',
+    'qc_late_result:INSERT',
+    'qc_late_result:SELECT',
     'qc_run:INSERT', // W2-05: append-only
     'qc_run:SELECT',
     'registry_counter:INSERT', // W1-02: the per-year counter is upserted inside the create transaction
@@ -140,6 +153,17 @@ test('the schema holds the W0-04 tables (plus W1-01 session, W1-09 fixture_set, 
     'session:SELECT',
     'session:UPDATE',
   ]);
+  const jobUpdateColumns = await db.raw('owner', (c) =>
+    c.query<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.role_column_grants
+       WHERE table_schema = 'public' AND table_name = 'operator_job_run'
+         AND grantee = 'rai_app' AND privilege_type = 'UPDATE' ORDER BY column_name`,
+    ),
+  );
+  assert.deepEqual(
+    jobUpdateColumns.rows.map((r) => r.column_name),
+    ['breach_count', 'error_code', 'error_stage', 'finished_at', 'status'],
+  );
   // rai_operator: rai_app (by membership, docker/postgres/init) plus DELETE on idempotency_key and on session (W1-01 sweep).
   assert.deepEqual(byGrantee('rai_operator'), ['idempotency_key:DELETE', 'session:DELETE']);
 });
