@@ -896,6 +896,10 @@ Closed at W0 exit (W0-09), recorded here so the list stays honest: upload types 
 
 `GET /api/queue` uses `case.list`, with `QueueQuerySchema` and `QueueResponse` in `rai-web/shared/src/schemas/queue.ts`. The existing `/api/cases` contract remains unchanged. Search, filters, counts, options, current lane due dates and deterministic pagination follow the [queue contract](../../changes/2026-09-22-w3-01-queue-contract/spec.md). This is a shared-contract PR before W3-01 server, W3-08 substitute and W3-02 UI consumers; it does not close #42.
 
+### W3-03a notification template contract
+
+The W3-03a prerequisite adds `mail.lane_opened.body`, `mail.sent_back.body` and `mail.ready_for_launch.body` to both shared locale catalogues. Existing `mail.lane_opened`, `mail.sent_back`, `mail.ready_for_launch` remain the subject and persisted template keys. Body parameters are `caseName`, `caseLink`; lane-open additionally `laneLabel`, `defectCount`, `dueDate` (frozen SLA date in Asia/Bangkok); send-back additionally `laneLabel`, `feedback` (reviewer text bounded to 500 code units). Thai is the default. All rendering uses shared `t()`; no new HTTP, database, authorization or mail-interface shape. W3-03b digest and W3-04 retries remain separate.
+
 ## W3-07a prerequisite amendment — 2026-09-22
 
 Section 7.8 adds `ReadinessReport`, `DeskHealthReport` (including mandatory `lateQc`), `SafeErrorFields` and `DigestJobProvenance` under shared `schemas/observability.ts`, re-exported from `schemas/queue.ts`. The [engineering reconciliation](../../changes/2026-09-22-w3-07a-observability-contract/spec.md) owns exact fields and OBS semantics. W3-07a adds migration `0007_w3_07a_observability`; W3-03b consumes job/linkage persistence only after the coordinated mail provenance/sink contract. W3-INT proves submit-trigger timeout and late-QC refusal with the synthetic runner. No consumer code is part of this prerequisite.

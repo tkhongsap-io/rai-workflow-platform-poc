@@ -1,5 +1,9 @@
 # Development log
 
+## W3-08: scoped queue substitute — 2026-09-22
+
+The dev/test-only API substitute now implements the queue contract, including scoped filters/counts, pagination, successor versions and frozen SLA dates. Regression tests cover role scopes, unknown query keys and disposition states. Full local verification passed: 413 unit, 198 integration and 213 browser tests. Independent review is clean after fixes. PR #108; integration acceptance remains W3-INT.
+
 ## W3-01: scoped server queue — 2026-09-22
 
 GET /api/queue applies authorization before search, counts, options and pagination in one consistent database snapshot. Results expose current lane state and frozen SLA dates while retaining successor draft versions. Full local verification passed: 409 unit, 205 integration and 213 browser tests. Independent review is clean. PR #109; 1,000-case latency and integrated M3 evidence remain pending.

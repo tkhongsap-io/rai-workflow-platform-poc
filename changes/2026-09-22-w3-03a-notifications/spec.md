@@ -1,0 +1,9 @@
+# W3-03a specification
+
+Authority: [approved split](../../docs/engineering/implementation-plan-w1-w3.md), [W0-07](../../docs/engineering/qc-boundary-and-mail-sink.md), [W0-04](../../docs/engineering/persistence-and-artifact-store.md), [W0-05 recipient rules](../../docs/engineering/authorization-policy-matrix.md#33-notification-recipients-d06-recipients-are-not-authority), [W0-10](../../docs/engineering/observability-contract.md), source notification table, D06/D12 and ADR-0003.
+
+Read committed outbox rows through a separate database connection, match the authoritative committed audit event, submitted version and (send-back) decision. Revalidate recipients with case.view and the event recipient rule; allow synthetic addresses only. Lane-open carries case name, localized lane, defect count, frozen working-day due date and version link. Send-back carries deciding lane, bounded reviewer feedback and version link. Ready carries desk completion and link without implying production permission. All templates use shared locale keys; Thai default. Build links from validated origin and IDs, never free-text parameters. No document/evidence contents.
+
+One initial sink attempt is wired after successful requests and on startup for queued, unattempted rows. Record only existing delivery columns in a separate notification transaction. Failure remains queued after attempt 1, visible via last_error_code; retry scheduling, attempts 2–4 and terminal failure belong to W3-04. Digest rows are excluded. W3-03a does not alter workflow transactions or outbox creators.
+
+Shared contract prerequisite: additive body template keys in the shared Thai/English catalogues (LocaleKey derives from Thai). Existing mail types, routes, persistence columns and authorization actions suffice; no queue contract needed. Parent must review/merge this contract commit before the consumer PR. The following consumer commit depends on it and mail promotion PR #107.

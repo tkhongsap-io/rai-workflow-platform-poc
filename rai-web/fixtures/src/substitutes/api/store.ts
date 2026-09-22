@@ -20,6 +20,7 @@ import { CONFIGURATION_SEED } from '@rai/server/configuration/seed';
 import { APP_TIMEZONE } from '@rai/shared/constants';
 import type { CaseId, ConfigurationRevisionId, SubjectId } from '@rai/shared/ids';
 import type { Lane } from '@rai/shared/constants';
+import type { LaneDue } from '@rai/shared/schemas/sla';
 import type { ArtifactRef } from '@rai/shared/schemas/artifacts';
 import type {
   CaseStatus,
@@ -127,6 +128,7 @@ export class SubstituteStore {
   readonly configuration: ConfigurationView;
   readonly manifest: FixtureManifest;
   sessions = new Map<string, SubstituteSession>();
+  laneDueByVersion = new Map<string, LaneDue[]>();
   cases = new Map<string, StoredCase>();
   artifacts = new Map<string, StoredArtifact>();
   idempotency = new Map<string, IdempotencyRecord>();
@@ -168,6 +170,7 @@ export class SubstituteStore {
   /** Rebuilds the fixture state; drops every session, upload, version, decision, finding and idempotency record. */
   reset(): void {
     this.sessions.clear();
+    this.laneDueByVersion.clear();
     this.cases.clear();
     this.artifacts.clear();
     this.idempotency.clear();

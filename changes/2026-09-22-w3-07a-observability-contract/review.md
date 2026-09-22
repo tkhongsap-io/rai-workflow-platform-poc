@@ -54,3 +54,7 @@ Final full-suite output:
 Full local output: `/tmp/rai-w3-obs-combined-final.log`. Repository link/frozen-source/diff checks also pass. No runtime observability consumers or new OBS end-to-end acceptance are claimed. The bounded types+persistence+proof size exception and the dependent-PR split fallback are recorded in plan.md for parent/Carver approval before publication. No push or PR.
 
 Final shared observability schema SHA-256: `6a14fd9c4381f02dee9e868c752730c67754170c6d135f66a52f9dd5420f5962`.
+
+## Independent review and prerequisite merge reconciliation
+
+Carver re-reviewed `d931cea` after the optional queued-failure timestamp fix and reported no remaining high-confidence findings. Ten independently run schema/migration/inventory/grant tests passed on disposable databases; operational reset and the restricted UPDATE grants were verified. The parent merged main `a2392c9`, retaining both the notification-template and observability amendments. This does not change consumer acceptance boundaries. Final PR CI remains required before merge.
