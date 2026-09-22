@@ -50,6 +50,12 @@ export function createErrorCapture(emitter: Emitter, now: () => Date = () => new
     return { category: safe.category, httpStatus };
   }
   return {
+    internal(error: unknown, route?: string) {
+      return capture(sanitizeStack(error), route);
+    },
+    notFound() {
+      return capture({ category: 'not_found', targetType: 'route' });
+    },
     /** Route is supplied only from the framework's registered pattern inventory, never request.url. */
     http(error: unknown, route?: string) {
       let fields: SafeErrorFields;

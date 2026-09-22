@@ -86,3 +86,7 @@ No application or operational capability is implemented.
 ## 2026-09-22 — W3-07a prerequisite contract
 
 Added shared observability shapes and additive persistence for digest provenance/dedup, truthful QC unavailable reasons and durable late-QC refusals. Reconciled HTTP/job error capture and synthetic integration gates. Runtime consumers remain separate work.
+
+### W3-07a local API checkpoint — 2026-09-22
+
+- Added health/operator assembly, typed safe HTTP diagnostics and correlated lane-QC refusal visibility on the isolated consumer branch. Full local suite passed; startup and notification integration remain pending. The Admin-only operator policy is a separately reviewed prerequisite, not a consumer scope change.

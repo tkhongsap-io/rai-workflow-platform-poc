@@ -1,7 +1,7 @@
 // W2-05 store helpers for qc_run / qc_finding (append-only inserts).
 import { and, asc, desc, eq } from 'drizzle-orm';
 import type { Lane } from '@rai/shared/constants';
-import type { QcTrigger } from '@rai/shared/qc/types';
+import type { QcTrigger, QcUnavailableReason } from '@rai/shared/qc/types';
 import type { Executor, Tx } from '../db/client.js';
 import { qcFinding } from '../db/schema/qc-finding.js';
 import { qcRun } from '../db/schema/qc-run.js';
@@ -15,6 +15,7 @@ export interface InsertRunInput {
   engineId: string;
   ruleRevision: string;
   status: 'completed' | 'unavailable';
+  unavailableReason?: QcUnavailableReason;
   requestedAt: Date;
   completedAt: Date;
   correlationId: string;
@@ -49,6 +50,7 @@ export async function insertQcRun(tx: Tx, input: InsertRunInput): Promise<void> 
     engineId: input.engineId,
     ruleRevision: input.ruleRevision,
     status: input.status,
+    unavailableReason: input.unavailableReason ?? null,
     requestedAt: input.requestedAt,
     completedAt: input.completedAt,
     correlationId: input.correlationId,

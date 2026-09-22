@@ -13,6 +13,7 @@ import type {
   QcRunResult,
   QcRunner,
   QcTrigger,
+  QcUnavailableReason,
   SlotState,
 } from '@rai/shared/qc/types';
 import { checkOwningLane, validateQcFinding } from '@rai/shared/qc/validate';
@@ -22,6 +23,10 @@ import { staleDetails } from '../cases/service.js';
 import type { Db, Tx } from '../db/client.js';
 import { setWorkflowWrite, lockCase, withTransaction } from '../db/transaction.js';
 import { auditStore } from '../audit/store.js';
+import type { Emitter } from '../observability/log.js';
+import type { ErrorCapture } from '../observability/errors.js';
+import { runWithContext, maybeContext } from '../observability/context.js';
+import { qcLateResult } from '../db/schema/operator-job-run.js';
 import { readSlotsWithArtifacts } from '../versions/repository.js';
 import { nextMonotonicStamp } from '../workflow/monotonic-stamp.js';
 import {
@@ -36,6 +41,8 @@ export const QC_TIMEOUT_MS = 10_000;
 export const UNBOUND_ENGINE_ID = 'unbound' as const;
 
 export interface QcOrchestratorDeps {
+  emitter?: Emitter;
+  errors?: ErrorCapture;
   db: Db;
   runner?: QcRunner;
   now?: () => Date;
@@ -61,7 +68,7 @@ export interface StoredFindingView {
 
 export type PersistQcOutcome =
   | { status: 'completed'; runId: string; findings: StoredFindingView[] }
-  | { status: 'unavailable'; reason: string; runId: string; findings: [] };
+  | { status: 'unavailable'; reason: QcUnavailableReason; runId: string; findings: [] };
 
 function runKeyOf(
   versionId: string,
@@ -196,6 +203,7 @@ async function persistCompleted(
   runner: QcRunner,
   stamp: Date,
   correlationId: string,
+  runId: string,
 ): Promise<{ runId: string; findings: StoredFindingView[] }> {
   const storeable = storeableFindings(result.findings, request.laneMappingVersion, {
     trigger: request.trigger,
@@ -203,7 +211,6 @@ async function persistCompleted(
     checklistTemplateVersion: request.checklistTemplateVersion,
   });
   const stampMs = stamp.getTime();
-  const runId = uuidv7(stampMs);
   await insertQcRun(tx, {
     id: runId,
     versionId: version.id,
@@ -278,8 +285,9 @@ async function persistUnavailable(
   engineId: string,
   stamp: Date,
   correlationId: string,
+  runId: string,
+  reason: QcUnavailableReason,
 ): Promise<string> {
-  const runId = uuidv7(stamp.getTime());
   await insertQcRun(tx, {
     id: runId,
     versionId: version.id,
@@ -289,6 +297,7 @@ async function persistUnavailable(
     engineId,
     ruleRevision: request.qcRulesRevision,
     status: 'unavailable',
+    unavailableReason: reason,
     requestedAt: stamp,
     completedAt: stamp,
     correlationId,
@@ -379,10 +388,7 @@ async function loadOpenSubmittedTarget(
  * case fail. Persist re-locks and re-checks the target so a send-back during the run does not store
  * findings, and a concurrent completed run is replayed instead of inserted twice.
  */
-export async function runAndPersistLaneQc(
-  deps: QcOrchestratorDeps,
-  input: RunLaneQcInput,
-): Promise<PersistQcOutcome> {
+async function runLaneQc(deps: QcOrchestratorDeps, input: RunLaneQcInput): Promise<PersistQcOutcome> {
   const clock = deps.now ?? (() => new Date());
   const timeoutMs = deps.timeoutMs ?? QC_TIMEOUT_MS;
 
@@ -409,7 +415,7 @@ export async function runAndPersistLaneQc(
         kind: 'outcome' as const,
         outcome: {
           status: 'unavailable' as const,
-          reason: 'not_configured',
+          reason: 'not_configured' as const,
           runId: prior.id,
           findings: [] as [],
         },
@@ -417,6 +423,7 @@ export async function runAndPersistLaneQc(
     }
 
     const stamp = nextMonotonicStamp(clock);
+    const attemptId = uuidv7(stamp.getTime());
     const request = await buildRequest(
       tx,
       caseRow,
@@ -435,17 +442,37 @@ export async function runAndPersistLaneQc(
         UNBOUND_ENGINE_ID,
         stamp,
         input.correlationId,
+        attemptId,
+        'not_configured',
       );
       return {
+        recorded: true,
         kind: 'outcome' as const,
-        outcome: { status: 'unavailable' as const, reason: 'not_configured', runId, findings: [] as [] },
+        outcome: {
+          status: 'unavailable' as const,
+          reason: 'not_configured' as const,
+          runId,
+          findings: [] as [],
+        },
       };
     }
 
-    return { kind: 'ready' as const, request, stamp };
+    return { kind: 'ready' as const, request, stamp, attemptId };
   });
 
-  if (prepared.kind === 'outcome') return prepared.outcome;
+  if (prepared.kind === 'outcome') {
+    if ('recorded' in prepared) emitUnavailable(deps, input, prepared.outcome.runId, 'not_configured');
+    return prepared.outcome;
+  }
+  deps.emitter?.log('qc.run.started', {
+    qcRunId: prepared.attemptId,
+    caseId: input.caseId,
+    versionId: input.versionId,
+    trigger: 'approve_attempt',
+    lane: input.lane,
+    qcKind: 'substitute', // W0-W3 binds only synthetic QC; real engines remain W4-gated.
+  });
+  const startedAt = performance.now();
 
   const runner = deps.runner;
   if (runner === undefined) {
@@ -460,7 +487,7 @@ export async function runAndPersistLaneQc(
   } catch {
     result = {
       status: 'unavailable',
-      reason: 'timeout',
+      reason: controller.signal.aborted ? 'timeout' : 'runner_error',
       detail: null,
       startedAt: prepared.stamp.toISOString(),
       finishedAt: prepared.stamp.toISOString(),
@@ -469,38 +496,127 @@ export async function runAndPersistLaneQc(
     clearTimeout(timer);
   }
 
-  return withTransaction(deps.db, async (tx) => {
-    await setWorkflowWrite(tx);
-    const { version } = await loadOpenSubmittedTarget(tx, input);
-    const prior = await findLatestApproveAttemptRun(tx, version.id, input.lane, ruleRevisionOf(version));
-    if (prior !== undefined && prior.status === 'completed') {
-      const findings = await listFindingsForRun(tx, prior.id);
-      return { status: 'completed', runId: prior.id, findings };
-    }
+  try {
+    const stored = await withTransaction(deps.db, async (tx) => {
+      await setWorkflowWrite(tx);
+      const { version } = await loadOpenSubmittedTarget(tx, input);
+      const prior = await findLatestApproveAttemptRun(tx, version.id, input.lane, ruleRevisionOf(version));
+      if (prior !== undefined && prior.status === 'completed') {
+        const findings = await listFindingsForRun(tx, prior.id);
+        return { status: 'completed' as const, runId: prior.id, findings, recorded: false };
+      }
 
-    if (result.status === 'unavailable') {
-      const runId = await persistUnavailable(
+      if (result.status === 'unavailable') {
+        const runId = await persistUnavailable(
+          tx,
+          version,
+          prepared.request,
+          runner.identity.runner,
+          prepared.stamp,
+          input.correlationId,
+          prepared.attemptId,
+          result.reason,
+        );
+        return {
+          status: 'unavailable' as const,
+          reason: result.reason,
+          runId,
+          findings: [] as [],
+          recorded: true,
+        };
+      }
+
+      const persisted = await persistCompleted(
         tx,
         version,
         prepared.request,
-        runner.identity.runner,
+        result,
+        runner,
         prepared.stamp,
         input.correlationId,
+        prepared.attemptId,
       );
-      return { status: 'unavailable', reason: result.reason, runId, findings: [] };
+      return {
+        status: 'completed' as const,
+        runId: persisted.runId,
+        findings: persisted.findings,
+        recorded: true,
+      };
+    });
+    const { recorded, ...outcome } = stored;
+    if (recorded) {
+      if (outcome.status === 'unavailable') emitUnavailable(deps, input, outcome.runId, outcome.reason);
+      else
+        deps.emitter?.log('qc.run.completed', {
+          qcRunId: outcome.runId,
+          findingCount: outcome.findings.length,
+          durationMs: Math.max(0, performance.now() - startedAt),
+        });
     }
+    return outcome;
+  } catch (error) {
+    if (error instanceof StaleVersionError) {
+      // The refused persistence transaction rolled back. A separate diagnostic transaction cannot append
+      // QC evidence to Ready, and locks the same case before proving this was a late result for that version.
+      const late = await withTransaction(deps.db, async (tx) => {
+        if (!(await lockCase(tx, input.caseId))) return undefined;
+        const version = await readVersionRow(tx, input.versionId);
+        if (version?.caseId !== input.caseId || version.readyAt === null) return undefined;
+        const fields = {
+          qcRunId: prepared.attemptId,
+          versionId: input.versionId,
+          trigger: 'approve_attempt',
+          lane: input.lane,
+          status: result.status,
+          refusedFindingCount: result.status === 'completed' ? result.findings.length : 0,
+          correlationId: input.correlationId,
+        };
+        const [inserted] = await tx
+          .insert(qcLateResult)
+          .values({ id: uuidv7(), ...fields, recordedAt: clock() })
+          .onConflictDoNothing({ target: qcLateResult.qcRunId })
+          .returning({ id: qcLateResult.id });
+        return inserted === undefined ? undefined : fields;
+      });
+      if (late !== undefined)
+        deps.emitter?.log('qc.run.late', {
+          qcRunId: late.qcRunId,
+          caseId: input.caseId,
+          versionId: late.versionId,
+          trigger: late.trigger,
+          lane: late.lane,
+          status: late.status,
+          refusedFindingCount: late.refusedFindingCount,
+        });
+    }
+    throw error;
+  }
+}
 
-    const persisted = await persistCompleted(
-      tx,
-      version,
-      prepared.request,
-      result,
-      runner,
-      prepared.stamp,
-      input.correlationId,
-    );
-    return { status: 'completed', runId: persisted.runId, findings: persisted.findings };
-  });
+function emitUnavailable(
+  deps: QcOrchestratorDeps,
+  input: RunLaneQcInput,
+  runId: string,
+  reason: QcUnavailableReason,
+): void {
+  const fields = { qcRunId: runId, caseId: input.caseId, versionId: input.versionId, reason };
+  deps.emitter?.log('qc.run.unavailable', fields);
+  deps.errors?.job({ category: 'qc_unavailable', ...fields });
+}
+
+/** Preserve the originating correlation even for callers outside an HTTP handler. */
+export function runAndPersistLaneQc(
+  deps: QcOrchestratorDeps,
+  input: RunLaneQcInput,
+): Promise<PersistQcOutcome> {
+  return runWithContext(
+    {
+      ...maybeContext(),
+      correlationId: input.correlationId,
+      startedAt: maybeContext()?.startedAt ?? performance.now(),
+    },
+    () => runLaneQc(deps, input),
+  );
 }
 
 /** Test/helper: case row type re-export so callers need not dig into cases/. */

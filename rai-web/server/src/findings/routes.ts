@@ -19,6 +19,7 @@ import {
 } from '@rai/shared/schemas/review';
 import { actorOf } from '../authz/middleware.js';
 import { authorize, type Action, type CaseScopeFacts } from '../authz/policy.js';
+import type { ErrorCapture } from '../observability/errors.js';
 import type { Emitter } from '../observability/log.js';
 import { IDEMPOTENCY_HEADER, requireIdempotencyKey } from '../cases/idempotency.js';
 import { createScopeFactsSource } from '../authz/facts.js';
@@ -30,6 +31,7 @@ import { isUuid } from '../versions/repository.js';
 
 export interface FindingsRouteDeps extends DispositionServiceDeps {
   emitter: Emitter;
+  errors?: ErrorCapture;
   /** Optional QC runner injection; absent → lane QC persists unavailable:not_configured with engine_id unbound. */
   qc?: Omit<QcOrchestratorDeps, 'db'>;
 }
@@ -214,6 +216,8 @@ export function registerFindingsRoutes(fastify: FastifyInstance, deps: FindingsR
           db: deps.db,
           ...(deps.now === undefined ? {} : { now: deps.now }),
           ...(deps.qc === undefined ? {} : deps.qc),
+          emitter: deps.emitter,
+          ...(deps.errors === undefined ? {} : { errors: deps.errors }),
         },
         {
           caseId: request.params.caseId,
@@ -226,7 +230,7 @@ export function registerFindingsRoutes(fastify: FastifyInstance, deps: FindingsR
         return {
           runId: outcome.runId,
           status: 'unavailable' as const,
-          reason: outcome.reason as 'timeout' | 'runner_error' | 'not_configured' | 'artifact_unreadable',
+          reason: outcome.reason,
           findings: [],
         };
       }

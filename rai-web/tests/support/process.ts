@@ -17,6 +17,7 @@ import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readEnv } from '@rai/server/config';
+import { assertNoLeak } from './log-capture.js';
 
 export const RAI_WEB_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -125,7 +126,11 @@ export async function startTestServer(options: StartOptions = {}): Promise<TestS
     lines: capture.lines,
     waitForEvent: capture.waitForEvent,
     linesFor: (event) => capture.lines.filter((l) => l.event === event),
-    stop: capture.stop,
+    async stop(graceMs) {
+      const exit = await capture.stop(graceMs);
+      assertNoLeak({ text: () => JSON.stringify(capture.lines) });
+      return exit;
+    },
   };
   const timeoutMs = options.startTimeoutMs ?? 30_000;
   try {

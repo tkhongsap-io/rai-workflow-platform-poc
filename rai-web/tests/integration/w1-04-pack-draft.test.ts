@@ -11,13 +11,14 @@
 // (W1-09) loaded per test; identities from W0-03 section 7 (fx-user-owner-cm = owner-a, fx-user-owner-cm-2 =
 // owner-b, fx-user-spoc-cm = spoc-b1, fx-user-dpo = reviewer-dpo, fx-user-admin); B1 = CM, B2 = HR.
 
-import { after, before, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Writable } from 'node:stream';
+import { assertNoLeak } from '../support/log-capture.js';
 import { sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import type { ErrorDetails, ErrorResponse } from '@rai/shared/errors';
@@ -85,6 +86,9 @@ let blobDir: string;
 let outputDir: string;
 const denied: Array<Record<string, unknown>> = [];
 const captured: Array<Record<string, unknown>> = [];
+afterEach(() => {
+  assertNoLeak({ text: () => JSON.stringify(captured) });
+});
 const fired: UploadTriggerEvent[] = [];
 let triggerBehaviour: 'record' | 'throw' = 'record';
 let clock = Date.parse('2026-09-22T03:00:00Z');
@@ -818,9 +822,13 @@ describe(`W1-04 save the draft (A02) — ${SET}, fx-user-owner-cm`, () => {
     });
     assert.equal(res.statusCode, 200, res.body);
     await new Promise((r) => setImmediate(r));
-    const line = captured.find((l) => l.event === 'error.captured');
+    const lines = captured.filter(
+      (l) => l.event === 'error.captured' && l.correlationId === res.headers['x-correlation-id'],
+    );
+    assert.equal(lines.length, 1);
+    const line = lines[0];
     assert.ok(line !== undefined, 'a failing hook is reported as error.captured');
-    assert.equal((line.fields as Record<string, unknown>).category, 'qc_upload_trigger');
+    assert.equal((line.fields as Record<string, unknown>).category, 'internal_error');
     assert.deepEqual((await getDraft(owner, view.caseId)).json<PackDraft>().slots[6], {
       state: 'attached',
       artifactId: ref.artifactId,

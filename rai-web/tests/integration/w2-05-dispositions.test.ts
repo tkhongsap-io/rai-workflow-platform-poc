@@ -4,13 +4,13 @@
 // appends; unavailable stores qc_run status=unavailable with zero findings. #35 stays open (slot-5 / pack /
 // unavailable owning lane blocked until §7.3). Ready is W2-06. Fixture set slice1-synthetic@1.
 
-import { after, before, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { Writable } from 'node:stream';
+import { createLogCapture, assertNoLeak, type LogCapture } from '../support/log-capture.js';
 import { sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { StaleVersionError, type ErrorResponse } from '@rai/shared/errors';
@@ -35,6 +35,9 @@ import { fixtureSetLabel, readManifest } from '@rai/fixtures/manifest';
 import { ScriptedQcRunner } from '@rai/fixtures/substitutes/qc/index';
 import type { QcRunner, VersionRef } from '@rai/shared/qc/types';
 import { runAndPersistLaneQc } from '@rai/server/qc/orchestrator';
+import { computeReadiness } from '@rai/server/observability/health';
+import { createStoreProbes } from '@rai/server/observability/probes';
+import type { DeskHealthReport } from '@rai/shared/schemas/observability';
 import { openTestDatabase, type TestDatabase } from '../support/db.js';
 import { asUser, signInAsFixture, type FixtureSession } from '../support/sign-in.js';
 
@@ -62,10 +65,11 @@ let store: FilesystemBlobStore;
 let blobDir: string;
 let outputDir: string;
 let runner: ScriptedQcRunner;
+let capture: LogCapture;
 let clock = Date.parse('2026-09-22T06:00:00Z');
 const now = () => new Date(clock);
 
-async function rebuildApp(): Promise<void> {
+async function rebuildApp(runnerOverride?: QcRunner): Promise<void> {
   if (app !== undefined) await app.close();
   runner = new ScriptedQcRunner({
     fixtureCaseIdOf: (version: VersionRef) => fixtureCaseIdByRowId.get(version.caseId),
@@ -80,14 +84,29 @@ async function rebuildApp(): Promise<void> {
     now,
   });
   await adapter.start({ host: '127.0.0.1', port: 8787, publicBaseUrl, trustProxy: false });
-  const logStream = new Writable({
-    write(_chunk: Buffer, _enc, cb) {
-      cb();
-    },
-  });
+  capture = createLogCapture();
+  const logStream = capture.stream;
   const built = buildApp({
     config: { nodeEnv: 'test', log: { level: 'info', pretty: false }, trustProxy: false, publicBaseUrl },
     logStream,
+    observability: {
+      db: db.app,
+      readiness: () =>
+        computeReadiness(
+          {
+            identity: () => adapter.health(),
+            loopbackBind: true,
+            mailKind: 'memory',
+            qcKind: 'substitute',
+            build: { commit: 'dev', schemaVersion: '8' },
+          },
+          {
+            ...createStoreProbes(db.urls.app, blobDir),
+            mailSink: () => Promise.resolve('ok'),
+            qc: () => runner.probe(),
+          },
+        ),
+    },
     identity: {
       adapter,
       sessionStore: createPgSessionStore(db.app),
@@ -113,11 +132,20 @@ async function rebuildApp(): Promise<void> {
         sendBackRecipientsFromIdentities(FIXTURE_USERS, ownerSubjectId),
       knownIdentities: FIXTURE_USERS,
     },
-    findings: { db: db.app, now, qc: { runner, now }, knownIdentities: FIXTURE_USERS },
+    findings: {
+      db: db.app,
+      now,
+      qc: { runner: runnerOverride ?? runner, now },
+      knownIdentities: FIXTURE_USERS,
+    },
   });
   app = built.fastify;
   await app.ready();
 }
+
+afterEach(() => {
+  assertNoLeak(capture);
+});
 
 before(async () => {
   db = await openTestDatabase();
@@ -174,7 +202,21 @@ async function submitOk(session: FixtureSession, caseId: string) {
     payload: body,
   });
   assert.equal(res.statusCode, 201, res.body);
-  return res.json<SubmittedVersion>();
+  const version = res.json<SubmittedVersion>();
+  const audit = await db.owner.execute(
+    sql`SELECT id, correlation_id FROM audit_event WHERE action = 'version.submitted' AND target_version_id = ${version.versionId}`,
+  );
+  assert.equal(audit.rows.length, 1);
+  assert.equal(audit.rows[0]!.correlation_id, res.headers['x-correlation-id']);
+  assert.ok(
+    capture
+      .lines()
+      .some(
+        (line) =>
+          line.event === 'request.completed' && line.correlationId === res.headers['x-correlation-id'],
+      ),
+  );
+  return version;
 }
 
 async function caseRevision(caseId: string): Promise<number> {
@@ -188,14 +230,18 @@ async function runLaneQc(
   versionId: string,
   lane: string,
   revision: number,
-): Promise<{ statusCode: number; body: LaneQcRunResponse | ErrorResponse }> {
+): Promise<{ statusCode: number; body: LaneQcRunResponse | ErrorResponse; correlationId: string }> {
   const res = await app.inject({
     method: 'POST',
     url: `/api/cases/${caseId}/versions/${versionId}/lanes/${lane}/qc-run`,
     headers: { 'content-type': 'application/json', ...asUser(session) },
     payload: { expectedVersion: { versionId, revision } },
   });
-  return { statusCode: res.statusCode, body: res.json() };
+  return {
+    statusCode: res.statusCode,
+    body: res.json(),
+    correlationId: String(res.headers['x-correlation-id']),
+  };
 }
 
 function dispose(
@@ -295,8 +341,8 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
         await runGate;
         return {
           status: 'completed',
-          findings: [],
           rulesEvaluated: [],
+          findings: [],
           startedAt: new Date(0).toISOString(),
           finishedAt: new Date(0).toISOString(),
         };
@@ -541,11 +587,8 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
       now,
     });
     await adapter.start({ host: '127.0.0.1', port: 8787, publicBaseUrl, trustProxy: false });
-    const logStream = new Writable({
-      write(_chunk: Buffer, _enc, cb) {
-        cb();
-      },
-    });
+    capture = createLogCapture();
+    const logStream = capture.stream;
     const built = buildApp({
       config: { nodeEnv: 'test', log: { level: 'info', pretty: false }, trustProxy: false, publicBaseUrl },
       logStream,
@@ -593,6 +636,20 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
     const secondBody = second.body as LaneQcRunResponse;
     assert.equal(secondBody.status, 'unavailable');
     assert.equal(secondBody.runId, firstBody.runId);
+    assert.equal(
+      capture
+        .lines()
+        .filter((line) => line.event === 'qc.run.unavailable' && line.fields?.qcRunId === firstBody.runId)
+        .length,
+      1,
+    );
+    assert.equal(
+      capture
+        .lines()
+        .filter((line) => line.correlationId === second.correlationId && line.event?.startsWith('qc.run.'))
+        .length,
+      0,
+    );
 
     const runs = await db.owner.execute(
       sql`SELECT id, status, engine_id FROM qc_run WHERE version_id = ${version.versionId}`,
@@ -638,6 +695,25 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
     assert.equal(runs.rows.length, 1);
     assert.equal((runs.rows[0] as { status: string }).status, 'unavailable');
     assert.equal((runs.rows[0] as { id: string }).id, body.runId);
+    const stored = await db.owner.execute(
+      sql`SELECT unavailable_reason, correlation_id FROM qc_run WHERE id = ${body.runId}`,
+    );
+    assert.equal(stored.rows[0]!.unavailable_reason, 'runner_error');
+    assert.equal(stored.rows[0]!.correlation_id, qc.correlationId);
+    const audit = await db.owner.execute(
+      sql`SELECT id, correlation_id, target_ref FROM audit_event WHERE action='qc.run_recorded' AND target_version_id=${version.versionId}`,
+    );
+    assert.equal(audit.rows.length, 1);
+    assert.equal((audit.rows[0]!.target_ref as { run_id: string }).run_id, body.runId);
+    assert.equal(audit.rows[0]!.correlation_id, qc.correlationId);
+    const diagnostics = capture.lines().filter((line) => line.correlationId === qc.correlationId);
+    assert.equal(diagnostics.filter((line) => line.event === 'qc.run.unavailable').length, 1);
+    assert.equal(
+      diagnostics.filter(
+        (line) => line.event === 'error.captured' && line.fields?.category === 'qc_unavailable',
+      ).length,
+      1,
+    );
   });
 
   it('replaying a completed approve_attempt returns the same run and appends nothing', async () => {
@@ -655,6 +731,20 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
     const secondBody = second.body as LaneQcRunResponse;
     assert.equal(secondBody.status, 'completed');
     assert.equal(secondBody.runId, firstBody.runId);
+    assert.equal(
+      capture
+        .lines()
+        .filter((line) => line.event === 'qc.run.completed' && line.fields?.qcRunId === firstBody.runId)
+        .length,
+      1,
+    );
+    assert.equal(
+      capture
+        .lines()
+        .filter((line) => line.correlationId === second.correlationId && line.event?.startsWith('qc.run.'))
+        .length,
+      0,
+    );
     assert.deepEqual(
       secondBody.findings.map((f) => f.findingId).sort(),
       firstBody.findings.map((f) => f.findingId).sort(),
@@ -756,5 +846,101 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
 
     const runs = await db.owner.execute(sql`SELECT id FROM qc_run WHERE version_id = ${version.versionId}`);
     assert.equal(runs.rows.length, 0);
+  });
+});
+
+describe('W3-07a durable late-QC diagnostics', () => {
+  it('actual QC HTTP race against Ready retains refusal without new QC evidence or audit', async () => {
+    let entered!: () => void;
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const delayed: QcRunner = {
+      identity: { runner: 'synthetic-late', runnerVersion: '1' },
+      async run() {
+        entered();
+        await gate;
+        return {
+          status: 'completed',
+          rulesEvaluated: [],
+          findings: [],
+          startedAt: now().toISOString(),
+          finishedAt: now().toISOString(),
+        };
+      },
+    };
+    await rebuildApp(delayed);
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, VENDOR.caseId);
+    const ai = await signIn(AI_COE);
+    const before = await db.owner.execute(sql`SELECT count(*)::int AS n FROM audit_event`);
+    const pending = runLaneQc(
+      ai,
+      VENDOR.caseId,
+      version.versionId,
+      'ai_coe',
+      await caseRevision(VENDOR.caseId),
+    );
+    await started;
+    try {
+      await db.owner.execute(sql`UPDATE pack_version SET ready_at=now() WHERE id=${version.versionId}`);
+    } finally {
+      release();
+    }
+    const response = await pending;
+    assert.equal(response.statusCode, 409);
+    const late = await db.owner.execute(
+      sql`SELECT * FROM qc_late_result WHERE version_id=${version.versionId}`,
+    );
+    assert.equal(late.rows.length, 1);
+    assert.equal(late.rows[0]!.correlation_id, response.correlationId);
+    const logs = capture.lines().filter((line) => line.correlationId === response.correlationId);
+    const begin = logs.find((line) => line.event === 'qc.run.started')!;
+    const refused = logs.filter((line) => line.event === 'qc.run.late');
+    assert.equal(refused.length, 1);
+    assert.equal(begin.fields!.qcRunId, late.rows[0]!.qc_run_id);
+    assert.equal(refused[0]!.fields!.qcRunId, late.rows[0]!.qc_run_id);
+    assert.equal(
+      (await db.owner.execute(sql`SELECT id FROM qc_run WHERE version_id=${version.versionId}`)).rows.length,
+      0,
+    );
+    assert.equal(
+      (await db.owner.execute(sql`SELECT id FROM qc_finding WHERE version_id=${version.versionId}`)).rows
+        .length,
+      0,
+    );
+    assert.deepEqual(
+      (await db.owner.execute(sql`SELECT count(*)::int AS n FROM audit_event`)).rows,
+      before.rows,
+    );
+    const admin = await signIn(ADMIN);
+    const view = await app.inject({ url: '/api/operator/desk-health', headers: asUser(admin) });
+    assert.equal(view.statusCode, 200, view.body);
+    assert.equal(view.json<DeskHealthReport>().lateQc[0]?.qcRunId, late.rows[0]!.qc_run_id);
+  });
+});
+
+describe('W3-07a operator authorization and liveness', () => {
+  it('operator.view uses real sessions: no session401, every non-admin including dual403, Admin200', async () => {
+    assert.equal((await app.inject('/api/operator/desk-health')).statusCode, 401);
+    for (const user of FIXTURE_USERS) {
+      const session = await signIn(user.fixtureUserId);
+      const response = await app.inject({ url: '/api/operator/desk-health', headers: asUser(session) });
+      const admin = user.roles.some((grant) => grant.role === 'admin');
+      assert.equal(response.statusCode, admin ? 200 : 403, user.fixtureUserId);
+    }
+  });
+  it('healthz has no logs and readyz uses actual dependency probes', async () => {
+    capture.clear();
+    const health = await app.inject('/healthz');
+    assert.equal(health.statusCode, 200);
+    assert.deepEqual(capture.lines(), []);
+    const ready = await app.inject('/readyz');
+    assert.equal(ready.statusCode, 200, ready.body);
+    assert.equal(ready.json<{ store: { migrations: string } }>().store.migrations, 'current');
   });
 });

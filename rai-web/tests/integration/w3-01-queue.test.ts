@@ -1,12 +1,12 @@
 // W3-01 / A06: real Postgres, synthetic fixtures, actual authenticated HTTP handlers.
 
-import { after, before, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { Writable } from 'node:stream';
+import { createLogCapture, assertNoLeak, type LogCapture } from '../support/log-capture.js';
 import { sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import type { PackDraft } from '@rai/shared/schemas/pack';
@@ -56,6 +56,10 @@ const DPO = 'fx-user-dpo';
 const VENDOR = findFixtureCase('fx-case-vendor')!;
 const OPEN = new Date('2026-04-09T02:00:00.000Z'); // Thursday 09:00 Bangkok, before Songkran
 
+let capture: LogCapture;
+afterEach(() => {
+  assertNoLeak(capture);
+});
 let db: TestDatabase;
 let app: FastifyInstance;
 let store: FilesystemBlobStore;
@@ -75,11 +79,8 @@ async function rebuildApp(): Promise<void> {
     now,
   });
   await adapter.start({ host: '127.0.0.1', port: 8787, publicBaseUrl, trustProxy: false });
-  const logStream = new Writable({
-    write(_chunk: Buffer, _enc, cb) {
-      cb();
-    },
-  });
+  capture = createLogCapture();
+  const logStream = capture.stream;
   const built = buildApp({
     config: { nodeEnv: 'test', log: { level: 'info', pretty: false }, trustProxy: false, publicBaseUrl },
     logStream,

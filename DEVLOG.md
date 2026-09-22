@@ -175,3 +175,7 @@ W2-07/W2-09 wired to the real server: promoted evidence browser specs, the autom
 ## W3-07a prerequisite contract — 2026-09-22
 
 Isolated branch from 5fe59ad; shared observability schemas and additive migration 0007 only. [Plan](changes/2026-09-22-w3-07a-observability-contract/plan.md) and [contract](changes/2026-09-22-w3-07a-observability-contract/spec.md). No consumer implementation or OBS acceptance claimed; parent reviews before any publication.
+
+## W3-07a API checkpoint — 2026-09-22
+
+Independent observability modules and app wiring now support readiness/operator reads, safe HTTP capture and correlated lane-QC diagnostics, including durable late-result refusal without new evidence or audit. Local full verification passed 484 unit / 211 integration / 123 real-server browser / 90 substitute browser tests. This is not issue48 completion: separate operator-policy prerequisite PR117, actual-main dependency integration, startup readiness handles, actual notification/retry/digest acceptance, whole-suite noPII proof and W3-INT synthetic submit triggering remain explicit gates. No owning lane or real QC is invented. See changes/2026-09-22-w3-07a-observability-api/review.md. No consumer push or PR.

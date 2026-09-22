@@ -173,6 +173,7 @@ export function loggerOptions(config: {
   pretty: boolean;
 }): NonNullable<FastifyServerOptions['logger']> {
   const base = {
+    base: null, // The W0-10 processId replaces Pino's pid/hostname; never expose the host account name.
     level: config.level,
     redact: {
       paths: [
