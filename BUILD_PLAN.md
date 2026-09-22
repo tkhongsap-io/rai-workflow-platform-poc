@@ -157,17 +157,20 @@ All recorded on 2026-09-21 in the [register](docs/product/decisions.md); the [br
 
 Still open: D04 (inside W0-01), D07-D10 (gates for W4-W8).
 
-## Status against this plan — 2026-09-21 (evening)
+## Status against this plan — 2026-09-22 (W1 exit)
 
 A dated read, not a rewrite. Packages above stay as written. DEVLOG.md is the live record; where they disagree, DEVLOG is newer.
 
-| Gate / package / milestone | Status on 2026-09-21 | Evidence | Next evidence needed |
+| Gate / package / milestone | Status on 2026-09-22 | Evidence | Next evidence needed |
 |---|---|---|---|
 | Documentation anchor | Prepared | changes/2026-09-20-build-anchor | — (used to close G0) |
 | Delivery pack | Prepared, reviewed by two workflows, A11 accepted | changes/2026-09-21-delivery-planning | Team kickoff |
 | G0 | **Closed 2026-09-21** | decisions.md recorded table; changes/2026-09-21-g0-close | — |
 | W0 | **Exit recorded 2026-09-21** | changes/2026-09-21-w0-exit/review.md; docs/delivery/w0-technical-contract.md exit checklist | W1-00 skeleton PR |
-| M1 (W1), M2 (W2), M3 (W3, slice 1) | M1: **Ready (W1 issues status:ready)**; M2, M3: authorized (D03), blocked by the preceding package exit | changes/2026-09-21-w0-exit/review.md | W1-00 contract PR, then W1 exit (W1-08) |
+| W1 | **Exit recorded 2026-09-22 (Google loopback sign-in pending Ta)** | changes/2026-09-22-w1-exit/review.md (347 unit, 135 integration, 108 evidence browser tests; exit negatives and restart by hand; fixture set slice1-synthetic@1 7c80ccd43663) | Ta's manual `local-google` sign-in (TESTING.md runbook) |
+| M1 (W1) | **Reached** (2026-09-22) | changes/2026-09-22-w1-exit/review.md | — |
+| W2 | **Ready** (W2 issues #31-#41 status:ready) | D02 and D05 recorded; W1 exit recorded | W2-01 (submit opens three lanes) |
+| M2 (W2), M3 (W3, slice 1) | M2: authorized (D03), open until W2 exit (W2-08); M3: authorized, blocked by W2 exit | changes/2026-09-22-w1-exit/review.md | W2 exit (W2-08), then W3 |
 | W4-W8 | Not authorized | — | D07-D10 and package gate entries |
 
 ### Where the build diverged from the plan
