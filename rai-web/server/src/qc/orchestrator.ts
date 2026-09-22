@@ -472,12 +472,7 @@ export async function runAndPersistLaneQc(
   return withTransaction(deps.db, async (tx) => {
     await setWorkflowWrite(tx);
     const { version } = await loadOpenSubmittedTarget(tx, input);
-    const prior = await findLatestApproveAttemptRun(
-      tx,
-      version.id,
-      input.lane,
-      ruleRevisionOf(version),
-    );
+    const prior = await findLatestApproveAttemptRun(tx, version.id, input.lane, ruleRevisionOf(version));
     if (prior !== undefined && prior.status === 'completed') {
       const findings = await listFindingsForRun(tx, prior.id);
       return { status: 'completed', runId: prior.id, findings };

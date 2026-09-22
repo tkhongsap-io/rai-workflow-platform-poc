@@ -270,6 +270,7 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
       assert.ok(waited < 750, `case lock held during QC for ${waited}ms`);
     } finally {
       releaseRun();
+      await pending.catch(() => undefined);
     }
     const outcome = await pending;
     assert.equal(outcome.status, 'unavailable');
@@ -329,6 +330,7 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
       assert.equal(sent.statusCode, 201, sent.body);
     } finally {
       releaseRun();
+      await pending.catch(() => undefined);
     }
     await assert.rejects(pending, (err: unknown) => {
       assert.ok(err instanceof StaleVersionError);
