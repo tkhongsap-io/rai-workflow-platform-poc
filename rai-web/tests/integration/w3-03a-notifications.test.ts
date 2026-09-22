@@ -25,7 +25,10 @@ import {
   type Notifications,
 } from '@rai/server/notifications/service';
 import { laneDueDates } from '@rai/server/sla/due-dates';
-import { MemoryMailSink } from '@rai/fixtures/substitutes/mail-sink/index';
+import { createDb } from '@rai/server/db/client';
+import type { QueryConfig, QueryResult } from 'pg';
+import type { MailSink } from '@rai/shared/mail/types';
+import { FileMailSink, MemoryMailSink } from '@rai/fixtures/substitutes/mail-sink/index';
 import { FIXTURE_USERS } from '@rai/fixtures/data/users';
 import { findFixtureCase } from '@rai/fixtures/data/cases/index';
 import { loadFixtures } from '@rai/fixtures/load';
@@ -247,6 +250,8 @@ for (const fail of [false, true])
       const res = await decide(await signIn(id!), version.versionId, lane!, 'approve');
       assert.equal(res.statusCode, 201, res.body);
     }
+    // SKIP LOCKED is not a completion barrier for another post-response worker.
+    await app.close();
     await notifications.deliverPending();
     const result = await db.owner.execute(
       sql`SELECT n.status, n.attempts, n.last_error_code, c.ai_readiness_status FROM notification n JOIN "case" c ON c.id = n.case_id WHERE n.event = 'ready'`,
@@ -427,6 +432,186 @@ test('exported committed loader is reusable without a delivery or status write',
   const [unchanged] = await db.owner.select().from(notification).where(eq(notification.id, row!.id));
   assert.equal(unchanged!.attempts, 0);
   assert.equal(unchanged!.status, 'queued');
+});
+
+// W3-04 reuses the committed workflow harness; no duplicate composer/fixture setup.
+const retryWorker = (mail: MailSink, clock: () => Date, database = db.app) =>
+  createNotifications({
+    db: database,
+    sink: mail,
+    now: clock,
+    identities: FIXTURE_USERS,
+    publicBaseUrl: base,
+    emitter,
+  });
+
+test('W3-04 four failed results persist deadlines and leave Ready decisions unchanged', async () => {
+  await build({ auto: false });
+  const { version } = await submit();
+  for (const [id, lane] of [
+    ['fx-user-dpo', 'dpo'],
+    ['fx-user-ai-coe', 'ai_coe'],
+    ['fx-user-it-security', 'it_security'],
+  ]) {
+    assert.equal((await decide(await signIn(id!), version.versionId, lane!, 'approve')).statusCode, 201);
+  }
+  const snapshot = () =>
+    db.owner.execute(sql`SELECT row_to_json(c) AS c,
+    (SELECT jsonb_agg(d ORDER BY d.id) FROM lane_decision d) AS decisions FROM "case" c WHERE c.id=${caseId}`);
+  const before = (await snapshot()).rows;
+  const [row] = await db.owner.select().from(notification).where(eq(notification.event, 'ready'));
+  sink.failAlways(true);
+  let time = now().getTime();
+  for (const [i, delta] of [0, 1000, 5000, 25000].entries()) {
+    time += delta;
+    const worker = retryWorker(sink, () => new Date(time));
+    if (i > 0)
+      assert.equal(await retryWorker(sink, () => new Date(time - 1)).deliverInitial(row!.id), undefined);
+    assert.equal((await worker.deliverInitial(row!.id))?.attempt, i + 1);
+  }
+  assert.equal(await retryWorker(sink, () => new Date(time + 99999)).deliverInitial(row!.id), undefined);
+  const [stored] = await db.owner.select().from(notification).where(eq(notification.id, row!.id));
+  assert.equal(stored!.status, 'failed');
+  assert.equal(stored!.attempts, 4);
+  assert.equal(stored!.nextAttemptAt, null);
+  assert.deepEqual((await snapshot()).rows, before);
+  const events = logs
+    .join('')
+    .trim()
+    .split('\n')
+    .map(
+      (s) => JSON.parse(s) as { event: string; correlationId: string; fields?: { notificationId?: string } },
+    )
+    .filter((e) => e.fields?.notificationId === row!.id);
+  assert.equal(events.filter((e) => e.event === 'mail.attempt_failed').length, 3);
+  assert.equal(events.filter((e) => e.event === 'mail.failed').length, 1);
+  assert.ok(events.every((e) => e.correlationId === row!.correlationId));
+});
+
+test('W3-04 adopts legacy deadline once; reconnect preserves it and successful retry stops', async () => {
+  await build({ auto: false });
+  await submit();
+  const [row] = await db.owner.select().from(notification);
+  await db.owner
+    .update(notification)
+    .set({ attempts: 1, lastErrorCode: 'sink_failure' })
+    .where(eq(notification.id, row!.id));
+  const time = now().getTime();
+  await retryWorker(sink, now).deliverInitial(row!.id);
+  const connection = createDb(db.urls.app);
+  try {
+    assert.equal(
+      await retryWorker(sink, () => new Date(time + 999), connection.db).deliverInitial(row!.id),
+      undefined,
+    );
+    assert.equal(
+      (await retryWorker(sink, () => new Date(time + 1000), connection.db).deliverInitial(row!.id))?.status,
+      'delivered',
+    );
+    assert.equal(await retryWorker(sink, () => new Date(time + 99999)).deliverInitial(row!.id), undefined);
+    assert.equal(sink.receipts.length, 1);
+    assert.equal(sink.receipts[0]!.attempt, 2);
+  } finally {
+    await connection.close();
+  }
+});
+
+test('W3-04 independent workers skip a held row while another notification progresses', async () => {
+  await build({ auto: false });
+  await submit();
+  const rows = await db.owner.select().from(notification);
+  const entered = Promise.withResolvers<void>(),
+    release = Promise.withResolvers<void>();
+  const gated: MailSink = {
+    identity: sink.identity,
+    deliver: async (r) => {
+      entered.resolve();
+      await release.promise;
+      return sink.deliver(r);
+    },
+  };
+  const connection = createDb(db.urls.app);
+  const otherSink = new MemoryMailSink({ publicBaseUrl: base });
+  const first = retryWorker(gated, now).deliverInitial(rows[0]!.id);
+  try {
+    await entered.promise;
+    const other = retryWorker(otherSink, now, connection.db);
+    assert.equal(await other.deliverInitial(rows[0]!.id), undefined);
+    assert.equal((await other.deliverInitial(rows[1]!.id))?.status, 'delivered');
+  } finally {
+    release.resolve();
+    await first;
+    await connection.close();
+  }
+  assert.equal(sink.sent.length, 1);
+  assert.equal(otherSink.sent.length, 1);
+});
+
+test('W3-04 accepted file then DB rollback: fresh sink deduplicates replay; no precommit success log', async (t) => {
+  await build({ auto: false });
+  await submit();
+  const [row] = await db.owner.select().from(notification);
+  const dir = await mkdtemp(path.join(scratch, 'replay-'));
+  const connection = createDb(db.urls.app, { max: 1 });
+  connection.pool.on('connect', (client) => {
+    const original = client.query.bind(client) as unknown as (
+      config: string | QueryConfig,
+      values?: unknown[],
+    ) => Promise<QueryResult>;
+    let fail = true;
+    t.mock.method(client, 'query', async (query: string | QueryConfig, values?: unknown[]) => {
+      if (fail && (typeof query === 'string' ? query : query.text)?.toLowerCase() === 'commit') {
+        fail = false;
+        throw new Error('synthetic commit failure');
+      }
+      return await original(query, values);
+    });
+  });
+  try {
+    const first = new FileMailSink({ publicBaseUrl: base, dir });
+    await assert.rejects(retryWorker(first, now, connection.db).deliverInitial(row!.id));
+    assert.equal(first.sent.length, 1);
+    const [pending] = await db.owner.select().from(notification).where(eq(notification.id, row!.id));
+    assert.equal(pending!.attempts, 0);
+    assert.ok(!logs.join('').includes('mail.sent'));
+    const restarted = new FileMailSink({ publicBaseUrl: base, dir });
+    assert.equal((await retryWorker(restarted, now).deliverInitial(row!.id))?.status, 'duplicate');
+    assert.equal(restarted.sent.length, 0);
+    const [sent] = await db.owner.select().from(notification).where(eq(notification.id, row!.id));
+    assert.equal(sent!.status, 'sent');
+    assert.equal(sent!.attempts, 1); // two sink invocations, one committed result
+  } finally {
+    await connection.close();
+  }
+});
+
+test('W3-04 selects at most 25 due rows per scan and leaves future retries alone', async () => {
+  await build({ auto: false });
+  await submit();
+  const [row] = await db.owner.select().from(notification).where(eq(notification.lane, 'dpo'));
+  const reviewer = FIXTURE_USERS.find((u) => u.fixtureUserId === 'fx-user-dpo')!;
+  const extra = Array.from({ length: 26 }, (_, i) => ({
+    ...reviewer,
+    subjectId: `retry-${i}`,
+    email: `retry-${i}@rai-desk.example`,
+  }));
+  for (const user of extra)
+    await db.owner.insert(notification).values({ ...row!, id: randomUUID(), recipient: user.email });
+  const worker = createNotifications({
+    db: db.app,
+    sink,
+    now,
+    identities: [...FIXTURE_USERS, ...extra],
+    publicBaseUrl: base,
+    emitter,
+  });
+  sink.failAlways(true);
+  await worker.deliverPending();
+  assert.equal(sink.receipts.length, 25);
+  await worker.deliverPending();
+  assert.equal(sink.receipts.length, 30);
+  await worker.deliverPending();
+  assert.equal(sink.receipts.length, 30);
 });
 
 test('shutdown cancellation keeps the notification lock until the sink settles, then rolls back', async () => {
