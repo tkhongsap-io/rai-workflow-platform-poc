@@ -2,7 +2,7 @@
 // never evidence). The BUILT deployable (`node server/dist/main.js`, what playwright.config.ts starts and what
 // `npm start` runs) is spawned here with every substitute-shaped variable set in its environment; it starts
 // unchanged and nothing of the W1-13 substitute appears: no substitute banner in the served SPA (the product bundle
-// is built with VITE_API_SUBSTITUTE=false whatever the process environment says), no `x-rai-substitute` header on
+// has no API-substitute configuration whatever the process environment says), no `x-rai-substitute` header on
 // any answer, no `/__substitute/reset` hook (the W0-06 JSON 404), and no substitute marker in the served bundle.
 // The static half (no evidence test imports the substitute; the configuration file names no substitute) is
 // tests/integration/w1-int-substitute-absent.test.ts. Fixture ids: fx-user-owner-cm.

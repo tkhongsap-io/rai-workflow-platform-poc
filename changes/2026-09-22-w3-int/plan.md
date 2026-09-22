@@ -1,6 +1,6 @@
 # W3-INT file-level implementation plan — lead review required
 
-Status: planning only, 2026-09-22. Worktree `/tmp/rai-w3-integration`, branch `codex/w3-int`, exact base `fe65fc1`. No implementation has started. See [intent](intent.md) and [spec](spec.md).
+Status: lead-approved early independent implementation, 2026-09-22. Worktree `/tmp/rai-w3-integration`, branch `codex/w3-int`. Plan recorded at `fe65fc1`, committed and rebased onto authorized main `f5c17fc`. Final dependency-sensitive wiring is held; see the approval amendment below. See [intent](intent.md) and [spec](spec.md).
 
 ## Entry and ownership
 
@@ -73,7 +73,7 @@ Lead reviews the plan before code, a separate reviewer reviews implementation, a
 
 ## Parent steering: migration-upgrade CI opt-in
 
-Parent reports main now includes queue UI #114 at `ec2c99b`; this planning worktree remains at its requested `fe65fc1` base until lead authorizes the implementation rebase.
+At planning time, parent reported main included queue UI #114 at `ec2c99b`; the worktree stayed at its requested `fe65fc1` base until the implementation rebase approved below.
 
 Existing full integration discovery skips `w3-07a-migration-contract.test.ts` when `OBS_MIGRATION_ADMIN_URL` is absent. Add the opt-in at the CI integration job/step scope, targeting only its disposable Postgres service (not application runtime config, committed .env, production secrets or other agents' DBs). Existing CI uses the known synthetic postgres/postgres-local account and initializes rai_owner/rai_app; retain that setup and service-port mapping. Give the URL only to the test job. Require an explicit environment-presence check before the migration test and retain visible 1 passed / 0 skipped output so a missing opt-in fails the gate. Do not make the application role a database administrator.
 
@@ -86,3 +86,9 @@ OBS_MIGRATION_ADMIN_URL=postgres://postgres:postgres-local@127.0.0.1:54366/rai n
 ```
 
 This is a known synthetic local credential, not an authored production credential. Port54366 is historical evidence, never a target for this worktree. For eventual local INT verification, use only the parent-confirmed dedicated disposable DB; for CI use its isolated service. Record a new no-skip migration result on the final integration head and the CI run; the parent's prior pass does not substitute for that gate.
+
+## Approved early implementation — 2026-09-22
+
+Lead approved this plan, the test-owned substitute split and CI opt-in, and reserved DB54369/browser58819/substitute58829/web55219. Plan/claim committed as f1a3c7e after rebase onto f5c17fc. Early implementation is limited to independent API-substitute app configuration removal/harness split, real-server queue promotion and approved disposable-CI migration opt-in. Final wiring and 03b/07-dependent tests wait for merged interfaces. One W3-INT PR follows all prerequisites; no agent push/PR/merge.
+
+Direct coordination with Descartes agreed: 07a owns `runAndPersistSubmitQc(QcOrchestratorDeps, {caseId, versionId, correlationId})`, trigger submit/lane null, reusing its runner/persistence/refusal machinery without trigger binding. Terminal submit replays include unavailable results; historical NULL reason is reported unknown, never fabricated. W3-INT later owns the newly committed submit hook, drain/soft-response behavior and restart acceptance. This entry is not yet available for binding; no QC/submit files are edited at this checkpoint. #35 remains open.

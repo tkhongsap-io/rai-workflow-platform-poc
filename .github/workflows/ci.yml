@@ -134,7 +134,12 @@ jobs:
       - name: local configuration (placeholders only; DATABASE_URL names the service port)
         run: cp .env.example .env
       - run: npm run migrate
-      - run: npm run test:integration
+      - name: integration including historical observability migration (no opt-in skip)
+        env:
+          OBS_MIGRATION_ADMIN_URL: postgres://postgres:postgres-local@127.0.0.1:54320/rai # disposable CI service only
+        run: |
+          test -n "$OBS_MIGRATION_ADMIN_URL"
+          npm run test:integration
 
   # 6. Build and substitute absence (production bundle: NODE_ENV deliberately unset here)
   build:

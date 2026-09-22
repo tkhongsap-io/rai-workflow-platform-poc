@@ -1,7 +1,7 @@
 // Playwright configuration for Lane B specs against the W1-13 in-memory API substitute (W0-02 sections 3.4 and
 // 8.1; W1-07 adds it). Two loopback processes: the substitute (support/substitute-server.ts: the W1-13 handler
 // on node:http plus a test-only `POST /__substitute/reset` so a spec that saves, uploads or submits can start
-// each test from the fixture state; W1-06) and the Vite dev server with VITE_API_SUBSTITUTE=true proxying /api
+// each test from the fixture state; W1-06) and a test-owned Vite configuration proxying /api
 // and /auth to it. The three handoff widths run as projects; one worker, because the substitute's state is
 // shared by every spec.
 //
@@ -39,15 +39,14 @@ export default defineConfig({
       env: { NODE_ENV: 'test' },
     },
     {
-      command: `npx vite --host 127.0.0.1 --port ${webPort} --strictPort`,
+      command: `npx vite --config ../tests/browser/support/vite.substitute.config.ts --host 127.0.0.1 --port ${webPort} --strictPort`,
       cwd: '../../web',
       port: webPort,
       reuseExistingServer: false,
       timeout: 120_000,
       env: {
         NODE_ENV: 'test',
-        VITE_API_SUBSTITUTE: 'true',
-        API_PROXY_TARGET: `http://127.0.0.1:${substitutePort}`,
+        SUBSTITUTE_PORT: String(substitutePort),
       },
     },
   ],

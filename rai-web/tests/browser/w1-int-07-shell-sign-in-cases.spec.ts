@@ -129,7 +129,7 @@ test.describe(`W1-INT (W1-07) sign-in and scoped list on the real server (fx-use
     await expect(page).toHaveURL(/\/sign-in/);
     await expect(page.getByRole('heading', { level: 1, name: th['sign_in.title'] })).toBeVisible();
     // The real server, not the substitute: the product bundle carries no substitute banner
-    // (VITE_API_SUBSTITUTE is forced off by `npm run build`) and no answer is marked as a substitute's.
+    // (application configuration has no API-substitute selector) and no answer is marked as a substitute's.
     await expect(page.getByText(th['shell.substitute_banner'])).toHaveCount(0);
     await expect(page.getByTestId('substitute-banner')).toHaveCount(0);
     const probe = await page.request.get('/auth/fixture/users');
