@@ -85,3 +85,10 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: next ticket in the dependency map.
 - Author: operator=ta session=build-workflow model=claude-opus-5
 - Evidence: https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/87
+
+## 2026-09-21 (time not recorded) — W1-08 merged
+- What: W1 exit (Milestone M1): clean-checkout evidence for A01/A02/A07 with every command and output, explicit fail-closed and scope negatives, hand-run restart journey with byte-identical bodies and download; Google-on-loopback runbook in TESTING.md pending Ta; W2 issues flipped to ready; epic #52 closed. PR #88.
+- Why: Ticket W1-08 of the delivery pack; two independent reviewer agents passed before merge.
+- Next: next ticket in the dependency map.
+- Author: operator=ta session=build-workflow model=claude-opus-5
+- Evidence: https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/88
