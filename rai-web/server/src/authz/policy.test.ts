@@ -76,7 +76,7 @@ function targetFor(action: Action, facts: CaseScopeFacts, role: Role = 'dpo'): T
   }
 }
 
-test('every row names a known role and action; W1-00 plus W2-02 D05 rows are present; W3 rows are not', () => {
+test('every row names a known role and action; W1-00 plus W2-02 D05 rows are present; W3-07a operator row is present', () => {
   const actionsWithRows = new Set(POLICY_ROWS.map((r) => r.action));
   assert.deepEqual(
     [...actionsWithRows].sort(),
@@ -101,9 +101,10 @@ test('every row names a known role and action; W1-00 plus W2-02 D05 rows are pre
       'history.view',
       'lane.approve',
       'lane.send_back',
+      'operator.view',
       'version.view',
     ],
-    'queue.*, operator.view (W3) have no row yet',
+    'queue.* remain without rows; operator.view is Admin-only',
   );
   for (const row of POLICY_ROWS) {
     assert.ok((ROLES as readonly string[]).includes(row.role));
@@ -369,4 +370,20 @@ test('authorize is pure: the same inputs give the same decision and the actor is
   const b = authorize(actor, 'case.view', { kind: 'case', facts: inScope });
   assert.deepEqual(a, b);
   assert.equal(JSON.stringify(actor), before);
+});
+
+test('W3-07a operator.view admits only Admin, including explicit denial of combined non-Admin roles (W0-05 T14)', () => {
+  assert.deepEqual(rowsForAction('operator.view'), [
+    { action: 'operator.view', role: 'admin', scope: 'all_cases' },
+  ]);
+  assert.equal(authorize(actorOf('admin'), 'operator.view', { kind: 'none' }).allow, true);
+  for (const role of ROLES.filter((role) => role !== 'admin')) {
+    assert.equal(authorize(actorOf(role), 'operator.view', { kind: 'none' }).allow, false, role);
+  }
+  assert.equal(authorize(actorOf('owner', 'dpo'), 'operator.view', { kind: 'none' }).allow, false);
+  assert.equal(authorize(actorOf(), 'operator.view', { kind: 'none' }).allow, false);
+  assert.equal(
+    authorize(actorOf('admin'), 'lane.approve', { kind: 'lane', facts: outOfScope, lane: 'dpo' }).allow,
+    false,
+  );
 });
