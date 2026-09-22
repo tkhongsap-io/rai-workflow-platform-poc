@@ -1,5 +1,9 @@
 # Development log
 
+## W0 and W1 build closed: 2026-09-22
+
+32 PRs (#57-#88) through the reviewed ticket flow. W0 exit and Milestone M1 recorded; W2 ready. [Change review](changes/2026-09-21-w0-w1-build/review.md) records what the gate caught and the process fixes for W2.
+
 ## Milestone M1: 2026-09-22
 
 W1 exit recorded from a clean checkout of `main` ([review](changes/2026-09-22-w1-exit/review.md), PR for W1-08, issue #30). Fixture set `slice1-synthetic@1 7c80ccd43663`. `npm run verify`: 347 unit and 135 integration tests green on the real Postgres; `npm run build && npm run check:substitute-absent`: 391 files scanned, 0 with the marker; `npm run test:browser:server`: 108 evidence browser tests green (the W1-INT journey create → attach → submit → restart → reopen, the BU-SPOC positive, the promoted W1-06/W1-07 specs, the evidence-configuration check, at three widths, axe zero critical); repository checks green. The W1 exit negatives were also run explicitly against the built server and quoted: no session and a direct file URL 401, wrong role 403, other BU 403 with the HR cases absent from the CM SPOC's list, disguised executables `422 unsafe_upload` with nothing stored, `local-google` with `HOST=0.0.0.0` → `process.refused bind_not_loopback` exit 78 and with `RAI_IDENTITY_MODE=bogus` → `mode_unknown` exit 78. The restart journey was run once more by hand over the API: five bodies and the artifact bytes byte-identical across a SIGTERM and a new process; a write to the frozen version is `409 version_superseded` and a raw `UPDATE pack_version` raises `rai.frozen_version` as `rai_owner` and `rai_app`.
