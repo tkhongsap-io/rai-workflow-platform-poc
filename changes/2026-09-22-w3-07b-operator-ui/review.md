@@ -1,8 +1,38 @@
 # W3-07b prerequisite and consumer evidence
 
+## Final preparation on merged API main — 2026-09-23
+
+Current local publication base is `4fa14d62a8b615206e7880b9a596812536f8c5e8` (API #123 merged). Earlier sections below retain historical prerequisite/consumer evidence; their pending rebase and dependency notes are superseded by this checkpoint.
+
+The unpublished combined preparation `999bbe4` is preserved at local ref `archive/w3-07b-combined-999bbe4`. Starting from actual main, replayed **only** consumer `43ed6c7` as `761f9e7` and review documentation `bb6d4fc` as `b846230`, without conflicts. No API commit, runtime wiring, schema, migration, shared locale/client change or duplicate API documentation was replayed. Queue and operator route registrations both remain present. September 23 root delivery entries and this record are a separate docs-only commit.
+
+### Full-proof provenance
+
+Parent supplied `/tmp/rai-w3-operator-ui-combined-full.log`; its `npm run verify:full` output was inspected locally. It records lint, typecheck, build, substitute-absence and all four suites passing:
+
+| Suite | Passed | Failed / skipped |
+|---|---:|---|
+| Unit | 530 | 0 / 0 |
+| Integration | 256 | 0 / 0 |
+| Real-server browser | 126 | 0 / 0 |
+| Substitute browser | 171 | 0 / 0 |
+
+The tested `rai-web` tree is **`b0462037070becc4ca42c630ae199532d279f863`**. Independently checked `git rev-parse 999bbe4:rai-web` and the replayed `HEAD:rai-web`: both equal that exact hash. Full-proof reuse is based on tracked application/test/config/lockfile tree identity, not an assertion that the new commit independently reran the full suite. No database or full suite was started during this finalization. Final-head CI remains mandatory.
+
+### Focused verification and remaining gates
+
+Fresh focused checks on the replayed tree with Node 24.21.0 passed:
+
+- `npm run typecheck` and `npm run lint` (ESLint, Prettier, CSS).
+- `NODE_ENV=test RAI_IDENTITY_MODE=fixture node --import tsx --conditions=rai-source --test web/src/screens/operator/desk-health.view-model.test.ts`: **2 passed, zero failed/skipped**.
+- `NODE_ENV=test SUBSTITUTE_PORT=60789 SUBSTITUTE_WEB_PORT=60175 npx playwright test -c tests/browser/playwright.substitute.config.ts tests/browser/w3-07b-operator.rehearsal.substitute.spec.ts`: **48 passed**, all 16 scenarios at 1440/834/390; log `/tmp/rai-w3-operator-ui-final-focused-browser.log`.
+- Documentation links: **203 files / 725 links / zero broken**; frozen-source hash matched; diff whitespace clean.
+
+Operator browser checks remain Playwright-intercepted rehearsal, never actual API/failed-mail/QC provenance or real OBS-17 acceptance. W3-INT owns that acceptance. The existing bounded consumer size exception remains in plan.md. Parent arranges independent review before push, then CI and merge; published PR #119 remains draft at `bb6d4fc` and is not changed by this local work.
+
 ## Scope and dependency
 
-Parent accepted the operator UI plan under #48 and authorized a separate local locale/routes/client prerequisite commit, followed by a separate consumer commit. Planning began on `89f7de9`; the work is now based on supplied combined contract head `9980c7e` (validated W3-07a `d931cea` plus main `a2392c9`). Planning documents were retained. The append-only Lane B conflict was resolved by keeping both W3-03a and W3-07b claims. No shared schema or server implementation was copied from a dirty worktree.
+Parent accepted the operator UI plan under #48 and authorized a separate local locale/routes/client prerequisite commit, followed by a separate consumer commit. Planning began on `89f7de9`; the prerequisite was then based on supplied combined contract head `9980c7e` (validated W3-07a `d931cea` plus main `a2392c9`). Planning documents were retained. The append-only Lane B conflict was resolved by keeping both W3-03a and W3-07b claims. No shared schema or server implementation was copied from a dirty worktree.
 
 The committed W3-07a JSON schemas are authoritative. No response-schema extension is needed. Queued mail permits omitted nextAttemptAt; terminal mail requires four attempts and failureCategory. Missing optional digest values stay missing. These are contract semantics, not proof of a live operator endpoint.
 
