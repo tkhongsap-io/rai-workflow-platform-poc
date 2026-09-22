@@ -42,4 +42,11 @@ Whole-PR size supersedes the earlier per-commit wording. Final INT base is not s
 
 All three confirmed findings addressed: complete bounded startup environment extracted and validated by the actual parser; canonical fixture display-name enrollment with subject identity preserved; both authoritative submission audit actions included in per-submit and aggregate settlement. Regressions reject incomplete environments, subject text in descriptive business_owner, wrong version/correlation, and non-clean successor aggregate outcomes. The earlier19 tests missed these defects and did not establish runtime feasibility.
 
-Local verification:22 pure tests pass with zero failures/skips; focused TypeScript, ESLint, Prettier, link/frozen-source and whitespace checks pass. No DB, real application startup, browser or benchmark execution. Independent re-review remains pending on the repair commit; final-INT rebase/typecheck and authorized runtime smoke remain separate gates. Whole-PR exception/count policy is unchanged.
+Local verification:22 pure tests pass with zero failures/skips; focused TypeScript, ESLint, Prettier, link/frozen-source and whitespace checks pass. No DB, real application startup, browser or benchmark execution. Independent re-review was pending at repair handoff; the collected outcome is recorded below. Final-INT rebase/typecheck and authorized runtime smoke remain separate gates. Whole-PR exception/count policy is unchanged.
+
+
+## Collected independent re-review
+
+Parent relayed Descartes's CLEAN re-review of exact `a3e835f2124dfc8fdd50b42b9758f8014d41d847`: all three P2 findings resolved; reviewer independently reran22 pure tests, all passed with zero skips. This is independent preparation evidence, not runtime startup, SQL execution, seed feasibility or performance acceptance.
+
+Hold code and runtime execution until parent supplies the actual merged final INT commit and execution authorization. The only reserved benchmark DB endpoint is loopback **54370**, with two distinct guarded database names and distinct explicitly assigned HTTP origins; no guessed environment values or use of other agents' databases. No rebase or runtime action accompanies this documentation update. Once the base is supplied, reconcile the branch, rerun focused typechecks/tests, report the whole-PR diff against that exact base for the bounded test-only exception, and perform runtime smoke only when authorized. The pending INT lifecycle fix and its verification belong to the parent.
