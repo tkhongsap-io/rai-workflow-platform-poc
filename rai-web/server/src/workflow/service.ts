@@ -72,6 +72,8 @@ function caseRef(row: CaseRow): Record<string, AuditRefValue> {
 
 /**
  * Shared expected-version / precondition checks for decide (W0-06 4.4 / 4.5 / 5.2).
+ * Does **not** compare `expected.revision` to `case.row_version`: §5.1 freezes revision for submitted
+ * versions, and §5.2 names version_superseded / version_closed / lane_already_decided for these actions.
  * `requireNoSuccessor`: approve only — a successor draft closes the version for further approvals.
  */
 async function assertDecideTarget(
@@ -133,18 +135,6 @@ async function assertDecideTarget(
     );
   }
 
-  if (row.rowVersion !== expected.revision) {
-    throw new StaleVersionError(
-      staleDetails(
-        'revision_changed',
-        'error.stale_version.guidance.revision_changed',
-        current,
-        row.rowVersion,
-        refreshPathFor(row.id, current),
-      ),
-    );
-  }
-
   return current;
 }
 
@@ -170,12 +160,12 @@ async function assertLanePending(
 
 /** Reject approve without a qc_run_id (W0-06 4.4 `lane_qc_not_run`). Accepts any UUID without a QC lookup. */
 export function requireQcRunId(qcRunId: string | undefined): string {
-  if (typeof qcRunId !== 'string' || qcRunId.trim() === '' || !UUID.test(qcRunId)) {
+  if (typeof qcRunId !== 'string' || qcRunId.trim() === '' || !UUID.test(qcRunId.trim())) {
     throw new InvalidInputError([
       { path: 'body.qcRunId', messageKey: 'error.invalid_input.lane_qc_not_run' },
     ]);
   }
-  return qcRunId;
+  return qcRunId.trim();
 }
 
 /** A09: send-back feedback must name at least one artifact (slot). Schema enforces minItems; belt-and-braces. */
@@ -268,7 +258,7 @@ export async function approveLane(
         });
 
         const after = await writeLaneProjection(tx, before, lane, 'approved', now);
-        const body = responseOf(decisionId, version.id, lane, 'approve', now, null, after.rowVersion);
+        const body = responseOf(decisionId, version.id, lane, 'approve', now, null, before.rowVersion);
         await audit({
           action: 'lane.approved',
           targetCaseId: before.id,
@@ -402,7 +392,7 @@ export async function sendBackLane(
           'send_back',
           now,
           successor.draft.id,
-          after.rowVersion,
+          before.rowVersion,
         );
         return { status: 201, body };
       },

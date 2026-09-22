@@ -257,28 +257,39 @@ describe(`W2-02 lane decision — ${SET}`, () => {
     assert.equal((decisions.rows[0] as { n: number }).n, 0);
   });
 
-  it('stale expected revision is rejected; approve without qcRunId is invalid_input lane_qc_not_run', async () => {
+  it('stale versionId is version_superseded; missing qcRunId hits lane_qc_not_run in the service', async () => {
     const owner = await signIn(OWNER_A);
     const version = await submitOk(owner, NONVENDOR.caseId);
     const revision = await caseRevision(NONVENDOR.caseId);
     const dpo = await signIn(DPO);
 
-    const stale = await decide(dpo, NONVENDOR.caseId, version.versionId, 'dpo', 'approve', {
-      expectedVersion: { versionId: version.versionId, revision: revision - 1 },
+    // Path and body must agree; the id must not be the latest submitted version (§5.2 version_superseded).
+    const otherVersionId = randomUUID();
+    const stale = await decide(dpo, NONVENDOR.caseId, otherVersionId, 'dpo', 'approve', {
+      expectedVersion: { versionId: otherVersionId, revision },
       qcRunId: randomUUID(),
     });
     assert.equal(stale.statusCode, 409, stale.body);
     assert.equal(
       stale.json<{ error: { code: string; details: { reason: string } } }>().error.details.reason,
-      'revision_changed',
+      'version_superseded',
     );
 
+    // Omit qcRunId so Ajv accepts the body and requireQcRunId throws lane_qc_not_run.
     const noQc = await decide(dpo, NONVENDOR.caseId, version.versionId, 'dpo', 'approve', {
       expectedVersion: { versionId: version.versionId, revision },
-      qcRunId: '',
     });
-    // empty string fails schema or our requireQcRunId — either 422
     assert.equal(noQc.statusCode, 422, noQc.body);
+    const err = noQc.json<{
+      error: { code: string; details: { fields: Array<{ path: string; messageKey: string }> } };
+    }>();
+    assert.equal(err.error.code, 'invalid_input');
+    assert.ok(
+      err.error.details.fields.some(
+        (f) => f.path === 'body.qcRunId' && f.messageKey === 'error.invalid_input.lane_qc_not_run',
+      ),
+      noQc.body,
+    );
   });
 
   it('repeated Idempotency-Key returns the same body and writes no second decision', async () => {
@@ -303,11 +314,53 @@ describe(`W2-02 lane decision — ${SET}`, () => {
     assert.equal(approved.length, 1);
   });
 
-  it('send-back without named artifact feedback is rejected; with feedback creates successor draft and notice', async () => {
+  it('a second approve of the same lane with a new Idempotency-Key is 409 lane_already_decided', async () => {
     const owner = await signIn(OWNER_A);
     const version = await submitOk(owner, NONVENDOR.caseId);
     const revision = await caseRevision(NONVENDOR.caseId);
     const dpo = await signIn(DPO);
+    const body = {
+      expectedVersion: { versionId: version.versionId, revision },
+      qcRunId: randomUUID(),
+    };
+    const first = await decide(dpo, NONVENDOR.caseId, version.versionId, 'dpo', 'approve', body);
+    assert.equal(first.statusCode, 201, first.body);
+    const again = await decide(dpo, NONVENDOR.caseId, version.versionId, 'dpo', 'approve', {
+      ...body,
+      qcRunId: randomUUID(),
+    });
+    assert.equal(again.statusCode, 409, again.body);
+    assert.equal(
+      again.json<{ error: { details: { reason: string } } }>().error.details.reason,
+      'lane_already_decided',
+    );
+    const n = await db.owner.execute(sql`SELECT count(*)::int AS n FROM lane_decision`);
+    assert.equal((n.rows[0] as { n: number }).n, 1);
+  });
+
+  it('send-back without named artifact is rejected; with feedback creates successor copying stage, template and slots', async () => {
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, NONVENDOR.caseId);
+    const revision = await caseRevision(NONVENDOR.caseId);
+    const dpo = await signIn(DPO);
+
+    const parentMeta = (
+      await db.owner.execute(
+        sql`SELECT stage_context, checklist_template_version FROM pack_version WHERE id = ${version.versionId}`,
+      )
+    ).rows[0] as { stage_context: string; checklist_template_version: string };
+    const parentSlots = (
+      await db.owner.execute(
+        sql`SELECT slot, state, reason, artifact_id FROM artifact_slot
+            WHERE version_id = ${version.versionId} ORDER BY slot`,
+      )
+    ).rows as Array<{
+      slot: number;
+      state: string;
+      reason: string | null;
+      artifact_id: string | null;
+    }>;
+    assert.equal(parentSlots.length, 9);
 
     const empty = await decide(dpo, NONVENDOR.caseId, version.versionId, 'dpo', 'send-back', {
       expectedVersion: { versionId: version.versionId, revision },
@@ -325,18 +378,50 @@ describe(`W2-02 lane decision — ${SET}`, () => {
     assert.ok(body.successorDraftVersionId);
 
     const drafts = await db.owner.execute(
-      sql`SELECT id, parent_version_id, version_number, submitted_at IS NULL AS is_draft
+      sql`SELECT id, parent_version_id, version_number, stage_context, checklist_template_version,
+                 submitted_at IS NULL AS is_draft
           FROM pack_version WHERE id = ${body.successorDraftVersionId}`,
     );
     const draft = drafts.rows[0] as {
       id: string;
       parent_version_id: string;
       version_number: number;
+      stage_context: string;
+      checklist_template_version: string;
       is_draft: boolean;
     };
     assert.equal(draft.parent_version_id, version.versionId);
     assert.equal(draft.version_number, version.versionNumber + 1);
     assert.equal(draft.is_draft, true);
+    assert.equal(draft.stage_context, parentMeta.stage_context);
+    assert.equal(draft.checklist_template_version, parentMeta.checklist_template_version);
+
+    const childSlots = (
+      await db.owner.execute(
+        sql`SELECT slot, state, reason, artifact_id FROM artifact_slot
+            WHERE version_id = ${body.successorDraftVersionId} ORDER BY slot`,
+      )
+    ).rows as Array<{
+      slot: number;
+      state: string;
+      reason: string | null;
+      artifact_id: string | null;
+    }>;
+    assert.equal(childSlots.length, 9);
+    assert.deepEqual(
+      childSlots.map((s) => ({
+        slot: s.slot,
+        state: s.state,
+        reason: s.reason,
+        artifact_id: s.artifact_id,
+      })),
+      parentSlots.map((s) => ({
+        slot: s.slot,
+        state: s.state,
+        reason: s.reason,
+        artifact_id: s.artifact_id,
+      })),
+    );
 
     // Version N stays readable and frozen
     const frozen = await app.inject({
@@ -389,23 +474,24 @@ describe(`W2-02 lane decision — ${SET}`, () => {
     assert.equal(hrSend.statusCode, 403, hrSend.body);
   });
 
-  it('AI/COE and IT/Security each decide only their own lane', async () => {
+  it('AI/COE and IT/Security each decide only their own lane; sibling decide does not change case.row_version', async () => {
     const owner = await signIn(OWNER_A);
     const version = await submitOk(owner, NONVENDOR.caseId);
-    let revision = await caseRevision(NONVENDOR.caseId);
+    const revision = await caseRevision(NONVENDOR.caseId);
     const ai = await signIn(AI_COE);
     const aiOk = await decide(ai, NONVENDOR.caseId, version.versionId, 'ai_coe', 'approve', {
       expectedVersion: { versionId: version.versionId, revision },
       qcRunId: randomUUID(),
     });
     assert.equal(aiOk.statusCode, 201, aiOk.body);
-    revision = await caseRevision(NONVENDOR.caseId);
+    assert.equal(await caseRevision(NONVENDOR.caseId), revision, 'lane decide must not bump row_version');
     const it = await signIn(IT_SEC);
     const itOk = await decide(it, NONVENDOR.caseId, version.versionId, 'it_security', 'approve', {
       expectedVersion: { versionId: version.versionId, revision },
       qcRunId: randomUUID(),
     });
     assert.equal(itOk.statusCode, 201, itOk.body);
+    assert.equal(await caseRevision(NONVENDOR.caseId), revision);
     const c = await db.owner.execute(
       sql`SELECT privacy_status, security_status, rai_status FROM "case" WHERE id = ${NONVENDOR.caseId}`,
     );

@@ -4,14 +4,15 @@
 // requires feedback that names at least one artifact slot (A09).
 
 import { Type, type Static } from 'typebox';
-import { LANES, type Lane } from '../constants.js';
+import type { Lane } from '../constants.js';
 import { ExpectedVersionSchema } from './versions.js';
 import { SlotNumberSchema } from './slots.js';
 
+// Explicit literals (not LANES[i]): noUncheckedIndexedAccess makes indexed access `Lane | undefined`.
 export const LaneSchema = Type.Union([
-  Type.Literal(LANES[0]),
-  Type.Literal(LANES[1]),
-  Type.Literal(LANES[2]),
+  Type.Literal('ai_coe'),
+  Type.Literal('dpo'),
+  Type.Literal('it_security'),
 ]);
 export type { Lane };
 
@@ -21,11 +22,7 @@ export type LaneStateName = (typeof LANE_STATES)[number];
 
 export const LaneStateSchema = Type.Object({
   lane: LaneSchema,
-  state: Type.Union([
-    Type.Literal(LANE_STATES[0]),
-    Type.Literal(LANE_STATES[1]),
-    Type.Literal(LANE_STATES[2]),
-  ]),
+  state: Type.Union([Type.Literal('pending'), Type.Literal('approved'), Type.Literal('sent_back')]),
 });
 export type LaneState = Static<typeof LaneStateSchema>;
 
@@ -43,10 +40,14 @@ export const SendBackFeedbackSchema = Type.Object({
 });
 export type SendBackFeedback = Static<typeof SendBackFeedbackSchema>;
 
-/** POST …/lanes/{lane}/approve — W0-06 4.4. */
+/**
+ * POST …/lanes/{lane}/approve — W0-06 4.4.
+ * `qcRunId` is optional at the schema layer so a missing value reaches the service check
+ * (`invalid_input` `lane_qc_not_run`); do not rely on minLength alone.
+ */
 export const ApproveLaneRequestSchema = Type.Object({
   expectedVersion: ExpectedVersionSchema,
-  qcRunId: Type.String({ minLength: 1 }), // required; missing/empty → invalid_input lane_qc_not_run
+  qcRunId: Type.Optional(Type.String()),
 });
 export type ApproveLaneRequest = Static<typeof ApproveLaneRequestSchema>;
 
@@ -65,10 +66,11 @@ export const LaneDecisionResponseSchema = Type.Object({
   decisionId: Type.String(),
   versionId: Type.String(),
   lane: LaneSchema,
-  decision: Type.Union([Type.Literal(LANE_DECISIONS[0]), Type.Literal(LANE_DECISIONS[1])]),
+  decision: Type.Union([Type.Literal('approve'), Type.Literal('send_back')]),
   decidedAt: Type.String(),
-  /** Present when this send-back created the successor draft; null when reusing an existing one or on approve. */
+  /** Present when this send-back created or reused a successor draft; null on approve. */
   successorDraftVersionId: Type.Union([Type.String(), Type.Null()]),
+  /** case.row_version at decision time (unchanged by the decision; W0-06 5.1 frozen for submitted versions). */
   caseRevision: Type.Integer({ minimum: 1 }),
 });
 export type LaneDecisionResponse = Static<typeof LaneDecisionResponseSchema>;
