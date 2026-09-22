@@ -634,3 +634,9 @@ Other:
 ## W3-07a observability reconciliation — 2026-09-22
 
 The [W3-07a contract](../../changes/2026-09-22-w3-07a-observability-contract/spec.md) implements the persistence prerequisite for the required lateQc list, preserves unknown historical unavailable reasons and requires synthetic submit-trigger/late-result integration proof in W3-INT. The owning-lane question remains unresolved. Digest job provenance requires a separate coordinated mail contract and sink regression tests; ordinary audit provenance remains mandatory. Existing CommittedEvent/sink validation is unchanged by this prerequisite.
+
+## W3-03b committed digest provenance amendment
+
+The W3-07a persisted operator job/link is the digest authority. `CommittedEvent` retains mandatory auditEventId for business events; `DeliveryRequest.event` is now the precisely narrowed case-event arm or `CommittedDigestEvent`. The digest arm has no auditEventId and requires `DigestJobProvenance` (kind=sla_digest_job, jobRunId, digestDay, correlationId). The sink validates the shared provenance schema, real calendar day and matching event/day/correlation; the server loader must separately prove the committed SQL linkage. A UUID alone is not authority. File-sink text records job-run/day headers for digest, audit-ID for case events.
+
+This supersedes the illustrative digest-as-business-event shape above, not ordinary audit requirements. The dedup tuple remains event/Bangkok-day/-/recipient; 07a's unique day/recipient linkage and deferred orphan constraint supply persisted authority. Day is frozen from job start. Configured operator recipients only; empty breaches complete with zero count and no email. Retry uses original notification/job provenance. This amendment introduces no external transport or digest consumer.

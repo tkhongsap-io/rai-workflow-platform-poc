@@ -1,6 +1,7 @@
 // W0-07 section 4.2, transcribed (W1-00 creates; W1-11 and W3-03/W3-04 consume). The sink is handed committed
 // events only; a deep link carries no token and grants nothing (A05).
 
+import type { DigestJobProvenance } from '../schemas/observability.js';
 import type { Lane } from '../constants.js';
 
 export type MailEventKind = 'lane_opened' | 'sent_back' | 'ready_for_launch' | 'sla_breach_digest';
@@ -27,6 +28,26 @@ export interface CommittedEvent {
   committedAt: string; // ISO-8601 UTC
   correlationId: string; // W0-10; shared with the audit event, the notification row and the log line
 }
+
+/** Case delivery always retains business audit provenance. */
+export type CaseMailEvent = CommittedEvent & {
+  kind: Exclude<MailEventKind, 'sla_breach_digest'>;
+  provenance?: never;
+};
+/** Persisted job evidence, never a fabricated human/business audit. */
+export interface CommittedDigestEvent {
+  kind: 'sla_breach_digest';
+  caseId: null;
+  versionId: null;
+  versionNumber: null;
+  lane: null;
+  digestDay: string;
+  committedAt: string;
+  correlationId: string;
+  provenance: DigestJobProvenance;
+  auditEventId?: never;
+}
+export type MailDeliveryEvent = CaseMailEvent | CommittedDigestEvent;
 
 export interface AuthorizedRecipient {
   recipientId: string; // subject ID for a person; `operator_recipients:<n>` for a configured address. Not part of the dedup key
@@ -60,7 +81,7 @@ export interface RenderedMail {
 
 export interface DeliveryRequest {
   dedupKey: string; // W0-07 section 4.4; the W0-04 `notification` unique index (event, version_id, lane, recipient) as one string
-  event: CommittedEvent;
+  event: MailDeliveryEvent;
   recipient: AuthorizedRecipient;
   deepLinks: SafeDeepLink[]; // at least one
   digestCases: DigestCaseRef[] | null; // non-empty for sla_breach_digest; null for every other kind

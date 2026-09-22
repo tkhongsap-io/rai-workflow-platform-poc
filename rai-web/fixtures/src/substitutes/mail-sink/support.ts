@@ -3,7 +3,9 @@
 
 import type {
   AuthorizedRecipient,
-  CommittedEvent,
+  CaseMailEvent,
+  CommittedDigestEvent,
+  MailDeliveryEvent,
   DeliveryRequest,
   DigestCaseRef,
   SafeDeepLink,
@@ -33,7 +35,7 @@ export const OPERATOR_RECIPIENT: AuthorizedRecipient = {
   basis: 'operator_recipients',
 };
 
-export function laneOpenedEvent(overrides: Partial<CommittedEvent> = {}): CommittedEvent {
+export function laneOpenedEvent(overrides: Partial<CaseMailEvent> = {}): CaseMailEvent {
   return {
     kind: 'lane_opened',
     caseId: CASE_ID,
@@ -48,7 +50,7 @@ export function laneOpenedEvent(overrides: Partial<CommittedEvent> = {}): Commit
   };
 }
 
-export function digestEvent(overrides: Partial<CommittedEvent> = {}): CommittedEvent {
+export function digestEvent(overrides: Partial<CommittedDigestEvent> = {}): CommittedDigestEvent {
   return {
     kind: 'sla_breach_digest',
     caseId: null,
@@ -56,7 +58,12 @@ export function digestEvent(overrides: Partial<CommittedEvent> = {}): CommittedE
     versionNumber: null,
     digestDay: '2026-09-21',
     lane: null,
-    auditEventId: AUDIT_EVENT_ID,
+    provenance: {
+      kind: 'sla_digest_job',
+      jobRunId: '0192b3c4-0000-7000-8000-000000000401',
+      digestDay: overrides.digestDay ?? '2026-09-21',
+      correlationId: overrides.correlationId ?? CORRELATION_ID,
+    },
     committedAt: '2026-09-21T01:00:00.000Z',
     correlationId: CORRELATION_ID,
     ...overrides,
@@ -86,7 +93,7 @@ export function queueLink(): SafeDeepLink {
 }
 
 export interface RequestOverrides {
-  event?: CommittedEvent;
+  event?: MailDeliveryEvent;
   recipient?: AuthorizedRecipient;
   deepLinks?: SafeDeepLink[];
   digestCases?: DigestCaseRef[] | null;
@@ -161,7 +168,7 @@ export function digestRequest(
 }
 
 /** buildDedupKey when the event is complete; a stable placeholder when a test deliberately breaks the identity. */
-function safeDedupKey(event: CommittedEvent, recipient: AuthorizedRecipient): string {
+function safeDedupKey(event: MailDeliveryEvent, recipient: AuthorizedRecipient): string {
   try {
     return buildDedupKey(event, recipient);
   } catch {

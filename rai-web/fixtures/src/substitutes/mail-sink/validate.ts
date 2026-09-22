@@ -2,6 +2,7 @@
 // is the receipt's `error`. Defensive: the W3-03 notifier already guarantees them. No message ever carries an
 // address, a URL, a subject or a body (W0-10 redaction); it names a field or an index.
 
+import { isDigestJobProvenance } from '@rai/shared/mail/provenance';
 import type { DeliveryErrorCode, DeliveryRequest, SafeDeepLink } from '@rai/shared/mail/types';
 
 export interface DeliveryError {
@@ -158,9 +159,36 @@ function checkBodyLinks(request: DeliveryRequest): DeliveryError | null {
 }
 
 function checkCommitted(request: DeliveryRequest): DeliveryError | null {
-  const id = request.event.auditEventId;
-  if (typeof id !== 'string' || id === '')
-    return { code: 'malformed_request', message: 'event.auditEventId: empty; not a committed event' };
+  const event = request.event;
+  if (event.kind === 'sla_breach_digest') {
+    if (!realDay(event.digestDay))
+      return { code: 'malformed_request', message: 'event.digestDay: invalid calendar day' };
+    // Shape only: the server must resolve the committed SQL job/link before invoking a sink.
+    if (
+      'auditEventId' in event ||
+      !isDigestJobProvenance(event.provenance) ||
+      event.provenance.digestDay !== event.digestDay ||
+      event.provenance.correlationId !== event.correlationId ||
+      event.caseId !== null ||
+      event.versionId !== null ||
+      event.versionNumber !== null ||
+      event.lane !== null ||
+      !realDay(event.digestDay) ||
+      request.recipient.basis !== 'operator_recipients'
+    )
+      return { code: 'malformed_request', message: 'event: invalid digest job provenance' };
+  } else {
+    if (
+      !['lane_opened', 'sent_back', 'ready_for_launch'].includes(event.kind) ||
+      'provenance' in event ||
+      typeof event.auditEventId !== 'string' ||
+      event.auditEventId === ''
+    )
+      return {
+        code: 'malformed_request',
+        message: 'event.auditEventId/provenance: invalid business audit provenance',
+      };
+  }
   return null;
 }
 
@@ -191,4 +219,11 @@ function checkSize(request: DeliveryRequest): DeliveryError | null {
   if (bodyBytes > MAX_BODY_BYTES)
     return { code: 'sink_failure', message: `mail.textBody: ${bodyBytes} bytes exceeds ${MAX_BODY_BYTES}` };
   return null;
+}
+
+/** Reject normalized impossible dates, including non-leap February 29. */
+function realDay(day: unknown): day is string {
+  if (typeof day !== 'string' || !DIGEST_DAY.test(day) || day.startsWith('0000')) return false;
+  const date = new Date(`${day}T00:00:00.000Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === day;
 }
