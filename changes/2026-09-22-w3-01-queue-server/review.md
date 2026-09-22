@@ -2,7 +2,7 @@
 
 ## Scope and implementation
 
-Prepared locally on `codex/w3-01-scoped-queue`, base `ae8e25d`, isolated worktree `/tmp/rai-w3-queue-server`. Issue #42 / A06, synthetic W0-W3 scope only. No shared-contract, UI, mail, migration or root-log edits. The parent checkout was not modified. The consumer PR is #109, rebased onto merged contract PR #106 (`a30c304`).
+Prepared locally on `codex/w3-01-scoped-queue`, base `ae8e25d`, isolated worktree `/tmp/rai-w3-queue-server`. Issue #42 / A06, synthetic W0-W3 scope only. The original implementation made no shared-contract, UI, mail, migration or root-log edits. The parent subsequently added DEVLOG and CHANGELOG outcome records. The parent checkout was not modified. The consumer PR is #109, rebased onto merged contract PR #106 (`a30c304`).
 
 - `rai-web/server/src/queue/repository.ts`: one actor-scoped SQL subquery reused by all filters, aggregates, distinct options and page reads. Status derives from current/draft versions, lane projections and the latest disposition event for each current-version finding. `fixed_proposed` stays unresolved.
 - `rai-web/server/src/queue/routes.ts`: existing `case.list` action and shared TypeBox query; `app.ts` registers it beside the unchanged case routes using their database dependency.
