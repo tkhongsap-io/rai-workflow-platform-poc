@@ -7,11 +7,12 @@
 // The static half (no evidence test imports the substitute; the configuration file names no substitute) is
 // tests/integration/w1-int-substitute-absent.test.ts. Fixture ids: fx-user-owner-cm.
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/real-test.js';
 import th from '@rai/shared/locales/th.json' with { type: 'json' };
 import { FIXTURE_SIGN_IN_PATH } from './support/sign-in.js';
-import { resetToFixtureSet } from './support/database.js';
 import { startTestServer } from '../support/process.js';
+
+test.use({ serverMode: 'reset-only' });
 
 // Split so this file never contains the marker itself (as scripts/check-substitute-absent.mjs does).
 const MARKER = ['RAI_DESK', 'SUBSTITUTE', 'MARKER'].join('_');
@@ -24,10 +25,6 @@ const SUBSTITUTE_FLAGS = {
   SUBSTITUTE_PORT: '8789',
   SUBSTITUTE_WEB_PORT: '5175',
 };
-
-test.beforeEach(async () => {
-  await resetToFixtureSet();
-});
 
 test.describe('W1-INT evidence configuration: the built server ignores every substitute flag', () => {
   test('with VITE_API_SUBSTITUTE=true and the other substitute variables in its environment the built server serves the product bundle and the real API only', async ({

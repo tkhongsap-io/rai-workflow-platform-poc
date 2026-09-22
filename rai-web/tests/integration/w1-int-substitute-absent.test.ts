@@ -146,17 +146,12 @@ describe('W1-INT: the evidence configuration cannot load the substitute', () => 
     assert.equal(ignore.test('tests/browser/w1-int-journey.spec.ts'), false);
     assert.equal(evidenceConfig.workers, 1);
     assert.equal(evidenceConfig.forbidOnly, true);
-    const webServer = evidenceConfig.webServer;
-    assert.ok(webServer !== undefined && !Array.isArray(webServer), 'one web server: the deployable');
-    const command = webServer.command;
-    assert.match(command, /node server\/dist\/main\.js/);
-    assert.doesNotMatch(command, /substitute/i);
-    assert.doesNotMatch(command, /vite(?!\s+build)/); // no dev server, no proxy
-    const env = webServer.env ?? {};
-    for (const name of Object.keys(env)) assert.doesNotMatch(name, /SUBSTITUTE/i, name);
-    assert.equal(env.RAI_IDENTITY_MODE, 'fixture');
-    assert.equal(env.NODE_ENV, 'test');
-    assert.equal(env.QC_MODE, 'substitute'); // the W1-10 QC substitute is the slice-1 substitute stand-in (section 1.1); real QC is W4; it is not the W1-13 API substitute
+    assert.equal(evidenceConfig.webServer, undefined, 'no persistent child may outlive a reset');
+    assert.equal(evidenceConfig.globalSetup, './support/build-real.ts');
+    const lifecycle = readFileSync(path.join(TESTS_DIR, 'browser/support/real-server-lifecycle.ts'), 'utf8');
+    assert.match(lifecycle, /built: true/);
+    assert.match(lifecycle, /startTestServer/);
+    assert.doesNotMatch(lifecycle, /substitute-server|vite\.substitute\.config|substitutes\/api/);
     const source = readFileSync(path.join(TESTS_DIR, 'browser', 'playwright.config.ts'), 'utf8');
     assert.doesNotMatch(
       source,

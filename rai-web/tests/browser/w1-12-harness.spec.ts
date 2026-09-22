@@ -3,7 +3,7 @@
 // the only browser (W0-02 section 2). The pages audited here are synthetic documents set on the page, not product
 // screens: the product screens arrive with W1-07 and W1-06 and use these same helpers. Fixture ids: none.
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/real-test.js';
 import {
   auditAccessibility,
   blockingViolations,

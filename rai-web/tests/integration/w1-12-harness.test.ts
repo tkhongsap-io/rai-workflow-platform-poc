@@ -84,13 +84,15 @@ describe('W1-12 test-server refusal is reported, not hidden', () => {
     );
   });
 
-  it('waitForEvent times out with the captured lines in the message instead of hanging', async () => {
+  it('waitForEvent times out with a count, never captured values, instead of hanging', async () => {
     const server = await startTestServer();
     try {
       await assert.rejects(
         server.waitForEvent('mail.sent', 50),
         (err: Error) =>
-          err.message.startsWith('no mail.sent line within 50 ms') && err.message.includes('process.started'),
+          err.message.startsWith('no mail.sent line within 50 ms') &&
+          err.message.includes('captured line count') &&
+          !err.message.includes('process.started'),
       );
     } finally {
       await server.stop();

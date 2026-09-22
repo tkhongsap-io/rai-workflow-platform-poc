@@ -1,7 +1,6 @@
 // W3-INT queue promotion: real server/SQL scope, synthetic fixtures; no API substitute.
 // Fault injection aborts or delays real HTTP only; never supplies queue payloads.
-import { resetToFixtureSet } from './support/database.js';
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './support/real-test.js';
 import th from '@rai/shared/locales/th.json' with { type: 'json' };
 import en from '@rai/shared/locales/en.json' with { type: 'json' };
 import type { QueueResponse } from '@rai/shared/schemas/queue';
@@ -37,9 +36,6 @@ async function submit(page: Page, caseId: string) {
   expect(response.status()).toBe(201);
   return (await response.json()) as SubmittedVersion;
 }
-test.beforeEach(async () => {
-  await resetToFixtureSet();
-});
 
 test('Thai queue cards, primary navigation and English rendering remain accessible', async ({
   page,
