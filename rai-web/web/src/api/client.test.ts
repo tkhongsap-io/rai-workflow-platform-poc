@@ -3,7 +3,15 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ApiError, NetworkError, artifactDownloadPath, createApiClient, type FetchLike } from './client.js';
+import type { DeskHealthReport } from '@rai/shared/schemas/observability';
+import {
+  ApiError,
+  InvalidResponseError,
+  NetworkError,
+  artifactDownloadPath,
+  createApiClient,
+  type FetchLike,
+} from './client.js';
 
 function fetchAnswering(status: number, body: unknown, headers: Record<string, string> = {}): FetchLike {
   return () =>
@@ -314,5 +322,178 @@ test('queue client preserves literal Thai filters, pagination and server respons
       pageSize: 10,
     }),
     response,
+  );
+});
+
+const operatorId = '11111111-1111-4111-8111-111111111111';
+const operatorTime = '2026-09-22T00:00:00.000Z';
+function deskHealthReport(): DeskHealthReport {
+  return {
+    generatedAt: operatorTime,
+    readiness: {
+      status: 'ready',
+      checkedAt: operatorTime,
+      identity: { mode: 'fixture', loopbackBind: true, status: 'ok' },
+      store: { db: 'ok', migrations: 'current', blob: 'ok' },
+      mailSink: { kind: 'file', status: 'ok' },
+      qc: { kind: 'substitute', status: 'disabled' },
+      build: { commit: 'dev', schemaVersion: '7' },
+    },
+    failedMail: [
+      {
+        notificationId: operatorId,
+        eventType: 'sla_breach_digest',
+        recipient: 'operator@rai-desk.example',
+        correlationId: operatorId,
+        status: 'queued',
+        attempts: 1,
+        lastErrorCode: 'sink_failure',
+      },
+    ],
+    unavailableQc: [
+      {
+        qcRunId: operatorId,
+        caseId: operatorId,
+        versionId: operatorId,
+        trigger: 'submit',
+        reason: 'unknown',
+        requestedAt: operatorTime,
+        correlationId: operatorId,
+      },
+    ],
+    lateQc: [
+      {
+        lateResultId: operatorId,
+        qcRunId: operatorId,
+        caseId: operatorId,
+        versionId: operatorId,
+        trigger: 'approve_attempt',
+        lane: 'dpo',
+        status: 'completed',
+        refusedFindingCount: 0,
+        recordedAt: operatorTime,
+        correlationId: operatorId,
+      },
+    ],
+    slaDigest: { recentFailures: [] },
+    errorCounters: [{ code: 'mail_delivery_failed', count: 1, lastAt: operatorTime }],
+  };
+}
+
+test('operator client uses canonical same-origin GET and preserves absent optional fields', async () => {
+  const report = deskHealthReport();
+  const client = createApiClient((input, init) => {
+    assert.equal(input, '/api/operator/desk-health');
+    assert.equal(init?.method, 'GET');
+    assert.equal(init?.credentials, 'same-origin');
+    assert.equal(init?.body, undefined);
+    return Promise.resolve(new Response(JSON.stringify(report)));
+  });
+  const result = await client.getDeskHealth();
+  assert.deepEqual(result, report);
+  assert.equal(Object.hasOwn(result.failedMail[0]!, 'nextAttemptAt'), false);
+  assert.equal(Object.hasOwn(result.slaDigest, 'lastRun'), false);
+  assert.equal(result.unavailableQc[0]!.reason, 'unknown');
+});
+
+test('operator client preserves terminal failure and digest provenance without deriving state', async () => {
+  const report = deskHealthReport();
+  report.failedMail = [
+    {
+      notificationId: operatorId,
+      eventType: 'send_back',
+      caseId: operatorId,
+      versionId: operatorId,
+      lane: 'dpo',
+      recipient: 'owner@rai-desk.example',
+      correlationId: operatorId,
+      status: 'failed',
+      attempts: 4,
+      lastErrorCode: 'sink_failure',
+      failureCategory: 'mail_delivery_failed',
+    },
+  ];
+  report.slaDigest = {
+    lastRun: {
+      jobRunId: operatorId,
+      digestDay: '2026-09-22',
+      startedAt: operatorTime,
+      status: 'running',
+      notificationIds: [],
+      correlationId: operatorId,
+    },
+    recentFailures: [
+      {
+        jobRunId: operatorId,
+        digestDay: '2026-09-21',
+        startedAt: operatorTime,
+        stage: 'enqueue',
+        errorCode: 'enqueue_failed',
+        correlationId: operatorId,
+      },
+    ],
+  };
+  assert.deepEqual(await createApiClient(fetchAnswering(200, report)).getDeskHealth(), report);
+});
+
+for (const status of [401, 403]) {
+  test(`operator client preserves ${status} and its correlation instead of returning an empty report`, async () => {
+    const code = status === 401 ? 'unauthenticated' : 'forbidden';
+    await assert.rejects(
+      createApiClient(
+        fetchAnswering(status, {
+          error: { code, messageKey: `error.${code}`, correlationId: operatorId },
+        }),
+      ).getDeskHealth(),
+      (err: unknown) => {
+        assert.ok(err instanceof ApiError);
+        assert.equal(err.status, status);
+        assert.equal(err.code, code);
+        assert.equal(err.correlationId, operatorId);
+        return true;
+      },
+    );
+  });
+}
+
+test('operator client rejects invalid success payloads with a safe error and no retained report', async () => {
+  const report = deskHealthReport();
+  const queued = report.failedMail[0]!;
+  for (const payload of [
+    {},
+    null,
+    { ...report, readiness: { ...report.readiness, status: 'healthy' } },
+    { ...report, failedMail: [{ ...queued, nextAttemptAt: null }] },
+    { ...report, failedMail: [{ ...queued, status: 'failed', attempts: 4 }] },
+    { ...report, failedMail: [{ ...queued, attempts: 4 }] },
+    { ...report, failedMail: [{ ...queued, failureCategory: 'mail_delivery_failed' }] },
+    { ...report, unavailableQc: [{ ...report.unavailableQc[0], reason: 'raw provider exception' }] },
+    { ...report, failedMail: Array.from({ length: 101 }, () => queued) },
+    { ...report, secret: 'private-report-sentinel' },
+  ]) {
+    await assert.rejects(createApiClient(fetchAnswering(200, payload)).getDeskHealth(), (err: unknown) => {
+      assert.ok(err instanceof InvalidResponseError);
+      assert.equal(err.messageKey, 'operator.invalid_response');
+      assert.equal(err.message, 'invalid_response');
+      assert.equal(err.cause, undefined);
+      assert.doesNotMatch(JSON.stringify(err), /operator@|private-report-sentinel|raw provider/);
+      return true;
+    });
+  }
+  await assert.rejects(createApiClient(fetchAnswering(204, null)).getDeskHealth(), InvalidResponseError);
+});
+
+test('operator client preserves HTTP and network failures instead of treating them as healthy or empty', async () => {
+  await assert.rejects(
+    createApiClient(fetchAnswering(500, {})).getDeskHealth(),
+    (err: unknown) => err instanceof ApiError && err.status === 500,
+  );
+  await assert.rejects(
+    createApiClient(() => Promise.reject(new Error('offline'))).getDeskHealth(),
+    NetworkError,
+  );
+  await assert.rejects(
+    createApiClient(() => Promise.resolve(new Response('<html>unavailable</html>'))).getDeskHealth(),
+    NetworkError,
   );
 });

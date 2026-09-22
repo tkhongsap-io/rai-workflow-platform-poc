@@ -26,3 +26,10 @@ test('queue route is additive and its filtered return path survives sign-in', ()
   assert.equal(ROUTES.cases, '/cases');
   assert.equal(safeReturnTo('/queue?status=draft&page=2'), '/queue?status=draft&page=2');
 });
+
+test('operator route is additive and keeps its same-origin sign-in return path', () => {
+  assert.equal(ROUTES.operatorDeskHealth, '/operator/desk-health');
+  assert.equal(safeReturnTo(ROUTES.operatorDeskHealth), ROUTES.operatorDeskHealth);
+  assert.equal(ROUTES.queue, '/queue');
+  assert.equal(ROUTES.cases, '/cases');
+});
