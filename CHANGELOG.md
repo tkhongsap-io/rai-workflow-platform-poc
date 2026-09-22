@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-23
+
+- W3-07a: Dependency-aware health/readiness, Admin desk-health API, safe correlated errors and durable unavailable/late-QC diagnostics. Notification delivery remains on the existing worker.
+
 ## 2026-09-22
 
 - W3-03b: Local daily SLA digests with persisted job provenance, configured-recipient deduplication and partial-failure recovery through the existing retry worker.

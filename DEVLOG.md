@@ -1,5 +1,9 @@
 # Development log
 
+## W3-07a: operator runtime and correlation — 2026-09-23
+
+Health/readiness and Admin-only desk-health routes use the actual configured dependencies. Safe error capture, mail failure and QC diagnostics preserve correlation without logging submitted content. Independent reviews are clean after fixes for health-cookie isolation, readiness transition severity/frequency and response timing. Full combined verification passed; remaining package-level OBS and journey proof stays with W3-INT.
+
 ## W3-03b: daily SLA digest — 2026-09-22
 
 The local daily producer freezes its Bangkok day, persists job provenance and queues each configured recipient once per day. Empty results send no mail. The existing retry worker delivers the digest, with recovery retaining original provenance. Core and binding reviews are clean; integrated operator/journey evidence remains pending.

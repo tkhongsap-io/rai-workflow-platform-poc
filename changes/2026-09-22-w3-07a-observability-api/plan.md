@@ -47,3 +47,7 @@ Move background producer/notification registration after request-completed loggi
 ## Publication split
 
 The lead separates the independent observability modules from HTTP/QC/notification runtime activation. This first PR contains only the original planned health predicate, store probes, safe error projection, operator query and their tests. No route or worker is activated. The roughly 930-line bounded exception includes the recorded plan and 317 test lines; the related predicate/projection rules stay together. The later runtime PR has its own review and size assessment.
+
+## Runtime publication exception — 2026-09-23
+
+After core and notification prerequisites merged, the actual runtime diff is 1,610 changed lines: 547 runtime lines, 939 test/support lines and 124 documentation lines. The lead approves this bounded activation/correlation slice: HTTP health and operator routes, safe error capture, QC persistence diagnostics and existing-worker integration require a coherent correlation boundary and its tests. No shared schema, migration, locale, new transport, second worker or W4 implementation is included. This is a separate exception from the core PR. Final publication review and CI gate merge; W3-INT retains the combined journey and remaining OBS proof.
