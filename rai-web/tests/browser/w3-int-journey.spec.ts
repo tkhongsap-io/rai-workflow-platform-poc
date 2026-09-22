@@ -322,16 +322,31 @@ test('one keyboard case: create/upload/submit/restart/queue/mail/send-back/v2/di
         )
           qcPostsAfterReady.push(pathname);
       });
-      const expectReadyReadOnly = async (priorFindingsGets: number) => {
+      const expectReadyReadOnly = async (
+        priorFindingsGets: number,
+        presentation: 'it-empty' | 'owner-findings',
+      ) => {
         await expect.poll(() => readyFindingsGets).toBeGreaterThan(priorFindingsGets);
         await expect(page.locator('[data-status="ready_for_launch"]').first()).toBeVisible();
         await expect(page.locator('[data-review-qc="loading"]')).toHaveCount(0);
-        await expect(
-          page.locator(`[data-finding-id="${findingId}"] [data-disposition-kind="fixed_confirmed"]`),
-        ).toBeVisible();
-        await expect(page.locator(`[data-finding-id="${findingId}"]`)).toContainText(
-          t('th', 'review.findings.slot', { number: 1, name: label('slot.s1.name') }),
-        );
+        if (presentation === 'it-empty') {
+          const workspace = page.locator('.reviewer-workspace');
+          await expect(workspace.getByRole('heading')).toHaveText(
+            t('th', 'review.findings.heading', { lane: label('lane.it_security') }),
+          );
+          await expect(workspace.locator('[data-review-qc="empty"]')).toBeVisible();
+          await expect(workspace.locator('[data-review-qc="empty"]')).toHaveText(
+            label('review.findings.empty'),
+          );
+          await expect(workspace.locator('[data-finding-id]')).toHaveCount(0);
+        } else {
+          await expect(
+            page.locator(`[data-finding-id="${findingId}"] [data-disposition-kind="fixed_confirmed"]`),
+          ).toBeVisible();
+          await expect(page.locator(`[data-finding-id="${findingId}"]`)).toContainText(
+            t('th', 'review.findings.slot', { number: 1, name: label('slot.s1.name') }),
+          );
+        }
         await expect(page.getByRole('alert')).toHaveCount(0);
         await expect(page.locator('[data-disposition-kind-action]')).toHaveCount(0);
         await expect(button(page, 'review.action.approve')).toHaveCount(0);
@@ -358,7 +373,7 @@ test('one keyboard case: create/upload/submit/restart/queue/mail/send-back/v2/di
       }
       await expect(page.locator('[data-status="ready_for_launch"]').first()).toBeVisible();
       expect(finalApprovalSucceeded).toBe(true);
-      await expectReadyReadOnly(0);
+      await expectReadyReadOnly(0, 'it-empty');
       await expectAccessible(page, info, { name: 'combined-ready-th', lang: 'th' });
       await expect
         .poll(async () =>
@@ -396,7 +411,7 @@ test('one keyboard case: create/upload/submit/restart/queue/mail/send-back/v2/di
       expect(readyMail.recipient.recipientId).toBe('fixture:fx-user-owner-cm');
       const priorFindingsGets = readyFindingsGets;
       await signIn(page, origin, 'fx-user-owner-cm', new URL(readyMail.deepLinks[0]!.url).pathname);
-      await expectReadyReadOnly(priorFindingsGets);
+      await expectReadyReadOnly(priorFindingsGets, 'owner-findings');
       await expect(page.locator('[data-status="ready_for_launch"]').first()).toBeVisible();
       await activate(page, page.getByRole('link', { name: label('queue.title'), exact: true }));
       await expect(page.getByTestId('queue-count')).toBeVisible();
