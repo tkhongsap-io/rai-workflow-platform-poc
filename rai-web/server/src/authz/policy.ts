@@ -142,6 +142,7 @@ export const POLICY_ROWS: readonly PolicyRow[] = Object.freeze([
   ...rows('config.read_effective', VIEW_ROLES), // value lists a screen needs; not operator_recipients
   ...rows('config.read_revisions', ADMIN_ONLY), // D06: operator_recipients holds addresses; Admin only
   ...rows('config.publish', ADMIN_ONLY), // W6; exists so W1-00 can test that nobody else has it
+  ...rows('operator.view', ADMIN_ONLY), // W3-07a: existing W0-05 T14/W0-10 Admin-only operator contract
   ...rows('audit.read', ADMIN_ONLY), // W0-04: Admin (the slice-1 operator audience, W0-05 section 8)
   // W2-02 contract: D05 lane decision, resubmit, disposition authority (W2-05 consumes finding.*)
   ...laneDecisionRows('lane.approve'),
