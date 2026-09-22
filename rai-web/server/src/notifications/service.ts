@@ -147,7 +147,8 @@ export async function loadCommittedCaseRequest(
 
 export function createNotifications(deps: NotificationDeps) {
   /** Row lock protects distinct workers; W1-11 dedup covers sink success followed by a DB commit failure. */
-  async function deliverInitial(id: string): Promise<DeliveryReceipt | undefined> {
+  async function deliverInitial(id: string, signal?: AbortSignal): Promise<DeliveryReceipt | undefined> {
+    signal?.throwIfAborted();
     return deps.db.transaction(async (tx) => {
       const [row] = await tx
         .select()
@@ -176,6 +177,7 @@ export function createNotifications(deps: NotificationDeps) {
           });
           return Promise.resolve();
         });
+        signal?.throwIfAborted();
         receipt = await deps.sink.deliver(request);
       } catch (err) {
         receipt = {
@@ -190,6 +192,8 @@ export function createNotifications(deps: NotificationDeps) {
           },
         };
       }
+      // Wait for the sink before cancellation rolls back: never unlock an active delivery.
+      signal?.throwIfAborted();
       const success = receipt.status !== 'failed';
       await tx
         .update(notification)
@@ -216,11 +220,13 @@ export function createNotifications(deps: NotificationDeps) {
           });
         return Promise.resolve();
       });
+      signal?.throwIfAborted();
       return receipt;
     });
   }
   /** Initial backlog or the committed rows of one response; no retry selection and no digest. */
-  async function deliverPending(correlationId?: string): Promise<void> {
+  async function deliverPending(correlationId?: string, signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted();
     const rows = await deps.db
       .select({ id: notification.id })
       .from(notification)
@@ -233,7 +239,7 @@ export function createNotifications(deps: NotificationDeps) {
         ),
       )
       .orderBy(asc(notification.createdAt), asc(notification.id));
-    for (const row of rows) await deliverInitial(row.id);
+    for (const row of rows) await deliverInitial(row.id, signal);
   }
   return { deliverInitial, deliverPending };
 }

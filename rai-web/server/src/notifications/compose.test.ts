@@ -74,7 +74,9 @@ for (const locale of ['th', 'en'] as const) {
       if (locale === 'th') assert.match(req.mail.subject, /[ก-๙]/);
       if (kind === 'lane_opened') {
         assert.equal(req.mail.templateParams.defectCount, 3);
-        assert.ok(req.mail.templateParams.dueDate);
+        assert.match(String(req.mail.templateParams.dueDate), /2026/);
+        assert.doesNotMatch(String(req.mail.templateParams.dueDate), /2569/);
+        if (locale === 'th') assert.equal(req.mail.templateParams.dueDate, '25 กันยายน ค.ศ. 2026');
         assert.ok(req.mail.templateParams.laneLabel);
       }
       if (kind === 'sent_back') assert.equal(req.mail.templateParams.feedback, feedback.summary);

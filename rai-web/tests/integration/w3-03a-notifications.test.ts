@@ -411,3 +411,45 @@ test('exported committed loader is reusable without a delivery or status write',
   assert.equal(unchanged!.attempts, 0);
   assert.equal(unchanged!.status, 'queued');
 });
+
+test('shutdown cancellation keeps the notification lock until the sink settles, then rolls back', async () => {
+  await build({ auto: false });
+  await submit();
+  const [row] = await db.owner.select().from(notification);
+  const entered = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  const controller = new AbortController();
+  const consumer = createNotifications({
+    db: db.app,
+    identities: FIXTURE_USERS,
+    publicBaseUrl: base,
+    emitter,
+    sink: {
+      identity: sink.identity,
+      deliver: async (request) => {
+        entered.resolve();
+        await release.promise;
+        return sink.deliver(request);
+      },
+    },
+  });
+  const delivery = consumer.deliverInitial(row!.id, controller.signal);
+  const rejected = assert.rejects(delivery, { name: 'AbortError' });
+  try {
+    await entered.promise;
+    controller.abort();
+    const locked = await db.owner.transaction((tx) =>
+      tx.select().from(notification).where(eq(notification.id, row!.id)).for('update', { skipLocked: true }),
+    );
+    assert.equal(locked.length, 0, 'cancellation must not release the active sink lock');
+  } finally {
+    release.resolve();
+  }
+  await rejected;
+  const [unchanged] = await db.owner.select().from(notification).where(eq(notification.id, row!.id));
+  assert.equal(unchanged!.attempts, 0);
+  assert.equal(unchanged!.status, 'queued');
+  assert.equal(sink.sent.length, 1, 'sink may have accepted before rollback; replay remains explicit');
+  await consumer.deliverInitial(row!.id);
+  assert.equal(sink.sent.length, 1, 'same live sink deduplicates the replay');
+});

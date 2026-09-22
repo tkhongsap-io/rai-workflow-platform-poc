@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import type { MailSink } from '@rai/shared/mail/types';
 import type { AppConfig } from '../config.js';
 import type { Notifications } from './service.js';
+import type { Drain } from '../shutdown.js';
 import type { Emitter } from '../observability/log.js';
 
 export async function loadMailSink(
@@ -23,13 +24,17 @@ export function registerNotifications(
   app: FastifyInstance,
   notifications: Notifications,
   emitter: Emitter,
+  drain: Drain,
 ): void {
   const active = new Set<Promise<void>>();
   function run(correlationId?: string): Promise<void> {
-    const task = notifications.deliverPending(correlationId).catch(() => {
+    if (drain.signal.aborted) return Promise.resolve();
+    const task = notifications.deliverPending(correlationId, drain.signal).catch(() => {
+      if (drain.signal.aborted) return;
       emitter.log('error.captured', { category: 'dependency', code: 'mail_delivery_failed' });
     });
     active.add(task);
+    drain.track(task);
     void task.finally(() => active.delete(task));
     return task;
   }

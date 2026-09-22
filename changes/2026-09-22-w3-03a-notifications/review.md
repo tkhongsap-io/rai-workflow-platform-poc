@@ -50,3 +50,11 @@ Failure stays queued with attempts=1, safe last_error_code and next_attempt_at=N
 Digest rows and typed operator-job provenance remain W3-03b/W3-07 work. The three case events always require their real business audit row. No fabricated audit ID, digest implementation, job-run migration or retry policy is introduced here. Operator delivery shapes remain W3-07's ownership.
 
 Self-review only; parent owns independent review, prerequisite merge, consumer PR, final full-suite/CI and package acceptance. Local commit only; no push, PR creation or merge by this agent.
+
+## Independent-review correction evidence
+
+Parent baseline full suite on `36dcee9` completed exit 0 (`/tmp/rai-w3-notifications-final-full.log`); historical evidence only, not acceptance of these fixes. Review found onClose could wait forever after POST 200 and request count zero, plus Thai due dates used Buddhist years.
+
+Fixed with tracked background tasks and cancellation in the existing drain. Shutdown rejects at its deadline if a sink is still active; main.ts already exits 1 on close rejection. The DB pool-close line is not reached on rejection. No transaction race releases the lock: cancellation waits for sink settlement, then rolls back; a sink acceptance before rollback may replay as already documented. New tasks and subsequent rows stop. Thai dates explicitly use Gregorian calendar, with Thai text/year 2026 asserted.
+
+Focused composer/runtime/shutdown: 16 passed. Real Postgres notification suite: 16 passed, including SKIP LOCKED proof that an aborted but active sink retains its notification lock, rollback leaves attempts=0, and live-sink replay deduplicates. Full unit suite: 469 passed. Typecheck and full ESLint/Prettier/CSS checks passed; the final runtime-only rerun passed both tests. These runs used the parent-released 54363 database; no Compose lifecycle changes. Parent will rerun final full suite and independent review on the fix commit. W3-03b planning remains paused.

@@ -110,9 +110,9 @@ export function buildApp(deps: AppDeps): App {
     ajv: { customOptions: { removeAdditional: false } }, // a key an `additionalProperties: false` shape does not list is 422, never stripped
   });
   const emitter = createEmitter(fastify.log, { strict: deps.config.nodeEnv === 'test' });
-  if (deps.notifications !== undefined)
-    registerNotifications(fastify, createNotifications({ ...deps.notifications, emitter }), emitter);
   const drain = createDrain(fastify); // first hook: every accepted request is counted (shutdown.ts)
+  if (deps.notifications !== undefined)
+    registerNotifications(fastify, createNotifications({ ...deps.notifications, emitter }), emitter, drain);
 
   fastify.addHook('onRequest', (request, reply, done) => {
     void reply.header('X-Correlation-Id', request.id);

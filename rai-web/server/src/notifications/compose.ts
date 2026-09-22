@@ -134,6 +134,7 @@ export function composeCaseMail(
     // A date-only Bangkok SLA day; do not reinterpret it as the server's local timezone.
     params.dueDate = new Intl.DateTimeFormat(recipient.locale === 'th' ? 'th-TH' : 'en-GB', {
       timeZone: 'Asia/Bangkok',
+      calendar: 'gregory',
       dateStyle: 'long',
     }).format(new Date(`${content.dueOn}T00:00:00+07:00`));
   }
