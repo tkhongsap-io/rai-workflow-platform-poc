@@ -21,3 +21,7 @@ Routine engineering choices: bounded queries/probe timeouts, deterministic sorti
 ## Base update before consumer edits
 
 Parent reports prerequisite re-review clean (10 independent tests) and draft PR 112 open. API branch advanced to 9980c7e, which includes main a2392c9 and shared notification contract e5bee77. Published prerequisite worktree is parent-owned and must not be edited without coordination. Consumer implementation remains unstarted at this plan handoff.
+
+## Accepted notification integration seam
+
+Parent explicitly authorized 07a to adapt `server/src/notifications/runtime.ts` after actual W3-04 merge: replace its unexpected load/DB-error fallback with safe internal-error capture. Adapt the terminal receipt path in `server/src/notifications/service.ts` only as needed to capture typed mail_delivery_failed from the committed notification identity/attempt count and bounded cause. Keep existing worker and correct domain mail.failed event. One domain event and one error.captured are distinct; neither is emitted twice. Do not log raw causes, recipients or idempotency keys. Final acceptance must inspect actual W3-04 events and the W3-07a operator read view before PR publication.
