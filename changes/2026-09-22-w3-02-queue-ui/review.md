@@ -6,10 +6,39 @@ Additive Thai/English queue labels, ROUTES.queue, API_PATHS.queue and typed getQ
 
 Node24, own npm ci. Typecheck, focused ESLint and 20 client/route/locale unit tests passed; git diff --check and repository link check passed. Log: /tmp/rai-w3-ui-contract-check.log. Parent may publish this commit as the separate prerequisite contract PR. W3-08 PR108 must also land before consumer delivery.
 
-## Implementation
-
-Pending in the second commit. Substitute verification only; real-server wiring and acceptance belong to W3-INT.
-
 ## Independent contract review and parent verification
 
 PR #110: independent reviewer Confucius reported no actionable findings on `35f798a`, independently ran all 20 client/route/locale tests and checked whitespace. Parent verification on the isolated contract branch passed `npm run lint`, `npm run typecheck` and all 459 unit tests. Full final-head CI remains required before merge. This is prerequisite-contract evidence only; the consumer and W3-INT are not accepted here.
+
+## Implementation
+
+Implemented separately after contract commit `4f3940b`. Consumer paths: `web/src/screens/queue/` (screen, URL view model and tests, scoped CSS), `web/src/router.tsx`, `web/src/screens/shell/app-shell.tsx`, and `tests/browser/w3-02-queue.substitute.spec.ts`. No locale, API client, shared-schema or route-constant changes in the consumer commit. No server, fixture, DB or root-log writes.
+
+Protected `/queue` uses existing cards, badges, form styles, locale provider and date formatting. The design handoff's two-column case grid becomes one column on narrow screens. Current submission and latest version are separate; a draft is explicitly labelled as a draft. Lane states/due dates stay on the current submitted version while a successor draft exists. The screen renders API nextAction text without deriving workflow state or offering approval controls. Finding counts are intentionally absent because the shared queue response has none.
+
+Primary shell navigation and signed-in brand point to `/queue`; `/cases` keeps its original route, navigation link, root/sign-in fallback and post-create destination. Existing `/cases` tests are unchanged. This additive handoff avoids making existing real-server journeys depend on the pending W3-INT queue integration; parent can migrate landing behavior with that integration.
+
+URL search, field selector, status, owner, group and pagination survive reload and browser history; applying filters resets page to one. Counts/options/items are taken from the response, with no browser scope filtering. Invalid, duplicate and unknown URL keys show an explicit error/reset instead of broadening the search. The parser uses a null-prototype record so `__proto__` cannot disappear through the object setter. Selected URL values outside the returned options are echoed only as the user's selected filter, not added to the response population.
+
+Request identity includes URL, actor subject/grants and reload counter. Previous cards/options are hidden while a different request loads; cancelled/superseded responses cannot overwrite the latest result. Session expiry returns through existing sign-in handling. Network/HTTP failures render the existing localized error notice plus Retry.
+
+## Consumer verification
+
+Node 24.21.0, own `npm ci` and node_modules. No database used. Substitute/Vite ports **58789 / 55175**, one worker, three projects (1440 / 834 / 390). Synthetic fixture set `slice1-synthetic@1`; all browser evidence below is substitute-only.
+
+- Full `npm run test:unit`: **418 passed**, zero failures/skips (includes 20 first-commit contract checks and three URL view-model tests).
+- `npm run lint`, `npm run typecheck`: passed on the consumer source.
+- `npm run build`, `npm run check:substitute-absent`: passed; 471 built files scanned, zero substitute markers.
+- `node --test scripts/*.test.mjs tests/*.test.mjs`: **40 passed**.
+- Link check: 157 Markdown files, 694 relative links, zero broken; frozen source hash unchanged; `git diff --check` passed.
+- Focused queue browser run before the final version-label/complete-state additions: **24 passed**. Final full UI run: **117 passed** in 1.5 minutes (90 unchanged W1/W2 tests + 27 queue tests). Queue axe checks reported zero critical and zero serious violations across all three widths.
+
+The nine queue browser scenarios cover Thai/English cards and navigation; URL filters/pages/back/forward/reload and empty/error reset; independent expected owner/BU/reviewer/dual-role/empty scope IDs, direct API counts/options/search negatives and BU pagination; signed-out queue/card deep links and copied HR case denial to CM SPOC; submitted and successor versions/frozen due-date rendering; keyboard-only filter/open with visible focus; deferred loading, network failure, retry and expired sessions; delayed old-response suppression; and actual substitute approvals/dispositions leading to awaiting_disposition and ready_for_launch. Axe checks cover Thai and English, empty/loading/error/forbidden and workflow states at all widths. Backend authorization and SQL isolation are not proved by this suite.
+
+Visual review: inspected desktop cards and the phone successor view; fixed the draft/submission wording found in the first screenshots. Final desktop and phone screenshots were inspected after the correction. Screenshots are retained under `rai-web/test-results/substitute/`; the HTML report and axe attachments are under `rai-web/playwright-report/substitute/`. No browser artifacts are committed.
+
+Logs: `/tmp/rai-w3-ui-contract-check.log`, `/tmp/rai-w3-ui-unit.log`, `/tmp/rai-w3-ui-lint.log`, `/tmp/rai-w3-ui-typecheck.log`, `/tmp/rai-w3-ui-build.log`, `/tmp/rai-w3-ui-browser-full.log`, `/tmp/rai-w3-ui-repo.log`.
+
+## Handoff boundary
+
+Parent is reviewing/publishing the first contract commit separately, without modifying this worktree. Consumer delivery still requires the contract prerequisite and W3-08 to be merged; parent owns independent review, PRs and merge gates. No push, PR, merge or external publication performed here. Real-server wiring, integration/browser evidence and acceptance belong to W3-INT; no production permission is claimed.
