@@ -24,3 +24,4 @@ Merged delivery PRs verified against GitHub. The final exit PR is recorded in it
 | [#122](https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/122) | W3-03b: deliver durable daily SLA digests through the retry worker | `e37fb4f72f27` |
 | [#123](https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/123) | W3-07a: activate safe desk-health and correlated runtime diagnostics | `4fa14d62a8b6` |
 | [#124](https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/124) | W3-INT real-server integration and regression repairs | `6d60181a9e3e` |
+| [#125](https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/125) | W3-06: verified synthetic journey and performance evidence | `e62b669ab2aa` |

@@ -2,11 +2,13 @@
 
 ## 2026-09-23
 
+- Final W3 delivery: all nine engineering tickets merged, including PR #125 (`e62b669`). Actual-main CI [35781574925](https://github.com/tkhongsap-io/rai-workflow-platform-poc/actions/runs/35781574925) passed all 12 checks. Reconciled delivery records after merge; Ta’s package review, manual Google sign-in, workload confirmation and finding-ownership policy remain pending.
+
 - W3-06: Added the synthetic engineering exit, acceptance map, source-attributed test evidence, supplementary keyboard recording and guarded performance harness. Preserved raw measurements and failed attempts; reconciled current-state documentation with implemented W3 and the existing D03 review delegation. Team/operator acceptance and production gates remain explicit.
 
 - W3-INT: Integrated real-server queue, protected notification links, postcommit submit QC and Admin diagnostics with a single-case keyboard/restart journey. Added actual worker-failure, late-QC/restart and suite-wide integration log-privacy regression coverage; moved the API substitute entirely into the test harness. Browser fixtures own and drain their test server before resetting data; notification checks observe committed worker completion. Completed cases show persisted read-only findings without an automatic QC error, including completion by final disposition. Clean-checkout tests now build required outputs before importing or starting the built server. Synthetic package exit evidence remains separate from production acceptance.
 
-- W3-07b: Bilingual Admin operator desk-health page for readiness, failed mail, unavailable/late QC, digest and safe error counters. Manual refresh and session guards prevent stale Admin reports from remaining visible. Local finalization on merged API #123 is ready for independent review; real OBS-17 acceptance remains W3-INT.
+- W3-07b: Bilingual Admin operator desk-health page for readiness, failed mail, unavailable/late QC, digest and safe error counters. Manual refresh and session guards prevent stale Admin reports from remaining visible. Delivered in PR #119; real-server operator verification was completed in W3-INT and included in final-main CI.
 
 - W3-07a: Dependency-aware health/readiness, Admin desk-health API, safe correlated errors and durable unavailable/late-QC diagnostics. Notification delivery remains on the existing worker.
 
