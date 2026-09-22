@@ -206,7 +206,9 @@ test('queue combines filters within BU scope and unions grants for a multiple-ro
     search: item.useCaseName,
     searchBy: 'all',
   });
-  const filtered = (await call(api, 'GET', '/api/queue?' + query, { cookie: spoc })).json<QueueResponse>();
+  const filtered = (
+    await call(api, 'GET', '/api/queue?' + query.toString(), { cookie: spoc })
+  ).json<QueueResponse>();
   assert.deepEqual(
     filtered.items.map((row) => row.caseId),
     [item.caseId],
