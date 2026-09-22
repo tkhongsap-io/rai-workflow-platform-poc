@@ -20,3 +20,9 @@ test('the case and version paths encode their ids', () => {
   assert.equal(ROUTES.case('a b'), '/cases/a%20b');
   assert.equal(ROUTES.caseVersion('c 1', 'v/2'), '/cases/c%201/versions/v%2F2');
 });
+
+test('queue route is additive and its filtered return path survives sign-in', () => {
+  assert.equal(ROUTES.queue, '/queue');
+  assert.equal(ROUTES.cases, '/cases');
+  assert.equal(safeReturnTo('/queue?status=draft&page=2'), '/queue?status=draft&page=2');
+});

@@ -67,3 +67,9 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: W2-08 exit evidence (Lead) — not this session.
 - Author: operator=ta session=w2-int model=composer
 - Evidence: branch codex/w2-int-real-server-journey
+
+## 2026-09-22 — CLAIM Lane B: W3-02 queue UI
+- Author: operator=ta session=codex-w3-02-queue-ui model=GPT-6
+- Takes over from: session=w2-int (reason: parent delegates queue UI in isolated worktree)
+- What: /tmp/rai-w3-queue-ui at edb5d89; first additive UI contract commit, then implementation against substitute only. No server/DB, push, PR or merge.
+- Evidence: [plan](../../changes/2026-09-22-w3-02-queue-ui/plan.md)
