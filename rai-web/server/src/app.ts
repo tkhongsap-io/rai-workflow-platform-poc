@@ -20,6 +20,7 @@ import { registerAuthorization, type ScopeFactsSource } from './authz/middleware
 import { registerCaseRoutes, type CaseRouteDeps } from './cases/routes.js';
 import { registerPackRoutes, type PackRouteDeps } from './pack/routes.js';
 import { registerVersionRoutes, type VersionRouteDeps } from './versions/routes.js';
+import { registerDecideRoutes, type DecideRouteDeps } from './workflow/routes.js';
 import { staticPlugin, type StaticOptions } from './static.js';
 import type { FixtureIdentityProvider } from './identity/fixture.js';
 import { registerAuthRoutes } from './identity/routes.js';
@@ -49,6 +50,8 @@ export interface AppDeps {
   /** W1-05: the submit and version-navigation routes' dependencies (database). Needs `identity`.
    * `nodeEnv` is taken from `config` when the routes are registered (never from process.env in versions/). */
   versions?: Omit<VersionRouteDeps, 'nodeEnv'>;
+  /** W2-02: lane approve / send-back. Needs `identity`. */
+  decide?: DecideRouteDeps;
   /** W1-INT: the built SPA to serve from web/dist (static.ts); absent when there is no web build (API only). */
   static?: StaticOptions;
   /** Test seam: where the pino lines go instead of stdout, so a suite can assert on emitted events. */
@@ -191,6 +194,13 @@ export function buildApp(deps: AppDeps): App {
     if (versionDeps !== undefined) {
       void fastify.register((instance, _opts, done) => {
         registerVersionRoutes(instance, { ...versionDeps, nodeEnv: deps.config.nodeEnv });
+        done();
+      });
+    }
+    const decideDeps = deps.decide;
+    if (decideDeps !== undefined) {
+      void fastify.register((instance, _opts, done) => {
+        registerDecideRoutes(instance, decideDeps);
         done();
       });
     }

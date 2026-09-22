@@ -10,6 +10,7 @@ export * from './schemas/cases.js';
 export * from './schemas/artifacts.js';
 export * from './schemas/pack.js';
 export * from './schemas/versions.js';
+export * from './schemas/review.js';
 export * as qc from './qc/types.js';
 export * as mail from './mail/types.js';
 // The typed key union lives in ./locales/keys.js (import it by subpath); ids.ts keeps the plain string alias.

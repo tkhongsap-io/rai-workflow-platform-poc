@@ -138,6 +138,7 @@ test('rai_app cannot DELETE from any business table; rai_operator may delete ide
     'idempotency_key',
     'audit_event',
     'notification', // W2-01: no DELETE for rai_app
+    'lane_decision', // W2-02: no DELETE for rai_app
   ]) {
     const err = await expectSqlError(db, 'app', `DELETE FROM "${table}"`);
     assert.equal(err?.code, INSUFFICIENT_PRIVILEGE, `rai_app DELETE on ${table}`);

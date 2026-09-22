@@ -1,5 +1,13 @@
 # Development log
 
+## W2-02: lane decision — 2026-09-22
+
+Lane approve and send-back are live (own lane only, expected version, idempotency, D05 self-exclusion, decision audit, successor draft on first send-back). This is not the W2 exit; concurrent send-back (W2-03), resubmit, findings/dispositions, Ready, UI and mail delivery remain later tickets.
+
+### Fix round 1
+
+LaneSchema uses explicit literals (typecheck under noUncheckedIndexedAccess). Decide no longer compares or bumps `case.row_version` (§5.1 / §5.2). Missing `qcRunId` reaches the service `lane_qc_not_run` check. Append-only and lane_already_decided coverage added; agent scratch report removed from the branch.
+
 ## W2-01: lane open on submit — 2026-09-22
 
 Submit now opens the three review lanes (`lane.opened` × 3 + `lane_open` notification rows) in the same transaction as the freeze. This is not the W2 exit; decisions, send-back, Ready, UI and mail delivery remain later W2/W3 tickets.

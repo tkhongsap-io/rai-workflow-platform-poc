@@ -7,9 +7,11 @@
 // (three columns); the facts lookup, the
 // `authorize` call and the 404 answer for an allowed-but-unresolved id are one helper so the 403 and 404 paths
 // cannot diverge. A deny emits `authz.denied` (W0-10 3.3) and no audit row; a 401 never reaches `authorize`.
+// W2-02 adds target `lane` (:caseId + :lane → { kind: 'lane', facts, lane }).
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { ForbiddenError, NotFoundError, UnauthenticatedError } from '@rai/shared/errors';
+import { LANES, type Lane } from '@rai/shared/constants';
 import type { Principal } from '@rai/shared/schemas/auth';
 import type { SessionRecord, SessionStore } from '../identity/session.js';
 import { maybeContext } from '../observability/context.js';
@@ -28,7 +30,8 @@ export type RouteAuth =
   | { kind: 'session' } // a live session, no policy action: GET /api/session, sign-out, locale
   | { kind: 'action'; action: Action; target: 'none' } // case.list, config.*, audit.read, the role step of case.create
   | { kind: 'action'; action: Action; target: 'case' } // :caseId → CaseScopeFacts
-  | { kind: 'action'; action: Action; target: 'artifact' }; // :artifactId → artifact.case_id → CaseScopeFacts
+  | { kind: 'action'; action: Action; target: 'artifact' } // :artifactId → artifact.case_id → CaseScopeFacts
+  | { kind: 'action'; action: Action; target: 'lane' }; // :caseId + :lane → lane target (W2-02)
 
 export interface AuthzResult {
   decision: Decision & { allow: true };
@@ -82,6 +85,7 @@ export function parseCookieHeader(header: string | undefined): Record<string, st
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const LANE_SET: ReadonlySet<string> = new Set(LANES);
 
 export function actorOf(principal: Principal): Actor {
   return { subjectId: principal.subjectId, roles: principal.roles };
@@ -93,6 +97,28 @@ function paramOf(request: FastifyRequest, name: string): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
+function isLane(value: string | undefined): value is Lane {
+  return value !== undefined && LANE_SET.has(value);
+}
+
+function emitDenied(
+  deps: Pick<AuthorizationDeps, 'emitter'>,
+  actor: Actor,
+  auth: Extract<RouteAuth, { kind: 'action' }>,
+  targetId: string | undefined,
+  reason: 'role' | 'scope' | 'lane' | 'self_approval',
+): never {
+  deps.emitter.log('authz.denied', {
+    action: auth.action,
+    targetType: auth.target,
+    targetId,
+    actorSubjectId: actor.subjectId,
+    actorRole: actor.roles.map((r) => r.role).join(','),
+    reason,
+  });
+  throw new ForbiddenError();
+}
+
 /**
  * The helper W0-05 names: facts lookup → authorize → 404 only after an allow. Throws ForbiddenError (403, after
  * emitting authz.denied) or NotFoundError (404); returns the decision and facts otherwise.
@@ -101,14 +127,31 @@ export async function authorizeRequest(
   deps: Pick<AuthorizationDeps, 'facts' | 'emitter'>,
   principal: Principal,
   auth: Extract<RouteAuth, { kind: 'action' }>,
-  ids: { caseId?: string; artifactId?: string },
+  ids: { caseId?: string; artifactId?: string; lane?: string },
 ): Promise<AuthzResult> {
   const actor = actorOf(principal);
   let target: Target;
   let facts: CaseScopeFacts | undefined;
   let targetId: string | undefined;
+
   if (auth.target === 'none') {
     target = { kind: 'none' };
+  } else if (auth.target === 'lane') {
+    targetId = ids.caseId;
+    if (ids.caseId !== undefined && UUID.test(ids.caseId)) {
+      facts = await deps.facts.byCaseId(ids.caseId);
+    }
+    if (facts === undefined) {
+      target = { kind: 'unresolved' };
+    } else if (!isLane(ids.lane)) {
+      // Unknown :lane: still authorize so Admin → role and a reviewer → lane (params are not a body 422).
+      target = { kind: 'lane', facts, lane: 'dpo' };
+      const probe = authorize(actor, auth.action, target);
+      if (!probe.allow) emitDenied(deps, actor, auth, targetId, probe.reason);
+      emitDenied(deps, actor, auth, targetId, 'lane');
+    } else {
+      target = { kind: 'lane', facts, lane: ids.lane };
+    }
   } else {
     const id = auth.target === 'case' ? ids.caseId : ids.artifactId;
     targetId = id;
@@ -117,19 +160,12 @@ export async function authorizeRequest(
     }
     target = facts === undefined ? { kind: 'unresolved' } : { kind: 'case', facts };
   }
+
   const decision = authorize(actor, auth.action, target);
-  if (!decision.allow) {
-    deps.emitter.log('authz.denied', {
-      action: auth.action,
-      targetType: auth.target,
-      targetId,
-      actorSubjectId: actor.subjectId,
-      actorRole: actor.roles.map((r) => r.role).join(','),
-      reason: decision.reason,
-    });
-    throw new ForbiddenError();
+  if (!decision.allow) emitDenied(deps, actor, auth, targetId, decision.reason);
+  if (target.kind === 'unresolved') {
+    throw new NotFoundError(auth.target === 'artifact' ? 'artifact' : 'case');
   }
-  if (target.kind === 'unresolved') throw new NotFoundError(auth.target === 'artifact' ? 'artifact' : 'case');
   return { decision, facts };
 }
 
@@ -171,11 +207,13 @@ export function registerAuthorization(fastify: FastifyInstance, deps: Authorizat
     const auth = request.routeOptions.config.auth;
     if (auth === undefined || auth.kind !== 'action') return payload;
     if (request.principal === undefined) throw new UnauthenticatedError(); // cannot happen after onRequest; belt and braces
-    const ids: { caseId?: string; artifactId?: string } = {};
+    const ids: { caseId?: string; artifactId?: string; lane?: string } = {};
     const caseId = paramOf(request, 'caseId');
     const artifactId = paramOf(request, 'artifactId');
+    const lane = paramOf(request, 'lane');
     if (caseId !== undefined) ids.caseId = caseId;
     if (artifactId !== undefined) ids.artifactId = artifactId;
+    if (lane !== undefined) ids.lane = lane;
     request.authz = await authorizeRequest(deps, request.principal, auth, ids);
     return payload;
   });

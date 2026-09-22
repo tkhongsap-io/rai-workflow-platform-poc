@@ -36,6 +36,13 @@
       "when": 1790049719882,
       "tag": "0004_w2_01_notification",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790052000000,
+      "tag": "0005_w2_02_lane_decision",
+      "breakpoints": true
     }
   ]
 }

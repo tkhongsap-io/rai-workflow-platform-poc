@@ -48,9 +48,13 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=w2-01 model=grok-4.7
 - Evidence: branch codex/w2-01-open-lanes (commit pending land)
 
-## 2026-09-22 11:15 — W2-01 review fixes (recipients from fixture lane holders)
-- What: Lane-open notices go to every fixture identity that holds the lane (including dual-role DPO); failure injection after the first notification insert; notification immutability tests; mail.lane_opened locale keys; slots from the recorded lane_mapping_version.
-- Why: Independent review — addresses must come from identity data, and a failed open must leave no notice behind.
-- Next: W2-02a/W2-02 (decisions) — not this session.
-- Author: operator=ta session=w2-01 model=grok-4.7
-- Evidence: https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/90
+## 2026-09-22 11:25 — CLAIM Lane A
+- Author: operator=ta session=w2-02 model=composer
+- Takes over from: session=w2-01 (reason: handoff)
+
+## 2026-09-22 11:40 — W2-02 lane decision landed
+- What: Lane approve/send-back (own lane, expected version, idempotency, D05 self-exclusion); D05 policy rows for dispositions; successor draft on first send-back; decision audit; migration 0005 lane_decision.
+- Why: Ticket W2-02 (#32); proves A01 and A09; decision D05. Contract for W2-05 disposition authority.
+- Next: W2-03 concurrent send-backs share one draft — not this session.
+- Author: operator=ta session=w2-02 model=composer
+- Evidence: branch codex/w2-02-lane-decision

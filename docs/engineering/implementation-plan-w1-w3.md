@@ -728,7 +728,14 @@ Immutability at the store (W0-04, A07): the version and frozen-slot tables have 
 
 ### 7.7 W2 shapes
 
-Added here by the W2-02 contract PR (lane state, lane decision, send-back feedback naming an artifact, expected version, idempotency), the W2-05 contract PR (typed finding from `shared/src/qc/types.ts`, disposition with D05 authority) and the W2-03 successor-draft rule. Until then this subsection is intentionally empty; W2-10 extends the substitute from it.
+Added by W2-02 (lane decision / send-back) and extended by W2-05 (findings/dispositions) and W2-03 (successor-draft read fields). TypeBox schemas live in `rai-web/shared/src/schemas/review.ts`.
+
+| Endpoint | Request | Success | Errors |
+|---|---|---|---|
+| `POST /api/cases/{caseId}/versions/{versionId}/lanes/{lane}/approve` | header `Idempotency-Key`; `ApproveLaneRequest` (`expectedVersion`, `qcRunId`) | `201 LaneDecisionResponse` | `401`; `403` (wrong lane, Admin, D05 self-approval); `404`; `409 stale_version`; `422` missing key / `lane_qc_not_run` |
+| `POST /api/cases/{caseId}/versions/{versionId}/lanes/{lane}/send-back` | header `Idempotency-Key`; `SendBackLaneRequest` (`expectedVersion`, `feedback` with ≥1 item naming a slot) | `201 LaneDecisionResponse` (creates or reuses successor draft) | as approve, plus `422` when feedback does not name an artifact |
+
+Approve records `lane_decision` (`approve`), writes the lane projection, audits `lane.approved`. Send-back records `send_back` with feedback, writes the projection, creates version N+1 draft when none exists (`draft.successor_created`), queues a `send_back` notification to the owner, audits `lane.sent_back`. Ready is not evaluated here (W2-06).
 
 ### 7.8 W3 shapes
 

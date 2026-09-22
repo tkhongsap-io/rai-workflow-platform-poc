@@ -28,6 +28,7 @@ export interface TestDatabase {
 export const BUSINESS_TABLES = [
   'fixture_set',
   'notification', // W2-01 (0004_w2_01_notification)
+  'lane_decision', // W2-02 (0005_w2_02_lane_decision)
   'audit_event',
   'idempotency_key',
   'artifact_slot',

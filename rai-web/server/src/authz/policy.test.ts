@@ -16,7 +16,6 @@ import {
   type Action,
   type Actor,
   type CaseScopeFacts,
-  type PolicyRow,
   type Target,
 } from './policy.js';
 
@@ -45,8 +44,14 @@ const actorOf = (...roles: Role[]): Actor => ({ subjectId: S, roles: roles.map((
 const inScope: CaseScopeFacts = { caseId: 'c-1', ownerSubjectId: S, businessUnitId: 'CM' };
 const outOfScope: CaseScopeFacts = { caseId: 'c-2', ownerSubjectId: OTHER, businessUnitId: 'HR' };
 
+/** Lane matching the reviewer role so own_lane / owning_lane rows allow in the table-driven sweep. */
+function laneForRole(role: Role): 'ai_coe' | 'dpo' | 'it_security' {
+  if (role === 'ai_coe' || role === 'it_security') return role;
+  return 'dpo';
+}
+
 /** The target an action is evaluated against in the table-driven test, with facts every scope kind covers. */
-function targetFor(action: Action, facts: CaseScopeFacts): Target {
+function targetFor(action: Action, facts: CaseScopeFacts, role: Role = 'dpo'): Target {
   switch (action) {
     case 'case.list':
     case 'config.read_effective':
@@ -59,19 +64,19 @@ function targetFor(action: Action, facts: CaseScopeFacts): Target {
       return { kind: 'none' };
     case 'lane.approve':
     case 'lane.send_back':
-      return { kind: 'lane', facts, lane: 'dpo' };
+      return { kind: 'lane', facts, lane: laneForRole(role) };
     case 'finding.propose_fixed':
     case 'finding.mark_fixed':
     case 'finding.confirm_fixed':
     case 'finding.waive':
     case 'finding.mark_na':
-      return { kind: 'finding', facts, owningLane: 'dpo' };
+      return { kind: 'finding', facts, owningLane: laneForRole(role) };
     default:
       return { kind: 'case', facts };
   }
 }
 
-test('every row names a known role and action, and only the W1-00 actions have rows', () => {
+test('every row names a known role and action; W1-00 plus W2-02 D05 rows are present; W3 rows are not', () => {
   const actionsWithRows = new Set(POLICY_ROWS.map((r) => r.action));
   assert.deepEqual(
     [...actionsWithRows].sort(),
@@ -82,21 +87,41 @@ test('every row names a known role and action, and only the W1-00 actions have r
       'case.create',
       'case.edit_draft',
       'case.list',
+      'case.resubmit',
       'case.submit',
       'case.view',
       'config.publish',
       'config.read_effective',
       'config.read_revisions',
+      'finding.confirm_fixed',
+      'finding.mark_fixed',
+      'finding.mark_na',
+      'finding.propose_fixed',
+      'finding.waive',
       'history.view',
+      'lane.approve',
+      'lane.send_back',
       'version.view',
     ],
-    'lane.*, case.resubmit, finding.* (W2-02) and queue.*, operator.view (W3) have no row yet',
+    'queue.*, operator.view (W3) have no row yet',
   );
   for (const row of POLICY_ROWS) {
     assert.ok((ROLES as readonly string[]).includes(row.role));
     assert.ok((ACTIONS as readonly string[]).includes(row.action));
-    assert.equal(row.laneRule, undefined, 'no W1-00 row carries a lane rule');
-    assert.equal(row.excludeOwnerOrSpoc, undefined, 'no W1-00 row carries the D05 exclusion');
+  }
+  const laneRows = POLICY_ROWS.filter((r) => r.action === 'lane.approve' || r.action === 'lane.send_back');
+  assert.equal(laneRows.length, 6);
+  for (const row of laneRows) {
+    assert.equal(row.laneRule, 'own_lane');
+    assert.equal(row.excludeOwnerOrSpoc, true);
+  }
+  const dispositionRows = POLICY_ROWS.filter((r) =>
+    ['finding.mark_fixed', 'finding.confirm_fixed', 'finding.waive', 'finding.mark_na'].includes(r.action),
+  );
+  assert.equal(dispositionRows.length, 12);
+  for (const row of dispositionRows) {
+    assert.equal(row.laneRule, 'owning_lane');
+    assert.equal(row.excludeOwnerOrSpoc, true);
   }
   assert.ok(Object.isFrozen(POLICY_ROWS));
 });
@@ -107,7 +132,8 @@ test('table-driven: for every role × action, access is granted iff a policy row
   for (const action of ACTIONS) {
     for (const role of ROLES) {
       const hasRow = POLICY_ROWS.some((r) => r.action === action && r.role === role);
-      const decision = authorize(actorOf(role), action, targetFor(action, inScope));
+      // inScope: owner/SPOC cover; reviewers are not owner/SPOC grants so excludeOwnerOrSpoc still allows.
+      const decision = authorize(actorOf(role), action, targetFor(action, inScope, role));
       assert.equal(decision.allow, hasRow, `${role} × ${action}`);
       if (decision.allow) {
         allowed += 1;
@@ -272,102 +298,68 @@ test('the dual-role identity (dpo + bu_spoc HR) reads everything and writes only
   assert.equal(isOwnerOrSpocOnCase(actorOf('owner'), outOfScope), false);
 });
 
-test('T34 (evaluation logic for the W2-02 rows, exercised with synthesised rows): lane and self-exclusion reasons', () => {
-  const w2Rows: PolicyRow[] = [
-    {
-      action: 'lane.approve',
-      role: 'dpo',
-      scope: 'all_cases',
-      laneRule: 'own_lane',
-      excludeOwnerOrSpoc: true,
-    },
-    {
-      action: 'lane.approve',
-      role: 'it_security',
-      scope: 'all_cases',
-      laneRule: 'own_lane',
-      excludeOwnerOrSpoc: true,
-    },
-    {
-      action: 'finding.waive',
-      role: 'dpo',
-      scope: 'all_cases',
-      laneRule: 'owning_lane',
-      excludeOwnerOrSpoc: true,
-    },
-  ];
+test('T34 / D05: real POLICY_ROWS — lane and disposition self-exclusion (owner branch) and wrong-lane / Admin', () => {
   const reviewerOwner: Actor = { subjectId: S, roles: [grantFor('dpo'), grantFor('owner')] };
   const ownCase: CaseScopeFacts = { ownerSubjectId: S, businessUnitId: 'CM' };
   const otherCase: CaseScopeFacts = { ownerSubjectId: OTHER, businessUnitId: 'CM' };
-  // own case: self_approval on the lane and on the finding (owner branch of isOwnerOrSpocOnCase)
+  for (const action of [
+    'lane.approve',
+    'lane.send_back',
+    'finding.mark_fixed',
+    'finding.waive',
+    'finding.mark_na',
+    'finding.confirm_fixed',
+  ] as const) {
+    const ownTarget: Target = action.startsWith('lane.')
+      ? { kind: 'lane', facts: ownCase, lane: 'dpo' }
+      : { kind: 'finding', facts: ownCase, owningLane: 'dpo' };
+    assert.deepEqual(
+      authorize(reviewerOwner, action, ownTarget),
+      { allow: false, code: 'forbidden', reason: 'self_approval' },
+      `own case ${action}`,
+    );
+    const otherTarget: Target = action.startsWith('lane.')
+      ? { kind: 'lane', facts: otherCase, lane: 'dpo' }
+      : { kind: 'finding', facts: otherCase, owningLane: 'dpo' };
+    const ok = authorize(reviewerOwner, action, otherTarget);
+    assert.equal(ok.allow, true, `other case ${action}`);
+    assert.equal(ok.allow && ok.via.role, 'dpo');
+  }
   assert.deepEqual(
-    evaluate(w2Rows, reviewerOwner, 'lane.approve', { kind: 'lane', facts: ownCase, lane: 'dpo' }),
-    {
-      allow: false,
-      code: 'forbidden',
-      reason: 'self_approval',
-    },
+    authorize(actorOf('dpo'), 'lane.approve', { kind: 'lane', facts: otherCase, lane: 'it_security' }),
+    { allow: false, code: 'forbidden', reason: 'lane' },
   );
   assert.deepEqual(
-    evaluate(w2Rows, reviewerOwner, 'finding.waive', { kind: 'finding', facts: ownCase, owningLane: 'dpo' }),
-    {
-      allow: false,
-      code: 'forbidden',
-      reason: 'self_approval',
-    },
-  );
-  // other case: allowed via the dpo row
-  const ok = evaluate(w2Rows, reviewerOwner, 'lane.approve', { kind: 'lane', facts: otherCase, lane: 'dpo' });
-  assert.equal(ok.allow, true);
-  assert.equal(ok.allow && ok.via.role, 'dpo');
-  // wrong lane: reason lane (more specific than role)
-  assert.deepEqual(
-    evaluate(w2Rows, actorOf('dpo'), 'lane.approve', { kind: 'lane', facts: otherCase, lane: 'it_security' }),
-    {
-      allow: false,
-      code: 'forbidden',
-      reason: 'lane',
-    },
+    authorize(actorOf('dpo'), 'finding.waive', { kind: 'finding', facts: otherCase, owningLane: 'ai_coe' }),
+    { allow: false, code: 'forbidden', reason: 'lane' },
   );
   assert.deepEqual(
-    evaluate(w2Rows, actorOf('dpo'), 'finding.waive', {
-      kind: 'finding',
-      facts: otherCase,
-      owningLane: 'ai_coe',
-    }),
-    {
-      allow: false,
-      code: 'forbidden',
-      reason: 'lane',
-    },
+    authorize(actorOf('admin'), 'lane.approve', { kind: 'lane', facts: otherCase, lane: 'dpo' }),
+    { allow: false, code: 'forbidden', reason: 'role' },
   );
-  // admin has no lane row → role
   assert.deepEqual(
-    evaluate(w2Rows, actorOf('admin'), 'lane.approve', { kind: 'lane', facts: otherCase, lane: 'dpo' }),
-    {
-      allow: false,
-      code: 'forbidden',
-      reason: 'role',
-    },
+    authorize(actorOf('admin'), 'lane.send_back', { kind: 'lane', facts: otherCase, lane: 'dpo' }),
+    { allow: false, code: 'forbidden', reason: 'role' },
   );
-  // the SPOC branch: dpo + bu_spoc HR on an HR case
+  // dual-role SPOC branch: forbidden on HR, allowed on CM
   const dual: Actor = { subjectId: S, roles: [grantFor('dpo'), grantFor('bu_spoc', 'HR')] };
   assert.deepEqual(
-    evaluate(w2Rows, dual, 'lane.approve', {
+    authorize(dual, 'lane.approve', {
       kind: 'lane',
       facts: { ownerSubjectId: OTHER, businessUnitId: 'HR' },
       lane: 'dpo',
     }),
-    {
-      allow: false,
-      code: 'forbidden',
-      reason: 'self_approval',
-    },
+    { allow: false, code: 'forbidden', reason: 'self_approval' },
   );
-  assert.equal(
-    evaluate(w2Rows, dual, 'lane.approve', { kind: 'lane', facts: otherCase, lane: 'dpo' }).allow,
-    true,
+  assert.deepEqual(
+    authorize(dual, 'lane.send_back', {
+      kind: 'lane',
+      facts: { ownerSubjectId: OTHER, businessUnitId: 'HR' },
+      lane: 'dpo',
+    }),
+    { allow: false, code: 'forbidden', reason: 'self_approval' },
   );
+  assert.equal(authorize(dual, 'lane.approve', { kind: 'lane', facts: otherCase, lane: 'dpo' }).allow, true);
 });
 
 test('authorize is pure: the same inputs give the same decision and the actor is not mutated', () => {
