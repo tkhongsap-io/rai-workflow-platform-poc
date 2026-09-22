@@ -79,3 +79,9 @@ Code remains immutable while INT's browser-fix final verification runs. Timing r
 ## Candidate-timing authorization boundary
 
 Lead approved the plan's candidate-timing amendment: clean completed local full integration AND real-browser runs, idle local test load, exact final INT checkpoint and explicit GO remain prerequisites; remote CI/merge may still be pending. Capture candidate identity and unchanged production/config fingerprint, then reconcile against actual merged main and invalidate/rerun affected evidence if it changes. Candidate timings do not establish merge or M3 acceptance. No new code, scripts, tests, DB/resource starts or measurements in this documentation update; waiting for GO.
+
+## Collected independent functional-smoke review
+
+Parent relayed Confucius's CLEAN review at `ad0ed8971ed298a212f815466a9aa41dceaa28e5`, covering the unchanged smoke packet from `997cb8bb510854febc83958633322e7fc1944f51`. Reviewer checked all four artifact hashes, role/DB guards, the case's four QC records and three real approvals reaching Ready, five-mail deduplication, log privacy and child-stop evidence. Compose/socket cleanup was assessed from the recorded evidence, not independently re-probed. This records the reported review, not another execution.
+
+The995-case seed, successor runtime behavior and profile timing remain unproved. The conditional candidate-timing amendment remains approved, but execution awaits the exact final INT HEAD and explicit GO after the required clean local runs and idle-test check. No code, resource, test or measurement action accompanies this bounded review record.
