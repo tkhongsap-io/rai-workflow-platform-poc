@@ -23,3 +23,13 @@ Node 24.21.0; npm ci, no lockfile changes.
 Logs: `/tmp/rai-w3-digest-contract-{install,focused,unit,lint,build}.log`. Early focused checks caught legacy error-field wording and a direct TypeBox import in the sink. Fixed the wording and moved the schema call behind shared mail; the final focused/full-unit/lint results above supersede those failures. No weakening of the import guard.
 
 No DB or browser tests run: no persistence/runtime consumer changes. 54363 and 54366 remain untouched; 54367 is reserved for the future consumer. Broader combined acceptance and independent contract review remain with the parent. No push or PR.
+
+## Actual consumer compatibility check
+
+Parent requested verification beyond the bare d931cea base. Created disposable detached `/tmp/rai-w3-mail-compat` at published 03a `555ff90`; overlaid fadc39e shared mail/sink paths and the exact d931cea provenance schema prerequisite (no schema edits). Initial typecheck reproduced TS2345/TS2322 at compose.ts's buildDedupKey and returned event: the broad CommittedEvent object does not inherit its property's kind narrowing.
+
+`03a-compat.patch` is the required minimal compatibility diff, tested only in that detached checkout. After the existing digest rejection guard, copy `{ ...event, kind: event.kind }` into caseEvent and use it for key construction and request.event. No assertion/cast, audit relaxation, runtime guard change or loader signature change. Apply this patch when the parent combines the consumer and contract after prerequisite merges; it is not a standalone new composer file on the contract's base.
+
+With the patch, 03a typecheck and all 16 composer/runtime/shutdown tests passed. Then overlaid Parfit's read-only W3-04 notification snapshot (HEAD 84d3db6 plus current runtime/runtime-test edits) in the same detached checkout. W3-04 typecheck and all 24 composer/retry/runtime/shutdown tests passed with the same patch; no additional consumer type diff needed. Its integration test source was also included for typechecking, not DB execution. Runtime snapshot hashes: runtime.ts 740b64210c8c743bdb92cc26c742e062f5cb6a6caf5246b9bae12559932c2450; runtime.test.ts 00d28460fc20143f07a5156217336ae2d0929a3997613e72ebb5b948c73e8160; service.ts 456c9859ef113ddb24dd3c01ef394e8be630fcc5b4bcc9f7ebaedeacb74c6e8c. This is snapshot compatibility evidence, not validation of later Parfit edits or full combined acceptance.
+
+Logs: `/tmp/rai-w3-mail-compat-03a-{before,after,tests}.log`, `/tmp/rai-w3-mail-compat-04{,-tests}.log`. No parent/03a/04 worktree modifications, DB access, push or PR. Original fadc39e typecheck was only for callers present on d931cea; these added checks establish the actual case composer/loader/dispatcher compatibility with the attached refinement.
