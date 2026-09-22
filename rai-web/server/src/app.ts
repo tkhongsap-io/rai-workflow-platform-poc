@@ -18,6 +18,7 @@ import type { AppConfig } from './config.js';
 import { registerArtifactRoutes, type ArtifactRouteDeps } from './artifacts/routes.js';
 import { registerAuthorization, type ScopeFactsSource } from './authz/middleware.js';
 import { registerCaseRoutes, type CaseRouteDeps } from './cases/routes.js';
+import { registerQueueRoutes } from './queue/routes.js';
 import { registerPackRoutes, type PackRouteDeps } from './pack/routes.js';
 import { registerVersionRoutes, type VersionRouteDeps } from './versions/routes.js';
 import { registerDecideRoutes, type DecideRouteDeps } from './workflow/routes.js';
@@ -182,6 +183,7 @@ export function buildApp(deps: AppDeps): App {
     if (caseDeps !== undefined) {
       void fastify.register((instance, _opts, done) => {
         registerCaseRoutes(instance, { ...caseDeps, emitter });
+        registerQueueRoutes(instance, { db: caseDeps.db });
         done();
       });
     }
