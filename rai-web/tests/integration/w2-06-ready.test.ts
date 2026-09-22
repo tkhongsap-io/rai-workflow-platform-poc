@@ -31,6 +31,7 @@ import { createFixtureIdentityProvider } from '@rai/server/identity/fixture';
 import { createPgSessionStore } from '@rai/server/identity/session';
 import { laneOpenRecipientsFromIdentities } from '@rai/server/versions/open-lanes';
 import { sendBackRecipientsFromIdentities } from '@rai/server/workflow/send-back-notice';
+import type { ReadyKnownIdentity } from '@rai/server/workflow/ready';
 import { FIXTURE_USERS, findFixtureUser } from '@rai/fixtures/data/users';
 import { FIXTURE_CASES, findFixtureCase } from '@rai/fixtures/data/cases/index';
 import { loadFixtures } from '@rai/fixtures/load';
@@ -73,8 +74,12 @@ let runner: ScriptedQcRunner;
 let clock = Date.parse('2026-09-22T07:00:00Z');
 const now = () => new Date(clock);
 
-async function rebuildApp(withQc: boolean): Promise<void> {
+async function rebuildApp(
+  withQc: boolean,
+  opts: { knownIdentities?: readonly ReadyKnownIdentity[] } = {},
+): Promise<void> {
   if (app !== undefined) await app.close();
+  const knownForReady = opts.knownIdentities ?? FIXTURE_USERS;
   runner = new ScriptedQcRunner({
     fixtureCaseIdOf: (version: VersionRef) => fixtureCaseIdByRowId.get(version.caseId),
     now,
@@ -118,13 +123,13 @@ async function rebuildApp(withQc: boolean): Promise<void> {
       db: db.app,
       now,
       sendBackRecipientsForOwner: ownerRecipients,
-      knownIdentities: FIXTURE_USERS,
+      knownIdentities: knownForReady,
     },
     findings: {
       db: db.app,
       now,
       readyRecipientsForOwner: ownerRecipients,
-      knownIdentities: FIXTURE_USERS,
+      knownIdentities: knownForReady,
       ...(withQc ? { qc: { runner, now } } : {}),
     },
   });
@@ -547,6 +552,22 @@ describe(`W2-06 Ready predicate — ${SET}`, () => {
     assert.equal(state.version.ready_at, null);
     assert.equal(state.caseRow.desk_status, 'in_review');
     assert.equal(state.readyAudits.length, 0);
+  });
+
+  it('empty knownIdentities (local-google shape) still sets Ready when lane reviewers have sessions', async () => {
+    await rebuildApp(true, { knownIdentities: [] });
+
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, NONVENDOR.caseId);
+    const revision = await caseRevision(NONVENDOR.caseId);
+    // Sign-ins create session.principal rows used when the known list is empty.
+    const last = await approveAllThree(NONVENDOR.caseId, version.versionId, revision);
+    assert.equal(last.ready, true);
+
+    const state = await readyState(NONVENDOR.caseId, version.versionId);
+    assert.ok(state.version.ready_at != null);
+    assert.equal(state.caseRow.desk_status, 'ready');
+    assert.equal(state.readyAudits.length, 1);
   });
 
   it('upload on a Ready case is 409 version_closed, not no_open_draft', async () => {

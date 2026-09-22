@@ -1,9 +1,9 @@
 // W2-06: Ready predicate and system transition (W0-06 §4.9 / §6; W0-04 Ready row). Evaluated only inside
 // lane.approved and disposition transactions under the case row lock — never a user route. Desk completion
 // only; not Council or ITSM approval.
-import { and, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { LANE_MAPPINGS_BY_VERSION, type Lane } from '@rai/shared/constants';
-import type { RoleScope } from '@rai/shared/schemas/auth';
+import type { Principal, RoleScope } from '@rai/shared/schemas/auth';
 import type { AuditRefValue } from '../audit/store.js';
 import { auditStore } from '../audit/store.js';
 import { isOwnerOrSpocOnCase, type Actor, type CaseScopeFacts } from '../authz/policy.js';
@@ -12,6 +12,7 @@ import type { Tx } from '../db/client.js';
 import { cases } from '../db/schema/case.js';
 import { laneDecision } from '../db/schema/lane-decision.js';
 import { packVersion } from '../db/schema/pack-version.js';
+import { session } from '../db/schema/session.js';
 import { CaseRowChanged } from '../versions/repository.js';
 import { insertReadyNotifications } from './ready-notice.js';
 
@@ -70,6 +71,45 @@ function actorFromKnown(subjectId: string, known: readonly ReadyKnownIdentity[])
   return { subjectId: match.subjectId, roles: [...match.roles] };
 }
 
+/** Same store as cases/subject-directory: newest session.principal for the subject. */
+async function actorFromLatestSession(tx: Tx, subjectId: string): Promise<Actor | undefined> {
+  const [row] = await tx
+    .select({ principal: session.principal })
+    .from(session)
+    .where(eq(session.subjectId, subjectId))
+    .orderBy(desc(session.createdAt))
+    .limit(1);
+  const principal = row?.principal as Partial<Principal> | undefined;
+  if (principal === undefined || !Array.isArray(principal.roles) || principal.roles.length === 0) {
+    return undefined;
+  }
+  return { subjectId, roles: [...principal.roles] };
+}
+
+/**
+ * When neither known list nor session can resolve the approver: leak only if the decision names the
+ * case owner as actor, or the stored actor_role is owner / bu_spoc. A plain reviewer we cannot look
+ * up is not a leak (empty known list in local-google / network / production must still allow Ready).
+ */
+function leakFromDecisionFallback(actorSubjectId: string, actorRole: string, caseRow: CaseRow): boolean {
+  if (actorSubjectId === caseRow.ownerSubjectId) return true;
+  return actorRole === 'owner' || actorRole === 'bu_spoc';
+}
+
+async function approverIsOwnerOrSpocLeak(
+  tx: Tx,
+  approval: { actorSubjectId: string; actorRole: string },
+  caseRow: CaseRow,
+  knownIdentities: readonly ReadyKnownIdentity[],
+  facts: CaseScopeFacts,
+): Promise<boolean> {
+  const fromKnown = actorFromKnown(approval.actorSubjectId, knownIdentities);
+  if (fromKnown !== undefined) return isOwnerOrSpocOnCase(fromKnown, facts);
+  const fromSession = await actorFromLatestSession(tx, approval.actorSubjectId);
+  if (fromSession !== undefined) return isOwnerOrSpocOnCase(fromSession, facts);
+  return leakFromDecisionFallback(approval.actorSubjectId, approval.actorRole, caseRow);
+}
+
 /**
  * W0-06 §6 + persistence Ready SQL sketches. Runs under the case lock. Approvals on any earlier version
  * do not count; fixed_proposed alone leaves a finding undispositioned; owner/BU-SPOC as approver fails closed.
@@ -105,6 +145,7 @@ export async function evaluateReadyPredicate(
       id: laneDecision.id,
       lane: laneDecision.lane,
       actorSubjectId: laneDecision.actorSubjectId,
+      actorRole: laneDecision.actorRole,
     })
     .from(laneDecision)
     .where(and(eq(laneDecision.versionId, versionId), eq(laneDecision.decision, 'approve')));
@@ -127,19 +168,21 @@ export async function evaluateReadyPredicate(
   `);
   const undispositionedFindingIds = (undispositioned.rows as Array<{ id: string }>).map((r) => r.id);
 
-  // §6 condition 4: each approving actor must be neither owner nor BU SPOC of the case (recheck under lock).
-  // Unknown subject (not in the known-identity list) fails closed.
+  // §6 condition 4: each approving actor must be neither owner nor BU SPOC of the case.
+  // Resolve grants: known-identity list → latest session.principal → decision/case fallback.
   const facts: CaseScopeFacts = {
     ownerSubjectId: caseRow.ownerSubjectId,
     businessUnitId: caseRow.businessUnitId,
   };
-  const selfApprovalLeak = requiredLanes.some((lane) => {
+  let selfApprovalLeak = false;
+  for (const lane of requiredLanes) {
     const row = byLane.get(lane);
-    if (row === undefined) return false;
-    const actor = actorFromKnown(row.actorSubjectId, knownIdentities);
-    if (actor === undefined) return true;
-    return isOwnerOrSpocOnCase(actor, facts);
-  });
+    if (row === undefined) continue;
+    if (await approverIsOwnerOrSpocLeak(tx, row, caseRow, knownIdentities, facts)) {
+      selfApprovalLeak = true;
+      break;
+    }
+  }
 
   if (missingApprovals.length > 0 || undispositionedFindingIds.length > 0 || selfApprovalLeak) {
     return { ready: false, missingApprovals, undispositionedFindingIds };
