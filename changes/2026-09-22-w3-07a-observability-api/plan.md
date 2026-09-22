@@ -25,3 +25,7 @@ Parent reports prerequisite re-review clean (10 independent tests) and draft PR 
 ## Accepted notification integration seam
 
 Parent explicitly authorized 07a to adapt `server/src/notifications/runtime.ts` after actual W3-04 merge: replace its unexpected load/DB-error fallback with safe internal-error capture. Adapt the terminal receipt path in `server/src/notifications/service.ts` only as needed to capture typed mail_delivery_failed from the committed notification identity/attempt count and bounded cause. Keep existing worker and correct domain mail.failed event. One domain event and one error.captured are distinct; neither is emitted twice. Do not log raw causes, recipients or idempotency keys. Final acceptance must inspect actual W3-04 events and the W3-07a operator read view before PR publication.
+
+## Publication split
+
+The lead separates the independent observability modules from HTTP/QC/notification runtime activation. This first PR contains only the original planned health predicate, store probes, safe error projection, operator query and their tests. No route or worker is activated. The roughly 930-line bounded exception includes the recorded plan and 317 test lines; the related predicate/projection rules stay together. The later runtime PR has its own review and size assessment.

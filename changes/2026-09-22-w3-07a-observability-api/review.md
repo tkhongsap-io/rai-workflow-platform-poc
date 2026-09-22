@@ -13,3 +13,7 @@ Verified: full lint and typecheck; 14 observability unit tests (including existi
 Pending: route/startup wiring, actual process and HTTP noPII/correlation acceptance, QC diagnostics/late-result runtime, integrated notification acceptance OBS-07/09/11, W3-INT synthetic submit trigger OBS-10, full combined verify:full. No PR/push. Parent coordinates startup handles after W3-04 merge. Independent modules are a local checkpoint, not completion of issue48 or OBS-01–16.
 
 Full current unit suite also passed: 480 tests, zero failures. This is unit evidence only; full runtime integration remains pending as listed above.
+
+## Core publication boundary
+
+Selected original plan 20391e5 and core checkpoint 4a8f156 onto actual main 52a80ed. Runtime activation and subsequent runtime-dependent revisions remain outside this PR. Independent review and final-head CI are required before merge. No health endpoint, delivery or OBS acceptance is inferred from these inactive modules.
