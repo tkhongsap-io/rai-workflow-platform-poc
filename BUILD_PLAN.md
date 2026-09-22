@@ -157,7 +157,7 @@ All recorded on 2026-09-21 in the [register](docs/product/decisions.md); the [br
 
 Still open: D04 (inside W0-01), D07-D10 (gates for W4-W8).
 
-## Status against this plan — 2026-09-22 (W1 exit)
+## Status against this plan — 2026-09-22 (W2 exit)
 
 A dated read, not a rewrite. Packages above stay as written. DEVLOG.md is the live record; where they disagree, DEVLOG is newer.
 
@@ -166,17 +166,18 @@ A dated read, not a rewrite. Packages above stay as written. DEVLOG.md is the li
 | Documentation anchor | Prepared | changes/2026-09-20-build-anchor | — (used to close G0) |
 | Delivery pack | Prepared, reviewed by two workflows, A11 accepted | changes/2026-09-21-delivery-planning | Team kickoff |
 | G0 | **Closed 2026-09-21** | decisions.md recorded table; changes/2026-09-21-g0-close | — |
-| W0 | **Exit recorded 2026-09-21** | changes/2026-09-21-w0-exit/review.md; docs/delivery/w0-technical-contract.md exit checklist | W1-00 skeleton PR |
-| W1 | **Exit recorded 2026-09-22 (Google loopback sign-in pending Ta)** | changes/2026-09-22-w1-exit/review.md (347 unit, 135 integration, 108 evidence browser tests; exit negatives and restart by hand; fixture set slice1-synthetic@1 7c80ccd43663) | Ta's manual `local-google` sign-in (TESTING.md runbook) |
+| W0 | **Exit recorded 2026-09-21** | changes/2026-09-21-w0-exit/review.md; docs/delivery/w0-technical-contract.md exit checklist | — |
+| W1 | **Exit recorded 2026-09-22 (Google loopback sign-in pending Ta)** | changes/2026-09-22-w1-exit/review.md (347 unit, 135 integration, 108 evidence browser tests; exit negatives and restart by hand; fixture set slice1-synthetic@1 7c80ccd43663) | Ta's manual `local-google` sign-in (TESTING.md runbook); not a W2 blocker |
 | M1 (W1) | **Reached** (2026-09-22) | changes/2026-09-22-w1-exit/review.md | — |
-| W2 | **Ready** (W2 issues #31-#41 status:ready) | D02 and D05 recorded; W1 exit recorded | W2-01 (submit opens three lanes) |
-| M2 (W2), M3 (W3, slice 1) | M2: authorized (D03), open until W2 exit (W2-08); M3: authorized, blocked by W2 exit | changes/2026-09-22-w1-exit/review.md | W2 exit (W2-08), then W3 |
-| W4-W8 | Not authorized | — | D07-D10 and package gate entries |
+| W2 | **Exit recorded 2026-09-22** | changes/2026-09-22-w2-exit/review.md (lint, typecheck; 15 W2-INT evidence browser tests; 6 W2-INT negatives; check:substitute-absent 544/0; fixture set slice1-synthetic@1 7c80ccd43663) | — |
+| M2 (W2) | **Reached** (2026-09-22) | changes/2026-09-22-w2-exit/review.md | — |
+| M3 (W3, slice 1) | Authorized (D03), **unblocked** by W2 exit; next package | BUILD_PLAN W3; docs/delivery/slice-1-work-breakdown.md | W3-01 / W3 contract path |
+| W4-W8 | **Not authorized** | — | D07-D10 and package gate entries |
 
 ### Where the build diverged from the plan
 
-None; nothing started. The authorized synthetic demo (ADR-0002) is outside W0-W8.
+None on authorization: W0–W3 remain the synthetic-data scope of D03; W4–W8 stay unauthorized until their decision gates. The authorized synthetic demo (ADR-0002) is outside W0-W8.
 
-The [delivery pack](docs/delivery/README.md) breaks G0, W0 and W1-W3 into decision briefs and assignable tickets; it does not change these packages or start them.
+The [delivery pack](docs/delivery/README.md) breaks G0, W0 and W1-W3 into decision briefs and assignable tickets; it does not change these packages.
 
-G0 is closed; the next action is W0-01, the stack and deployment-boundary ADR (D04), by the tech lead with Ta. No starter is generated before W0-02 records the file-level plan. This plan is usable as a stable backlog now; exact code paths and commands arrive in W0-02 after the ADR. Supporting [architecture](docs/architecture/README.md), [threat model](docs/security/threat-model.md) and [evaluation](docs/evaluation/plan.md) remain part of the build contract.
+W2 exit is recorded and Milestone M2 is reached; **next is W3** (queue, notification links and SLA reporting). W4–W8 are not authorized. Supporting [architecture](docs/architecture/README.md), [threat model](docs/security/threat-model.md) and [evaluation](docs/evaluation/plan.md) remain part of the build contract. DEVLOG.md is the live record.
