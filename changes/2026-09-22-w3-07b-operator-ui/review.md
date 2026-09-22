@@ -42,4 +42,4 @@ Real OBS-17 remains W3-INT against the actual W3-07a endpoint, actual failed-mai
 
 ## PR-size handoff
 
-The local prerequisite is larger than the W0-02 working rule of about 600 changed lines: bilingual exhaustive enum copy, typed maps, boundary tests and the previously accepted planning documents account for the diff. Before opening a PR, parent must split the publication scope or explicitly approve a bounded size exception; no exception is assumed here. This local commit is the requested reviewable handoff, not authorization to publish it.
+The local prerequisite is larger than the W0-02 working rule of about 600 changed lines: bilingual exhaustive enum copy, typed maps, boundary tests and the previously accepted planning documents account for the diff. The parent recorded a bounded size exception in plan.md before publication, retaining matching catalogues, exhaustive mappings and client-boundary proof together. This local commit is the requested reviewable handoff, not authorization to publish it.
