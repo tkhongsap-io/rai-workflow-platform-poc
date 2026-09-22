@@ -72,6 +72,7 @@
   "error.invalid_input": "ข้อมูลบางรายการไม่ถูกต้อง กรุณาตรวจสอบแล้วลองอีกครั้ง",
   "error.invalid_input.idempotency_key_reused": "คำขอนี้ซ้ำกับคำขอก่อนหน้าที่มีเนื้อหาต่างกัน",
   "error.invalid_input.lane_qc_not_run": "กรุณาตรวจผล QC ของช่องทางก่อนอนุมัติ",
+  "error.invalid_input.fixed_confirmed_without_proposal": "ยืนยันว่าแก้ไขแล้วได้เฉพาะหลังเจ้าของหรือ SPOC เสนอการแก้ไข",
   "error.invalid_input.projected_field": "ฟิลด์สถานะนี้เขียนโดยระบบเท่านั้น",
   "error.invalid_input.send_back_artifact_required": "การส่งกลับต้องระบุอย่างน้อยหนึ่งเอกสาร",
   "error.mail_delivery_failed": "ส่งอีเมลแจ้งเตือนไม่สำเร็จ การตัดสินใจถูกบันทึกแล้วและระบบจะลองส่งอีกครั้ง",

@@ -43,7 +43,7 @@ test('migrations apply from an empty database and a rerun applies nothing', asyn
   assert.deepEqual(third, second);
 });
 
-test('the schema holds the W0-04 tables (plus W1-01 session, W1-09 fixture_set, W1-02 registry_counter, W2-01 notification and W2-02 lane_decision), triggers and grants', async () => {
+test('the schema holds the W0-04 tables (plus W1-01 session, W1-09 fixture_set, W1-02 registry_counter, W2-01 notification, W2-02 lane_decision and W2-05 qc/disposition tables), triggers and grants', async () => {
   const tables = await db.raw('owner', (c) =>
     c.query<{ tablename: string }>(
       `SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename`,
@@ -57,11 +57,14 @@ test('the schema holds the W0-04 tables (plus W1-01 session, W1-09 fixture_set, 
       'audit_event',
       'case',
       'configuration_revision',
+      'disposition_event', // W2-05 (0006_w2_05_findings_dispositions)
       'fixture_set', // W1-09 (0002_w1_09_fixture_set)
       'idempotency_key',
       'lane_decision', // W2-02 (0005_w2_02_lane_decision)
       'notification', // W2-01 (0004_w2_01_notification)
       'pack_version',
+      'qc_finding', // W2-05
+      'qc_run', // W2-05
       'registry_counter', // W1-02 (0003_w1_02_registry_counter; W0-04 case.registry_id per-year sequence)
       'session', // W1-01 (0001_w1_01_session; W0-03 section 6.3)
     ],
@@ -80,9 +83,12 @@ test('the schema holds the W0-04 tables (plus W1-01 session, W1-09 fixture_set, 
       'audit_event.audit_event_append_only',
       'case.case_projection_gate',
       'configuration_revision.configuration_revision_frozen',
+      'disposition_event.disposition_event_append_only', // W2-05
       'lane_decision.lane_decision_append_only', // W2-02
       'notification.notification_delivery_only', // W2-01: delivery columns only
       'pack_version.pack_version_frozen',
+      'qc_finding.qc_finding_append_only', // W2-05
+      'qc_run.qc_run_append_only', // W2-05
     ],
   );
 
@@ -109,6 +115,8 @@ test('the schema holds the W0-04 tables (plus W1-01 session, W1-09 fixture_set, 
     'case:UPDATE',
     'configuration_revision:INSERT',
     'configuration_revision:SELECT',
+    'disposition_event:INSERT', // W2-05: append-only
+    'disposition_event:SELECT',
     'fixture_set:INSERT',
     'fixture_set:SELECT',
     'idempotency_key:INSERT',
@@ -121,6 +129,10 @@ test('the schema holds the W0-04 tables (plus W1-01 session, W1-09 fixture_set, 
     'pack_version:INSERT',
     'pack_version:SELECT',
     'pack_version:UPDATE',
+    'qc_finding:INSERT', // W2-05: append-only
+    'qc_finding:SELECT',
+    'qc_run:INSERT', // W2-05: append-only
+    'qc_run:SELECT',
     'registry_counter:INSERT', // W1-02: the per-year counter is upserted inside the create transaction
     'registry_counter:SELECT',
     'registry_counter:UPDATE',
