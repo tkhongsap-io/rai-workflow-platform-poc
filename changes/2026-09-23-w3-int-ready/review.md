@@ -6,7 +6,7 @@ Base: `a055ccd8df6cd77ffea57d6a75d8ed6fe71884b8`; isolated branch `codex/w3-int-
 
 Explicit server `aiReadinessStatus=ready` selects persisted GET-only findings. Reviewer panels retain their own lane, consistent with their heading and pre-Ready presentation; owner/SPOC retains the authorized full list. Recorded dispositions remain visible without mutation controls. Decision/disposition guards deny actions even under a contradictory pending lane projection. The load-mode key invalidates stale workspace results. A ready=true disposition refreshes case/version state through the same reload token used after decisions; loading removes the old action workspace. Ready omits only action-inviting intro copy. ErrorNotice, authentication handling and server refusal are unchanged; no blanket suppression.
 
-## Independently executed local author checks
+## Author verification
 
 Node24.21.0, own npm dependencies installed; application and fixture builds completed. Dedicated loopback service verified as running `rai-w3-int-observability-postgres-1`, project `rai-w3-int-observability`, bound to127.0.0.1:54371; browser58859 was free before use. Ignored local config selects that service for all three roles. Existing helper validates all DB URLs and creates/drops only a generated database for each new scenario. Affected W2 tests reset only the assigned base fixture database while their managed child is stopped.
 
@@ -44,3 +44,7 @@ Raw logs remain in the private temporary workspace; they are not committed. The 
 ## Delivery boundary
 
 This is local author verification, not independent review or full INT acceptance. Hypatia review remains pending. Parent Heisenberg owns the shared journey assertions and assembly; final IT expectations must use own-lane empty state, while owner verifies the AI/COE persisted finding. Carver owns the fresh whole-browser walkthrough after assembly. The prior full-proof UI fingerprint is invalidated. No full integration suite was run here, no model/A06 acceptance is claimed, and no push/PR/merge occurred. Existing in-review policy and issue35 remain unchanged.
+
+## Independent review
+
+Hypatia reviewed exact `3621e6762cf5f7fa412bdf64e2ae1f2ba4c2e146` against `a055ccd` with no blocking findings. Fourteen independent pure tests passed, zero skips. Author logs for 538 unit and 18 browser passes were inspected, not independently rerun against the database. The Ready read-only flow, disposition refresh, role presentation, real denials and regression coverage were reviewed. This packet heading now distinguishes author verification from independent review. Final assembled browser/recording and CI remain the parent merge gates.

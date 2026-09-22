@@ -133,7 +133,7 @@ The completed `bea6278` integration rerun had one real 40P01 failure: W2-INT neg
 
 ## Lead publication size exception — 2026-09-23
 
-The lead accepts one cohesive W3-INT PR under the declared cross-lane integration exception. The runtime/configuration delta is 14 files, 79 additions and 49 deletions; the larger remainder consists of required journey, fault, privacy and restart proofs plus their dated plans/reviews. Shared public contracts, migrations and component features were already delivered in separate reviewed prerequisite PRs. No new owning-lane policy is chosen here.
+The lead accepts one cohesive W3-INT PR under the declared cross-lane integration exception. At assembled `27ad01b`, the runtime/configuration delta is 17 files, 102 additions and 58 deletions; the larger remainder consists of required journey, fault, privacy and restart proofs plus their dated plans/reviews. Shared public contracts, migrations and component features were already delivered in separate reviewed prerequisite PRs. No new owning-lane policy is chosen here.
 
 Independent whole-change review recommended keeping this evidence with its integration wiring. Its missing late-QC/restart proof was added and re-reviewed; the subsequent negative-suite reset race received a separate lifecycle repair and review. The exception is to PR size only: final independent review, relevant local verification and all required CI checks on the exact published head still gate merge. W3-06 measurements, walkthrough handoff and owner acceptance remain separate.
 
@@ -184,3 +184,7 @@ Hypatia confirmed the Ready/false stale-version alert finding; Confucius owns th
 ### Approved lane-filtered Ready assertion correction — 2026-09-23
 
 Confucius confirmed that Ready persisted findings retain reviewer lane filtering. The final IT actor has no IT findings; requiring the AI CoE slot1 row for that actor would change UI semantics merely to satisfy the test. Before editing, record the approved correction: parameterize only the shared journey helper's presentation expectation. Final IT requires its explicit own-lane empty status after a new successful findings GET, Ready, no error/actions/loading or post-success QC POST. Owner Ready-mail navigation still requires the same visible slot1 fixed_confirmed evidence. Keep network boundary and all other assertions; no UI edits, runtime execution or scope expansion. Send the new immutable assertion checkpoint for Hypatia review.
+
+## Publication exception update after visual review
+
+The same W3-INT exception includes the three small UI paths needed to repair the actual final-journey Ready defect: persisted findings reads, read-only action guards and authoritative refresh after a disposition completes review. The new regression spec and strengthened shared journey stay with the integration that exposed it. At `27ad01b` the whole PR is 102 files, 4,681 additions/208 deletions, predominantly test and evidence material; final document-only additions will change that total. Runtime/configuration counts above exclude tests and prose. No shared schema, migration, new locale contract or owning-lane policy was added. Independent UI and assertion reviews passed; final assembled tests, recording inspection and final-head CI still gate merge.
