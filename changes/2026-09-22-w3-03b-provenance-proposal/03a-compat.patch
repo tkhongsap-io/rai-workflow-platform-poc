@@ -1,0 +1,18 @@
+diff --git a/rai-web/server/src/notifications/compose.ts b/rai-web/server/src/notifications/compose.ts
+index 2f4cc13..b6e3a13 100644
+--- a/rai-web/server/src/notifications/compose.ts
++++ b/rai-web/server/src/notifications/compose.ts
+@@ -145,9 +145,11 @@ export function composeCaseMail(
+       content.feedback.items.map((item) => `${String(item.slot)}: ${item.deficiency}`).join('; ')
+     ).slice(0, 500);
+   }
++  // The guard above excludes digest; carry that narrowed kind into the delivery union.
++  const caseEvent = { ...event, kind: event.kind };
+   return {
+-    dedupKey: buildDedupKey(event, recipient),
+-    event,
++    dedupKey: buildDedupKey(caseEvent, recipient),
++    event: caseEvent,
+     recipient,
+     deepLinks: [link],
+     digestCases: null,

@@ -91,3 +91,15 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=codex-w3-04-retries model=GPT-6
 - What: Parent supplied committed W3-03a `36dcee9`; integrate retry dispatch only in `/tmp/rai-w3-retries`, preserving Hypatia's composition. Review fixes and final dependency rebase remain parent-coordinated. Isolated DB 54365.
 - Evidence: [integration plan](../../changes/2026-09-22-w3-04-retries/plan.md)
+
+## 2026-09-22 (time not recorded) — CLAIM W3-03b provenance planning only
+- Author: operator=ta session=w3-03b-provenance-plan model=codex
+- Scope: separate documentation-only proposal; no consumer or shared-code edits, no takeover of other Lane B work.
+- Evidence: changes/2026-09-22-w3-03b-provenance-proposal/plan.md
+- Next: parent reviews proposed mail/sink boundary against W3-07a aabee4c before implementation.
+
+## 2026-09-22 (time not recorded) — W3-03b shared provenance implementation authorized
+- Author: operator=ta session=w3-03b-provenance-plan model=codex
+- What: parent accepted proposal; isolated branch rebased onto W3-07a d931cea. Implemented shared mail union and synthetic sink validation only.
+- Evidence: changes/2026-09-22-w3-03b-provenance-proposal/review.md
+- Next: independent contract review; no consumer before parent coordinates W3-04 integration.
