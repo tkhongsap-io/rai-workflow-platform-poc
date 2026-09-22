@@ -7,6 +7,7 @@ import path from 'node:path';
 import { Writable } from 'node:stream';
 import { sql, eq } from 'drizzle-orm';
 import { notification } from '@rai/server/db/schema/notification';
+import { operatorJobRun, operatorJobNotification } from '@rai/server/db/schema/operator-job-run';
 import type { FastifyInstance } from 'fastify';
 import type { PackDraft } from '@rai/shared/schemas/pack';
 import type { SubmittedVersion } from '@rai/shared/schemas/versions';
@@ -372,16 +373,32 @@ for (const invalid of ['missing_audit', 'unauthorized', 'external', 'unsafe_link
 
 test('digest rows remain untouched for W3-03b', async () => {
   const id = randomUUID();
-  await db.owner.insert(notification).values({
-    id,
-    event: 'sla_breach_digest',
-    lane: '-',
-    recipient: 'operator@rai-desk.example',
-    deepLinkPath: '/queue',
-    templateKey: 'mail.sla_breach_digest',
-    templateParams: {},
-    correlationId: randomUUID(),
-    createdAt: now(),
+  const jobRunId = randomUUID();
+  const correlationId = randomUUID();
+  const digestDay = '2026-09-22';
+  const recipient = 'operator-digest@rai-desk.example';
+  // The merged observability contract requires real job linkage even for an undelivered digest fixture.
+  await db.owner.transaction(async (tx) => {
+    await tx.insert(operatorJobRun).values({
+      id: jobRunId,
+      job: 'sla_digest',
+      digestDay,
+      correlationId,
+      startedAt: now(),
+      status: 'running',
+    });
+    await tx.insert(notification).values({
+      id,
+      event: 'sla_breach_digest',
+      lane: '-',
+      recipient,
+      deepLinkPath: '/queue',
+      templateKey: 'mail.sla_breach_digest',
+      templateParams: {},
+      correlationId,
+      createdAt: now(),
+    });
+    await tx.insert(operatorJobNotification).values({ jobRunId, notificationId: id, digestDay, recipient });
   });
   await notifications.deliverPending();
   const [stored] = await db.owner.select().from(notification).where(eq(notification.id, id));

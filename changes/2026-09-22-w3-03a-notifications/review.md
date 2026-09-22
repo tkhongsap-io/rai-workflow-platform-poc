@@ -62,3 +62,7 @@ Focused composer/runtime/shutdown: 16 passed. Real Postgres notification suite: 
 ## Parent final verification and independent re-review
 
 Confucius re-reviewed `4aa19a3` after both fixes, independently ran 16 composer/runtime/shutdown tests and reported no remaining actionable findings. Parent `npm run verify:full` on that implementation exited 0: lint, typecheck, 469 unit, 214 integration, 126 real-server browser and 90 substitute browser tests, build and production substitute-absence. Log: `/tmp/rai-w3-notifications-fixed-full.log`. Rebase onto current main retained the independent contract record and existing queue wiring. Final combined-head CI remains required before merge; this does not claim digest, retries or M3 acceptance.
+
+## Compatibility with the merged observability contract
+
+PR #112 merged as `fe65fc1` while this consumer was under review. The digest-exclusion test now creates a real running job, outbox row and day/recipient link in one transaction, preserving the new deferred constraint and the original zero-attempt/zero-mail assertions. Its 16 focused integration tests pass. The composer copies the already-validated non-digest kind at the delivery boundary so the following provenance union can retain ordinary audit authority without widening the type; all 10 composer tests and typecheck pass. No digest behavior is added. Final combined-head CI remains the full regression gate.

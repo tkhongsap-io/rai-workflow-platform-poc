@@ -145,9 +145,11 @@ export function composeCaseMail(
       content.feedback.items.map((item) => `${String(item.slot)}: ${item.deficiency}`).join('; ')
     ).slice(0, 500);
   }
+  // Preserve the validated case-event kind at the typed delivery boundary.
+  const caseEvent = { ...event, kind: event.kind };
   return {
-    dedupKey: buildDedupKey(event, recipient),
-    event,
+    dedupKey: buildDedupKey(caseEvent, recipient),
+    event: caseEvent,
     recipient,
     deepLinks: [link],
     digestCases: null,
