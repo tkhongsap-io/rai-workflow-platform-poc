@@ -121,6 +121,7 @@
   "lane.dpo": "Privacy (DPO)",
   "lane.it_security": "IT/Security",
   "mail.lane_opened": "A review lane is open",
+  "mail.ready_for_launch": "Desk review is complete (Ready for launch)",
   "mail.sent_back": "A review lane sent the pack back",
   "model_type.classic_ml": "Classic ML",
   "model_type.llm": "LLM",

@@ -1,5 +1,6 @@
-// W2-05 disposition: append-only event on a finding (W0-06 4.7 / 4.8). Ready (W2-06) is not evaluated here.
-// Authorization maps body.kind → finding.* action; the route calls authorize before this service.
+// W2-05 disposition: append-only event on a finding (W0-06 4.7 / 4.8). Ready (W2-06) is evaluated in the same
+// transaction after the disposition write. Authorization maps body.kind → finding.* action; the route calls
+// authorize before this service.
 
 import { createHash } from 'node:crypto';
 import { InvalidInputError, NotFoundError, StaleVersionError } from '@rai/shared/errors';
@@ -13,6 +14,7 @@ import { staleDetails } from '../cases/service.js';
 import type { Db } from '../db/client.js';
 import { withWorkflowTransaction, type WorkflowResult } from '../versions/transaction.js';
 import { nextMonotonicStamp } from '../workflow/monotonic-stamp.js';
+import { applyReadyIfHeld, type ReadyKnownIdentity, type ReadyTrigger } from '../workflow/ready.js';
 import { isUuid } from '../versions/repository.js';
 import {
   findLatestSubmittedVersionId,
@@ -24,6 +26,10 @@ import {
 export interface DispositionServiceDeps {
   db: Db;
   now?: () => Date;
+  /** Owner email(s) for ready notices; resolved from identity data in start.ts / tests. */
+  readyRecipientsForOwner?: (ownerSubjectId: string) => readonly string[];
+  /** Known identities for Ready §6 condition 4 (same list as decide notices). */
+  knownIdentities?: readonly ReadyKnownIdentity[];
 }
 
 export interface ActionContext {
@@ -58,6 +64,10 @@ function caseRef(row: CaseRow): Record<string, AuditRefValue> {
     current_version_id: row.currentVersionId,
     desk_status: row.deskStatus,
     row_version: row.rowVersion,
+    privacy_status: row.privacyStatus,
+    security_status: row.securityStatus,
+    rai_status: row.raiStatus,
+    ai_readiness_status: row.aiReadinessStatus,
   };
 }
 
@@ -181,16 +191,9 @@ export async function recordDisposition(
           correlationId: ctx.correlationId,
         });
 
-        const body: DispositionResponse = {
-          dispositionId,
-          findingId: finding.id,
-          kind: request.kind,
-          recordedAt: stamp.toISOString(),
-          caseRevision: before.rowVersion,
-        };
-
+        const auditAction = KIND_TO_AUDIT[request.kind];
         await audit({
-          action: KIND_TO_AUDIT[request.kind],
+          action: auditAction,
           targetCaseId: caseId,
           targetVersionId: finding.versionId,
           targetRef: {
@@ -205,6 +208,24 @@ export async function recordDisposition(
           afterRef: caseRef(before),
           occurredAt: stamp,
         });
+
+        const recipients = (deps.readyRecipientsForOwner ?? (() => []))(before.ownerSubjectId);
+        const readyResult = await applyReadyIfHeld(tx, before, finding.versionId, {
+          trigger: { id: dispositionId, event: auditAction as ReadyTrigger['event'] },
+          correlationId: ctx.correlationId,
+          occurredAt: stamp,
+          recipients,
+          knownIdentities: deps.knownIdentities ?? [],
+        });
+
+        const body: DispositionResponse = {
+          dispositionId,
+          findingId: finding.id,
+          kind: request.kind,
+          recordedAt: stamp.toISOString(),
+          caseRevision: before.rowVersion,
+          ready: readyResult.applied,
+        };
 
         return { status: 201, body };
       },

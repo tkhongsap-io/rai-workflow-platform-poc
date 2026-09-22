@@ -72,6 +72,8 @@ export const LaneDecisionResponseSchema = Type.Object({
   successorDraftVersionId: Type.Union([Type.String(), Type.Null()]),
   /** case.row_version at decision time (unchanged by the decision; W0-06 5.1 frozen for submitted versions). */
   caseRevision: Type.Integer({ minimum: 1 }),
+  /** True when this approve applied Ready in the same transaction (W2-06); always false on send-back. */
+  ready: Type.Boolean(),
 });
 export type LaneDecisionResponse = Static<typeof LaneDecisionResponseSchema>;
 
@@ -116,6 +118,8 @@ export const DispositionResponseSchema = Type.Object({
   kind: DispositionKindSchema,
   recordedAt: Type.String(),
   caseRevision: Type.Integer({ minimum: 1 }),
+  /** True when this disposition applied Ready in the same transaction (W2-06). */
+  ready: Type.Boolean(),
 });
 export type DispositionResponse = Static<typeof DispositionResponseSchema>;
 

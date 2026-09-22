@@ -1,7 +1,8 @@
 // W2-02: approve / send-back a lane (W0-06 4.4 / 4.5; W0-04 Decide row). Authorization ran in the middleware
 // (lane.approve / lane.send_back with D05 self-exclusion). This module runs under withWorkflowTransaction:
 // expected-version checks, lane_decision insert, projection write, successor draft on first send-back,
-// send_back notification, and the decision audit event. Ready (W2-06) is not evaluated here.
+// send_back notification, and the decision audit event. Ready (W2-06) is evaluated inside approve after the
+// decision write, under the same case lock.
 
 import { createHash } from 'node:crypto';
 import { InvalidInputError, NotFoundError, StaleVersionError } from '@rai/shared/errors';
@@ -27,14 +28,20 @@ import {
   writeLaneProjection,
 } from './repository.js';
 import { insertSendBackNotifications } from './send-back-notice.js';
+import { applyReadyIfHeld, type ReadyKnownIdentity } from './ready.js';
 import { withWorkflowTransaction, type WorkflowResult } from '../versions/transaction.js';
 import { isUuid } from '../versions/repository.js';
 
 export interface DecideServiceDeps {
   db: Db;
   now?: () => Date;
-  /** Owner email(s) for send_back notices; resolved from identity data in start.ts / tests. */
+  /** Owner email(s) for send_back and ready notices; resolved from identity data in start.ts / tests. */
   sendBackRecipientsForOwner?: (ownerSubjectId: string) => readonly string[];
+  /**
+   * Known identities (fixture list in slice 1) for Ready §6 condition 4: resolve each approver's grants.
+   * Same list start.ts already injects for notices; do not build a separate directory.
+   */
+  knownIdentities?: readonly ReadyKnownIdentity[];
 }
 
 export interface ActionContext {
@@ -202,6 +209,7 @@ function responseOf(
   decidedAt: Date,
   successorDraftVersionId: string | null,
   caseRevision: number,
+  ready: boolean,
 ): LaneDecisionResponse {
   return {
     decisionId,
@@ -211,6 +219,7 @@ function responseOf(
     decidedAt: decidedAt.toISOString(),
     successorDraftVersionId,
     caseRevision,
+    ready,
   };
 }
 
@@ -266,7 +275,6 @@ export async function approveLane(
         });
 
         const after = await writeLaneProjection(tx, before, lane, 'approved', now);
-        const body = responseOf(decisionId, version.id, lane, 'approve', now, null, before.rowVersion);
         await audit({
           action: 'lane.approved',
           targetCaseId: before.id,
@@ -281,6 +289,25 @@ export async function approveLane(
           afterRef: caseRef(after),
           occurredAt: now,
         });
+
+        const recipients = (deps.sendBackRecipientsForOwner ?? (() => []))(before.ownerSubjectId);
+        const readyResult = await applyReadyIfHeld(tx, after, version.id, {
+          trigger: { id: decisionId, event: 'lane.approved' },
+          correlationId: ctx.correlationId,
+          occurredAt: now,
+          recipients,
+          knownIdentities: deps.knownIdentities ?? [],
+        });
+        const body = responseOf(
+          decisionId,
+          version.id,
+          lane,
+          'approve',
+          now,
+          null,
+          before.rowVersion,
+          readyResult.applied,
+        );
         return { status: 201, body };
       },
     },
@@ -401,6 +428,7 @@ export async function sendBackLane(
           now,
           successor.draft.id,
           before.rowVersion,
+          false,
         );
         return { status: 201, body };
       },

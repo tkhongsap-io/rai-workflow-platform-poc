@@ -189,11 +189,15 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
       db: db.db,
       sendBackRecipientsForOwner: (ownerSubjectId) =>
         sendBackRecipientsFromIdentities(knownIdentities, ownerSubjectId),
+      knownIdentities,
       ...(overrides.now === undefined ? {} : { now: overrides.now }),
     },
-    // W2-05: disposition routes; production keeps QC unbound (no substitute in server/dist).
+    // W2-05 / W2-06: disposition routes; Ready may fire inside disposition. Production keeps QC unbound.
     findings: {
       db: db.db,
+      readyRecipientsForOwner: (ownerSubjectId) =>
+        sendBackRecipientsFromIdentities(knownIdentities, ownerSubjectId),
+      knownIdentities,
       ...(overrides.now === undefined ? {} : { now: overrides.now }),
     },
     ...(serveWeb ? { static: { root: webDistDir } } : {}),

@@ -121,6 +121,7 @@
   "lane.dpo": "ความเป็นส่วนตัว (DPO)",
   "lane.it_security": "IT/Security",
   "mail.lane_opened": "ช่องทางตรวจสอบเปิดแล้ว",
+  "mail.ready_for_launch": "การตรวจสอบของโต๊ะเสร็จสิ้น (Ready for launch)",
   "mail.sent_back": "ช่องทางตรวจสอบส่งกลับให้แก้ไข",
   "model_type.classic_ml": "Classic ML",
   "model_type.llm": "LLM",
