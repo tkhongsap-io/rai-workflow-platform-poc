@@ -59,3 +59,38 @@ test('IPC whitelist rejects arbitrary paths, unbounded clocks, unknown commands 
   ])
     assert.equal(isJourneyCommand(command), false);
 });
+
+test('submit timeout cannot be consumed by lane, upload or another version; matching submit consumes once', async () => {
+  const { JourneyQcRunner } = await import('../browser/support/journey-runner.js');
+  const { buildRequest } = await import('../../fixtures/src/substitutes/qc/test-support.js');
+  const runner = new JourneyQcRunner();
+  const versionId = '11111111-1111-4111-8111-111111111111';
+  runner.armSubmitTimeout(versionId);
+  const signal = AbortSignal.timeout(1000);
+  for (const options of [
+    { trigger: 'approve_attempt', lane: 'dpo', versionId },
+    { trigger: 'upload', uploadSlot: 1, versionId },
+    { trigger: 'submit', versionId: '22222222-2222-4222-8222-222222222222' },
+  ] as const) {
+    const { request } = buildRequest('fx-case-nonvendor', options);
+    assert.equal((await runner.run(request, signal)).status, 'completed');
+  }
+  const { request } = buildRequest('fx-case-nonvendor', { trigger: 'submit', versionId });
+  const controller = new AbortController();
+  let settled = false;
+  const pending = runner.run(request, controller.signal);
+  const rejection = assert.rejects(pending, { name: 'AbortError' });
+  void pending.then(
+    () => {
+      settled = true;
+    },
+    () => {
+      settled = true;
+    },
+  );
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(settled, false);
+  controller.abort();
+  await rejection;
+  assert.equal((await runner.run(request, signal)).status, 'completed');
+});

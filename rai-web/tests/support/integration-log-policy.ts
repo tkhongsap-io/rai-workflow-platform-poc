@@ -16,6 +16,8 @@ export function integrationEntries(root: string): string[] {
 export function unauditedAppImports(root: string, entries = integrationEntries(root)): string[] {
   const wrapper = path.join(root, 'tests/support/observed-app.ts');
   const rawApp = path.join(root, 'server/src/app.ts');
+  const rawStart = path.join(root, 'server/src/start.ts');
+  const capturedStart = path.join(root, 'tests/support/fixtures/submit-binding-scenario.ts');
   const failures: string[] = [];
   const seen = new Set<string>();
   function resolve(from: string, specifier: string): string | undefined {
@@ -41,6 +43,8 @@ export function unauditedAppImports(root: string, entries = integrationEntries(r
         return;
       }
       const resolved = resolve(file, specifier.text);
+      if (resolved === rawStart && file !== capturedStart)
+        failures.push(`${path.relative(root, file)}: unaudited startup import`);
       if (resolved === rawApp && file !== wrapper)
         failures.push(`${path.relative(root, file)}: unaudited app import`);
       if (resolved?.startsWith(path.join(root, 'tests') + path.sep)) visitFile(resolved);
@@ -86,5 +90,6 @@ export function unauditedAppImports(root: string, entries = integrationEntries(r
     visit(source);
   }
   entries.forEach(visitFile);
+  if (existsSync(capturedStart)) visitFile(capturedStart);
   return failures;
 }

@@ -28,11 +28,11 @@ const dbUrl = new URL(env.DATABASE_OPERATOR_URL!);
 if (!isLoopbackHost(dbUrl.hostname)) throw new Error('Journey controls require loopback DB');
 const built = '../../../server/dist/start.js';
 const { startServer } = (await import(built)) as typeof Startup;
-const { ScriptedQcRunner } = await import('@rai/fixtures/substitutes/qc/index');
+const { JourneyQcRunner } = await import('./journey-runner.js');
 let caseId: string | undefined;
 let offset = 0;
 const now = () => new Date(Date.now() + offset);
-const runner = new ScriptedQcRunner({
+const runner = new JourneyQcRunner({
   now,
   fixtureCaseIdOf: (v) => (v.caseId === caseId ? 'fx-case-nonvendor' : undefined),
 });
@@ -68,7 +68,7 @@ async function control(command: JourneyCommand) {
   } else if (command.command === 'mailFailure') await mailFailure(command.enabled);
   else if (command.command === 'submitTimeout') {
     if (!caseId) throw new Error('case_not_bound');
-    runner.reset(); // only this isolated process's simulation state; mapping closure stays unchanged
+    runner.armSubmitTimeout(undefined); // clear future arm only, not an in-flight run
     if (command.enabled) {
       const result = await db.query<{ draft_version_id: string | null }>(
         'SELECT draft_version_id FROM "case" WHERE id=$1',
@@ -76,7 +76,7 @@ async function control(command: JourneyCommand) {
       );
       const versionId = result.rows[0]?.draft_version_id;
       if (!versionId) throw new Error('draft_missing');
-      runner.simulateTimeout('hang', { versionId });
+      runner.armSubmitTimeout(versionId);
     }
   } else {
     if (!caseId) throw new Error('case_not_bound');

@@ -21,6 +21,7 @@ test('policy rejects aliases, namespaces, dynamic imports, require and helper re
     for (const dir of ['server/src', 'tests/support', 'tests/integration'])
       await mkdir(path.join(folder, dir), { recursive: true });
     await writeFile(path.join(folder, 'server/src/app.ts'), 'export function buildApp() {}');
+    await writeFile(path.join(folder, 'server/src/start.ts'), 'export function startServer() {}');
     await writeFile(
       path.join(folder, 'tests/support/observed-app.ts'),
       "export { buildApp } from '@rai/server/app';",
@@ -28,6 +29,10 @@ test('policy rejects aliases, namespaces, dynamic imports, require and helper re
     await writeFile(path.join(folder, 'tests/support/bypass.ts'), "export * from '../../server/src/app.js';");
     const entry = path.join(folder, 'tests/integration/test.ts');
     for (const source of [
+      "import { startServer } from '@rai/server/start';",
+      "import * as runtime from '@rai/server/start';",
+      "const runtime = await import('@rai/server/start');",
+      "const runtime = require('@rai/server/start');",
       "import { buildApp } from '@rai/server/app';",
       "import { buildApp as make } from '@rai/server/app';",
       "import * as factory from '@rai/server/app';",
