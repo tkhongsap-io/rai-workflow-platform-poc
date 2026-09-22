@@ -31,6 +31,7 @@ import {
   reasonDisplay,
   reasonIsValid,
   reviewerLaneOf,
+  reviewerFindingsLoadMode,
   sameSlotState,
   sendBackFeedbackIsValid,
   severityKey,
@@ -500,4 +501,68 @@ test('W2-09: dispositionKindsForActor — lane kinds, confirm after propose, own
   ] as DispositionKind[]) {
     assert.ok(isLocaleKey(dispositionKindKey(kind)), kind);
   }
+});
+
+test('Ready loads persisted findings while non-Ready approved lanes still run QC', () => {
+  const ready = baseView({ aiReadinessStatus: 'ready' });
+  for (const lane of ['ai_coe', 'dpo', 'it_security', null] as const) {
+    assert.equal(reviewerFindingsLoadMode(ready, lane), 'persisted');
+    assert.equal(
+      reviewerFindingsLoadMode(baseView({ raiStatus: 'approved' }), lane),
+      lane === null ? 'persisted' : 'lane_qc',
+    );
+  }
+  assert.equal(
+    findingsLane({ roles: [aiCoe], subjectId: 'reviewer', view: ready, version: baseVersion() }),
+    'ai_coe',
+  );
+  assert.equal(
+    findingsLane({ roles: [aiCoe], subjectId: ready.businessOwner, view: ready, version: baseVersion() }),
+    null,
+  );
+  assert.equal(
+    findingsLane({
+      roles: [aiCoe],
+      subjectId: 'reviewer',
+      view: ready,
+      version: baseVersion({ isLatest: false }),
+    }),
+    null,
+  );
+});
+
+test('Ready denies every offered mutation even when lane projections still say pending', () => {
+  const view = baseView({ aiReadinessStatus: 'ready' });
+  const it: RoleScope = { role: 'it_security', scope: { kind: 'all_cases', lane: 'it_security' } };
+  for (const grant of [aiCoe, dpo, it, owner, spocCm, admin]) {
+    const subjectId: string = grant === owner ? view.businessOwner : 'reviewer';
+    assert.equal(
+      decidableLane({ roles: [grant], subjectId, view, version: baseVersion(), hasOpenDraft: false }),
+      null,
+    );
+    for (const findingOwningLane of ['ai_coe', 'dpo', 'it_security'] as const) {
+      assert.deepEqual(
+        dispositionKindsForActor({
+          roles: [grant],
+          subjectId,
+          view,
+          findingOwningLane,
+          latestKind: 'fixed_proposed',
+          canSeeFindings: true,
+        }),
+        [],
+      );
+    }
+  }
+  assert.deepEqual(
+    dispositionKindsForActor({
+      roles: [aiCoe],
+      subjectId: 'reviewer',
+      view: baseView({ raiStatus: 'approved' }),
+      findingOwningLane: 'ai_coe',
+      latestKind: 'fixed_proposed',
+      canSeeFindings: true,
+    }),
+    ['fixed', 'waived', 'not_applicable', 'fixed_confirmed'],
+  );
 });

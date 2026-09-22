@@ -244,6 +244,7 @@ export function CaseScreen(): JSX.Element {
   const onDispositionRecorded = (response: DispositionResponse): void => {
     if (response.ready) {
       setNotice({ key: 'review.decided.ready', params: {} });
+      setReloadToken((n) => n + 1);
     }
   };
 

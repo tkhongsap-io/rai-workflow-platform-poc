@@ -221,6 +221,14 @@ export function findingsLane(args: {
   return lane;
 }
 
+/** Ready is a persisted read: lane QC remains available only before completion. */
+export function reviewerFindingsLoadMode(
+  view: Pick<CaseView, 'aiReadinessStatus'>,
+  lane: Lane | null,
+): 'persisted' | 'lane_qc' {
+  return view.aiReadinessStatus === 'ready' || lane === null ? 'persisted' : 'lane_qc';
+}
+
 /**
  * The lane the signed-in reviewer may decide on this version, or null when the UI must not draw controls
  * (wrong role, Admin, owner/SPOC self-exclusion, stale/superseded version, or lane already decided).
@@ -235,7 +243,7 @@ export function decidableLane(args: {
 }): Lane | null {
   const lane = findingsLane(args);
   if (lane === null) return null;
-  if (args.hasOpenDraft) return null;
+  if (args.view.aiReadinessStatus === 'ready' || args.hasOpenDraft) return null;
   if (laneProjectionStatus(args.view, lane) !== 'pending') return null;
   return lane;
 }
@@ -249,12 +257,12 @@ export function decidableLane(args: {
 export function dispositionKindsForActor(args: {
   roles: readonly RoleScope[];
   subjectId: string;
-  view: Pick<CaseView, 'businessOwner' | 'businessUnitId'>;
+  view: Pick<CaseView, 'businessOwner' | 'businessUnitId' | 'aiReadinessStatus'>;
   findingOwningLane: Lane;
   latestKind: DispositionKind | null;
   canSeeFindings: boolean;
 }): DispositionKind[] {
-  if (!args.canSeeFindings) return [];
+  if (!args.canSeeFindings || args.view.aiReadinessStatus === 'ready') return [];
   if (canProposeFixedOnCase(args.roles, args.subjectId, args.view)) {
     return ['fixed_proposed'];
   }
