@@ -222,6 +222,11 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
     ...(mailSink === undefined
       ? {}
       : {
+          digest: {
+            db: db.db,
+            publicBaseUrl: config.publicBaseUrl,
+            ...(overrides.now === undefined ? {} : { now: overrides.now }),
+          },
           notifications: {
             db: db.db,
             sink: mailSink,

@@ -400,7 +400,7 @@ for (const invalid of ['missing_audit', 'unauthorized', 'external', 'unsafe_link
     assert.equal(stored!.attempts, 1);
   });
 
-test('digest rows remain untouched for W3-03b', async () => {
+test('case-only loader refuses a digest without modifying its delivery state', async () => {
   const id = randomUUID();
   const jobRunId = randomUUID();
   const correlationId = randomUUID();
@@ -429,7 +429,12 @@ test('digest rows remain untouched for W3-03b', async () => {
     });
     await tx.insert(operatorJobNotification).values({ jobRunId, notificationId: id, digestDay, recipient });
   });
-  await notifications.deliverPending();
+  const [row] = await db.owner.select().from(notification).where(eq(notification.id, id));
+  await assert.rejects(
+    db.app.transaction((tx) =>
+      loadCommittedCaseRequest(tx, row!, { identities: FIXTURE_USERS, publicBaseUrl: base }),
+    ),
+  );
   const [stored] = await db.owner.select().from(notification).where(eq(notification.id, id));
   assert.equal(stored!.attempts, 0);
   assert.equal(stored!.status, 'queued');

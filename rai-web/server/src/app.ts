@@ -9,6 +9,8 @@
 // `versions` deps are given. W1-INT registers the SPA (static.ts: web/dist, helmet headers, history fallback)
 // when `static` is given; the API routes and the JSON not-found handler are unchanged by it.
 
+import { registerDailyDigest } from './notifications/digest-runtime.js';
+import type { DigestDeps } from './notifications/digest.js';
 import { createNotifications, type NotificationDeps } from './notifications/service.js';
 import { registerNotifications } from './notifications/runtime.js';
 import Fastify, { LogController, type FastifyError, type FastifyInstance } from 'fastify';
@@ -50,6 +52,8 @@ export interface IdentityDeps {
 
 export interface AppDeps {
   observability?: ObservabilityDeps;
+  /** Local daily producer; uses the same drain and single notification dispatcher. */
+  digest?: Omit<DigestDeps, 'emitter'>;
   /** W3-03a initial post-commit notifications; retries and digest remain separate. */
   notifications?: Omit<NotificationDeps, 'emitter' | 'errors'>;
   config: Pick<AppConfig, 'nodeEnv' | 'log' | 'trustProxy' | 'publicBaseUrl'>;
@@ -122,6 +126,11 @@ export function buildApp(deps: AppDeps): App {
   const errors = createErrorCapture(emitter);
   const requestErrors = new WeakMap<object, ErrorCategory>();
   const drain = createDrain(fastify); // first hook: every accepted request is counted (shutdown.ts)
+  if (deps.digest !== undefined)
+    registerDailyDigest(fastify, { ...deps.digest, emitter }, drain, () => {
+      // W3-07a replaces this fixed safe fallback with its app-owned errors.internal.
+      emitter.log('error.captured', { category: 'internal_error', code: 'internal_error', httpStatus: 500 });
+    });
   if (deps.notifications !== undefined)
     registerNotifications(
       fastify,
