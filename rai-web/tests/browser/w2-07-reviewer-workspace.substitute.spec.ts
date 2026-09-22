@@ -173,14 +173,26 @@ test.describe('W2-07 reviewer workspace on the W2-10 substitute (fx-case-nonvend
     expect(asked).toHaveLength(2);
     await expect(sendBackButton).toBeFocused();
 
-    // Valid keyboard send-back: name slot 5 (BRD) and a deficiency, then submit via Tab/Enter.
+    // Valid keyboard send-back: name slot 5 (BRD) via ArrowDown on the focused native select, then type and submit.
     await page.keyboard.press('Enter');
     await expect(dialog).toBeVisible();
     await expectFocusInsideDialog(page);
-    await expect(dialog.locator('select')).toBeFocused();
-    // Native <select> ArrowDown is unreliable across projects; selectOption is not a pointer click.
-    await dialog.locator('select').selectOption('5');
-    await expect(dialog.locator('select')).toHaveValue('5');
+    const slotSelect = dialog.locator('select');
+    await expect(slotSelect).toBeFocused();
+    const slotFiveLabel = t('th', 'review.send_back.slot_option', {
+      number: 5,
+      name: t('th', 'slot.s5.name'),
+    });
+    for (let step = 0; step < 12; step += 1) {
+      const selectedLabel = await slotSelect.evaluate((el) => {
+        const select = el as HTMLSelectElement;
+        return select.options[select.selectedIndex]?.textContent?.trim() ?? '';
+      });
+      if (selectedLabel === slotFiveLabel) break;
+      await page.keyboard.press('ArrowDown');
+    }
+    await expect(slotSelect.locator('option:checked')).toHaveText(slotFiveLabel);
+    await expect(slotSelect).toHaveValue('5');
     await pressTab(page);
     await expect(dialog.locator('textarea').first()).toBeFocused();
     await page.keyboard.type('BRD needs a cited metric before AI/COE can approve');

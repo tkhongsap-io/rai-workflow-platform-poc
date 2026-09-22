@@ -231,6 +231,13 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
     const slot1 = body.findings.find((f) => f.slot === 1);
     assert.ok(slot1, 'slot 1 defect expected');
     assert.equal(slot1.owningLane, 'ai_coe');
+    assert.ok(slot1.messageParams, 'qc-run finding must carry messageParams for t()');
+    assert.equal(slot1.messageParams.slot, 1);
+    const withMetric = body.findings.find(
+      (f) => f.messageKey === 'qc.finding.acc_extraction_not_hallucination',
+    );
+    assert.ok(withMetric?.messageParams, 'scripted finding with metric params');
+    assert.equal(withMetric.messageParams.metric, 'extraction_accuracy');
 
     const rows = await db.owner.execute(
       sql`SELECT owning_lane, kind, slot FROM qc_finding WHERE version_id = ${version.versionId}`,

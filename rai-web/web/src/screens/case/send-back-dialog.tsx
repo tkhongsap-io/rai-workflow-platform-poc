@@ -2,7 +2,7 @@
 // Dialog (native <dialog> + showModal()). The form cannot submit until a slot is named and the deficiency is
 // non-empty; an empty submit stays on the dialog (section 9 item 3 + A09).
 
-import { useId, useState, type FormEvent, type JSX } from 'react';
+import { useId, useState, type FormEvent, type JSX, type KeyboardEvent } from 'react';
 import type { SlotNumber } from '@rai/shared/schemas/pack';
 import type { SendBackFeedback } from '@rai/shared/schemas/review';
 import { Dialog } from '../../components/dialog.js';
@@ -67,6 +67,30 @@ function SendBackForm({
 
   const valid = sendBackFeedbackIsValid(slot === '' ? [] : [{ slot, deficiency: deficiency.trim() }]);
 
+  const chooseSlot = (next: SlotNumber | ''): void => {
+    setSlot(next);
+    onDirtyChange(true);
+    setShowValidation(false);
+  };
+
+  /** Arrow keys on a React-controlled <select> must update state; native change alone is not enough under Playwright. */
+  const onSlotKeyDown = (event: KeyboardEvent<HTMLSelectElement>): void => {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    event.preventDefault();
+    const index = slot === '' ? -1 : SLOT_NUMBERS.indexOf(slot);
+    if (event.key === 'ArrowDown') {
+      const next = Math.min(index + 1, SLOT_NUMBERS.length - 1);
+      if (next < 0) return;
+      chooseSlot(SLOT_NUMBERS[next]!);
+      return;
+    }
+    if (index <= 0) {
+      chooseSlot('');
+      return;
+    }
+    chooseSlot(SLOT_NUMBERS[index - 1]!);
+  };
+
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
     if (!valid) {
@@ -97,11 +121,10 @@ function SendBackForm({
           required={true}
           aria-required={true}
           aria-invalid={showValidation && slot === ''}
+          onKeyDown={onSlotKeyDown}
           onChange={(event) => {
             const value = event.target.value;
-            setSlot(value === '' ? '' : (Number(value) as SlotNumber));
-            onDirtyChange(true);
-            setShowValidation(false);
+            chooseSlot(value === '' ? '' : (Number(value) as SlotNumber));
           }}
         >
           <option value={''}>{t('field.choose')}</option>
