@@ -1,4 +1,4 @@
-# W3-07b UI prerequisite review and evidence
+# W3-07b prerequisite and consumer evidence
 
 ## Scope and dependency
 
@@ -43,3 +43,32 @@ Real OBS-17 remains W3-INT against the actual W3-07a endpoint, actual failed-mai
 ## PR-size handoff
 
 The local prerequisite is larger than the W0-02 working rule of about 600 changed lines: bilingual exhaustive enum copy, typed maps, boundary tests and the previously accepted planning documents account for the diff. The parent recorded a bounded size exception in plan.md before publication, retaining matching catalogues, exhaustive mappings and client-boundary proof together. This local commit is the requested reviewable handoff, not authorization to publish it.
+
+
+## Separate consumer — local implementation
+
+Parent received `ede6cc2` and approved the bounded prerequisite size exception in its isolated publication worktree. That exception applies to the prerequisite only. Parent then authorized this separate consumer; the earlier prerequisite-only scope and verification above remain historical evidence.
+
+Implemented Admin-only navigation and `/operator/desk-health` behind RequireSession. The page renders the validated DTO's readiness, mail, QC/late QC, digest and counter fields with the committed locale maps and Bangkok Gregorian formatter. Missing run/count/time, zero count, queued unscheduled mail and terminal failure stay distinct. Read-only labelled correlation fields and canonical case/version links carry no recipient in URLs. No business-state derivation, new permission, API handler, substitute endpoint, automatic refresh, database or external action.
+
+Report visibility is checked during render against the current Admin session object and request generation. Session replacement, role loss, sign-out and manual refresh hide previous data immediately; effect cleanup rejects obsolete responses. The browser-only harness checks the first committed DOM in a layout effect, before passive effects, including same-subject Admin-to-owner and logout transitions. It also releases an old Admin request while the owner is active. HTTP 401 uses the existing session-revocation flow; 403/network/5xx/malformed responses show safe errors without retaining visible report data.
+
+Development verification caught and fixed Refresh focus loss during loading (focusable aria-disabled control with guarded activation), and the correlation input grid's intrinsic minimum width at 390px. Early rehearsal setup failures were corrected: exact fixture IDs, Strict Mode initial request counts, and consistent Vite-transformed React imports in the test-only harness. No check was waived. Shared locales/maps/routes/client are byte-identical to the prerequisite.
+
+### Consumer verification
+
+Node 24.21.0, isolated worktree, substitute 60789/web 60175; no DB or integration run.
+
+| Check | Result |
+|---|---|
+| Typecheck / lint | Passed, including ESLint, Prettier and CSS |
+| Unit suite | 485 passed, zero failed |
+| Operator browser rehearsal | 48 passed: 16 scenarios at 1440/834/390 |
+| Keyboard / axe / layout | Refresh, retry, correlation selection and version link; both locales; zero critical/serious axe findings; no horizontal page overflow |
+| Production build / substitute absence | Passed; 487 scanned files, zero markers; existing large-chunk advisory remains |
+| Root unit checks | 40 passed |
+| Documentation / frozen source / whitespace | 177 Markdown files, 716 links, zero broken; source hash matches; diff check passed |
+
+Rehearsal covers all seven non-Admin fixture identities including the dual-role identity, absent/zero/unscheduled values, localized statuses, 401/403/500/network/invalid-schema/invalid-JSON recovery, first-commit data clearance and obsolete delivery. Synthetic recipient data does not appear in console, browser storage or URL. No server authorization, actual failure persistence/correlation provenance, OBS17 or acceptance is inferred. Logs: `/tmp/rai-w3-07b-consumer-{lint,typecheck,unit,browser,build,repo}.log`.
+
+No root delivery logs changed (parent owns them). No push/PR/merge. Before consumer publication, parent must verify both the shared UI contract and W3-07a API dependency readiness, obtain independent review, and resolve the consumer's own >600-line PR scope through an explicit exception or publication split; the prerequisite exception is not inherited. The consumer implementation remains a separate local commit as requested. Real API acceptance remains W3-INT.

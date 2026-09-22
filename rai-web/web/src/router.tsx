@@ -9,6 +9,8 @@ import { useLocale } from './i18n/locale-provider.js';
 import { useSession } from './session/session-provider.js';
 import { RETURN_TO_PARAM, ROUTES } from './routes.js';
 import { QueueScreen } from './screens/queue/queue-screen.js';
+
+import { DeskHealthScreen } from './screens/operator/desk-health.js';
 import { CaseScreen } from './screens/case/case-screen.js';
 import { CaseListScreen } from './screens/cases/case-list-screen.js';
 import { NewCaseScreen } from './screens/cases/new-case-screen.js';
@@ -77,6 +79,14 @@ export function AppRoutes(): JSX.Element {
         element={
           <RequireSession>
             <CaseScreen />
+          </RequireSession>
+        }
+      />
+      <Route
+        path={ROUTES.operatorDeskHealth}
+        element={
+          <RequireSession>
+            <DeskHealthScreen />
           </RequireSession>
         }
       />
