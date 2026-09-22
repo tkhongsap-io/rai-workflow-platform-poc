@@ -4,15 +4,15 @@
 
 Additive Thai/English queue labels, ROUTES.queue, API_PATHS.queue and typed getQueue(QueueQuery): Promise<QueueResponse>. The shared API schema is unchanged. No screen, router or navigation behavior change in this prerequisite commit.
 
-Node24, own npm ci. Typecheck, focused ESLint and 20 client/route/locale unit tests passed; git diff --check and repository link check passed. Log: /tmp/rai-w3-ui-contract-check.log. Parent may publish this commit as the separate prerequisite contract PR. W3-08 PR108 must also land before consumer delivery.
+Node24, own npm ci. Typecheck, focused ESLint and 20 client/route/locale unit tests passed; git diff --check and repository link check passed. Log: /tmp/rai-w3-ui-contract-check.log. This contract subsequently merged as PR #110 (`89f7de9`). W3-08 PR108 must also land before consumer delivery.
 
 ## Independent contract review and parent verification
 
-PR #110: independent reviewer Confucius reported no actionable findings on `35f798a`, independently ran all 20 client/route/locale tests and checked whitespace. Parent verification on the isolated contract branch passed `npm run lint`, `npm run typecheck` and all 459 unit tests. Full final-head CI remains required before merge. This is prerequisite-contract evidence only; the consumer and W3-INT are not accepted here.
+PR #110: independent reviewer Confucius reported no actionable findings on `35f798a`, independently ran all 20 client/route/locale tests and checked whitespace. Parent verification on the isolated contract branch passed `npm run lint`, `npm run typecheck` and all 459 unit tests. Final contract CI passed and PR #110 merged. This is prerequisite-contract evidence only; the consumer and W3-INT are not accepted here.
 
 ## Implementation
 
-Implemented separately after contract commit `4f3940b`. Consumer paths: `web/src/screens/queue/` (screen, URL view model and tests, scoped CSS), `web/src/router.tsx`, `web/src/screens/shell/app-shell.tsx`, and `tests/browser/w3-02-queue.substitute.spec.ts`. No locale, API client, shared-schema or route-constant changes in the consumer commit. No server, fixture, DB or root-log writes.
+Implemented separately after contract commit `4f3940b`. Consumer paths: `web/src/screens/queue/` (screen, URL view model and tests, scoped CSS), `web/src/router.tsx`, `web/src/screens/shell/app-shell.tsx`, and `tests/browser/w3-02-queue.substitute.spec.ts`. No locale, API client, shared-schema or route-constant changes in the consumer commit. The implementation did not modify server, fixture or DB behavior. The parent added root-log outcome records during delivery.
 
 Protected `/queue` uses existing cards, badges, form styles, locale provider and date formatting. The design handoff's two-column case grid becomes one column on narrow screens. Current submission and latest version are separate; a draft is explicitly labelled as a draft. Lane states/due dates stay on the current submitted version while a successor draft exists. The screen renders API nextAction text without deriving workflow state or offering approval controls. Finding counts are intentionally absent because the shared queue response has none.
 
@@ -60,3 +60,7 @@ The new empty-owner regression edits search, search field and page size, uses th
 Node 24.21.0, no DB, substitute ports 58789/55175: focused queue **33 passed**, full substitute browser **123 passed** (90 existing + 33 queue), full unit **418 passed** with zero failures/skips; lint and typecheck passed. Relative links (157 files/694 links), frozen-source check and git diff --check passed. Logs: `/tmp/rai-w3-ui-reset-all-focused.log`, `/tmp/rai-w3-ui-reset-all-browser-full.log`, `/tmp/rai-w3-ui-reset-all-unit.log`, `/tmp/rai-w3-ui-reset-all-lint.log`, `/tmp/rai-w3-ui-reset-all-typecheck.log`.
 
 The accepted bounded size exception remains unchanged. Local fix only: no push, PR, rebase, shared contract changes or digest work. Substitute results do not establish A06 real acceptance; parent owns re-review and delivery gates, and W3-INT owns real-server evidence.
+
+## Parent delivery review
+
+Carver independently reviewed the final implementation at `778bece` and reported no remaining high-confidence findings after both Reset fixes. Six browser regressions (both Reset paths at all widths) and three URL unit tests independently passed. The parent rebased the consumer onto the reviewed W3-08 branch, preserving PR #110's contract-review record. Application and test source are unchanged by this rebase. Final combined verification and PR CI remain delivery gates; W3-INT acceptance remains separate.
