@@ -1,5 +1,9 @@
 # Development log
 
+## W3-05: working-day SLA — 2026-09-22
+
+A lane's due date is computed from the version's `submitted_at` and the `sla` and `calendar` revisions frozen at submit (Asia/Bangkok, weekends and the frozen holiday list skipped, open date not counted). A later SLA revision does not move an already-frozen version. Resubmit starts a new clock. `listSlaBreaches` returns only pending lanes on the current review target whose due date is before the as-of Bangkok day. No SLA HTTP route, no mail send, no escalation. Issue #35 stays open.
+
 ## QC case lock: 2026-09-22
 
 Lane QC no longer holds `SELECT … FOR UPDATE` on the case row while `runner.run` is in flight. `lock_timeout` is 5s and the runner may take up to 10s, so the old transaction turned every other action on that case into a lock-timeout 500. The runner is awaited after the prepare transaction commits. Persist takes a new short transaction, re-checks that the version is still the open submitted target, and replays a completed run that landed while QC was in flight. A send-back during the run sets `draft_version_id` and leaves `current_version_id` on N; persist treats that open draft as `version_closed` and writes no `qc_run`. Issue #35 stays open.

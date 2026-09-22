@@ -739,7 +739,14 @@ Approve records `lane_decision` (`approve`), writes the lane projection, audits 
 
 ### 7.8 W3 shapes
 
-Added here by the W3-01 contract PR (scoped queue query: search by `sourceRecordId`, status, owner, `useCaseGroup` or all; counts; pagination; filter options) and the W3-05 contract PR (per-lane due date, breach query). Delivery-status shape for W3-07 comes with W3-03. Until then this subsection is intentionally empty; W3-08 extends the substitute from it.
+W3-01 adds the scoped queue query here (search by `sourceRecordId`, status, owner, `useCaseGroup` or all; counts; pagination; filter options). Delivery-status shape for W3-07 comes with W3-03. W3-08 extends the substitute from those shapes.
+
+W3-05 adds the due-date and breach-query shapes in `rai-web/shared/src/schemas/sla.ts`. There is no SLA HTTP route: the due date is a function of `submitted_at`, the SLA revision and the calendar revision frozen on the version (W0-06 4.3 (e)), not a stored column.
+
+| Shape | Meaning |
+|---|---|
+| `LaneDue` | `{ lane, openedAt, dueOn }` for one lane. `openedAt` is that version's `submitted_at`. `dueOn` is `YYYY-MM-DD` in Asia/Bangkok: `workingDays` weekdays after the open date, skipping Saturday, Sunday and the frozen holiday list. The open date itself is not counted. DPO days and the other lanes' days come from the frozen `sla` body (D01 defaults 3 and 5), never from the revision published later. |
+| `SlaBreach` | `{ caseId, versionId, lane, dueOn }` for a lane that is still `pending` on the current submitted version, that version is still the review target (`draft_version_id` is null and `ready_at` is null), and `dueOn` is strictly before the as-of Bangkok date. `listSlaBreaches` is what the W3-03 digest consumes. No escalation. |
 
 ### 7.9 Not in the W1 contract
 
