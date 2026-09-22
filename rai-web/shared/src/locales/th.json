@@ -130,6 +130,8 @@
   "mail.ready_for_launch.body": "เคส: {caseName}\nการตรวจสอบของโต๊ะเสร็จสิ้น (Ready for launch) การพิจารณาของ Council และ ITSM ยังคงอยู่นอกระบบนี้\nเปิดเคส (ต้องเข้าสู่ระบบ): {caseLink}",
   "mail.sent_back": "ช่องทางตรวจสอบส่งกลับให้แก้ไข",
   "mail.sent_back.body": "เคส: {caseName}\nส่งกลับโดย: {laneLabel}\nข้อเสนอแนะจากผู้ตรวจสอบ: {feedback}\nเปิดเคส (ต้องเข้าสู่ระบบ): {caseLink}",
+  "mail.sla_breach_digest": "สรุปเคสที่เกินกำหนด SLA ประจำวัน",
+  "mail.sla_breach_digest.body": "สรุปวันที่ {day}: มีเคสเกินกำหนด {count} เคส\n{entries}\nกรุณาเข้าสู่ระบบเพื่อดูแต่ละเคส โดยสิทธิ์การเข้าถึงยังเป็นไปตามที่กำหนด",
   "model_type.classic_ml": "Classic ML",
   "model_type.llm": "LLM",
   "model_type.other": "อื่น ๆ",

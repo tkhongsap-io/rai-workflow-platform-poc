@@ -130,6 +130,8 @@
   "mail.ready_for_launch.body": "Case: {caseName}\nDesk review is complete (Ready for launch). Council and ITSM decisions remain outside this desk.\nOpen the case (sign-in required): {caseLink}",
   "mail.sent_back": "A review lane sent the pack back",
   "mail.sent_back.body": "Case: {caseName}\nSent back by: {laneLabel}\nReviewer feedback: {feedback}\nOpen the case (sign-in required): {caseLink}",
+  "mail.sla_breach_digest": "Daily overdue review cases",
+  "mail.sla_breach_digest.body": "SLA digest for {day}: {count} cases overdue.\n{entries}\nSign in to view each case; access remains subject to your permissions.",
   "model_type.classic_ml": "Classic ML",
   "model_type.llm": "LLM",
   "model_type.other": "Other",
