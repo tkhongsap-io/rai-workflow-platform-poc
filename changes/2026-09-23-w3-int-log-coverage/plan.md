@@ -47,3 +47,7 @@ The 17 files, all under rai-web/tests/integration/:
 5. Parent integrates the test-only patch into INT and runs the final combined suite with Confucius's process tests. Confirm no diffs under server/, shared/, web/, fixtures/, manifests or production settings. Report counts and scope separately from parent acceptance. No PR or push.
 
 Expected scope is a few hundred test-support/control lines plus import-only changes across 17 files. Report actual size after implementation; stop for scope coordination if lifecycle repair requires application changes. Parent approval is required before code, explicitly requested in the task.
+
+## Execution outcome
+
+Parent approved the plan before code. Implemented the listed test files and 17 import migrations only; no existing workflow assertion or teardown needed modification. The sticky late-write failure uses the isolated test process exit status, proved by child-runner controls. Complete integration passed 269 tests with zero skips on the owned DB54373. See review.md for exact logs and remaining combined-INT/process boundaries.

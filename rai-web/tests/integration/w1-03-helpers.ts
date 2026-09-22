@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Writable } from 'node:stream';
 import type { FastifyInstance } from 'fastify';
-import { buildApp } from '@rai/server/app';
+import { buildApp } from '../support/observed-app.js';
 import { createFilesystemBlobStore, type FilesystemBlobStore } from '@rai/server/artifacts/blob-store';
 import { createScopeFactsSource } from '@rai/server/authz/facts';
 import { createIdentityAdapter } from '@rai/server/identity/adapter';

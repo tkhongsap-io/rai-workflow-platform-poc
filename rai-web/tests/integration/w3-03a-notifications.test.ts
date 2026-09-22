@@ -16,7 +16,7 @@ import { operatorJobRun, operatorJobNotification } from '@rai/server/db/schema/o
 import type { FastifyInstance } from 'fastify';
 import type { PackDraft } from '@rai/shared/schemas/pack';
 import type { SubmittedVersion } from '@rai/shared/schemas/versions';
-import { buildApp } from '@rai/server/app';
+import { buildApp } from '../support/observed-app.js';
 import { createScopeFactsSource } from '@rai/server/authz/facts';
 import { createIdentityAdapter } from '@rai/server/identity/adapter';
 import { createFixtureIdentityProvider } from '@rai/server/identity/fixture';

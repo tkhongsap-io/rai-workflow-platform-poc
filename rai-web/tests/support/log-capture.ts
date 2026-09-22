@@ -52,3 +52,53 @@ export function assertNoLeak(capture: Pick<LogCapture, 'text'>, forbidden = FIXT
     ),
   );
 }
+
+/** Private, never-cleared audit alongside the caller's independently owned stream. */
+export function createAuditedLogStream(forward?: NodeJS.WritableStream) {
+  const decoder = new StringDecoder('utf8');
+  let output = '';
+  let failure: Error | undefined;
+  function fail() {
+    failure ??= new Error('OBS15 serialized log audit failed');
+    // A background writer may outlive the final test hook or catch a write exception.
+    // The subprocess controls prove that neither case can turn this into a passing run.
+    process.exitCode = 1;
+  }
+  function assertClean() {
+    if (failure !== undefined) throw failure;
+  }
+  const stream = new Writable({
+    write(chunk: Buffer, _encoding, done) {
+      output += decoder.write(chunk);
+      try {
+        assertNoLeak({ text: () => output });
+      } catch {
+        fail();
+      }
+      if (forward === undefined) done();
+      else {
+        try {
+          forward.write(chunk, (error?: Error | null) => {
+            if (error) fail();
+            done(error ? failure : undefined);
+          });
+        } catch {
+          fail();
+          done(failure);
+        }
+      }
+    },
+  });
+  // Keep error diagnostics generic; retain the sticky failure for the test lifecycle.
+  stream.on('error', fail);
+  forward?.on('error', fail);
+  return {
+    stream,
+    assertClean,
+    async settled() {
+      if (!stream.destroyed)
+        await new Promise<void>((resolve) => stream.write(Buffer.alloc(0), () => resolve()));
+      assertClean();
+    },
+  };
+}

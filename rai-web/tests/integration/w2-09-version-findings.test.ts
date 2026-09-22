@@ -15,7 +15,7 @@ import type { ErrorResponse } from '@rai/shared/errors';
 import type { LaneQcRunResponse, VersionFindingsResponse } from '@rai/shared/schemas/review';
 import type { PackDraft } from '@rai/shared/schemas/pack';
 import type { SubmitRequest, SubmittedVersion } from '@rai/shared/schemas/versions';
-import { buildApp } from '@rai/server/app';
+import { buildApp } from '../support/observed-app.js';
 import { createFilesystemBlobStore, type FilesystemBlobStore } from '@rai/server/artifacts/blob-store';
 import { createScopeFactsSource } from '@rai/server/authz/facts';
 import { businessUnitsFromGrants, createBusinessUnitDirectory } from '@rai/server/cases/business-units';

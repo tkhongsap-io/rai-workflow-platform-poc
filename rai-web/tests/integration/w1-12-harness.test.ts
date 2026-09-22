@@ -5,7 +5,8 @@
 
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildApp, type App } from '@rai/server/app';
+import { buildApp } from '../support/observed-app.js';
+import type { App } from '@rai/server/app';
 import { parseConfig } from '@rai/server/config';
 import {
   startTestServer,
