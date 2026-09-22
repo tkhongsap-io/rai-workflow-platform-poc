@@ -179,7 +179,11 @@ export function expectedQueue(rows: QueueResponse['items'], user: string, query:
     },
   };
 }
-export function durations(log: string, ids: readonly string[]): number[] {
+export function durations(
+  log: string,
+  ids: readonly string[],
+  expected: { route: string; status: number } = { route: '/api/queue', status: 200 },
+): number[] {
   const found = new Map<string, number[]>();
   for (const line of log.split('\n').filter(Boolean)) {
     const r = JSON.parse(line) as {
@@ -188,8 +192,8 @@ export function durations(log: string, ids: readonly string[]): number[] {
       fields?: { durationMs?: number; route?: string; status?: number };
     };
     if (r.event !== 'request.completed' || !r.correlationId || !ids.includes(r.correlationId)) continue;
-    assert.equal(r.fields?.route, '/api/queue');
-    assert.equal(r.fields.status, 200);
+    assert.equal(r.fields?.route, expected.route);
+    assert.equal(r.fields.status, expected.status);
     const ms = r.fields.durationMs;
     assert(typeof ms === 'number' && Number.isFinite(ms) && ms >= 0);
     found.set(r.correlationId, [...(found.get(r.correlationId) ?? []), ms]);
