@@ -171,3 +171,9 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Takes over from: session=codex-w3-continuation (reason: delegated server implementation only; parent retains integration)
 - What: Prepare #42 in /tmp/rai-w3-queue-server, branch codex/w3-01-scoped-queue at ae8e25d. No parent-checkout writes, push, PR or merge; shared contract PR #106 remains prerequisite.
 - Evidence: [server plan](../../changes/2026-09-22-w3-01-queue-server/plan.md)
+
+## 2026-09-22 — CLAIM W3-07a API consumer
+- Author: operator=ta session=codex-w3-07a-observability-api model=GPT-6
+- Takes over from: session=codex-w3-07a-observability-contract (reason: owner-authorized successor on d931cea; notification owners retain implementation)
+- What: Health/probes, operator queries, safe error capture and correlated QC diagnostics. Isolated DB 54368 and HTTP/SUB/WEB 18788/18789/15175; no publication before prerequisite merge and notification integration proof.
+- Evidence: [file-level plan](../../changes/2026-09-22-w3-07a-observability-api/plan.md)
