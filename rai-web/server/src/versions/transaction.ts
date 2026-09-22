@@ -1,10 +1,11 @@
-// W0-04 `withWorkflowTransaction`, the recipe every keyed business action runs (submit here; W2 decisions,
-// send-back, disposition and resubmit reuse it): one transaction that marks itself a workflow write (the W1-00
+// W0-04 `withWorkflowTransaction`, the recipe every keyed business action runs (submit / resubmit here; W2
+// decisions, send-back, disposition reuse it): one transaction that marks itself a workflow write (the W1-00
 // projection gate admits projection changes only here), locks the case row (W0-06 9.1: the serialisation point
 // for every action on one case), runs the store-backed part of step 4, answers a replay for (actor, key) with the
 // stored response (step 5; a different digest under the same key is 422 `idempotency_key_reused`), runs the
 // action (steps 6 and 7), refuses to commit when the action wrote no audit event (W0-04 "Audit log": written in the
-// same transaction as the state change), and stores the key with the response (W0-04: only on success). A
+// same transaction as the state change), and stores the key with the response (W0-04: only on success; `storeAction`
+// lets submit record `case.resubmit` when the locked draft had a parent without forking a second helper). A
 // contract error thrown anywhere rolls everything back, so a failed action leaves no row and can be retried under
 // the same key.
 
@@ -30,9 +31,16 @@ export interface WorkflowActionContext {
 export interface WorkflowResponse<T> {
   status: number;
   body: T;
+  /**
+   * Optional override for the stored `idempotency_key.action` (W2-04: `case.resubmit` when the locked
+   * draft had a parent). Replay matching stays by actor + key + digest; this field is not part of the digest.
+   */
+  storeAction?: string;
 }
 
-export interface WorkflowResult<T> extends WorkflowResponse<T> {
+export interface WorkflowResult<T> {
+  status: number;
+  body: T;
   replayed: boolean;
 }
 
@@ -91,13 +99,13 @@ export async function withWorkflowTransaction<T>(
     await storeIdempotencyKey(tx, {
       actorSubjectId: ctx.actor.subjectId,
       key: ctx.idempotencyKey,
-      action: ctx.action,
+      action: response.storeAction ?? ctx.action,
       targetCaseId: caseId,
       digest: ctx.requestDigest,
       status: response.status,
       body: response.body,
       now: ctx.now,
     });
-    return { ...response, replayed: false };
+    return { status: response.status, body: response.body, replayed: false };
   });
 }

@@ -1,7 +1,8 @@
-// The W0-06 4.3 submit event (W0-04 "Submit" row, (a)-(g); W2-01 adds (d)-(f) to the same transaction) and
-// the three W0-02 7.6 reads. Authentication, authorization and the case's existence in the actor's scope ran in
-// the W1-01 middleware (W0-06 section 4 steps 1-3); the header and the body shape ran in the route (step 4, first
-// half). What runs here, in `withWorkflowTransaction` under the case row lock (W0-06 9.1):
+// The W0-06 4.3 submit and 4.6 resubmit events (W0-04 "Submit" / "Resubmit" rows; W2-01 adds (d)-(f) to the same
+// transaction) and the three W0-02 7.6 reads. Resubmit is submit of a draft whose `parent_version_id` is set —
+// same POST /draft/submit route (case.submit). Authentication, authorization and the case's existence in the
+// actor's scope ran in the W1-01 middleware (W0-06 section 4 steps 1-3); the header and the body shape ran in the
+// route (step 4, first half). What runs here, in `withWorkflowTransaction` under the case row lock (W0-06 9.1):
 //   step 4 (store)  — the nine slot rows of the open draft each carry a disposition and every N/A a reason;
 //   step 5          — replay: the same (actor, key, digest) → the stored 201 body, nothing written;
 //   step 6          — ExpectedVersion (W0-06 5.2 submit row): `version_closed` on a Ready case, `version_
@@ -11,11 +12,13 @@
 //                     frozen_configuration for every kind in force under the W1-00 activation rule, lane_mapping_
 //                     version = CURRENT_LANE_MAPPING.version with its content, manifest_hash, submit_correlation_id),
 //                     close the draft on the case (current_version_id, draft_version_id NULL, desk_status in_review,
-//                     three lane projections pending, row_version + 1), audit `version.submitted` then
+//                     three lane projections pending, row_version + 1; resubmit also ai_readiness_status =
+//                     not_ready), audit `version.submitted` (v1) or `version.resubmitted` (N+1) then
 //                     `lane.opened` × 3 and lane_open notification rows for each fixture holder of each lane
-//                     (W2-01 (d)+(f); no SLA columns), store the key with the 201 body, commit. A failure while
-//                     opening any lane rolls everything back. Pack QC after commit (W0-07 3.4) is not bound in
-//                     slice 1; the response never waits.
+//                     (W2-01 (d)+(f); no SLA columns), store the key with the 201 body (idempotency action
+//                     `case.resubmit` when the locked draft had a parent), commit. A failure while opening any
+//                     lane rolls everything back. Pack QC after commit (W0-07 3.4) is not bound in slice 1; the
+//                     response never waits.
 
 import { createHash } from 'node:crypto';
 import { CURRENT_LANE_MAPPING } from '@rai/shared/constants';
@@ -78,6 +81,8 @@ export interface ActionContext {
 }
 
 export const SUBMIT_ACTION = 'case.submit' as const;
+/** Stored on `idempotency_key.action` when the locked draft had a parent (W0-06 4.6 / W2-04). Digest stays `case.submit`. */
+export const RESUBMIT_ACTION = 'case.resubmit' as const;
 const AUDIT_REF = /^[A-Za-z0-9_.:/@-]{1,64}$/;
 
 /** The key as an audit reference: verbatim when it is one (a UUID is), else its SHA-256 (the audit store admits no free text). */
@@ -159,7 +164,7 @@ export async function revisionsInForce(exec: Executor, at: Date): Promise<Revisi
   return out;
 }
 
-/** The submit transaction (W0-06 4.3). Returns the 201 body, replayed or fresh. */
+/** The submit / resubmit transaction (W0-06 4.3 / 4.6). Returns the 201 body, replayed or fresh. */
 export async function submitDraft(
   deps: VersionServiceDeps,
   ctx: ActionContext,
@@ -168,6 +173,8 @@ export async function submitDraft(
   idempotencyKey: string,
 ): Promise<WorkflowResult<SubmittedVersion>> {
   const now = (deps.now ?? (() => new Date()))();
+  // Digest always uses case.submit so a replay after the draft is closed still matches (W2-04: do not derive
+  // the digest from post-commit state). The stored action may be case.resubmit via storeAction.
   return withWorkflowTransaction<SubmittedVersion>(
     deps.db,
     caseId,
@@ -190,6 +197,7 @@ export async function submitDraft(
       },
       async apply({ tx, caseRow: before, audit }) {
         const draft = await assertExpectedDraft(tx, before, request.expectedVersion);
+        const isResubmit = draft.parentVersionId !== null;
         // Step 7: resolve what the version freezes, then the two writes.
         const frozen = resolveFrozenConfiguration(await revisionsInForce(tx, now));
         const slots = await readSlotsWithArtifacts(tx, draft.id);
@@ -204,7 +212,9 @@ export async function submitDraft(
           manifestHash: manifestHash(slots.manifest),
           submitCorrelationId: ctx.correlationId,
         });
-        const after = await closeDraftOnCase(tx, before, version.id, now);
+        const after = await closeDraftOnCase(tx, before, version.id, now, {
+          resetAiReadiness: isResubmit,
+        });
         const body = submittedVersionView(version, frozenSlotsOf(slots.rows, slots.artifacts), true);
         const slotRefs: AuditRefValue[] = slots.rows.map((r) => {
           const ref: Record<string, AuditRefValue> = { slot: r.slot, state: r.state };
@@ -216,8 +226,9 @@ export async function submitDraft(
           return ref;
         });
         const idempotencyKeyReference = keyRef(idempotencyKey);
+        // W0-06 4.6: version.resubmitted payload equals version.submitted plus parent_version_id (already present).
         await audit({
-          action: 'version.submitted',
+          action: isResubmit ? 'version.resubmitted' : 'version.submitted',
           targetCaseId: before.id,
           targetVersionId: version.id,
           targetRef: {
@@ -255,7 +266,11 @@ export async function submitDraft(
             ? {}
             : { failAfterFirstLaneOpenNotification: deps.failAfterFirstLaneOpenNotification }),
         });
-        return { status: 201, body };
+        return {
+          status: 201,
+          body,
+          ...(isResubmit ? { storeAction: RESUBMIT_ACTION } : {}),
+        };
       },
     },
   );

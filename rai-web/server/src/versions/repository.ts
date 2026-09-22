@@ -72,16 +72,18 @@ export class CaseRowChanged extends Error {
 }
 
 /**
- * W0-04 "Submit" row on the case: `current_version_id = the version`, `draft_version_id = NULL` (no open draft
- * after submit; W2-03 creates N+1 later), `desk_status = 'in_review'`, the three lane projections `pending`
- * (W0-06 4.10: every submission reopens all lanes; a no-op for v1), `row_version + 1`. Runs under
- * `rai.workflow_write`, which `withWorkflowTransaction` set. `ai_readiness_status` and `risk_tier` are untouched.
+ * W0-04 "Submit" / "Resubmit" row on the case: `current_version_id = the version`, `draft_version_id = NULL`
+ * (no open draft after submit; W2-03 creates N+1 later), `desk_status = 'in_review'`, the three lane
+ * projections `pending` (W0-06 4.10: every submission reopens all lanes; a no-op for v1), `row_version + 1`.
+ * Runs under `rai.workflow_write`, which `withWorkflowTransaction` set. `risk_tier` is untouched.
+ * First submit leaves `ai_readiness_status` untouched; resubmit (W2-04) also sets it to `not_ready`.
  */
 export async function closeDraftOnCase(
   tx: Tx,
   before: CaseRow,
   versionId: string,
   now: Date,
+  opts?: { resetAiReadiness?: boolean },
 ): Promise<CaseRow> {
   const [row] = await tx
     .update(cases)
@@ -92,6 +94,7 @@ export async function closeDraftOnCase(
       privacyStatus: 'pending',
       securityStatus: 'pending',
       raiStatus: 'pending',
+      ...(opts?.resetAiReadiness === true ? { aiReadinessStatus: 'not_ready' as const } : {}),
       rowVersion: sql`${cases.rowVersion} + 1`,
       updatedAt: now,
     })
