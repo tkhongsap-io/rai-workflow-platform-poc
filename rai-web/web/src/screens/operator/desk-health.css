@@ -1,0 +1,46 @@
+.operator-health {
+  overflow-wrap: anywhere;
+}
+.operator-health section {
+  margin-block: 1.5rem;
+}
+.operator-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: 1rem;
+}
+.operator-health dt {
+  font-weight: 600;
+}
+.operator-health dd {
+  margin: 0.25rem 0 0;
+}
+.operator-records {
+  list-style: none;
+  padding: 0;
+}
+.operator-records > li {
+  border-block-start: 1px solid currentColor;
+  padding-block: 1rem;
+}
+.operator-references {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+}
+.operator-references label {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  gap: 0.25rem;
+  max-width: 100%;
+}
+.operator-references input {
+  width: 24rem;
+  max-width: 100%;
+  min-width: 0;
+}
+.operator-health button[aria-disabled='true'] {
+  cursor: wait;
+}

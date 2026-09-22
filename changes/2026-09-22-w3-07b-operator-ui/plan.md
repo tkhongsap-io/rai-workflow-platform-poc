@@ -51,7 +51,7 @@ Do not touch server, migrations, fixture package or CI. Do not turn health into 
 
 1. **Contract head (supplied):** `d931cea` inspected; optional-nextAttemptAt re-review and prerequisite merge remain parent gates. Current dirty types are design input only. Confirm the final schema import and report optionality; no need to request a new response field for this page.
 2. **UI contract (implemented and verified locally; report commit before consumer):** locale/routes/client prerequisite is based on supplied `9980c7e`; parent arranges independent review, separate prerequisite PR and merge. Consumer delivery follows both prerequisites.
-3. **Consumer (not started):** implement only the listed web/tests files after authorization and dependency reconciliation. Coordinate router/app-shell changes with the W3-02 author so neither navigation entry is lost. This scoped claim does not transfer their work.
+3. **Consumer (implemented locally after parent authorization):** the listed web/tests files implement the page; final verification and independent review are recorded in review.md. Coordinate router/app-shell changes with the W3-02 author so neither navigation entry is lost. This scoped claim does not transfer their work.
 4. **Real API and acceptance (pending):** W3-07a runtime, W3-04 terminal failure and W3-03b digest data may land independently. Rehearsal uses controlled report interception until those real sources exist; never substitute a browser fixture for their acceptance. Parent owns final isolated resources, full suite, CI, W3-INT, #48 and M3 closure.
 5. **Review continuity:** the separate W3-03a fix re-review at `4aa19a3` was clean; it does not unblock W3-07a types or prove operator UI/API behavior. Keep its verification and acceptance record with W3-03a.
 
@@ -74,3 +74,13 @@ Consumer phase must retain the planned immediate render guard as well as request
 ## Bounded prerequisite size exception
 
 The lead accepts this 864-line prerequisite as one coherent bilingual DTO/client contract: 290 catalogue lines, 134 exhaustive mappings, boundary tests and the accepted planning documents dominate; activation remains in the separate consumer. Keeping matching labels, enum maps and validation tests together avoids publishing a partial operator contract. Independent review and full CI remain mandatory; this is an engineering packaging exception, not runtime/OBS-17 acceptance.
+
+## Authorized consumer implementation
+
+Parent received prerequisite `ede6cc2`, isolated it at `/tmp/rai-w3-operator-contract` for review/publication, and authorized the separate consumer. Shared locale keys/maps, paths and client stay unchanged. The consumer adds the planned page/sections/style/view-model, router registration and Admin navigation, plus controlled browser rehearsals. A browser-only `tests/browser/support/operator-session-harness.js` mounts the actual provider/page through Vite for first-commit DOM inspection; it is never imported by the product or bundled.
+
+The page uses the existing typed maps rather than duplicating enum mapping in its view-model. The view-model owns only presentation access and synchronous session/generation visibility. Manual refresh removes prior rows and preserves keyboard focus with aria-disabled plus an activation guard while loading. No polling, database, endpoint, permission or shared-state changes. Parent still controls dependency readiness, independent review and publication. Real-server OBS17 remains INT work.
+
+## Consumer publication exception
+
+The lead accepts the bounded 897-line consumer: approximately 435 implementation lines form one page, with its session-privacy and accessibility regressions. Independent review recommends keeping those guarantees together. This exception is separate from the prerequisite exception. The PR may open as a draft for CI; merge waits for the real operator API dependency and final review.

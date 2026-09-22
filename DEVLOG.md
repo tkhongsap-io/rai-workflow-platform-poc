@@ -1,5 +1,9 @@
 # Development log
 
+## W3-07b: Admin operator UI finalization — 2026-09-23
+
+Replayed only the reviewed UI consumer and its review record onto main `4fa14d6`, after API #123 merged. The resulting `rai-web` tree exactly matches the combined full-verification tree: 530 unit, 256 integration, 126 real-server browser and 171 substitute browser tests passed, zero skips. The page provides bilingual read-only diagnostics, manual refresh and immediate removal of stale Admin data after session changes. Controlled operator browser rehearsals remain separate from real OBS-17 acceptance in W3-INT. Local delivery awaits independent review before any push; PR #119 remains draft and parent owns CI/merge. See `changes/2026-09-22-w3-07b-operator-ui/review.md` for exact provenance and focused checks.
+
 ## W3-07a: operator runtime and correlation — 2026-09-23
 
 Health/readiness and Admin-only desk-health routes use the actual configured dependencies. Safe error capture, mail failure and QC diagnostics preserve correlation without logging submitted content. Independent reviews are clean after fixes for health-cookie isolation, readiness transition severity/frequency and response timing. Full combined verification passed; remaining package-level OBS and journey proof stays with W3-INT.
