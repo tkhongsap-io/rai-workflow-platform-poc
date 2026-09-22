@@ -151,15 +151,6 @@ function QueueFilters({
   const [owner, setOwner] = useState(query.owner ?? '');
   const [group, setGroup] = useState(query.useCaseGroup ?? '');
   const [pageSize, setPageSize] = useState(query.pageSize ?? 25);
-  const resetDrafts = () => {
-    setSearch('');
-    setSearchBy('all');
-    setStatus('');
-    setOwner('');
-    setGroup('');
-    setPageSize(25);
-    reset();
-  };
   const submit = (event: FormEvent) => {
     event.preventDefault();
     apply({
@@ -254,7 +245,7 @@ function QueueFilters({
         <button className={'btn btn-primary'} type={'submit'}>
           {t('queue.apply')}
         </button>
-        <button className={'btn btn-secondary'} type={'button'} onClick={resetDrafts}>
+        <button className={'btn btn-secondary'} type={'button'} onClick={reset}>
           {t('queue.reset')}
         </button>
       </div>
@@ -272,6 +263,7 @@ export function QueueScreen(): JSX.Element {
   const search = params.toString();
   const parsed = useMemo(() => parseQueueQuery(search), [search]);
   const [reload, setReload] = useState(0);
+  const [resetCount, setResetCount] = useState(0);
   const [result, setResult] = useState<Result | null>(null);
   const actorKey = `${session.principal.subjectId}:${JSON.stringify(session.principal.roles)}`;
   const requestKey = `${actorKey}:${search}:${reload}`;
@@ -293,7 +285,10 @@ export function QueueScreen(): JSX.Element {
       cancelled = true;
     };
   }, [parsed, requestKey, signedOut]);
-  const reset = () => setParams({});
+  const reset = () => {
+    setParams({});
+    setResetCount((count) => count + 1);
+  };
   const response = state?.kind === 'loaded' ? state.response : undefined;
   const goPage = (page: number) => {
     if (parsed.valid) setParams(queueParams({ ...parsed.query, page }));
@@ -321,7 +316,7 @@ export function QueueScreen(): JSX.Element {
       ) : (
         <>
           <QueueFilters
-            key={`${actorKey}:${search}`}
+            key={`${actorKey}:${search}:${resetCount}`}
             query={parsed.query}
             options={response?.filterOptions}
             apply={(q) => setParams(queueParams(q))}

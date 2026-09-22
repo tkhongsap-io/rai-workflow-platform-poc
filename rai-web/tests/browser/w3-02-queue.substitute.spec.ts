@@ -140,6 +140,33 @@ test('Reset clears unapplied drafts on the bare queue before Apply', async ({ pa
   await expect.poll(() => ids(page)).toEqual(ALL);
 });
 
+test('empty-state Reset clears unapplied drafts for an empty owner before Apply', async ({ page }) => {
+  await open(page, 'fx-user-owner-cm-2');
+  const search = page.getByLabel(th['queue.search'], { exact: true });
+  const searchBy = page.getByLabel(th['queue.search_by'], { exact: true });
+  const pageSize = page.getByLabel(th['queue.page_size'], { exact: true });
+  await search.fill('unapplied');
+  await searchBy.selectOption('owner');
+  await pageSize.selectOption('10');
+  await expect(page).toHaveURL(/\/queue$/);
+  await page.locator('.empty-state').getByRole('button', { name: th['queue.reset'], exact: true }).click();
+  await expect(search).toHaveValue('');
+  await expect(searchBy).toHaveValue('all');
+  await expect(page.locator('#queue-status')).toHaveValue('');
+  await expect(page.locator('#queue-owner')).toHaveValue('');
+  await expect(page.locator('#queue-group')).toHaveValue('');
+  await expect(pageSize).toHaveValue('25');
+  const requested = page.waitForRequest((request) => new URL(request.url()).pathname === '/api/queue');
+  await page.getByRole('button', { name: th['queue.apply'], exact: true }).click();
+  expect(Object.fromEntries(new URL((await requested).url()).searchParams)).toEqual({
+    searchBy: 'all',
+    page: '1',
+    pageSize: '25',
+  });
+  await expect(page.getByRole('heading', { name: th['queue.no_matches'] })).toBeVisible();
+  await expect(cards(page)).toHaveCount(0);
+});
+
 test('independent scope expectations cover all roles, hidden options/counts, searches and pages', async ({
   page,
 }, info) => {

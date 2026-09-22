@@ -50,3 +50,13 @@ The reviewer reproduced an unapplied search surviving Reset on bare `/queue`: cl
 Validation on Node 24.21.0 with isolated substitute ports 58789/55175 and no database: focused queue browser **30 passed**; full substitute browser **120 passed** (90 existing + 30 queue), including the new regression at 1440/834/390; full unit **418 passed**, no failures/skips; lint and typecheck passed. Repository link check (157 files/694 links), frozen-source check and git diff --check passed. Logs: `/tmp/rai-w3-ui-reset-focused.log`, `/tmp/rai-w3-ui-reset-browser-full.log`, `/tmp/rai-w3-ui-reset-unit.log`, `/tmp/rai-w3-ui-reset-lint.log`, `/tmp/rai-w3-ui-reset-typecheck.log`.
 
 The own plan records the reviewer-recommended, user-authorized bounded engineering exception before consumer PR: keep the cohesive queue flow and its browser/unit tests together. No shared contract change, push, PR, merge, root log edit or digest implementation. Digest preparation is paused. These remain synthetic substitute results, not A06 real acceptance; W3-INT retains real-server verification and acceptance.
+
+## Re-review P2: empty-state Reset shares the form reset
+
+The first fix covered only the form button. The empty-state button still cleared only the URL, leaving unapplied drafts on bare `/queue` for `fx-user-owner-cm-2`. All Reset entry points now call the parent handler: clear URL and increment a reset counter in the filter form key. The form remount restores every draft from default query values even when the URL is unchanged; the separate form-only reset implementation is removed.
+
+The new empty-owner regression edits search, search field and page size, uses the empty-state Reset, asserts all six default controls, then applies and verifies only default query values are sent and no cards appear. The existing populated-owner form Reset regression remains intact. Both run at 1440/834/390.
+
+Node 24.21.0, no DB, substitute ports 58789/55175: focused queue **33 passed**, full substitute browser **123 passed** (90 existing + 33 queue), full unit **418 passed** with zero failures/skips; lint and typecheck passed. Relative links (157 files/694 links), frozen-source check and git diff --check passed. Logs: `/tmp/rai-w3-ui-reset-all-focused.log`, `/tmp/rai-w3-ui-reset-all-browser-full.log`, `/tmp/rai-w3-ui-reset-all-unit.log`, `/tmp/rai-w3-ui-reset-all-lint.log`, `/tmp/rai-w3-ui-reset-all-typecheck.log`.
+
+The accepted bounded size exception remains unchanged. Local fix only: no push, PR, rebase, shared contract changes or digest work. Substitute results do not establish A06 real acceptance; parent owns re-review and delivery gates, and W3-INT owns real-server evidence.

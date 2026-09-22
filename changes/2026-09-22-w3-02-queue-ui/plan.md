@@ -10,3 +10,7 @@
 Fix P2 Reset by explicitly clearing every local filter draft (search, searchBy, status, owner, group and page size) before clearing the URL, including when the URL is already bare /queue. Add a browser regression that changes every draft without applying, resets, then applies and proves no restrictive filters remain at all three widths. Run focused queue and full substitute browser suites, unit, lint and typecheck; record results in this change's review.
 
 Bounded engineering exception: keep this one cohesive queue flow together, approximately 535 implementation lines plus 371 browser-test and 47 unit-test lines at the reviewed baseline. It is reviewable in one sitting, and splitting its tests would separate behavior from its proof. The independent reviewer recommended this exception; the user authorized lead implementation judgment before the consumer PR. The shared contract remains a separate prerequisite commit. This exception grants no A06 real acceptance: substitute checks remain UI rehearsal, with real-server evidence and acceptance deferred to W3-INT.
+
+### Re-review: every Reset entry point
+
+Replace the form-only reset with a parent-owned reset counter included in the form key. Every Reset button clears the URL and increments this counter, so a bare URL still remounts all draft controls from defaults. Extend the regression to the empty-owner empty-state Reset at all widths, then run focused/full substitute browser, unit, lint and typecheck checks before a local fix commit. The accepted size exception and A06 boundary remain unchanged.
