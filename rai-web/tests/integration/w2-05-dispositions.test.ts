@@ -33,7 +33,8 @@ import { FIXTURE_CASES, findFixtureCase } from '@rai/fixtures/data/cases/index';
 import { loadFixtures } from '@rai/fixtures/load';
 import { fixtureSetLabel, readManifest } from '@rai/fixtures/manifest';
 import { ScriptedQcRunner } from '@rai/fixtures/substitutes/qc/index';
-import type { VersionRef } from '@rai/shared/qc/types';
+import type { QcRunner, VersionRef } from '@rai/shared/qc/types';
+import { runAndPersistLaneQc } from '@rai/server/qc/orchestrator';
 import { openTestDatabase, type TestDatabase } from '../support/db.js';
 import { asUser, signInAsFixture, type FixtureSession } from '../support/sign-in.js';
 
@@ -217,6 +218,63 @@ function dispose(
 }
 
 describe(`W2-05 findings and dispositions — ${SET}`, () => {
+  it('releases the case row lock before the QC runner returns', async () => {
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, VENDOR.caseId);
+    let releaseRun: () => void = () => {};
+    const runGate = new Promise<void>((resolve) => {
+      releaseRun = resolve;
+    });
+    let markEntered: () => void = () => {};
+    const entered = new Promise<void>((resolve) => {
+      markEntered = resolve;
+    });
+    const runner: QcRunner = {
+      identity: { runner: 'lock-probe', runnerVersion: '1' },
+      async run() {
+        markEntered();
+        await runGate;
+        return {
+          status: 'unavailable',
+          reason: 'timeout',
+          detail: null,
+          startedAt: new Date(0).toISOString(),
+          finishedAt: new Date(0).toISOString(),
+        };
+      },
+    };
+    const pending = runAndPersistLaneQc(
+      { db: db.app, runner, now, timeoutMs: 30_000 },
+      {
+        caseId: VENDOR.caseId,
+        versionId: version.versionId,
+        lane: 'ai_coe',
+        correlationId: randomUUID(),
+      },
+    );
+    try {
+      await entered;
+      const started = Date.now();
+      await db.raw('app', async (client) => {
+        await client.query('BEGIN');
+        try {
+          await client.query("SET LOCAL lock_timeout = '750ms'");
+          await client.query('SELECT id FROM "case" WHERE id = $1 FOR UPDATE', [VENDOR.caseId]);
+          await client.query('COMMIT');
+        } catch (err) {
+          await client.query('ROLLBACK');
+          throw err;
+        }
+      });
+      const waited = Date.now() - started;
+      assert.ok(waited < 750, `case lock held during QC for ${waited}ms`);
+    } finally {
+      releaseRun();
+    }
+    const outcome = await pending;
+    assert.equal(outcome.status, 'unavailable');
+  });
+
   it('records a single-lane AI/COE defect on fx-case-vendor slot 1 via the injected substitute', async () => {
     const owner = await signIn(OWNER_A);
     const version = await submitOk(owner, VENDOR.caseId);
