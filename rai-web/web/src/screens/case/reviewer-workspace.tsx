@@ -6,7 +6,6 @@
 // latest disposition). Issue #35 stays open for slot-5 / pack / unavailable owning-lane disposition.
 
 import { useCallback, useEffect, useState, type JSX } from 'react';
-import { isLocaleKey } from '@rai/shared/locales/keys';
 import type { CaseView } from '@rai/shared/schemas/cases';
 import type { Lane } from '@rai/shared/constants';
 import type {
@@ -15,33 +14,15 @@ import type {
   LaneDecisionResponse,
   LaneQcRunResponse,
   SendBackFeedback,
-  StoredFindingSummary,
 } from '@rai/shared/schemas/review';
 import type { SubmittedVersion } from '@rai/shared/schemas/versions';
 import type { SessionInfo } from '@rai/shared/schemas/auth';
 import { api } from '../../api/client.js';
-import { Badge, type BadgeTone } from '../../components/status-badge.js';
 import { ErrorNotice } from '../../components/error-notice.js';
 import { useLocale } from '../../i18n/locale-provider.js';
-import { DispositionControls } from './disposition-controls.js';
+import { FindingsBlock } from './finding-list.js';
 import { SendBackDialog } from './send-back-dialog.js';
-import {
-  decidableLane,
-  expectedVersionOf,
-  findingMessageParams,
-  findingsLane,
-  laneKey,
-  qcUnavailableReasonKey,
-  severityKey,
-  slotNameKey,
-} from './view-model.js';
-
-const SEVERITY_TONE: Readonly<Record<StoredFindingSummary['severity'], BadgeTone>> = {
-  high: 'danger',
-  medium: 'warn',
-  low: 'info',
-  info: 'neutral',
-};
+import { decidableLane, expectedVersionOf, findingsLane, laneKey } from './view-model.js';
 
 type QcResult = { kind: 'error'; error: unknown } | { kind: 'ready'; run: LaneQcRunResponse };
 type QcState = { kind: 'loading' } | QcResult;
@@ -269,124 +250,5 @@ function ReviewerWorkspaceBody({
         </>
       ) : null}
     </section>
-  );
-}
-
-function FindingsBlock({
-  run,
-  overlay,
-  caseId,
-  expectedVersion,
-  session,
-  view,
-  onDisposition,
-  onUnauthenticated,
-}: {
-  run: LaneQcRunResponse;
-  overlay: ReadonlyMap<string, DispositionKind>;
-  caseId: string;
-  expectedVersion: ReturnType<typeof expectedVersionOf>;
-  session: SessionInfo;
-  view: CaseView;
-  onDisposition: (response: DispositionResponse) => void;
-  onUnauthenticated: (err: unknown) => boolean;
-}): JSX.Element {
-  const { t } = useLocale();
-  if (run.status === 'unavailable') {
-    return (
-      <div className={'review-qc-unavailable'} data-review-qc={'unavailable'} role={'status'}>
-        <Badge status={'unavailable'} tone={'warn'} label={t('review.qc.unavailable_badge')} />
-        <p>
-          {t('review.qc.unavailable_body', {
-            reason: t(qcUnavailableReasonKey(run.reason)),
-          })}
-        </p>
-        {run.runId !== null ? (
-          <p className={'muted small'}>{t('review.qc.run_id', { runId: run.runId })}</p>
-        ) : null}
-      </div>
-    );
-  }
-  if (run.findings.length === 0) {
-    return (
-      <p className={'muted'} role={'status'} data-review-qc={'empty'}>
-        {t('review.findings.empty')}
-      </p>
-    );
-  }
-  return (
-    <ul className={'findings-list'} data-review-qc={'findings'} aria-label={t('review.findings.list_label')}>
-      {run.findings.map((finding) => (
-        <FindingRow
-          key={finding.findingId}
-          finding={finding}
-          latestKind={overlay.get(finding.findingId) ?? null}
-          caseId={caseId}
-          expectedVersion={expectedVersion}
-          session={session}
-          view={view}
-          onDisposition={onDisposition}
-          onUnauthenticated={onUnauthenticated}
-        />
-      ))}
-    </ul>
-  );
-}
-
-function FindingRow({
-  finding,
-  latestKind,
-  caseId,
-  expectedVersion,
-  session,
-  view,
-  onDisposition,
-  onUnauthenticated,
-}: {
-  finding: StoredFindingSummary;
-  latestKind: DispositionKind | null;
-  caseId: string;
-  expectedVersion: ReturnType<typeof expectedVersionOf>;
-  session: SessionInfo;
-  view: CaseView;
-  onDisposition: (response: DispositionResponse) => void;
-  onUnauthenticated: (err: unknown) => boolean;
-}): JSX.Element {
-  const { t } = useLocale();
-  const message = isLocaleKey(finding.messageKey)
-    ? t(finding.messageKey, findingMessageParams(finding))
-    : finding.messageKey;
-  return (
-    <li className={'finding-row'} data-finding-id={finding.findingId}>
-      <Badge
-        status={finding.severity}
-        tone={SEVERITY_TONE[finding.severity]}
-        label={t(severityKey(finding.severity))}
-      />
-      <div className={'finding-body'}>
-        <p className={'finding-message'}>{message}</p>
-        <p className={'muted small finding-meta'}>
-          {finding.slot === null
-            ? t('review.findings.slot_none')
-            : t('review.findings.slot', {
-                number: finding.slot,
-                name: t(slotNameKey(finding.slot)),
-              })}
-          {' · '}
-          {t(laneKey(finding.owningLane))}
-        </p>
-        <DispositionControls
-          caseId={caseId}
-          finding={finding}
-          expectedVersion={expectedVersion}
-          session={session}
-          view={view}
-          latestKind={latestKind}
-          canSeeFindings={true}
-          onRecorded={onDisposition}
-          onUnauthenticated={onUnauthenticated}
-        />
-      </div>
-    </li>
   );
 }
