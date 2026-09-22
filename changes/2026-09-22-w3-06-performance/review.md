@@ -75,3 +75,7 @@ Normal commands under standard Node24.21.0 passed: npm run typecheck; npm run te
 Parent relayed Descartes's CLEAN review of exact `357849164bf6c03ca17855b34eabd311afe57428`, with no findings. Reviewer independently ran the normal unit command:558 passed, zero skips; a typecheck dry run confirmed both root and performance projects are included. This records the independent evidence as reported, not a new local rerun or full reviewer typecheck execution.
 
 Code remains immutable while INT's browser-fix final verification runs. Timing remains held until the parent's explicit go after integration delivery. Owned54370 resources stay stopped and retained as documented; this append makes no code, resource or execution changes.
+
+## Candidate-timing authorization boundary
+
+Lead approved the plan's candidate-timing amendment: clean completed local full integration AND real-browser runs, idle local test load, exact final INT checkpoint and explicit GO remain prerequisites; remote CI/merge may still be pending. Capture candidate identity and unchanged production/config fingerprint, then reconcile against actual merged main and invalidate/rerun affected evidence if it changes. Candidate timings do not establish merge or M3 acceptance. No new code, scripts, tests, DB/resource starts or measurements in this documentation update; waiting for GO.
