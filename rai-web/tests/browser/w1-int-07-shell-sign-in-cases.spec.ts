@@ -352,7 +352,10 @@ test.describe('W1-INT (W1-07) keyboard-only, dialog, locale and reflow on the re
     expect(newCase.text).toBe(th['shell.nav.new_case']);
     await page.keyboard.press('Enter');
     await expect(page.getByRole('heading', { level: 1, name: th['new_case.title'] })).toBeVisible();
+    // RouteFocus runs after paint; wait for it before the first keyboard input, as on the list/case steps.
+    await expectMainFocused(page);
     await tabUntil(page, (info) => info.tag === 'input');
+    await expect(page.getByLabel(th['field.use_case_name'])).toBeFocused();
     const unique = `W1-07 keyboard ${Date.now()}`;
     await page.keyboard.type(unique);
     await pressTab(page); // businessUnitId (pre-filled CM from the SPOC grant)

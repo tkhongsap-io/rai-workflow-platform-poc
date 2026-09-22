@@ -41,7 +41,7 @@ Logs: `/tmp/rai-w3-ui-contract-check.log`, `/tmp/rai-w3-ui-unit.log`, `/tmp/rai-
 
 ## Handoff boundary
 
-Parent is reviewing/publishing the first contract commit separately, without modifying this worktree. Consumer delivery still requires the contract prerequisite and W3-08 to be merged; parent owns independent review, PRs and merge gates. No push, PR, merge or external publication performed here. Real-server wiring, integration/browser evidence and acceptance belong to W3-INT; no production permission is claimed.
+The contract prerequisite (#110) and W3-08 (#108) are merged. Consumer delivery still requires final PR verification; parent owns independent review, PRs and merge gates. No push, PR, merge or external publication performed here. Real-server wiring, integration/browser evidence and acceptance belong to W3-INT; no production permission is claimed.
 
 ## Independent review P2: reset unapplied filters
 
@@ -64,3 +64,9 @@ The accepted bounded size exception remains unchanged. Local fix only: no push, 
 ## Parent delivery review
 
 Carver independently reviewed the final implementation at `778bece` and reported no remaining high-confidence findings after both Reset fixes. Six browser regressions (both Reset paths at all widths) and three URL unit tests independently passed. The parent rebased the consumer onto the reviewed W3-08 branch, preserving PR #110's contract-review record. Application and test source are unchanged by this rebase. Final combined verification and PR CI remain delivery gates; W3-INT acceptance remains separate.
+
+## Combined full verification and keyboard harness correction
+
+The first combined run passed unit/integration checks but failed one existing tablet keyboard journey: entering the new-case form began before RouteFocus settled, so input shifted into the wrong fields and submission correctly returned validation failure. Both real/substitute mirrors now wait for main focus and explicitly assert the first named input is focused. No keyboard, visible-focus, submission or created-card assertion was removed; no sleep/retry/skip or programmatic focus was added. Carver independently reviewed this correction clean. Fifteen repeated real-server runs (five per width) passed.
+
+Final `npm run verify:full` exited 0: lint, typecheck, 470 unit, 205 integration, 123 real-server browser and 123 substitute browser tests, build and substitute-absence. Logs: `/tmp/rai-w3-ui-keyboard-regression.log` and `/tmp/rai-w3-ui-fixed-full.log`. The prerequisite PRs #108 and #110 are merged. These full regressions protect existing server behavior; the dedicated combined W3 journey remains W3-INT. Final PR CI is still required.
