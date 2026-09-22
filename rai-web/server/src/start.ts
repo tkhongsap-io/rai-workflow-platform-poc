@@ -2,6 +2,7 @@
 // exit function: config → identity adapter start() (never listens on a refusal, exit 78) → app → listen → post-listen
 // loopback check (S16: close and exit 78 when the bound address is not loopback). main.ts never migrates (W0-04).
 
+import { loadMailSink } from './notifications/runtime.js';
 import type { AddressInfo } from 'node:net';
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
@@ -193,7 +194,19 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
     config.qc.mode === 'substitute' && config.nodeEnv !== 'production'
       ? await loadQcSubstituteRunner(overrides.now)
       : undefined;
+  // Only fixture identities can be synthetic mail recipients in this slice. No live directory or transport.
+  const mailSink = config.identity.mode === 'fixture' ? await loadMailSink(config) : undefined;
   const { fastify, emitter, drain } = buildApp({
+    ...(mailSink === undefined
+      ? {}
+      : {
+          notifications: {
+            db: db.db,
+            sink: mailSink,
+            identities: knownIdentities,
+            publicBaseUrl: config.publicBaseUrl,
+          },
+        }),
     config,
     artifacts: { store, db: db.db, limits: config.upload },
     identity: {
