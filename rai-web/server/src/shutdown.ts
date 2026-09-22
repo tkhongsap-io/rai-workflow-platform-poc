@@ -20,6 +20,9 @@ export const SHUTDOWN_DRAIN_MS = 10_000;
 export interface Drain {
   /** Requests accepted and not yet answered (or abandoned by the client). */
   inFlight(): number;
+  /** Abort new/background work when shutdown begins; active sinks must settle before rollback. */
+  readonly signal: AbortSignal;
+  track(task: Promise<void>): void;
   /** Closes the app: initiate, wait for in-flight requests up to `drainMs`, destroy what is left, complete. */
   close(drainMs?: number): Promise<void>;
 }
@@ -27,19 +30,21 @@ export interface Drain {
 /** Installs the in-flight counter on `fastify` (before listen) and returns the bounded close. */
 export function createDrain(fastify: FastifyInstance): Drain {
   let inFlight = 0;
+  const controller = new AbortController();
+  const background = new Set<Promise<void>>();
   const idleWaiters = new Set<() => void>();
   fastify.addHook('onRequest', (_request, reply, done) => {
     inFlight += 1;
     reply.raw.once('close', () => {
       inFlight -= 1;
-      if (inFlight === 0) for (const wake of idleWaiters) wake();
+      if (inFlight === 0 && background.size === 0) for (const wake of idleWaiters) wake();
     });
     done();
   });
 
   const untilIdle = (deadlineMs: number) =>
     new Promise<void>((resolve) => {
-      if (inFlight === 0) {
+      if (inFlight === 0 && background.size === 0) {
         resolve();
         return;
       }
@@ -54,10 +59,24 @@ export function createDrain(fastify: FastifyInstance): Drain {
 
   return {
     inFlight: () => inFlight,
+    signal: controller.signal,
+    track(task) {
+      background.add(task);
+      const finished = () => {
+        background.delete(task);
+        if (inFlight === 0 && background.size === 0) for (const wake of idleWaiters) wake();
+      };
+      void task.then(finished, finished);
+    },
     async close(drainMs = SHUTDOWN_DRAIN_MS) {
+      controller.abort();
       const closing = fastify.close(); // stops accepting; Node's idle sweep; the onClose hooks
+      void closing.catch(() => {}); // observed even if the deadline rejects first
       await untilIdle(drainMs);
       fastify.server.closeAllConnections(); // whatever the sweep left: 0-byte sockets, late idles, the overdue
+      // Never release a transaction while its sink is still active. main.ts handles this
+      // rejection with process.exit(1); process termination closes DB connections/rolls back.
+      if (background.size !== 0) throw new Error('shutdown_background_deadline');
       await closing;
     },
   };

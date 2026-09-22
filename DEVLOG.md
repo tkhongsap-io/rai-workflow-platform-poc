@@ -1,5 +1,13 @@
 # Development log
 
+## W3-03a: committed case notifications — 2026-09-22
+
+Lane-open, send-back and Ready messages are composed from committed outbox/audit records with scoped synthetic recipients, protected version links and bilingual templates. Thai dates use Gregorian years. Initial delivery cannot undo a committed decision; background shutdown is bounded and retains active transaction locks until settlement or process exit. Independent review is clean after both fixes. Digest, retries and operator visibility remain separate tickets.
+
+## W3-02: queue UI — 2026-09-22
+
+The bilingual queue renders server-scoped cards, status counts, current lane dates and the latest version. Filters and pagination survive reload and browser history; loading/error states suppress stale results. Both Reset paths clear unapplied edits after independent review found and verified regressions. The shared contract is PR #110. Substitute UI verification is separate from W3-INT real-server journey acceptance.
+
 ## W3-08: scoped queue substitute — 2026-09-22
 
 The dev/test-only API substitute now implements the queue contract, including scoped filters/counts, pagination, successor versions and frozen SLA dates. Regression tests cover role scopes, unknown query keys and disposition states. Full local verification passed: 413 unit, 198 integration and 213 browser tests. Independent review is clean after fixes. PR #108; integration acceptance remains W3-INT.

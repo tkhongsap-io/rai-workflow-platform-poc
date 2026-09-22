@@ -1,0 +1,270 @@
+// W3-04 bounded retry dispatcher; W3-03a committed composition remains unchanged. Reads committed outbox rows on its own connection; never called with a workflow Tx.
+import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
+import { Value } from 'typebox/value';
+import { LANES, type Lane } from '@rai/shared/constants';
+import type { CommittedEvent, DeliveryReceipt, MailSink } from '@rai/shared/mail/types';
+import { SendBackFeedbackSchema } from '@rai/shared/schemas/review';
+import type { Db, Tx } from '../db/client.js';
+import {
+  auditEvent,
+  cases,
+  laneDecision,
+  notification,
+  packVersion,
+  qcFinding,
+  session,
+} from '../db/schema/index.js';
+import { runWithContext } from '../observability/context.js';
+import type { Emitter } from '../observability/log.js';
+import { deliveryUpdate, nextAttempt, RETRY_BACKOFF_MS } from './retry.js';
+import { laneDueDates } from '../sla/due-dates.js';
+import {
+  composeCaseMail,
+  CompositionError,
+  resolveRecipient,
+  type CaseMailContent,
+  type CaseMailKind,
+  type MailIdentity,
+} from './compose.js';
+
+const KINDS: Record<string, CaseMailKind> = {
+  lane_open: 'lane_opened',
+  send_back: 'sent_back',
+  ready: 'ready_for_launch',
+};
+const ACTIONS = {
+  lane_opened: 'lane.opened',
+  sent_back: 'lane.sent_back',
+  ready_for_launch: 'case.ready_for_launch',
+} as const;
+export interface NotificationDeps {
+  db: Db;
+  sink: MailSink;
+  identities: readonly MailIdentity[];
+  publicBaseUrl: URL;
+  emitter: Emitter;
+  now?: () => Date;
+}
+export type NotificationRow = typeof notification.$inferSelect;
+
+/** Call only from the dispatcher's own transaction after reading a committed outbox row.
+ * Composition has no delivery/status/log side effects. W3-04 supplies the attempt on the returned request.
+ */
+export async function loadCommittedCaseRequest(
+  tx: Tx,
+  row: NotificationRow,
+  deps: Pick<NotificationDeps, 'identities' | 'publicBaseUrl'>,
+) {
+  const kind = KINDS[row.event];
+  if (!kind || !row.caseId || !row.versionId) throw new CompositionError('malformed_request');
+  const lane = row.lane === '-' ? null : (row.lane as Lane);
+  if (kind === 'ready_for_launch' ? lane !== null : !LANES.includes(lane as Lane))
+    throw new CompositionError('malformed_request');
+  const [caseRow] = await tx.select().from(cases).where(eq(cases.id, row.caseId));
+  const [version] = await tx
+    .select()
+    .from(packVersion)
+    .where(and(eq(packVersion.id, row.versionId), eq(packVersion.caseId, row.caseId)));
+  if (!caseRow || !version?.submittedAt) throw new CompositionError('malformed_request');
+  const audits = await tx
+    .select()
+    .from(auditEvent)
+    .where(
+      and(
+        eq(auditEvent.targetCaseId, row.caseId),
+        eq(auditEvent.targetVersionId, row.versionId),
+        eq(auditEvent.correlationId, row.correlationId),
+        eq(auditEvent.action, ACTIONS[kind]),
+        lane === null ? undefined : sql`${auditEvent.targetRef}->>'lane' = ${lane}`,
+      ),
+    )
+    .limit(2);
+  if (audits.length !== 1) throw new CompositionError('malformed_request');
+  const audit = audits[0]!;
+  const event: CommittedEvent = {
+    kind,
+    caseId: row.caseId,
+    versionId: row.versionId,
+    versionNumber: version.versionNumber,
+    digestDay: null,
+    lane,
+    auditEventId: audit.id,
+    committedAt: audit.occurredAt.toISOString(),
+    correlationId: row.correlationId,
+  };
+  const recipient = resolveRecipient(deps.identities, row.recipient, event, {
+    caseId: caseRow.id,
+    ownerSubjectId: caseRow.ownerSubjectId,
+    businessUnitId: caseRow.businessUnitId,
+  });
+  const [preference] = await tx
+    .select({ locale: session.locale })
+    .from(session)
+    .where(eq(session.subjectId, recipient.recipientId))
+    .orderBy(desc(session.createdAt), desc(session.id))
+    .limit(1);
+  if (preference?.locale === 'en' || preference?.locale === 'th') recipient.locale = preference.locale;
+  const content: CaseMailContent = { caseName: caseRow.useCaseName };
+  if (kind === 'lane_opened') {
+    const [total] = await tx
+      .select({ value: count() })
+      .from(qcFinding)
+      .where(and(eq(qcFinding.versionId, row.versionId), eq(qcFinding.kind, 'defect')));
+    content.defectCount = total?.value ?? 0;
+    content.dueOn = (await laneDueDates(tx, row.versionId)).find((d) => d.lane === lane)!.dueOn;
+  }
+  if (kind === 'sent_back') {
+    const params = row.templateParams as { decision_id?: unknown };
+    if (typeof params.decision_id !== 'string') throw new CompositionError('malformed_request');
+    const [decision] = await tx
+      .select()
+      .from(laneDecision)
+      .where(
+        and(
+          eq(laneDecision.versionId, row.versionId),
+          eq(laneDecision.lane, row.lane),
+          eq(laneDecision.decision, 'send_back'),
+          eq(laneDecision.correlationId, row.correlationId),
+        ),
+      );
+    if (
+      !decision ||
+      decision.id !== params.decision_id ||
+      (audit.targetRef as { decision_id?: unknown } | null)?.decision_id !== decision.id ||
+      !Value.Check(SendBackFeedbackSchema, decision.feedback)
+    )
+      throw new CompositionError('malformed_request');
+    content.feedback = decision.feedback;
+  }
+  if (kind === 'ready_for_launch' && version.readyAt === null)
+    throw new CompositionError('malformed_request');
+  const request = composeCaseMail(event, recipient, content, deps.publicBaseUrl);
+  if (
+    row.templateKey !== request.mail.templateKey ||
+    row.deepLinkPath !== new URL(request.deepLinks[0]!.url).pathname
+  )
+    throw new CompositionError('unsafe_link');
+  return request;
+}
+
+export function createNotifications(deps: NotificationDeps) {
+  const now = deps.now ?? (() => new Date());
+  /** Compatibility name: dispatches one eligible attempt, including retries. A crash before commit can replay it. */
+  async function deliverInitial(id: string, signal?: AbortSignal): Promise<DeliveryReceipt | undefined> {
+    signal?.throwIfAborted();
+    const outcome = await deps.db.transaction(async (tx) => {
+      const [row] = await tx
+        .select()
+        .from(notification)
+        .where(
+          and(
+            eq(notification.id, id),
+            eq(notification.status, 'queued'),
+            inArray(notification.event, Object.keys(KINDS)),
+          ),
+        )
+        .for('update', { skipLocked: true });
+      signal?.throwIfAborted();
+      if (!row) return undefined;
+      // Legacy W3-03a failure has no completion timestamp: adopt once, never infer from createdAt.
+      if (row.attempts === 1 && row.nextAttemptAt === null) {
+        await tx
+          .update(notification)
+          .set({ nextAttemptAt: new Date(now().getTime() + RETRY_BACKOFF_MS[0]) })
+          .where(eq(notification.id, id));
+        signal?.throwIfAborted();
+        return undefined;
+      }
+      const attempt = nextAttempt({ ...row, status: 'queued' }, now());
+      if (attempt === undefined) return undefined;
+      let receipt: DeliveryReceipt;
+      try {
+        const request = await loadCommittedCaseRequest(tx, row, deps);
+        signal?.throwIfAborted();
+        receipt = await deps.sink.deliver({ ...request, attempt });
+      } catch (err) {
+        receipt = {
+          dedupKey: '',
+          status: 'failed',
+          attempt,
+          at: now().toISOString(),
+          sinkMessageId: null,
+          error: {
+            code: err instanceof CompositionError ? err.code : 'sink_failure',
+            message: 'composition or delivery failed',
+          },
+        };
+      }
+      // Cancellation waits for sink settlement before rollback; never unlock a pending sink call.
+      signal?.throwIfAborted();
+      const update = deliveryUpdate(attempt, receipt, now());
+      await tx.update(notification).set(update).where(eq(notification.id, id));
+      signal?.throwIfAborted();
+      return { row, receipt, update, attempt };
+    });
+    if (outcome === undefined) return undefined;
+    const { row, receipt, update, attempt } = outcome;
+    // No outcome log until COMMIT succeeds. Logs themselves are not crash-atomic with the DB.
+    await runWithContext({ correlationId: row.correlationId, startedAt: performance.now() }, () => {
+      if (attempt === 1)
+        deps.emitter.log('mail.enqueued', {
+          notificationId: row.id,
+          eventType: row.event,
+          caseId: row.caseId,
+          versionId: row.versionId,
+          lane: row.lane,
+          recipientCount: 1,
+        });
+      if (receipt.status === 'duplicate')
+        deps.emitter.log('mail.deduplicated', {
+          eventType: row.event,
+          caseId: row.caseId,
+          versionId: row.versionId,
+          lane: row.lane,
+          existingNotificationId: row.id,
+        });
+      if (update.status === 'sent')
+        deps.emitter.log('mail.sent', {
+          notificationId: row.id,
+          attempt,
+          sinkKind: deps.sink.identity.sink,
+        });
+      else if (update.status === 'failed')
+        deps.emitter.log('mail.failed', {
+          notificationId: row.id,
+          attempts: attempt,
+          errorCode: update.lastErrorCode,
+        });
+      else
+        deps.emitter.log('mail.attempt_failed', {
+          notificationId: row.id,
+          attempt,
+          nextAttemptAt: update.nextAttemptAt!.toISOString(),
+          errorCode: receipt.error?.code ?? 'sink_failure',
+        });
+      return Promise.resolve();
+    });
+    return receipt;
+  }
+  /** One bounded batch; polling revisits backlog. Digests remain W3-03b. */
+  async function deliverPending(correlationId?: string, signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted();
+    const rows = await deps.db
+      .select({ id: notification.id })
+      .from(notification)
+      .where(
+        and(
+          eq(notification.status, 'queued'),
+          sql`${notification.attempts} >= 0 AND ${notification.attempts} < 4`,
+          sql`(${notification.nextAttemptAt} <= ${now()} OR (${notification.nextAttemptAt} IS NULL AND ${notification.attempts} <= 1))`,
+          inArray(notification.event, Object.keys(KINDS)),
+          correlationId === undefined ? undefined : eq(notification.correlationId, correlationId),
+        ),
+      )
+      .orderBy(asc(notification.createdAt), asc(notification.id))
+      .limit(25);
+    for (const row of rows) await deliverInitial(row.id, signal);
+  }
+  return { deliverInitial, deliverPending };
+}
+export type Notifications = ReturnType<typeof createNotifications>;
