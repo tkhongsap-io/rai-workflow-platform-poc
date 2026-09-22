@@ -172,6 +172,57 @@ async function submit() {
   });
   return { response, body, headers, version: response.json<SubmittedVersion>() };
 }
+// A SKIP LOCKED sweep is not a completion barrier for the app's automatic worker.
+async function settledDeliveries(versionId: string, expected: Record<string, number>) {
+  const deadline = performance.now() + 5_000;
+  const kinds: Record<string, string> = { lane_open: 'lane_opened', send_back: 'sent_back' };
+  while (true) {
+    const result = await db.owner.execute(sql`
+      SELECT id, event, status, attempts, next_attempt_at, last_error_code
+      FROM notification WHERE case_id = ${caseId} AND version_id = ${versionId}`);
+    const rows = result.rows as {
+      id: string;
+      event: string;
+      status: string;
+      attempts: number;
+      next_attempt_at: unknown;
+      last_error_code: unknown;
+    }[];
+    const sent = sink.sent.filter((r) => r.event.caseId === caseId && r.event.versionId === versionId);
+    const emitted = logs
+      .join('')
+      .split('\n')
+      .filter(Boolean)
+      .map(
+        (line) =>
+          JSON.parse(line) as {
+            event: string;
+            fields?: { notificationId?: string };
+          },
+      );
+    const count = Object.values(expected).reduce((a, b) => a + b, 0);
+    const settled =
+      rows.length === count &&
+      sent.length === count &&
+      Object.entries(expected).every(
+        ([event, n]) =>
+          rows.filter((r) => r.event === event).length === n &&
+          sent.filter((r) => r.event.kind === kinds[event]).length === n,
+      ) &&
+      rows.every(
+        (r) =>
+          r.status === 'sent' &&
+          r.attempts === 1 &&
+          r.next_attempt_at === null &&
+          r.last_error_code === null &&
+          emitted.filter((l) => l.event === 'mail.sent' && l.fields?.notificationId === r.id).length === 1,
+      );
+    if (settled) return;
+    assert.ok(performance.now() < deadline, 'exact committed notification/sink/log state did not settle');
+    await delay(10); // bounded read-only observation; never retries delivery
+  }
+}
+
 async function decide(
   user: FixtureSession,
   versionId: string,
@@ -207,6 +258,7 @@ test(`W3-03a committed lane opens: contents, locale, auth, idempotency — ${fix
   const { response, version, headers, body } = await submit();
   assert.equal(response.statusCode, 201, response.body);
   await notifications.deliverPending();
+  await settledDeliveries(version.versionId, { lane_open: 4 });
   assert.equal(sink.sent.length, 4);
   const due = await laneDueDates(db.app, version.versionId);
   for (const request of sink.sent) {
@@ -233,6 +285,7 @@ test(`W3-03a committed lane opens: contents, locale, auth, idempotency — ${fix
     201,
   );
   await notifications.deliverPending();
+  await settledDeliveries(version.versionId, { lane_open: 4 });
   assert.equal(sink.sent.length, 4);
   const allLogs = logs.join('');
   assert.ok(allLogs.includes('mail.sent'));
@@ -247,6 +300,57 @@ test(`W3-03a committed lane opens: contents, locale, auth, idempotency — ${fix
   assert.ok(!allLogs.includes(sink.sent[0]!.deepLinks[0]!.url));
 });
 
+test('manual sweep skips the automatic worker held sink row; settlement requires its commit', async () => {
+  const entered = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  const original = sink.deliver.bind(sink);
+  let held = false;
+  sink.deliver = async (request) => {
+    if (!held) {
+      held = true;
+      entered.resolve();
+      await release.promise;
+    }
+    return original(request);
+  };
+  const submitted = submit();
+  const bounded = async <T>(pending: Promise<T>): Promise<T> => {
+    const controller = new AbortController();
+    try {
+      return await Promise.race([
+        pending,
+        delay(5_000, undefined, { signal: controller.signal }).then(() => {
+          throw new Error('held notification control exceeded deadline');
+        }),
+      ]);
+    } finally {
+      controller.abort();
+    }
+  };
+  try {
+    await bounded(entered.promise);
+    const { response, version } = await bounded(submitted);
+    assert.equal(response.statusCode, 201);
+    await bounded(notifications.deliverPending());
+    const rows = await db.owner.execute(sql`
+      SELECT status, attempts FROM notification
+      WHERE case_id = ${caseId} AND version_id = ${version.versionId}`);
+    assert.equal(rows.rows.length, 4);
+    assert.equal(rows.rows.filter((r) => r.status === 'queued' && r.attempts === 0).length, 1);
+    assert.equal(rows.rows.filter((r) => r.status === 'sent' && r.attempts === 1).length, 3);
+    assert.equal(sink.sent.length, 3);
+    release.resolve();
+    await settledDeliveries(version.versionId, { lane_open: 4 });
+  } finally {
+    release.resolve();
+    try {
+      await submitted;
+    } finally {
+      await app.close();
+    }
+  }
+});
+
 test('send-back mail goes only to owner, with deciding lane and bounded reviewer feedback', async () => {
   const { version } = await submit();
   const dpo = await signIn('fx-user-dpo');
@@ -256,6 +360,7 @@ test('send-back mail goes only to owner, with deciding lane and bounded reviewer
   });
   assert.equal(res.statusCode, 201, res.body);
   await notifications.deliverPending();
+  await settledDeliveries(version.versionId, { lane_open: 4, send_back: 1 });
   const messages = sink.sent.filter((r) => r.event.kind === 'sent_back');
   assert.equal(messages.length, 1);
   assert.equal(messages[0]!.recipient.address, emailOf(ownerId));
