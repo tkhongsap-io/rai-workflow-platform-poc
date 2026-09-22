@@ -41,6 +41,75 @@ export async function latestDispositionKind(
   return row?.kind as DispositionKind | undefined;
 }
 
+function asMessageParams(value: unknown): Record<string, string | number> | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
+  const out: Record<string, string | number> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (typeof entry === 'string' || typeof entry === 'number') out[key] = entry;
+  }
+  return Object.keys(out).length === 0 ? undefined : out;
+}
+
+/** Stored findings for a version plus each finding's latest disposition kind (GET …/findings; no qc_run write). */
+export async function listFindingsForVersion(
+  exec: Executor,
+  caseId: string,
+  versionId: string,
+): Promise<
+  Array<{
+    findingId: string;
+    ruleId: string;
+    slot: number | null;
+    severity: string;
+    owningLane: Lane;
+    messageKey: string;
+    messageParams?: Record<string, string | number>;
+    latestDisposition: DispositionKind | null;
+  }>
+> {
+  const rows = await exec
+    .select({
+      findingId: qcFinding.id,
+      ruleId: qcFinding.ruleId,
+      slot: qcFinding.slot,
+      severity: qcFinding.severity,
+      owningLane: qcFinding.owningLane,
+      messageKey: qcFinding.messageKey,
+      messageParams: qcFinding.messageParams,
+    })
+    .from(qcFinding)
+    .innerJoin(packVersion, eq(qcFinding.versionId, packVersion.id))
+    .where(and(eq(qcFinding.versionId, versionId), eq(packVersion.caseId, caseId)))
+    .orderBy(asc(qcFinding.createdAt), asc(qcFinding.id));
+
+  const out: Array<{
+    findingId: string;
+    ruleId: string;
+    slot: number | null;
+    severity: string;
+    owningLane: Lane;
+    messageKey: string;
+    messageParams?: Record<string, string | number>;
+    latestDisposition: DispositionKind | null;
+  }> = [];
+  for (const r of rows) {
+    const latest = await latestDispositionKind(exec, r.findingId);
+    const entry: (typeof out)[number] = {
+      findingId: r.findingId,
+      ruleId: r.ruleId,
+      slot: r.slot,
+      severity: r.severity,
+      owningLane: r.owningLane as Lane,
+      messageKey: r.messageKey,
+      latestDisposition: latest ?? null,
+    };
+    const params = asMessageParams(r.messageParams);
+    if (params !== undefined) entry.messageParams = params;
+    out.push(entry);
+  }
+  return out;
+}
+
 export async function listDispositions(
   exec: Executor,
   findingId: string,

@@ -25,6 +25,7 @@ import {
   DispositionRequestSchema,
   LaneQcRunRequestSchema,
   SendBackLaneRequestSchema,
+  VersionFindingsResponseSchema,
   type ApproveLaneRequest,
   type DispositionKind,
   type DispositionRequest,
@@ -34,6 +35,7 @@ import {
   type LaneQcRunResponse,
   type SendBackLaneRequest,
   type StoredFindingSummary,
+  type VersionFindingsResponse,
 } from '@rai/shared/schemas/review';
 import type { SubmittedVersion } from '@rai/shared/schemas/versions';
 import type { RouteContext, RouteDefinition } from './handler.js';
@@ -453,6 +455,35 @@ export function reviewRoutes(): RouteDefinition[] {
         );
         storeReplay(ctx, key, digest, response);
         return response;
+      },
+    },
+    {
+      method: 'GET',
+      path: '/api/cases/:caseId/versions/:versionId/findings',
+      auth: { kind: 'action', action: 'version.view', target: 'case' },
+      handler: (ctx) => {
+        const stored = authorizedCase(ctx);
+        const versionId = ctx.params.versionId ?? '';
+        if (!UUID_PATTERN.test(versionId)) throw new NotFoundError('version');
+        const version = stored.versions.find((v) => v.versionId === versionId);
+        if (version === undefined) throw new NotFoundError('version');
+        const findings: VersionFindingsResponse['findings'] = [];
+        for (const finding of ctx.store.findings.values()) {
+          if (finding.caseId !== stored.caseId || finding.versionId !== versionId) continue;
+          const latest = (ctx.store.dispositions.get(finding.findingId) ?? []).at(-1);
+          findings.push({
+            findingId: finding.findingId,
+            ruleId: finding.ruleId,
+            slot: finding.slot,
+            severity: finding.severity,
+            owningLane: finding.owningLane,
+            messageKey: finding.messageKey,
+            latestDisposition: latest?.kind ?? null,
+            ...(finding.messageParams === undefined ? {} : { messageParams: finding.messageParams }),
+          });
+        }
+        assertValid(VersionFindingsResponseSchema, { findings });
+        return json(200, ctx.correlationId, { findings } satisfies VersionFindingsResponse);
       },
     },
     {

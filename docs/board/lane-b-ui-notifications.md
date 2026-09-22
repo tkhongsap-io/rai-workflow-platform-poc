@@ -44,3 +44,14 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: W2-09 findings/disposition UI; W2-INT wires to the real server.
 - Author: operator=ta session=w2-07 model=composer
 - Evidence: branch codex/w2-07-reviewer-workspace
+
+## 2026-09-22 15:46 — CLAIM Lane B
+- Author: operator=ta session=w2-09 model=composer
+- Takes over from: session=w2-07 (reason: W2-09 disposition UI)
+
+## 2026-09-22 15:46 — W2-09 findings and disposition UI
+- What: Disposition UI on the reviewer workspace. Owning-lane reviewer: qc-run then GET …/findings for latestDisposition; fixed_confirmed when that kind is fixed_proposed. Owner/BU SPOC: GET …/findings (version.view, no qc_run write) with propose-fixed only. Waived/N/A require the reason dialog. After each disposition POST the GET is refetched. Every kind is reachable on the substitute. qc-run auth unchanged. Issue #35 stays open. Locale keys in th.json and en.json. Not the W2 exit.
+- Why: Ticket W2-09 of the delivery pack; proves A09 for the disposition UI layer on the W2-10 substitute. Spec fix: GET makes propose/confirm reachable without weakening qc-run.
+- Next: W2-INT wires to the real server.
+- Author: operator=ta session=w2-09 model=composer
+- Evidence: branch codex/w2-09-disposition-ui

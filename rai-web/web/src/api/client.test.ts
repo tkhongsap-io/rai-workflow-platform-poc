@@ -194,6 +194,63 @@ test('W2-07: lane qc-run, approve and send-back paths carry expectedVersion and 
   assert.equal((calls[2]?.init?.headers as Record<string, string>)['idempotency-key'], 'key-b');
 });
 
+test('W2-09: recordDisposition path carries expectedVersion, kind and the mint key', async () => {
+  const calls: { input: string; init: RequestInit | undefined }[] = [];
+  const client = createApiClient((input, init) => {
+    calls.push({ input, init });
+    return Promise.resolve(
+      new Response(
+        JSON.stringify({
+          dispositionId: 'd1',
+          findingId: 'f1',
+          kind: 'waived',
+          recordedAt: '2026-09-22T12:00:00Z',
+          caseRevision: 1,
+          ready: false,
+        }),
+        { status: 201, headers: { 'content-type': 'application/json' } },
+      ),
+    );
+  });
+  await client.recordDisposition(
+    'c1',
+    'f/1',
+    {
+      expectedVersion: { versionId: 'v-1', revision: 1 },
+      kind: 'waived',
+      reason: 'accepted residual risk',
+    },
+    'key-d',
+  );
+  assert.equal(calls[0]?.input, '/api/cases/c1/findings/f%2F1/dispositions');
+  assert.equal(calls[0]?.init?.method, 'POST');
+  assert.equal((calls[0]?.init?.headers as Record<string, string>)['idempotency-key'], 'key-d');
+  const body = JSON.parse(calls[0]?.init?.body as string) as {
+    kind: string;
+    reason: string;
+    expectedVersion: { versionId: string; revision: number };
+  };
+  assert.equal(body.kind, 'waived');
+  assert.equal(body.reason, 'accepted residual risk');
+  assert.equal(body.expectedVersion.revision, 1);
+});
+
+test('W2-09: listVersionFindings path is a GET under the version', async () => {
+  const calls: { input: string; init: RequestInit | undefined }[] = [];
+  const client = createApiClient((input, init) => {
+    calls.push({ input, init });
+    return Promise.resolve(
+      new Response(JSON.stringify({ findings: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+  });
+  await client.listVersionFindings('c1', 'v/1');
+  assert.equal(calls[0]?.input, '/api/cases/c1/versions/v%2F1/findings');
+  assert.equal(calls[0]?.init?.method ?? 'GET', 'GET');
+});
+
 test('W1-06: a 409 stale_version exposes its guidance and refresh path; other codes expose none', async () => {
   const client = createApiClient(
     fetchAnswering(409, {

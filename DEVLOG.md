@@ -1,5 +1,9 @@
 # Development log
 
+## W2-09: findings and disposition UI — 2026-09-22
+
+On a current submitted version the owning-lane reviewer runs `POST …/qc-run` then enriches each finding with `latestDisposition` from `GET …/versions/:versionId/findings` (authorized as `version.view`; does not insert a `qc_run`). Owner/BU SPOC load that GET only and may propose fixed; qc-run auth is unchanged. After every disposition POST the GET is refetched so a reload shows the kind. Waived and N/A open the shared reason dialog. Every disposition kind is reachable on the W2-10 substitute (owner propose → lane confirm; waive with reason). Ready on the disposition response shows the existing `review.decided.ready` notice. Single-lane findings only; issue #35 stays open. This is not the W2 exit.
+
 ## W2-07: reviewer workspace UI — 2026-09-22
 
 On a current submitted version the owning-lane reviewer sees that lane's QC findings (from `POST …/qc-run`) above approve / send-back. Controls wait for the run, including an unavailable run (still has a run id). Send-back reuses the shared dialog and cannot submit without naming a slot. Admin, owner, wrong lane and stale/superseded versions never draw the buttons. History keeps frozen N readable after send-back. Substitute Playwright path is keyboard-only with axe zero critical / zero serious. Copy comes from the catalogue keys in the W2-07 contract PR. This is not the W2 exit; disposition UI remains W2-09.

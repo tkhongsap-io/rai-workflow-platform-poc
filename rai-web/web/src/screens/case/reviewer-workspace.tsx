@@ -1,44 +1,42 @@
-// Reviewer workspace (W2-07): on a current submitted version the owning-lane reviewer sees that lane's QC
-// findings (from POST …/qc-run) above the approve / send-back controls. Controls are not rendered until the run
-// returns, including an unavailable run (still has a run id). Admin, owner, wrong lane and stale versions never
-// draw the buttons (the server would 403). Disposition UI is W2-09.
+// Reviewer workspace (W2-07 / W2-09): owning-lane reviewer runs qc-run then enriches latestDisposition via
+// GET …/findings; owner/BU SPOC loads that GET only and may propose fixed — the owner panel renders only after
+// GET returns at least one finding (no loading/empty status). After every disposition POST the GET is refetched.
+// qc-run auth is unchanged. Issue #35 stays open.
 
 import { useCallback, useEffect, useState, type JSX } from 'react';
-import { isLocaleKey } from '@rai/shared/locales/keys';
 import type { CaseView } from '@rai/shared/schemas/cases';
 import type { Lane } from '@rai/shared/constants';
 import type {
+  DispositionKind,
+  DispositionResponse,
   LaneDecisionResponse,
   LaneQcRunResponse,
-  SendBackFeedback,
   StoredFindingSummary,
 } from '@rai/shared/schemas/review';
 import type { SubmittedVersion } from '@rai/shared/schemas/versions';
 import type { SessionInfo } from '@rai/shared/schemas/auth';
 import { api } from '../../api/client.js';
-import { Badge, type BadgeTone } from '../../components/status-badge.js';
 import { ErrorNotice } from '../../components/error-notice.js';
 import { useLocale } from '../../i18n/locale-provider.js';
-import { SendBackDialog } from './send-back-dialog.js';
+import { FindingsList, QcUnavailableBlock } from './finding-list.js';
+import { LaneDecisionActions } from './lane-decision-actions.js';
 import {
+  canProposeFixedOnCase,
   decidableLane,
   expectedVersionOf,
-  findingMessageParams,
+  findingsLane,
   laneKey,
-  qcUnavailableReasonKey,
-  severityKey,
-  slotNameKey,
 } from './view-model.js';
 
-const SEVERITY_TONE: Readonly<Record<StoredFindingSummary['severity'], BadgeTone>> = {
-  high: 'danger',
-  medium: 'warn',
-  low: 'info',
-  info: 'neutral',
-};
-
-type QcResult = { kind: 'error'; error: unknown } | { kind: 'ready'; run: LaneQcRunResponse };
-type QcState = { kind: 'loading' } | QcResult;
+type LoadResult =
+  | { kind: 'error'; error: unknown }
+  | {
+      kind: 'ready';
+      run: LaneQcRunResponse | null;
+      findings: StoredFindingSummary[];
+      latestKinds: ReadonlyMap<string, DispositionKind | null>;
+    };
+type LoadState = { kind: 'loading' } | LoadResult;
 
 export interface ReviewerWorkspaceProps {
   caseId: string;
@@ -47,126 +45,190 @@ export interface ReviewerWorkspaceProps {
   hasOpenDraft: boolean;
   session: SessionInfo;
   onDecided: (response: LaneDecisionResponse) => void;
+  onDispositionRecorded: (response: DispositionResponse) => void;
   onUnauthenticated: (err: unknown) => boolean;
 }
 
 export function ReviewerWorkspace(props: ReviewerWorkspaceProps): JSX.Element | null {
-  const lane = decidableLane({
-    roles: props.session.principal.roles,
-    subjectId: props.session.principal.subjectId,
+  const roles = props.session.principal.roles;
+  const subjectId = props.session.principal.subjectId;
+  const lane = findingsLane({
+    roles,
+    subjectId,
     view: props.view,
     version: props.version,
-    hasOpenDraft: props.hasOpenDraft,
   });
-  if (lane === null) return null;
+  const propose =
+    lane === null && props.version.isLatest && canProposeFixedOnCase(roles, subjectId, props.view);
+  if (lane === null && !propose) return null;
   return <ReviewerWorkspaceBody {...props} lane={lane} />;
 }
 
 function ReviewerWorkspaceBody({
   caseId,
   version,
+  view,
+  hasOpenDraft,
+  session,
   lane,
   onDecided,
+  onDispositionRecorded,
   onUnauthenticated,
-}: ReviewerWorkspaceProps & { lane: Lane }): JSX.Element {
+}: ReviewerWorkspaceProps & { lane: Lane | null }): JSX.Element | null {
   const { t } = useLocale();
-  const qcKey = `${caseId}/${version.versionId}/${lane}`;
-  const [qcStored, setQcStored] = useState<{ key: string; result: QcResult } | null>(null);
+  const isPropose = lane === null;
+  const loadKey = `${caseId}/${version.versionId}/${lane ?? 'propose'}`;
+  const [stored, setStored] = useState<{ key: string; result: LoadResult } | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
-  const [busy, setBusy] = useState<'idle' | 'approving' | 'sending'>('idle');
-  const [decisionError, setDecisionError] = useState<unknown>(null);
-  const [sendBackOpen, setSendBackOpen] = useState(false);
+  const [overlay, setOverlay] = useState<ReadonlyMap<string, DispositionKind>>(new Map());
   const expectedVersion = expectedVersionOf(version);
-  const qc: QcState =
-    qcStored !== null && qcStored.key === `${qcKey}#${reloadToken}` ? qcStored.result : { kind: 'loading' };
+  const decideLane =
+    lane === null
+      ? null
+      : decidableLane({
+          roles: session.principal.roles,
+          subjectId: session.principal.subjectId,
+          view,
+          version,
+          hasOpenDraft,
+        });
+  const state: LoadState =
+    stored !== null && stored.key === `${loadKey}#${reloadToken}` ? stored.result : { kind: 'loading' };
 
   useEffect(() => {
     let cancelled = false;
-    const key = `${qcKey}#${reloadToken}`;
-    void api
-      .runLaneQc(caseId, version.versionId, lane, {
-        expectedVersion: { versionId: version.versionId, revision: 1 },
-      })
-      .then((run) => {
-        if (!cancelled) setQcStored({ key, result: { kind: 'ready', run } });
+    const key = `${loadKey}#${reloadToken}`;
+    const load = async (): Promise<LoadResult> => {
+      if (lane !== null) {
+        const run = await api.runLaneQc(caseId, version.versionId, lane, {
+          expectedVersion: { versionId: version.versionId, revision: 1 },
+        });
+        const listed = await api.listVersionFindings(caseId, version.versionId);
+        const latestKinds = new Map<string, DispositionKind | null>();
+        for (const f of listed.findings) latestKinds.set(f.findingId, f.latestDisposition);
+        return {
+          kind: 'ready',
+          run,
+          findings: run.status === 'completed' ? run.findings : [],
+          latestKinds,
+        };
+      }
+      const listed = await api.listVersionFindings(caseId, version.versionId);
+      const latestKinds = new Map<string, DispositionKind | null>();
+      for (const f of listed.findings) latestKinds.set(f.findingId, f.latestDisposition);
+      return {
+        kind: 'ready',
+        run: null,
+        findings: listed.findings.map(({ latestDisposition: _ld, ...summary }) => summary),
+        latestKinds,
+      };
+    };
+    void load()
+      .then((result) => {
+        if (!cancelled) setStored({ key, result });
       })
       .catch((err: unknown) => {
         if (cancelled || onUnauthenticated(err)) return;
-        setQcStored({ key, result: { kind: 'error', error: err } });
+        setStored({ key, result: { kind: 'error', error: err } });
       });
     return () => {
       cancelled = true;
     };
-  }, [caseId, version.versionId, lane, qcKey, reloadToken, onUnauthenticated]);
+  }, [caseId, version.versionId, lane, loadKey, reloadToken, onUnauthenticated]);
 
-  const approve = useCallback((): void => {
-    const runId =
-      qcStored !== null && qcStored.key === `${qcKey}#${reloadToken}` && qcStored.result.kind === 'ready'
-        ? qcStored.result.run.runId
-        : null;
-    if (runId === null) return;
-    setBusy('approving');
-    setDecisionError(null);
-    void api
-      .approveLane(caseId, version.versionId, lane, { expectedVersion, qcRunId: runId }, crypto.randomUUID())
-      .then((response) => {
-        onDecided(response);
-      })
-      .catch((err: unknown) => {
-        if (!onUnauthenticated(err)) setDecisionError(err);
-      })
-      .finally(() => {
-        setBusy('idle');
+  const onDisposition = useCallback(
+    (response: DispositionResponse): void => {
+      setOverlay((prev) => {
+        const next = new Map(prev);
+        next.set(response.findingId, response.kind);
+        return next;
       });
-  }, [
-    qcStored,
-    qcKey,
-    reloadToken,
-    caseId,
-    version.versionId,
-    lane,
-    expectedVersion,
-    onDecided,
-    onUnauthenticated,
-  ]);
-
-  const sendBack = useCallback(
-    (feedback: SendBackFeedback): void => {
-      setBusy('sending');
-      setDecisionError(null);
+      onDispositionRecorded(response);
       void api
-        .sendBackLane(caseId, version.versionId, lane, { expectedVersion, feedback }, crypto.randomUUID())
-        .then((response) => {
-          setSendBackOpen(false);
-          onDecided(response);
+        .listVersionFindings(caseId, version.versionId)
+        .then((listed) => {
+          const latestKinds = new Map<string, DispositionKind | null>();
+          for (const f of listed.findings) latestKinds.set(f.findingId, f.latestDisposition);
+          setStored((prev) => {
+            if (prev === null || prev.result.kind !== 'ready') return prev;
+            return {
+              key: prev.key,
+              result: {
+                ...prev.result,
+                latestKinds,
+                ...(lane === null
+                  ? {
+                      findings: listed.findings.map(({ latestDisposition: _ld, ...summary }) => summary),
+                    }
+                  : {}),
+              },
+            };
+          });
         })
         .catch((err: unknown) => {
-          if (!onUnauthenticated(err)) setDecisionError(err);
-        })
-        .finally(() => {
-          setBusy('idle');
+          void onUnauthenticated(err);
         });
     },
-    [caseId, version.versionId, lane, expectedVersion, onDecided, onUnauthenticated],
+    [onDispositionRecorded, caseId, version.versionId, lane, onUnauthenticated],
   );
+
+  const mergedKinds = (
+    base: ReadonlyMap<string, DispositionKind | null>,
+  ): Map<string, DispositionKind | null> => {
+    const out = new Map(base);
+    for (const [id, kind] of overlay) out.set(id, kind);
+    return out;
+  };
+
+  // Owner/SPOC: render nothing while GET is in flight or when there are no findings (no second role=status).
+  if (isPropose) {
+    if (state.kind === 'loading') return null;
+    if (state.kind === 'ready' && state.findings.length === 0) return null;
+    if (state.kind === 'error') {
+      return (
+        <ErrorNotice error={state.error}>
+          <button
+            type={'button'}
+            className={'btn btn-secondary'}
+            onClick={() => {
+              setReloadToken((n) => n + 1);
+            }}
+          >
+            {t('action.reload')}
+          </button>
+        </ErrorNotice>
+      );
+    }
+  }
 
   return (
     <section className={'card reviewer-workspace'} aria-labelledby={'reviewer-findings-heading'}>
       <div className={'panel-head'}>
         <div>
-          <h2 id={'reviewer-findings-heading'}>{t('review.findings.heading', { lane: t(laneKey(lane)) })}</h2>
-          <p className={'muted'}>{t('review.findings.intro')}</p>
+          {lane === null ? (
+            <>
+              <h2 id={'reviewer-findings-heading'}>{t('review.disposition.owner_heading')}</h2>
+              <p className={'muted'}>{t('review.disposition.owner_intro')}</p>
+            </>
+          ) : (
+            <>
+              <h2 id={'reviewer-findings-heading'}>
+                {t('review.findings.heading', { lane: t(laneKey(lane)) })}
+              </h2>
+              <p className={'muted'}>{t('review.findings.intro')}</p>
+            </>
+          )}
         </div>
       </div>
 
-      {qc.kind === 'loading' ? (
+      {!isPropose && state.kind === 'loading' ? (
         <p className={'muted'} role={'status'} data-review-qc={'loading'}>
           {t('review.findings.loading')}
         </p>
       ) : null}
 
-      {qc.kind === 'error' ? (
-        <ErrorNotice error={qc.error}>
+      {!isPropose && state.kind === 'error' ? (
+        <ErrorNotice error={state.error}>
           <button
             type={'button'}
             className={'btn btn-secondary'}
@@ -179,114 +241,35 @@ function ReviewerWorkspaceBody({
         </ErrorNotice>
       ) : null}
 
-      {qc.kind === 'ready' ? (
+      {state.kind === 'ready' ? (
         <>
-          <FindingsBlock run={qc.run} />
-          <div className={'reviewer-actions'} data-review-controls={'ready'}>
-            {decisionError !== null ? (
-              <ErrorNotice error={decisionError}>
-                <button
-                  type={'button'}
-                  className={'btn btn-ghost'}
-                  onClick={() => {
-                    setDecisionError(null);
-                  }}
-                >
-                  {t('action.dismiss')}
-                </button>
-              </ErrorNotice>
-            ) : null}
-            <button
-              type={'button'}
-              className={'btn btn-secondary'}
-              disabled={busy !== 'idle' || qc.run.runId === null}
-              onClick={() => {
-                setSendBackOpen(true);
-              }}
-            >
-              {t('review.action.send_back')}
-            </button>
-            <button
-              type={'button'}
-              className={'btn btn-primary'}
-              disabled={busy !== 'idle' || qc.run.runId === null}
-              onClick={approve}
-            >
-              {busy === 'approving' ? t('review.action.approving') : t('review.action.approve')}
-            </button>
-          </div>
-          <SendBackDialog
-            open={sendBackOpen}
-            busy={busy === 'sending'}
-            onClose={() => {
-              setSendBackOpen(false);
-            }}
-            onSubmit={sendBack}
-          />
+          {state.run !== null && state.run.status === 'unavailable' ? (
+            <QcUnavailableBlock run={state.run} />
+          ) : (
+            <FindingsList
+              findings={state.findings}
+              latestKinds={mergedKinds(state.latestKinds)}
+              caseId={caseId}
+              expectedVersion={expectedVersion}
+              session={session}
+              view={view}
+              onDisposition={onDisposition}
+              onUnauthenticated={onUnauthenticated}
+            />
+          )}
+          {decideLane !== null && state.run !== null ? (
+            <LaneDecisionActions
+              caseId={caseId}
+              versionId={version.versionId}
+              lane={decideLane}
+              expectedVersion={expectedVersion}
+              qcRunId={state.run.runId}
+              onDecided={onDecided}
+              onUnauthenticated={onUnauthenticated}
+            />
+          ) : null}
         </>
       ) : null}
     </section>
-  );
-}
-
-function FindingsBlock({ run }: { run: LaneQcRunResponse }): JSX.Element {
-  const { t } = useLocale();
-  if (run.status === 'unavailable') {
-    return (
-      <div className={'review-qc-unavailable'} data-review-qc={'unavailable'} role={'status'}>
-        <Badge status={'unavailable'} tone={'warn'} label={t('review.qc.unavailable_badge')} />
-        <p>
-          {t('review.qc.unavailable_body', {
-            reason: t(qcUnavailableReasonKey(run.reason)),
-          })}
-        </p>
-        {run.runId !== null ? (
-          <p className={'muted small'}>{t('review.qc.run_id', { runId: run.runId })}</p>
-        ) : null}
-      </div>
-    );
-  }
-  if (run.findings.length === 0) {
-    return (
-      <p className={'muted'} role={'status'} data-review-qc={'empty'}>
-        {t('review.findings.empty')}
-      </p>
-    );
-  }
-  return (
-    <ul className={'findings-list'} data-review-qc={'findings'} aria-label={t('review.findings.list_label')}>
-      {run.findings.map((finding) => (
-        <FindingRow key={finding.findingId} finding={finding} />
-      ))}
-    </ul>
-  );
-}
-
-function FindingRow({ finding }: { finding: StoredFindingSummary }): JSX.Element {
-  const { t } = useLocale();
-  const message = isLocaleKey(finding.messageKey)
-    ? t(finding.messageKey, findingMessageParams(finding))
-    : finding.messageKey;
-  return (
-    <li className={'finding-row'}>
-      <Badge
-        status={finding.severity}
-        tone={SEVERITY_TONE[finding.severity]}
-        label={t(severityKey(finding.severity))}
-      />
-      <div className={'finding-body'}>
-        <p className={'finding-message'}>{message}</p>
-        <p className={'muted small finding-meta'}>
-          {finding.slot === null
-            ? t('review.findings.slot_none')
-            : t('review.findings.slot', {
-                number: finding.slot,
-                name: t(slotNameKey(finding.slot)),
-              })}
-          {' · '}
-          {t(laneKey(finding.owningLane))}
-        </p>
-      </div>
-    </li>
   );
 }
