@@ -354,6 +354,18 @@ async function loadOpenSubmittedTarget(
   if (version.submittedAt === null) {
     throw new NotFoundError('version');
   }
+  // Send-back sets draft_version_id and leaves current_version_id on N (W0-06 §5.2 approve row).
+  if (caseRow.draftVersionId !== null) {
+    throw new StaleVersionError(
+      staleDetails(
+        'version_closed',
+        'error.stale_version.guidance.version_closed',
+        version,
+        caseRow.rowVersion,
+        refreshPathFor(input.caseId, version),
+      ),
+    );
+  }
   return { caseRow, version };
 }
 
