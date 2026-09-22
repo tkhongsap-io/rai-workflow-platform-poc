@@ -1,5 +1,9 @@
 # Development log
 
+## W3 synthetic engineering exit — 2026-09-23
+
+All implementation tickets through W3-INT are merged. The [exit review](changes/2026-09-23-w3-exit/review.md) maps source-attributed tests, the supplementary keyboard recording and the independently audited performance baseline:3,760 samples across selected HTTP/page profiles, with advisory targets met. The reviewed performance harness is included in normal unit/type checks; final delivery remains governed by independent review and exact-head CI. Earlier failed/repaired attempts and the PR120 merge-process exception remain disclosed. Ta’s package review, workload confirmation, manual Google sign-in and issue #35/#53 remain separate; W4–W8 are not authorized.
+
 ## W3-INT: integrated synthetic review journey — 2026-09-23
 
 The real-server assembly connects queue discovery, committed notifications/retries, submit-trigger QC and Admin diagnostics. API-substitute selection is removed from application configuration; historical UI rehearsals remain isolated in their test-owned harness. One keyboard-driven synthetic case covers upload, submit, process restart, queue and protected mail links, send-back, successor submission, disposition and three-lane completion. Real worker failures and a submit timeout are checked through the Admin page at three widths.

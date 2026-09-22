@@ -1,0 +1,24 @@
+{
+  "time": "2026-09-22T19:35:12.883637+00:00",
+  "load": [
+    4.76708984375,
+    4.552734375,
+    4.48095703125
+  ],
+  "processes": [
+    {
+      "pid": 7098,
+      "cpu": 0.0,
+      "elapsed": "09:42:28",
+      "executable": "node",
+      "testRunner": false
+    }
+  ],
+  "parentIdleAttestation": true,
+  "bootstrapParentReported": "3e9228 293 integration passed 0 skipped, two independent checkpoints CLEAN",
+  "portsFree": [
+    54370,
+    60870,
+    60871
+  ]
+}

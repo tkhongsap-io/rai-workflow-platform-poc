@@ -1,0 +1,67 @@
+{
+  "runId": "w306_20260923_a01",
+  "candidateIntHead": "REPLACE_PARENT_FINAL_INT_CHECKPOINT",
+  "serverRoot": "/private/tmp/rai-w3-performance/rai-web",
+  "artifactDir": "/private/tmp/rai-w3-performance/rai-web/.local/performance/w306_20260923_a01",
+  "queue": {
+    "baseUrl": "http://127.0.0.1:60870",
+    "target": {
+      "host": "127.0.0.1",
+      "port": 54370,
+      "database": "rai_perf_queue_w306_20260923_a01"
+    },
+    "urls": {
+      "app": "postgresql://rai_app:REPLACE_LOCAL_ROLE_PASSWORD@127.0.0.1:54370/rai_perf_queue_w306_20260923_a01",
+      "owner": "postgresql://rai_owner:REPLACE_LOCAL_ROLE_PASSWORD@127.0.0.1:54370/rai_perf_queue_w306_20260923_a01",
+      "operator": "postgresql://rai_operator:REPLACE_LOCAL_ROLE_PASSWORD@127.0.0.1:54370/rai_perf_queue_w306_20260923_a01"
+    },
+    "finalHead": "REPLACE_EXACT_CLEAN_BUILT_HEAD",
+    "authorization": "parent-authorized-final-head"
+  },
+  "mutation": {
+    "baseUrl": "http://127.0.0.1:60871",
+    "target": {
+      "host": "127.0.0.1",
+      "port": 54370,
+      "database": "rai_perf_mutation_w306_20260923_a01"
+    },
+    "urls": {
+      "app": "postgresql://rai_app:REPLACE_LOCAL_ROLE_PASSWORD@127.0.0.1:54370/rai_perf_mutation_w306_20260923_a01",
+      "owner": "postgresql://rai_owner:REPLACE_LOCAL_ROLE_PASSWORD@127.0.0.1:54370/rai_perf_mutation_w306_20260923_a01",
+      "operator": "postgresql://rai_operator:REPLACE_LOCAL_ROLE_PASSWORD@127.0.0.1:54370/rai_perf_mutation_w306_20260923_a01"
+    },
+    "finalHead": "REPLACE_EXACT_CLEAN_BUILT_HEAD",
+    "authorization": "parent-authorized-final-head"
+  },
+  "fixtureSha256": "REPLACE_CANONICAL_FIXTURE_HASH",
+  "resourceRoots": {
+    "queue": "/private/tmp/rai-perf-queue-w306_20260923_a01",
+    "mutation": "/private/tmp/rai-perf-mutation-w306_20260923_a01"
+  },
+  "go": {
+    "setup": "HELD",
+    "measure": "HELD"
+  },
+  "review": {
+    "driverSha256": "REPLACE_REVIEWED_DRIVER_HASH",
+    "clean": false
+  },
+  "attestations": {
+    "localIntegrationClean": false,
+    "localRealBrowserClean": false,
+    "localTestsIdle": false,
+    "freshDatabasesProvisioned": false,
+    "matchingFixturesLoaded": false,
+    "finalSelectorsReviewed": false
+  },
+  "productionFingerprint": {
+    "path": "/private/tmp/rai-w3-performance/rai-web/.local/performance/w306_20260923_a01/production-fingerprint.json",
+    "sha256": "REPLACE_APPROVED_FINGERPRINT_FILE_SHA256"
+  },
+  "selectors": {
+    "path": "/private/tmp/rai-w3-performance/rai-web/.local/performance/w306_20260923_a01/selectors.json",
+    "sha256": "REPLACE_FINAL_REVIEWED_SELECTOR_FILE_SHA256"
+  },
+  "responseFinishVerified": false,
+  "machine": "REPLACE_RECORDED_MACHINE_NODE_POSTGRES_DOCKER_BROWSER_AND_POOL_CONFIGURATION"
+}

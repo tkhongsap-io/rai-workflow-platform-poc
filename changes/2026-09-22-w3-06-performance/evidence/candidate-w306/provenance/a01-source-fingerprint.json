@@ -1,0 +1,1765 @@
+{
+  "candidateIntHead": "27ad01b1ba8179f286660959043c0e178fd51b35",
+  "builtHead": "0c99d61a61585dca51b333e95886476830419053",
+  "productionConfigCompared": true,
+  "buildExecution": {
+    "status": "passed",
+    "unitPassed": 560,
+    "unitSkipped": 0,
+    "typecheck": "passed",
+    "build": "passed",
+    "assetInventorySha256": "cfca9072dc8dc909ee25447b7f9bd141deec5befc6698a0536643eafa1ee8b2a",
+    "mergedMainReconciliation": "pending"
+  },
+  "inventory": [
+    {
+      "path": "docker-compose.yml",
+      "gitMode": "100644",
+      "gitObject": "72f9fc9994996787a4362040a2214d6a211654f2"
+    },
+    {
+      "path": "docker/postgres/init/001-roles.sql",
+      "gitMode": "100644",
+      "gitObject": "9f89c9621023e5558f849bf6c034e3f44687d1a0"
+    },
+    {
+      "path": "rai-web/.env.example",
+      "gitMode": "100644",
+      "gitObject": "9e260f1cd6df446910cd384e75182c78bcd1be46"
+    },
+    {
+      "path": "rai-web/.nvmrc",
+      "gitMode": "100644",
+      "gitObject": "df6ae3370f9f89272d88629c442cf554d6c1f9fb"
+    },
+    {
+      "path": "rai-web/fixtures/package.json",
+      "gitMode": "100644",
+      "gitObject": "534899764ac31ad7477bb5babcb005c7e6ecbaab"
+    },
+    {
+      "path": "rai-web/fixtures/src/data/README.md",
+      "gitMode": "100644",
+      "gitObject": "ad899ccafe4c0d0609507e572a6748eeda831030"
+    },
+    {
+      "path": "rai-web/fixtures/src/data/cases.test.ts",
+      "gitMode": "100644",
+      "gitObject": "a772b6da4c63818c8ee34ee1c6405d20fa8ff7e2"
+    },
+    {
+      "path": "rai-web/fixtures/src/data/cases/index.ts",
+      "gitMode": "100644",
+      "gitObject": "5ccf19de22d3ad66402433a9211aad672ef81ccb"
+    },
+    {
+      "path": "rai-web/fixtures/src/data/documents/index.ts",
+      "gitMode": "100644",
+      "gitObject": "690a23104aa4d7234f735c730b2f87362b1d1f46"
+    },
+    {
+      "path": "rai-web/fixtures/src/data/ids.ts",
+      "gitMode": "100644",
+      "gitObject": "99b1ca4f58752f062a36af7127e929c3c84ca5a5"
+    },
+    {
+      "path": "rai-web/fixtures/src/data/manifest.json",
+      "gitMode": "100644",
+      "gitObject": "dcd94074ee4caff0141c2476d065de9aea29ffcd"
+    },
+    {
+      "path": "rai-web/fixtures/src/data/provenance.test.ts",
+      "gitMode": "100644",
+      "gitObject": "328913dc4bc6539cee268a8a84fee77e92327f0b"
+    },
+    {
+      "path": "rai-web/fixtures/src/data/users.test.ts",
+      "gitMode": "100644",
+      "gitObject": "3672929b49c9d43ec1c88297e4f9783c8d65675e"
+    },
+    {
+      "path": "rai-web/fixtures/src/data/users.ts",
+      "gitMode": "100644",
+      "gitObject": "fe170248ab0a17df609f2d1a8f6f56163de70b7f"
+    },
+    {
+      "path": "rai-web/fixtures/src/generate.test.ts",
+      "gitMode": "100644",
+      "gitObject": "c5c5ba576cc707d5140c401594d6c312d21d5639"
+    },
+    {
+      "path": "rai-web/fixtures/src/generate.ts",
+      "gitMode": "100644",
+      "gitObject": "114870381cb39698f2dfdfe373f09da1c80a0ffb"
+    },
+    {
+      "path": "rai-web/fixtures/src/generate/blob-layout.ts",
+      "gitMode": "100644",
+      "gitObject": "32edfb79ab88b69815d653c3fc157713f640db64"
+    },
+    {
+      "path": "rai-web/fixtures/src/generate/jpeg.ts",
+      "gitMode": "100644",
+      "gitObject": "0d720f8c802e7ee7f3078dc21d2cef94e00c6c18"
+    },
+    {
+      "path": "rai-web/fixtures/src/generate/ooxml.ts",
+      "gitMode": "100644",
+      "gitObject": "5f048931a1444fd740a7a709d2d2c8406b2f568c"
+    },
+    {
+      "path": "rai-web/fixtures/src/generate/pdf.ts",
+      "gitMode": "100644",
+      "gitObject": "3fd5ef3e9d6fba718f7060a52cc89945b71b0e4f"
+    },
+    {
+      "path": "rai-web/fixtures/src/generate/png.ts",
+      "gitMode": "100644",
+      "gitObject": "5198cc1c1c87a928b53f19d413388a393b8b135c"
+    },
+    {
+      "path": "rai-web/fixtures/src/index.ts",
+      "gitMode": "100644",
+      "gitObject": "db2a75070f28b947a351569ead2d23c73dee621d"
+    },
+    {
+      "path": "rai-web/fixtures/src/load.ts",
+      "gitMode": "100644",
+      "gitObject": "48544f33e5d5114d983bc5e94da54a3a5835ed3e"
+    },
+    {
+      "path": "rai-web/fixtures/src/manifest.ts",
+      "gitMode": "100644",
+      "gitObject": "7370bd6f7638aebec55be77d6c9684b8fa3ad473"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitute-marker.ts",
+      "gitMode": "100644",
+      "gitObject": "04dd86224cad3c70777df214e18e03b66c023b64"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/api/README.md",
+      "gitMode": "100644",
+      "gitObject": "b46404402e4c15be67fda1395a15a01722e3cdcd"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/api/absence.test.ts",
+      "gitMode": "100644",
+      "gitObject": "237005adbf6a8747bacb600c5b5b8394fdd8e29a"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/api/artifacts.test.ts",
+      "gitMode": "100644",
+      "gitObject": "b16e083aea2b699a5ef043993ee4abfd1533b903"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/api/auth.test.ts",
+      "gitMode": "100644",
+      "gitObject": "2c8caf4581e09484d4f3d8b03647a790d7c7752f"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/api/cases.test.ts",
+      "gitMode": "100644",
+      "gitObject": "accf3e13122d473ca2f3bf2c2d653b756f8d682e"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/api/contract-cast.ts",
+      "gitMode": "100644",
+      "gitObject": "b6400bab72309d8c6cdbb7d7b587a8dd5a7b72bd"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/api/fetch.ts",
+      "gitMode": "100644",
+      "gitObject": "946696c2e63272218748dbef098fcf00ac9353a1"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/api/handler.ts",
+      "gitMode": "100644",
+      "gitObject": "52806eba1580198e33dcabd04331c1e0ecf68e2c"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/api/index.ts",
+      "gitMode": "100644",
+      "gitObject": "e2f61130e492229d9acc610d620548131009365e"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/api/multipart.ts",
+      "gitMode": "100644",
+      "gitObject": "bbebe58ba0125a9d915aa943462e173989b08856"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/api/pack.test.ts",
+      "gitMode": "100644",
+      "gitObject": "a746433fdba1e2a94016357df30c0b351bf65f3c"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/api/queue.test.ts",
+      "gitMode": "100644",
+      "gitObject": "081e280bd9dd0d91caeca591b3fc54bb6d0da9d9"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/api/review.test.ts",
+      "gitMode": "100644",
+      "gitObject": "e6aff32b329cac628433f39f3320e2051e2157f8"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/api/routes-artifacts.ts",
+      "gitMode": "100644",
+      "gitObject": "2d09c222549a5dfee57b020081701494a6157064"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/api/routes-auth.ts",
+      "gitMode": "100644",
+      "gitObject": "e4232466e0288402a44740c57c8cf7366f8f5d37"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/api/routes-cases.ts",
+      "gitMode": "100644",
+      "gitObject": "afda81dda3978db21433db9b6c0d7d8ac055db3f"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/api/routes-pack.ts",
+      "gitMode": "100644",
+      "gitObject": "bb5b5881e9abf974e6356a9da14390110d7366ce"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/api/routes-queue.ts",
+      "gitMode": "100644",
+      "gitObject": "97b7d8869b5647f1535f5165e7d0699dcb2038e6"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/api/routes-review.ts",
+      "gitMode": "100644",
+      "gitObject": "1dedd63e321cfb941d8b2cd05b826a3c924036a9"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/api/routes-versions.ts",
+      "gitMode": "100644",
+      "gitObject": "e446ad2b8db400692c403b151ea464fd05b93c98"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/api/serve.ts",
+      "gitMode": "100644",
+      "gitObject": "c65ea81c96d01ae0277e02c19ad6627a7647054b"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/api/server.test.ts",
+      "gitMode": "100644",
+      "gitObject": "36856cf0cf3b832248eb3b5068f025d52ce10d7d"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/api/server.ts",
+      "gitMode": "100644",
+      "gitObject": "fbbfccde5d11a59478a11a6eb5857e6d6c75729d"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/api/sniff.ts",
+      "gitMode": "100644",
+      "gitObject": "aa20a1a263787394cf53921ba418383f72ba0fae"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/api/store.ts",
+      "gitMode": "100644",
+      "gitObject": "0c086ae6a91d74a2aa0786f933c32ce80159fa77"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/api/support.ts",
+      "gitMode": "100644",
+      "gitObject": "75b574c0276465d7042d764ca3a656bed0a8c6ef"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/api/testing.ts",
+      "gitMode": "100644",
+      "gitObject": "d758af123aa77528e0a662e66feacff57bf3fe72"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/api/types.ts",
+      "gitMode": "100644",
+      "gitObject": "cf6b74b41f9b99ca5499cb02bd8e8200f382add1"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/api/versions.test.ts",
+      "gitMode": "100644",
+      "gitObject": "92d775776e4b60786c479ee6fa7f4acc165879a0"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/api/workflow.ts",
+      "gitMode": "100644",
+      "gitObject": "e6ca566070d59052c3893de1b2270ce3f81b038b"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/mail-sink/base.ts",
+      "gitMode": "100644",
+      "gitObject": "32298ca9145a8551177742528a69ba0de09fcc75"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/mail-sink/concurrent.test.ts",
+      "gitMode": "100644",
+      "gitObject": "17f013a6568f87b4e236d309ec168b2f4bfc32a0"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/mail-sink/control.ts",
+      "gitMode": "100644",
+      "gitObject": "1a8fad5147302dec8696a8a8dcc37c628db901a9"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/mail-sink/dedup-key.test.ts",
+      "gitMode": "100644",
+      "gitObject": "b3afc43dd22e72f16aa3cb4eee0e69c25df40596"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/mail-sink/file-sink.test.ts",
+      "gitMode": "100644",
+      "gitObject": "866848ea27113ba957b3a59916676117965d3fda"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/mail-sink/file.ts",
+      "gitMode": "100644",
+      "gitObject": "a1eb03a38f950b3a8a4205f372a0c57924623f00"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/mail-sink/index.ts",
+      "gitMode": "100644",
+      "gitObject": "72e97d5baf8c59ede0655b2946f5f0a3d05025de"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/mail-sink/mail-sink.test.ts",
+      "gitMode": "100644",
+      "gitObject": "148909d15691dd9ca26fa3f3a18fc09a9edd7ff9"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/mail-sink/memory.ts",
+      "gitMode": "100644",
+      "gitObject": "71a808695b6ab8ae9cf912a8507364ca3db782cc"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/mail-sink/no-external-mail.test.ts",
+      "gitMode": "100644",
+      "gitObject": "50f1b4ea1bee7e25cf6f8906e323b410ac63b402"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/mail-sink/provenance.test.ts",
+      "gitMode": "100644",
+      "gitObject": "341e91756c399ae9c57232b828ff205ce895ee41"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/mail-sink/support.ts",
+      "gitMode": "100644",
+      "gitObject": "8aeeda2b92ec1735c86d019d6887ab05ea931dfd"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/mail-sink/validate.ts",
+      "gitMode": "100644",
+      "gitObject": "9fe561f165ad9f0b0b164139dfc3ce5a2a544215"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/qc/config.test.ts",
+      "gitMode": "100644",
+      "gitObject": "e91af33007f91fc28ef888b58c4011f17caab4f9"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/qc/index.ts",
+      "gitMode": "100644",
+      "gitObject": "1d309d2b317ffae55fcb804616d0c342ae03a779"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/qc/no-write-path.test.ts",
+      "gitMode": "100644",
+      "gitObject": "13a8eab5d13773dcc775314140ed2048c0d335f3"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/qc/scripted-runner.test.ts",
+      "gitMode": "100644",
+      "gitObject": "34f79d235228865a61f52c9c8408c9e77f9dee48"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/qc/scripted-runner.ts",
+      "gitMode": "100644",
+      "gitObject": "e2a1167e26895e72d7d36e024e738be60d55a2bc"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/qc/scripts.test.ts",
+      "gitMode": "100644",
+      "gitObject": "c1cc2aaffc07e2e23d4ef2231f89df79b5d29321"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/qc/scripts.ts",
+      "gitMode": "100644",
+      "gitObject": "59f100b8fd32e210ec6a9fbc38d24ab36d515df5"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/qc/scripts/fx-case-missing-slot.json",
+      "gitMode": "100644",
+      "gitObject": "b9ac20fc40fe68c049d89c08a873cda4bd770d5d"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/qc/scripts/fx-case-na-reasons.json",
+      "gitMode": "100644",
+      "gitObject": "b8019bec723cb0bc18a4aa477a6b177c2cbcc2da"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/qc/scripts/fx-case-nonvendor.json",
+      "gitMode": "100644",
+      "gitObject": "84344c43a28ff4f9ccc999e72202a16a921a6c29"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/qc/scripts/fx-case-vendor.json",
+      "gitMode": "100644",
+      "gitObject": "39c47cc8c765dbb5046a9c63d2f663bed893902b"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/qc/test-support.ts",
+      "gitMode": "100644",
+      "gitObject": "9830c02878d921e680f9e0b1e3d6c3755ca34881"
+    },
+    {
+      "path": "rai-web/fixtures/src/substitutes/qc/version.ts",
+      "gitMode": "100644",
+      "gitObject": "2c01f2f5824eecb895dd2e7c44b2366826c8abb8"
+    },
+    {
+      "path": "rai-web/fixtures/tsconfig.json",
+      "gitMode": "100644",
+      "gitObject": "533f035fdc198394ffd41ebc8bce45be601c9f27"
+    },
+    {
+      "path": "rai-web/package-lock.json",
+      "gitMode": "100644",
+      "gitObject": "dce328ea27664d8492091aba33305f9337897c56"
+    },
+    {
+      "path": "rai-web/scripts/check-css.mjs",
+      "gitMode": "100644",
+      "gitObject": "9c1c509bd2e28374bfa03756d2ed5dd8f86bf682"
+    },
+    {
+      "path": "rai-web/scripts/check-substitute-absent.mjs",
+      "gitMode": "100644",
+      "gitObject": "f56d532fdb69165fa49ad6d1550728a8a74f855a"
+    },
+    {
+      "path": "rai-web/scripts/dev.mjs",
+      "gitMode": "100644",
+      "gitObject": "5d50f608b62818775d797a5fd9ef6446f5d5ef25"
+    },
+    {
+      "path": "rai-web/scripts/remove-local.mjs",
+      "gitMode": "100644",
+      "gitObject": "19b4daa8c9a0920977f442dc53fe2bd79a5076b6"
+    },
+    {
+      "path": "rai-web/server/drizzle.config.ts",
+      "gitMode": "100644",
+      "gitObject": "23c5dd6a49d0fc0a3d48c619115a4a11300d3b30"
+    },
+    {
+      "path": "rai-web/server/drizzle/0000_w1_00_substrate.sql",
+      "gitMode": "100644",
+      "gitObject": "0864e1fa73725bf623b415b5208faf0e794c39af"
+    },
+    {
+      "path": "rai-web/server/drizzle/0001_w1_01_session.sql",
+      "gitMode": "100644",
+      "gitObject": "08d0282889e315aa855d858500ead7f3053c2ecd"
+    },
+    {
+      "path": "rai-web/server/drizzle/0002_w1_09_fixture_set.sql",
+      "gitMode": "100644",
+      "gitObject": "1208e0d96f4b8432d4526e40fd72646588454964"
+    },
+    {
+      "path": "rai-web/server/drizzle/0003_w1_02_registry_counter.sql",
+      "gitMode": "100644",
+      "gitObject": "431c4defcdf06a7a1145ec0180e02ee74649f4d7"
+    },
+    {
+      "path": "rai-web/server/drizzle/0004_w2_01_notification.sql",
+      "gitMode": "100644",
+      "gitObject": "e9494508f23034cc4f2f7d4d5a3488588fd497a1"
+    },
+    {
+      "path": "rai-web/server/drizzle/0005_w2_02_lane_decision.sql",
+      "gitMode": "100644",
+      "gitObject": "cf11f7204369f885b3eba9cec00db6563f23bdf7"
+    },
+    {
+      "path": "rai-web/server/drizzle/0006_w2_05_findings_dispositions.sql",
+      "gitMode": "100644",
+      "gitObject": "995f55e2f1a66d399a6026db0790625cec4972a2"
+    },
+    {
+      "path": "rai-web/server/drizzle/0007_w3_07a_observability.sql",
+      "gitMode": "100644",
+      "gitObject": "7117f24d8a700f8a2746cd720133d21e5c689c46"
+    },
+    {
+      "path": "rai-web/server/drizzle/meta/0000_snapshot.json",
+      "gitMode": "100644",
+      "gitObject": "2d11e0000b968fee9adc1344ebdfe40ff668f576"
+    },
+    {
+      "path": "rai-web/server/drizzle/meta/0001_snapshot.json",
+      "gitMode": "100644",
+      "gitObject": "a622171742f89a45ff4c445ff3946f6e62eb1ed8"
+    },
+    {
+      "path": "rai-web/server/drizzle/meta/0002_snapshot.json",
+      "gitMode": "100644",
+      "gitObject": "855e9fd93c73e3bca56e943c0f7629e37888bbe8"
+    },
+    {
+      "path": "rai-web/server/drizzle/meta/0003_snapshot.json",
+      "gitMode": "100644",
+      "gitObject": "9ad2204927d55be3397671c2718e32dccafccd4a"
+    },
+    {
+      "path": "rai-web/server/drizzle/meta/0004_snapshot.json",
+      "gitMode": "100644",
+      "gitObject": "cfffa67ddc7da3265776c6ecbd2e15d98cb7ed4e"
+    },
+    {
+      "path": "rai-web/server/drizzle/meta/0005_snapshot.json",
+      "gitMode": "100644",
+      "gitObject": "bbcf777ce7047c5ae04a929fd523dce7c6c92f3b"
+    },
+    {
+      "path": "rai-web/server/drizzle/meta/0006_snapshot.json",
+      "gitMode": "100644",
+      "gitObject": "faacfd2f1b1cd4d3056c534649980d8c273753e4"
+    },
+    {
+      "path": "rai-web/server/drizzle/meta/0007_snapshot.json",
+      "gitMode": "100644",
+      "gitObject": "74f3d6ceb7e5aaff8fd9f7ae14f1d6d1127535db"
+    },
+    {
+      "path": "rai-web/server/drizzle/meta/_journal.json",
+      "gitMode": "100644",
+      "gitObject": "8ef800a40a42ce290191e3f59f7819756bfd00b1"
+    },
+    {
+      "path": "rai-web/server/package.json",
+      "gitMode": "100644",
+      "gitObject": "1f5c7235545807d090aa6f9dc83e7f172c244463"
+    },
+    {
+      "path": "rai-web/server/src/app.ts",
+      "gitMode": "100644",
+      "gitObject": "39701a365c5dd5897c4ffa6cd87acd23966901cb"
+    },
+    {
+      "path": "rai-web/server/src/artifacts/blob-store.test.ts",
+      "gitMode": "100644",
+      "gitObject": "d344cb02cd3d369c48058df759c219033c54bd23"
+    },
+    {
+      "path": "rai-web/server/src/artifacts/blob-store.ts",
+      "gitMode": "100644",
+      "gitObject": "84d93ea538df609a7f7a9de113069149e834e739"
+    },
+    {
+      "path": "rai-web/server/src/artifacts/filename.ts",
+      "gitMode": "100644",
+      "gitObject": "2326474b4dba131b7ed27d359616d7ee0babc53b"
+    },
+    {
+      "path": "rai-web/server/src/artifacts/pipeline.ts",
+      "gitMode": "100644",
+      "gitObject": "13e6b8b7623199197479ede373b65348a18475f9"
+    },
+    {
+      "path": "rai-web/server/src/artifacts/routes.ts",
+      "gitMode": "100644",
+      "gitObject": "e79ce58668610bcdafa1bcac4f47979218aae849"
+    },
+    {
+      "path": "rai-web/server/src/artifacts/sniff.test-bytes.ts",
+      "gitMode": "100644",
+      "gitObject": "3364601d94007d11cee419e431aec821f9b57c9d"
+    },
+    {
+      "path": "rai-web/server/src/artifacts/sniff.test.ts",
+      "gitMode": "100644",
+      "gitObject": "98d3cfd96396116d9f155b206c458464bc58c15e"
+    },
+    {
+      "path": "rai-web/server/src/artifacts/sniff.ts",
+      "gitMode": "100644",
+      "gitObject": "ddb39741a86ddd80896dbf8073d3767e80204ae4"
+    },
+    {
+      "path": "rai-web/server/src/audit/store.test.ts",
+      "gitMode": "100644",
+      "gitObject": "0d6acd2c95d2e692a3789d78b7e40efadaaa2ee4"
+    },
+    {
+      "path": "rai-web/server/src/audit/store.ts",
+      "gitMode": "100644",
+      "gitObject": "0320d7b84a87d31b4175ab9dcb9e0b0e3d9f8315"
+    },
+    {
+      "path": "rai-web/server/src/authz/facts.ts",
+      "gitMode": "100644",
+      "gitObject": "0e1b0d9b3f8efc59ac1b49a7126663d65f266b1f"
+    },
+    {
+      "path": "rai-web/server/src/authz/middleware.test.ts",
+      "gitMode": "100644",
+      "gitObject": "712236a07dd912b7c735fa650c5868c58ebd32f5"
+    },
+    {
+      "path": "rai-web/server/src/authz/middleware.ts",
+      "gitMode": "100644",
+      "gitObject": "b7b3fc83e87c0ffba743d80967cf03188d1b62d3"
+    },
+    {
+      "path": "rai-web/server/src/authz/policy.test.ts",
+      "gitMode": "100644",
+      "gitObject": "f7cb5d62f2cc01120277070cf0facbf8b15f6c50"
+    },
+    {
+      "path": "rai-web/server/src/authz/policy.ts",
+      "gitMode": "100644",
+      "gitObject": "23c087ab88d45a2bdc51f0c09263abaaca77670b"
+    },
+    {
+      "path": "rai-web/server/src/cases/business-units.test.ts",
+      "gitMode": "100644",
+      "gitObject": "f2b2f79df55d73743ea6844b8156ffc45108a6be"
+    },
+    {
+      "path": "rai-web/server/src/cases/business-units.ts",
+      "gitMode": "100644",
+      "gitObject": "d633212dc1881b2116292c2b617369d824b3b538"
+    },
+    {
+      "path": "rai-web/server/src/cases/idempotency.test.ts",
+      "gitMode": "100644",
+      "gitObject": "a6f01368242f51498e8dffa2110731ce15ccc1e3"
+    },
+    {
+      "path": "rai-web/server/src/cases/idempotency.ts",
+      "gitMode": "100644",
+      "gitObject": "016aee99e349c44305ce1097716b6247a2a21cd8"
+    },
+    {
+      "path": "rai-web/server/src/cases/projected-fields.test.ts",
+      "gitMode": "100644",
+      "gitObject": "64c88e3d865ad12c922be782aae3f8866b54bf42"
+    },
+    {
+      "path": "rai-web/server/src/cases/projected-fields.ts",
+      "gitMode": "100644",
+      "gitObject": "57788ac34306dcf459331e1e9db7e505fd893c41"
+    },
+    {
+      "path": "rai-web/server/src/cases/repository.ts",
+      "gitMode": "100644",
+      "gitObject": "f3948e12d02522d2914177bdf95f186e548a9e82"
+    },
+    {
+      "path": "rai-web/server/src/cases/routes.ts",
+      "gitMode": "100644",
+      "gitObject": "fbf20a1be3f38e0e2aef5cc2af078d41977fc681"
+    },
+    {
+      "path": "rai-web/server/src/cases/scope.test.ts",
+      "gitMode": "100644",
+      "gitObject": "0a792f7df500e042077feca70c8e87bd6ccef64f"
+    },
+    {
+      "path": "rai-web/server/src/cases/scope.ts",
+      "gitMode": "100644",
+      "gitObject": "d20e6b0d5dd9fe39211518e77aa006f1d78e09c7"
+    },
+    {
+      "path": "rai-web/server/src/cases/service.ts",
+      "gitMode": "100644",
+      "gitObject": "a7cbed8dcbbde6cda9a28509bb6f44d1700bc535"
+    },
+    {
+      "path": "rai-web/server/src/cases/source-record-id.test.ts",
+      "gitMode": "100644",
+      "gitObject": "d5552bdb9184ac4010082c728afa26311f13ae7e"
+    },
+    {
+      "path": "rai-web/server/src/cases/source-record-id.ts",
+      "gitMode": "100644",
+      "gitObject": "903bf59663410ecc3a756556c53ba3c9894d0120"
+    },
+    {
+      "path": "rai-web/server/src/cases/status.test.ts",
+      "gitMode": "100644",
+      "gitObject": "7140028f06e0c5cfd4d348a01a9029d426b85b5e"
+    },
+    {
+      "path": "rai-web/server/src/cases/status.ts",
+      "gitMode": "100644",
+      "gitObject": "e8d8b709bab3d5037290d9561d733cfc386a2d78"
+    },
+    {
+      "path": "rai-web/server/src/cases/subject-directory.ts",
+      "gitMode": "100644",
+      "gitObject": "cba2184a7b2a22c6c298c5cd4097daf071912261"
+    },
+    {
+      "path": "rai-web/server/src/config.test.ts",
+      "gitMode": "100644",
+      "gitObject": "8953e2daa305212fe9a36e2ce875a220aca635da"
+    },
+    {
+      "path": "rai-web/server/src/config.ts",
+      "gitMode": "100644",
+      "gitObject": "f889feaab189cacaec04bcb3210922e58877d713"
+    },
+    {
+      "path": "rai-web/server/src/configuration/activation.test.ts",
+      "gitMode": "100644",
+      "gitObject": "4fe99447e65758da3f880ce6323d46cf21d41d57"
+    },
+    {
+      "path": "rai-web/server/src/configuration/activation.ts",
+      "gitMode": "100644",
+      "gitObject": "71799365262ddbd524dfbc0c8590363c1479ba6c"
+    },
+    {
+      "path": "rai-web/server/src/configuration/seed.test.ts",
+      "gitMode": "100644",
+      "gitObject": "f971f2e2d40e71ef3ff9047ad1de3e39a2635c07"
+    },
+    {
+      "path": "rai-web/server/src/configuration/seed.ts",
+      "gitMode": "100644",
+      "gitObject": "d22ffb252e754f88fe059a50c172d068e8dd6197"
+    },
+    {
+      "path": "rai-web/server/src/configuration/store.ts",
+      "gitMode": "100644",
+      "gitObject": "e38c265dad869e97d6405b006515c69f3bd64ce3"
+    },
+    {
+      "path": "rai-web/server/src/db/client.ts",
+      "gitMode": "100644",
+      "gitObject": "c469865fba89cf6d27a48aa8b8079dff009b9d51"
+    },
+    {
+      "path": "rai-web/server/src/db/migrate.ts",
+      "gitMode": "100644",
+      "gitObject": "779dc7695ca7d6569fd643ef32fe6b51e6f0db72"
+    },
+    {
+      "path": "rai-web/server/src/db/schema/artifact-slot.ts",
+      "gitMode": "100644",
+      "gitObject": "6714b839e135208aa4950962dc4f0e0b7e580f3f"
+    },
+    {
+      "path": "rai-web/server/src/db/schema/artifact.ts",
+      "gitMode": "100644",
+      "gitObject": "2f23e0bab140b8d476e4e3cdf3e5cab81cd9a18d"
+    },
+    {
+      "path": "rai-web/server/src/db/schema/audit-event.ts",
+      "gitMode": "100644",
+      "gitObject": "52d440a4a47f49fa0c2fafde21b2cc02e4d2ff42"
+    },
+    {
+      "path": "rai-web/server/src/db/schema/case.ts",
+      "gitMode": "100644",
+      "gitObject": "4719b7ab2b9dcdea5d180d0d870ad5b98d50b49e"
+    },
+    {
+      "path": "rai-web/server/src/db/schema/configuration-revision.ts",
+      "gitMode": "100644",
+      "gitObject": "abb1f3d0ef707b0a48b8a441c5723ef6e9ae51ed"
+    },
+    {
+      "path": "rai-web/server/src/db/schema/disposition-event.ts",
+      "gitMode": "100644",
+      "gitObject": "196688efba30f8af6ab90c5817cd8909ae45c5f2"
+    },
+    {
+      "path": "rai-web/server/src/db/schema/fixture-set.ts",
+      "gitMode": "100644",
+      "gitObject": "21421fb9f7d6b8e248a03fe0ae8b5057d0977bcf"
+    },
+    {
+      "path": "rai-web/server/src/db/schema/idempotency-key.ts",
+      "gitMode": "100644",
+      "gitObject": "19faffc72258eb5e9faf7bd4a910292039d38c20"
+    },
+    {
+      "path": "rai-web/server/src/db/schema/index.ts",
+      "gitMode": "100644",
+      "gitObject": "043b83573a06f3c7a9611b5dab651d3a45738a4c"
+    },
+    {
+      "path": "rai-web/server/src/db/schema/lane-decision.ts",
+      "gitMode": "100644",
+      "gitObject": "c0c6c194a6371e7577609e97f5a184ff36cd251e"
+    },
+    {
+      "path": "rai-web/server/src/db/schema/notification.ts",
+      "gitMode": "100644",
+      "gitObject": "40af5e7f781c397742a74fe01278a5e726a94588"
+    },
+    {
+      "path": "rai-web/server/src/db/schema/operator-job-run.ts",
+      "gitMode": "100644",
+      "gitObject": "523c5a8d0764fe715dd4755e38b3dd58d399e807"
+    },
+    {
+      "path": "rai-web/server/src/db/schema/pack-version.ts",
+      "gitMode": "100644",
+      "gitObject": "765b4e6d8d050dbd1901a942d06becfaab35b193"
+    },
+    {
+      "path": "rai-web/server/src/db/schema/qc-finding.ts",
+      "gitMode": "100644",
+      "gitObject": "5dcc068284e91c65c4d181c82652fc5ddea52e45"
+    },
+    {
+      "path": "rai-web/server/src/db/schema/qc-run.ts",
+      "gitMode": "100644",
+      "gitObject": "00467821aaff7a19b01594f004a6943a3b87dd7d"
+    },
+    {
+      "path": "rai-web/server/src/db/schema/registry-counter.ts",
+      "gitMode": "100644",
+      "gitObject": "bd4f30dc96db5828f97c31e256d743d6f3df8190"
+    },
+    {
+      "path": "rai-web/server/src/db/schema/session.ts",
+      "gitMode": "100644",
+      "gitObject": "efd1865910b99619ef7a3b6c40ce7e04e6a5db4f"
+    },
+    {
+      "path": "rai-web/server/src/db/transaction.ts",
+      "gitMode": "100644",
+      "gitObject": "a8345d2e21dbeecd19128fd9a912cdfe51dfe298"
+    },
+    {
+      "path": "rai-web/server/src/findings/repository.ts",
+      "gitMode": "100644",
+      "gitObject": "992dbb5b4d80d5b89aaf1186579cb7005ce91f7d"
+    },
+    {
+      "path": "rai-web/server/src/findings/routes.ts",
+      "gitMode": "100644",
+      "gitObject": "967c46bb37a0d281f8cb41daf661d857238f7fe2"
+    },
+    {
+      "path": "rai-web/server/src/findings/service.ts",
+      "gitMode": "100644",
+      "gitObject": "4a346e4c9c96acf75175b3972ccd2692e85b165e"
+    },
+    {
+      "path": "rai-web/server/src/identity/adapter.test.ts",
+      "gitMode": "100644",
+      "gitObject": "0fb1ef6c4c796a1e1273f9275c918a7cc1ee6165"
+    },
+    {
+      "path": "rai-web/server/src/identity/adapter.ts",
+      "gitMode": "100644",
+      "gitObject": "2e6458f483a54c3988b52e60af2a56111fd69674"
+    },
+    {
+      "path": "rai-web/server/src/identity/allow-list.ts",
+      "gitMode": "100644",
+      "gitObject": "143f0f0d83b192fa87c640643e58dc801b70c456"
+    },
+    {
+      "path": "rai-web/server/src/identity/config.test.ts",
+      "gitMode": "100644",
+      "gitObject": "e4998829d7532ea4fe8eee63e7edc3ab3a67fbf8"
+    },
+    {
+      "path": "rai-web/server/src/identity/config.ts",
+      "gitMode": "100644",
+      "gitObject": "7d6c93f3e2634b048c3d21be9199c22ca632ce75"
+    },
+    {
+      "path": "rai-web/server/src/identity/fixture.test.ts",
+      "gitMode": "100644",
+      "gitObject": "4647b5fdd3b2313bb2c62bc4f6e5fd754223895f"
+    },
+    {
+      "path": "rai-web/server/src/identity/fixture.ts",
+      "gitMode": "100644",
+      "gitObject": "9abb80099bed58ee09e877a2ac712df3701ea843"
+    },
+    {
+      "path": "rai-web/server/src/identity/group-mapping.ts",
+      "gitMode": "100644",
+      "gitObject": "b18397d87d86702aad58ab0c4478e98f326c7e45"
+    },
+    {
+      "path": "rai-web/server/src/identity/oidc.ts",
+      "gitMode": "100644",
+      "gitObject": "0ad48b0d4f70660ab7d1895e7587b188b712990d"
+    },
+    {
+      "path": "rai-web/server/src/identity/routes.test.ts",
+      "gitMode": "100644",
+      "gitObject": "c9cec33a0f761a27d8d87fb1fa1c4ca18e1cfab2"
+    },
+    {
+      "path": "rai-web/server/src/identity/routes.ts",
+      "gitMode": "100644",
+      "gitObject": "ac305e7224788ccb6b3cf67f204a4e0805f860cf"
+    },
+    {
+      "path": "rai-web/server/src/identity/session.memory.ts",
+      "gitMode": "100644",
+      "gitObject": "878e5605343924a5878b7b155e544db4d63455c2"
+    },
+    {
+      "path": "rai-web/server/src/identity/session.ts",
+      "gitMode": "100644",
+      "gitObject": "704b8131bafc2f9112f98873c66c9be4fb46916e"
+    },
+    {
+      "path": "rai-web/server/src/identity/types.ts",
+      "gitMode": "100644",
+      "gitObject": "c835ec9763cc0b580f63bce033c0b0b453ce76ac"
+    },
+    {
+      "path": "rai-web/server/src/main.ts",
+      "gitMode": "100644",
+      "gitObject": "c6e2155db0d7e3e9362c64104aa8318da749214e"
+    },
+    {
+      "path": "rai-web/server/src/notifications/DIGEST.md",
+      "gitMode": "100644",
+      "gitObject": "5ddcca98947df78b10118dfc06df331861ed6546"
+    },
+    {
+      "path": "rai-web/server/src/notifications/README.md",
+      "gitMode": "100644",
+      "gitObject": "f07cd86b1f824e27c1f6ffb357fe6428d20df3d9"
+    },
+    {
+      "path": "rai-web/server/src/notifications/compose.test.ts",
+      "gitMode": "100644",
+      "gitObject": "b16bbdea9dfd0c20118e8af94e66fe6007fb15fc"
+    },
+    {
+      "path": "rai-web/server/src/notifications/compose.ts",
+      "gitMode": "100644",
+      "gitObject": "6de726ba403b1169a59df03ef794f304df2c6496"
+    },
+    {
+      "path": "rai-web/server/src/notifications/digest-runtime.test.ts",
+      "gitMode": "100644",
+      "gitObject": "154910caab98ea2f2596b621278f42e3b1b253a1"
+    },
+    {
+      "path": "rai-web/server/src/notifications/digest-runtime.ts",
+      "gitMode": "100644",
+      "gitObject": "bf620cd5d734cb54fd4ee4b59905c8633e7aa97b"
+    },
+    {
+      "path": "rai-web/server/src/notifications/digest.ts",
+      "gitMode": "100644",
+      "gitObject": "40126f7769ec4a63a53d9c5da9be7b90a5344152"
+    },
+    {
+      "path": "rai-web/server/src/notifications/retry.test.ts",
+      "gitMode": "100644",
+      "gitObject": "b1ae0d285668a20e5080a654dfe502ad6c9f9f91"
+    },
+    {
+      "path": "rai-web/server/src/notifications/retry.ts",
+      "gitMode": "100644",
+      "gitObject": "8582db42d552de5ff1f7826449c8d96e93aa46e5"
+    },
+    {
+      "path": "rai-web/server/src/notifications/runtime.test.ts",
+      "gitMode": "100644",
+      "gitObject": "940e14b543c8b777cefb887415b70751b9b249ea"
+    },
+    {
+      "path": "rai-web/server/src/notifications/runtime.ts",
+      "gitMode": "100644",
+      "gitObject": "c6cf863ac9c59e5a98df72d9af12cf7842073980"
+    },
+    {
+      "path": "rai-web/server/src/notifications/service.ts",
+      "gitMode": "100644",
+      "gitObject": "31c80fb395bfa827cb3fa7eb50844cf3ea01374f"
+    },
+    {
+      "path": "rai-web/server/src/observability/context.ts",
+      "gitMode": "100644",
+      "gitObject": "881984c100bcb7a656c20bf17a8e2f44075a8ef8"
+    },
+    {
+      "path": "rai-web/server/src/observability/errors.test.ts",
+      "gitMode": "100644",
+      "gitObject": "bb3cf9f36dc4ca49cd4d1750cefbbbc82479770d"
+    },
+    {
+      "path": "rai-web/server/src/observability/errors.ts",
+      "gitMode": "100644",
+      "gitObject": "96544554d663f4c1bdddf2da184c34d6af8cc2cc"
+    },
+    {
+      "path": "rai-web/server/src/observability/health.test.ts",
+      "gitMode": "100644",
+      "gitObject": "33ffef4c6c3b6367bdc34a5151326f905c806bd7"
+    },
+    {
+      "path": "rai-web/server/src/observability/health.ts",
+      "gitMode": "100644",
+      "gitObject": "a92d49bc45a6c2c9704569ddb3d6019b8d7293bf"
+    },
+    {
+      "path": "rai-web/server/src/observability/http.test.ts",
+      "gitMode": "100644",
+      "gitObject": "31f064aca5b313d6220a0ffeb44526424ce4cf7f"
+    },
+    {
+      "path": "rai-web/server/src/observability/log.test.ts",
+      "gitMode": "100644",
+      "gitObject": "176d1287ab3700d84918471a461851148f291866"
+    },
+    {
+      "path": "rai-web/server/src/observability/log.ts",
+      "gitMode": "100644",
+      "gitObject": "9d62dbbb8aa2f0876b57ae8ed795ad6c380d83ef"
+    },
+    {
+      "path": "rai-web/server/src/observability/operator.ts",
+      "gitMode": "100644",
+      "gitObject": "cf67a66fc470d6823eede38758c878c515027bb8"
+    },
+    {
+      "path": "rai-web/server/src/observability/probes.test.ts",
+      "gitMode": "100644",
+      "gitObject": "a4cc1640c1185e3f929a267a04465d6432d79bd7"
+    },
+    {
+      "path": "rai-web/server/src/observability/probes.ts",
+      "gitMode": "100644",
+      "gitObject": "bd187cd3656fdf652cdddc0c936d798324769ac1"
+    },
+    {
+      "path": "rai-web/server/src/observability/redact.ts",
+      "gitMode": "100644",
+      "gitObject": "5cb07dce0305de8c5d00c27174700a59a7a8c291"
+    },
+    {
+      "path": "rai-web/server/src/observability/routes.ts",
+      "gitMode": "100644",
+      "gitObject": "9f4c9a9e229b554226323fcee90b98155b878d4c"
+    },
+    {
+      "path": "rai-web/server/src/observability/started.test.ts",
+      "gitMode": "100644",
+      "gitObject": "c8016c7578265deca9434b8daf59c6c8ea769fa0"
+    },
+    {
+      "path": "rai-web/server/src/observability/started.ts",
+      "gitMode": "100644",
+      "gitObject": "c135386886afde10316651a61bd68df18fb6f654"
+    },
+    {
+      "path": "rai-web/server/src/operator/db-cleanup.ts",
+      "gitMode": "100644",
+      "gitObject": "9ae0649f2533f44ad7326406621b6cddd9c723c0"
+    },
+    {
+      "path": "rai-web/server/src/operator/store-cleanup.ts",
+      "gitMode": "100644",
+      "gitObject": "39fa21d90254d538e3774631d1a77a9497e62fe8"
+    },
+    {
+      "path": "rai-web/server/src/operator/store-verify.ts",
+      "gitMode": "100644",
+      "gitObject": "5a395abcc91a59b36b74aa5964060744f01b8f92"
+    },
+    {
+      "path": "rai-web/server/src/pack/qc-trigger.ts",
+      "gitMode": "100644",
+      "gitObject": "50d2bef696bf23d33406325c4bf060d0b9908ee2"
+    },
+    {
+      "path": "rai-web/server/src/pack/repository.ts",
+      "gitMode": "100644",
+      "gitObject": "ab0879ae0df7e017736901e4f443b67f30f5fc1d"
+    },
+    {
+      "path": "rai-web/server/src/pack/routes.ts",
+      "gitMode": "100644",
+      "gitObject": "fd6cb053bb565b6131a4b0f54bb9bcf5f0992e62"
+    },
+    {
+      "path": "rai-web/server/src/pack/service.ts",
+      "gitMode": "100644",
+      "gitObject": "cad2d9dbe0507f26535dda85beac6ccbef39f756"
+    },
+    {
+      "path": "rai-web/server/src/pack/slots.test.ts",
+      "gitMode": "100644",
+      "gitObject": "b426db14d66f54483d2c23cd626c56dd2bde4dcb"
+    },
+    {
+      "path": "rai-web/server/src/pack/slots.ts",
+      "gitMode": "100644",
+      "gitObject": "8cdd6d6a13b5aa9e49f0c2f68e5fa36dae5263e3"
+    },
+    {
+      "path": "rai-web/server/src/qc/orchestrator.ts",
+      "gitMode": "100644",
+      "gitObject": "7b2a295c3d9d9842e9a8131e2ac33c9fff3d4aa7"
+    },
+    {
+      "path": "rai-web/server/src/qc/repository.ts",
+      "gitMode": "100644",
+      "gitObject": "5455f697c2b85381cdeb876d3239d67d53d5f31e"
+    },
+    {
+      "path": "rai-web/server/src/qc/submit-trigger.ts",
+      "gitMode": "100644",
+      "gitObject": "b3e7342febdf251ed596a9970041f247fcbb18a2"
+    },
+    {
+      "path": "rai-web/server/src/queue/repository.test.ts",
+      "gitMode": "100644",
+      "gitObject": "1ed20298936e18a0db83934b845a84179ee39581"
+    },
+    {
+      "path": "rai-web/server/src/queue/repository.ts",
+      "gitMode": "100644",
+      "gitObject": "0d435ad5bc20f250f1bdc6860ce68ff7d3dc94d0"
+    },
+    {
+      "path": "rai-web/server/src/queue/routes.ts",
+      "gitMode": "100644",
+      "gitObject": "8712624e97be164f910c7f3d3728384c293fdbca"
+    },
+    {
+      "path": "rai-web/server/src/secrets/index.ts",
+      "gitMode": "100644",
+      "gitObject": "34588195d37fc1587b53f3812f1d52daf37fd22e"
+    },
+    {
+      "path": "rai-web/server/src/shutdown.test.ts",
+      "gitMode": "100644",
+      "gitObject": "63fd98988b91726878e52918e23a1cb5c18175e3"
+    },
+    {
+      "path": "rai-web/server/src/shutdown.ts",
+      "gitMode": "100644",
+      "gitObject": "0127b437bea8053ac095fb7ca16496ddad7b2179"
+    },
+    {
+      "path": "rai-web/server/src/sla/breach.ts",
+      "gitMode": "100644",
+      "gitObject": "016c37271f9f92fb98790a2f1afd4988b95a0d97"
+    },
+    {
+      "path": "rai-web/server/src/sla/due-dates.ts",
+      "gitMode": "100644",
+      "gitObject": "b17b8b18bf2abf89973d66fee5c01711c2f8e3f6"
+    },
+    {
+      "path": "rai-web/server/src/start-overrides.test.ts",
+      "gitMode": "100644",
+      "gitObject": "4eb135cb7ad18a598ef8840eb5af9570b60c4803"
+    },
+    {
+      "path": "rai-web/server/src/start.test.ts",
+      "gitMode": "100644",
+      "gitObject": "c6c42f017d9f00f40765bfa359f6c02320e5ce56"
+    },
+    {
+      "path": "rai-web/server/src/start.ts",
+      "gitMode": "100644",
+      "gitObject": "4e0f68d3a0bbe28866e18afb046647fd3ea287d8"
+    },
+    {
+      "path": "rai-web/server/src/static.test.ts",
+      "gitMode": "100644",
+      "gitObject": "12faa2d4b50bbf680738fa0a1b121a609a0f80fd"
+    },
+    {
+      "path": "rai-web/server/src/static.ts",
+      "gitMode": "100644",
+      "gitObject": "a1fc5b402cdcebdaf819b9c5007ec62d9c993606"
+    },
+    {
+      "path": "rai-web/server/src/versions/freeze.test.ts",
+      "gitMode": "100644",
+      "gitObject": "1ad1abe63272598b45341e69d903a13f81fc9adc"
+    },
+    {
+      "path": "rai-web/server/src/versions/freeze.ts",
+      "gitMode": "100644",
+      "gitObject": "0f57e4fae8d098757cdea14692d5c88df1bdae87"
+    },
+    {
+      "path": "rai-web/server/src/versions/manifest.test.ts",
+      "gitMode": "100644",
+      "gitObject": "311d329cd8df2daf84f2d716ebab9771550d8fde"
+    },
+    {
+      "path": "rai-web/server/src/versions/manifest.ts",
+      "gitMode": "100644",
+      "gitObject": "cdcfc2e9c62f4b261a5c7070ebb55bea2d934224"
+    },
+    {
+      "path": "rai-web/server/src/versions/open-lanes.ts",
+      "gitMode": "100644",
+      "gitObject": "0f79d0f4801e894bfedca47448e43371fb219197"
+    },
+    {
+      "path": "rai-web/server/src/versions/repository.ts",
+      "gitMode": "100644",
+      "gitObject": "e3bf813f82b587b4e89a3378022e00170c86574d"
+    },
+    {
+      "path": "rai-web/server/src/versions/routes.ts",
+      "gitMode": "100644",
+      "gitObject": "7cb3250a3e4d0aa9b9ae360796becae0b8ba6425"
+    },
+    {
+      "path": "rai-web/server/src/versions/service.ts",
+      "gitMode": "100644",
+      "gitObject": "1a329b77c44f97e77dfec7b41f879edb928d1aca"
+    },
+    {
+      "path": "rai-web/server/src/versions/transaction.ts",
+      "gitMode": "100644",
+      "gitObject": "ba68bd522906efb53836c5c0877b30fcffe532c1"
+    },
+    {
+      "path": "rai-web/server/src/workflow/monotonic-stamp.ts",
+      "gitMode": "100644",
+      "gitObject": "45d2f82b9191b6b5de424d3b3e6a71f4abf4352d"
+    },
+    {
+      "path": "rai-web/server/src/workflow/ready-notice.ts",
+      "gitMode": "100644",
+      "gitObject": "b77e13460630344b80d4ca1c72328bcb6b66d601"
+    },
+    {
+      "path": "rai-web/server/src/workflow/ready.ts",
+      "gitMode": "100644",
+      "gitObject": "6be4ea56a97d9c620d4edacdb3d294cf7ac219c0"
+    },
+    {
+      "path": "rai-web/server/src/workflow/repository.ts",
+      "gitMode": "100644",
+      "gitObject": "d2f4b5e40b7721926e44d475119fe3d170b3b438"
+    },
+    {
+      "path": "rai-web/server/src/workflow/routes.ts",
+      "gitMode": "100644",
+      "gitObject": "384b1d6278613a79b41537e51cef5c51516541ac"
+    },
+    {
+      "path": "rai-web/server/src/workflow/send-back-notice.ts",
+      "gitMode": "100644",
+      "gitObject": "4fdaab1a9c98328cda939d0566744267c6c8b865"
+    },
+    {
+      "path": "rai-web/server/src/workflow/service.ts",
+      "gitMode": "100644",
+      "gitObject": "4fdb115862118d6482f17db5094ef1678b088778"
+    },
+    {
+      "path": "rai-web/server/tsconfig.json",
+      "gitMode": "100644",
+      "gitObject": "62e387d1f8fde18b97a63e002d9beafc961fc43b"
+    },
+    {
+      "path": "rai-web/shared/package.json",
+      "gitMode": "100644",
+      "gitObject": "9c1a435024aee55aa83734e63c653014f209d9b5"
+    },
+    {
+      "path": "rai-web/shared/src/constants.test.ts",
+      "gitMode": "100644",
+      "gitObject": "0baf74f7dc7829434131e7dffffbc36832d67aec"
+    },
+    {
+      "path": "rai-web/shared/src/constants.ts",
+      "gitMode": "100644",
+      "gitObject": "43beb3ca52d849a992d974b318fc30105de4d92f"
+    },
+    {
+      "path": "rai-web/shared/src/errors.test.ts",
+      "gitMode": "100644",
+      "gitObject": "279e1968b9b5a28240264e4693761441cb860b25"
+    },
+    {
+      "path": "rai-web/shared/src/errors.ts",
+      "gitMode": "100644",
+      "gitObject": "e4ea4475688f0624f0ca6464c846bec360ca1d39"
+    },
+    {
+      "path": "rai-web/shared/src/ids.ts",
+      "gitMode": "100644",
+      "gitObject": "c4b5570beace69344143c05fd08a4c63bdb19518"
+    },
+    {
+      "path": "rai-web/shared/src/index.ts",
+      "gitMode": "100644",
+      "gitObject": "2fa64839a3c9a903d8e35ab9688c3cd4da2f5ad2"
+    },
+    {
+      "path": "rai-web/shared/src/locales/en.json",
+      "gitMode": "100644",
+      "gitObject": "17bc6adbdcc367275bf64a55570425d79ecb4bb9"
+    },
+    {
+      "path": "rai-web/shared/src/locales/keys.ts",
+      "gitMode": "100644",
+      "gitObject": "b9d13fa523d2678e5eb822bbbeaf5a598dcc3845"
+    },
+    {
+      "path": "rai-web/shared/src/locales/locales.test.ts",
+      "gitMode": "100644",
+      "gitObject": "c557b726c8a94cc98155ffa5a915f0e4f9b43fb2"
+    },
+    {
+      "path": "rai-web/shared/src/locales/th.json",
+      "gitMode": "100644",
+      "gitObject": "9cf65c6177f6881710327f23103a8e3ffaf14beb"
+    },
+    {
+      "path": "rai-web/shared/src/mail/dedup.test.ts",
+      "gitMode": "100644",
+      "gitObject": "84f4ded167d14aff0a10565c3dac31c3ce7f0034"
+    },
+    {
+      "path": "rai-web/shared/src/mail/dedup.ts",
+      "gitMode": "100644",
+      "gitObject": "48312dcc3f848952e6e1ee27031fa7055cc46b0b"
+    },
+    {
+      "path": "rai-web/shared/src/mail/provenance.ts",
+      "gitMode": "100644",
+      "gitObject": "c078dbe302f09e19f6cd8cacd4e8f8dbfd8f0119"
+    },
+    {
+      "path": "rai-web/shared/src/mail/types.ts",
+      "gitMode": "100644",
+      "gitObject": "5bf558c94e7550b553d24f3c019ad3a26c0009c1"
+    },
+    {
+      "path": "rai-web/shared/src/qc/types.ts",
+      "gitMode": "100644",
+      "gitObject": "2fd8d60c8ccdc524a30991fa2fa0c6bba55d46f2"
+    },
+    {
+      "path": "rai-web/shared/src/qc/validate.test.ts",
+      "gitMode": "100644",
+      "gitObject": "8905e762454eaa2feb027f8b1510a43e0d9e6089"
+    },
+    {
+      "path": "rai-web/shared/src/qc/validate.ts",
+      "gitMode": "100644",
+      "gitObject": "8ba58b2d299f7c98259e3dc6af50374707b407ad"
+    },
+    {
+      "path": "rai-web/shared/src/schemas/artifacts.ts",
+      "gitMode": "100644",
+      "gitObject": "0deaec72c4979d9a1b7cd05dd8b2847c4d70f4db"
+    },
+    {
+      "path": "rai-web/shared/src/schemas/auth.ts",
+      "gitMode": "100644",
+      "gitObject": "491885232f13bb9dbae266f96d6e07e397da3e30"
+    },
+    {
+      "path": "rai-web/shared/src/schemas/cases.ts",
+      "gitMode": "100644",
+      "gitObject": "e624c9a01114a7478302c259b84463a178f22d5b"
+    },
+    {
+      "path": "rai-web/shared/src/schemas/observability.test.ts",
+      "gitMode": "100644",
+      "gitObject": "e547cbd9e221bb0e19c59549d23bde5b8996dc97"
+    },
+    {
+      "path": "rai-web/shared/src/schemas/observability.ts",
+      "gitMode": "100644",
+      "gitObject": "fa62bb1fbafae266ebe211387fa20d79c070010d"
+    },
+    {
+      "path": "rai-web/shared/src/schemas/pack.ts",
+      "gitMode": "100644",
+      "gitObject": "28799218718e26ac7643ad6301ed882705644a69"
+    },
+    {
+      "path": "rai-web/shared/src/schemas/queue.test.ts",
+      "gitMode": "100644",
+      "gitObject": "1a154284466c6643d7d4b2394b33779af03ead2e"
+    },
+    {
+      "path": "rai-web/shared/src/schemas/queue.ts",
+      "gitMode": "100644",
+      "gitObject": "95f8fbce622b5ad8dc027711adf01d8a33935fca"
+    },
+    {
+      "path": "rai-web/shared/src/schemas/review.ts",
+      "gitMode": "100644",
+      "gitObject": "ce2b0bc47f4d1cc902140e39872ee453da065deb"
+    },
+    {
+      "path": "rai-web/shared/src/schemas/sla.ts",
+      "gitMode": "100644",
+      "gitObject": "22fa3eac30eed31100e9af53b887552ea728e135"
+    },
+    {
+      "path": "rai-web/shared/src/schemas/slots.ts",
+      "gitMode": "100644",
+      "gitObject": "bdbc2a2deb81fed81b9d36d02c784d05400a711b"
+    },
+    {
+      "path": "rai-web/shared/src/schemas/versions.ts",
+      "gitMode": "100644",
+      "gitObject": "27af0d52c567bdf69d7e257252ed44f838b6816c"
+    },
+    {
+      "path": "rai-web/shared/src/sla/working-days.test.ts",
+      "gitMode": "100644",
+      "gitObject": "d860412f6565ed0ef4a3c0922aa94ecc940364db"
+    },
+    {
+      "path": "rai-web/shared/src/sla/working-days.ts",
+      "gitMode": "100644",
+      "gitObject": "4f64a87bcd22b20dd093aef4a870ca0d63f8f3e4"
+    },
+    {
+      "path": "rai-web/shared/tsconfig.json",
+      "gitMode": "100644",
+      "gitObject": "71dbe8931868127cc9b130b1cc644cb8fdbdd4f6"
+    },
+    {
+      "path": "rai-web/tsconfig.base.json",
+      "gitMode": "100644",
+      "gitObject": "f967be970ad28a3768ab0af6f0a59570a80b3738"
+    },
+    {
+      "path": "rai-web/tsconfig.json",
+      "gitMode": "100644",
+      "gitObject": "51c03964652ef61f102a6d511558b02afd8c514b"
+    },
+    {
+      "path": "rai-web/web/index.html",
+      "gitMode": "100644",
+      "gitObject": "a1e7f5250c5dd887307b8b0bf3e4055c42a6a6f8"
+    },
+    {
+      "path": "rai-web/web/package.json",
+      "gitMode": "100644",
+      "gitObject": "fbd694ca1f1452fbe7cbb8051ca344d037ca734a"
+    },
+    {
+      "path": "rai-web/web/src/api/client.test.ts",
+      "gitMode": "100644",
+      "gitObject": "c2e7a97d4d47a1494d0a074faaca5cd8328697a2"
+    },
+    {
+      "path": "rai-web/web/src/api/client.ts",
+      "gitMode": "100644",
+      "gitObject": "96f5d7e1bc0637f171648de39e26e847b92f3923"
+    },
+    {
+      "path": "rai-web/web/src/app.tsx",
+      "gitMode": "100644",
+      "gitObject": "fc686699c091a603733bfe573aa96c5c05691bca"
+    },
+    {
+      "path": "rai-web/web/src/components/dialog.tsx",
+      "gitMode": "100644",
+      "gitObject": "186965ca5005c55c724cfb2d4693e1bbc94749c5"
+    },
+    {
+      "path": "rai-web/web/src/components/error-notice.tsx",
+      "gitMode": "100644",
+      "gitObject": "c62d221884965aac91266bdbb625c8141679437f"
+    },
+    {
+      "path": "rai-web/web/src/components/status-badge.tsx",
+      "gitMode": "100644",
+      "gitObject": "a9be5317ddc827ebadb0554b3fe1c71e3da355e3"
+    },
+    {
+      "path": "rai-web/web/src/i18n/format.test.ts",
+      "gitMode": "100644",
+      "gitObject": "740a84288eb69e6249a9604831ae17fb211f24e3"
+    },
+    {
+      "path": "rai-web/web/src/i18n/format.ts",
+      "gitMode": "100644",
+      "gitObject": "b6c206e92abd4b0df938dc36084acc5592a5bc75"
+    },
+    {
+      "path": "rai-web/web/src/i18n/locale-provider.tsx",
+      "gitMode": "100644",
+      "gitObject": "bf11267e507dc5463dc9bdd373a22ff586561232"
+    },
+    {
+      "path": "rai-web/web/src/i18n/no-hard-coded-strings.test.ts",
+      "gitMode": "100644",
+      "gitObject": "f5c1e5df1a37803f4bb5703daca44e2627d2c146"
+    },
+    {
+      "path": "rai-web/web/src/i18n/operator-labels.test.ts",
+      "gitMode": "100644",
+      "gitObject": "66d79edcf112c28f0338897a5c1ad76778f89342"
+    },
+    {
+      "path": "rai-web/web/src/i18n/operator-labels.ts",
+      "gitMode": "100644",
+      "gitObject": "29889f42e66a2c18d36c4bd07fdcaaf971d06fba"
+    },
+    {
+      "path": "rai-web/web/src/main.tsx",
+      "gitMode": "100644",
+      "gitObject": "04e8da4e32a2c95d63173a97999e050a2d64eba1"
+    },
+    {
+      "path": "rai-web/web/src/route-focus.tsx",
+      "gitMode": "100644",
+      "gitObject": "ee2620c47fcbab919a5c4834fdbe9a8fa0d59f7a"
+    },
+    {
+      "path": "rai-web/web/src/router.tsx",
+      "gitMode": "100644",
+      "gitObject": "dc42bd65d151958d65049bf8d659a0de31143e54"
+    },
+    {
+      "path": "rai-web/web/src/routes.test.ts",
+      "gitMode": "100644",
+      "gitObject": "5ec227615b6509b94730c0f4d3eff04da43545cc"
+    },
+    {
+      "path": "rai-web/web/src/routes.ts",
+      "gitMode": "100644",
+      "gitObject": "393890b73746f7f4cdb17c8cb2607217998f9092"
+    },
+    {
+      "path": "rai-web/web/src/screens/case/case-overview.tsx",
+      "gitMode": "100644",
+      "gitObject": "e402494a06f8a8e3dc5cb09024d89029115e2d08"
+    },
+    {
+      "path": "rai-web/web/src/screens/case/case-screen.tsx",
+      "gitMode": "100644",
+      "gitObject": "e16d736c4061fcaf251b116c143bb753438b254f"
+    },
+    {
+      "path": "rai-web/web/src/screens/case/case.css",
+      "gitMode": "100644",
+      "gitObject": "cd9e2b549aebc2b03495094f3e0376df220a7003"
+    },
+    {
+      "path": "rai-web/web/src/screens/case/disposition-controls.tsx",
+      "gitMode": "100644",
+      "gitObject": "f8c6354e73cc2c213613fd8e357a561104354143"
+    },
+    {
+      "path": "rai-web/web/src/screens/case/disposition-dialog.tsx",
+      "gitMode": "100644",
+      "gitObject": "35247a3af833ee54b69c42e8932e77b76465a895"
+    },
+    {
+      "path": "rai-web/web/src/screens/case/finding-list.tsx",
+      "gitMode": "100644",
+      "gitObject": "f03037e57819daa373004a2a60cdd4b2821a17a5"
+    },
+    {
+      "path": "rai-web/web/src/screens/case/lane-decision-actions.tsx",
+      "gitMode": "100644",
+      "gitObject": "854b77de735bda9d11a16042c5f43410cbaf622b"
+    },
+    {
+      "path": "rai-web/web/src/screens/case/pack-editor.tsx",
+      "gitMode": "100644",
+      "gitObject": "44bc2bf8cd399386c528210c04543c9c9a3d668e"
+    },
+    {
+      "path": "rai-web/web/src/screens/case/pack-frozen.tsx",
+      "gitMode": "100644",
+      "gitObject": "cf4cb3171ca542aa890b09a35f0f04cd814fa330"
+    },
+    {
+      "path": "rai-web/web/src/screens/case/reviewer-workspace.tsx",
+      "gitMode": "100644",
+      "gitObject": "29ad7fb10336e3b07fa78b1ef4d72eee1876b10f"
+    },
+    {
+      "path": "rai-web/web/src/screens/case/send-back-dialog.tsx",
+      "gitMode": "100644",
+      "gitObject": "3744414c2afc31c466ca4946079e96f4d6998358"
+    },
+    {
+      "path": "rai-web/web/src/screens/case/slot-dialog.tsx",
+      "gitMode": "100644",
+      "gitObject": "27c2c6f9bbe58d9a51319c34a99d4804f2144954"
+    },
+    {
+      "path": "rai-web/web/src/screens/case/slot-rows.tsx",
+      "gitMode": "100644",
+      "gitObject": "90dd587e0fbea244eb4889cee19280d02667800f"
+    },
+    {
+      "path": "rai-web/web/src/screens/case/version-nav.tsx",
+      "gitMode": "100644",
+      "gitObject": "33bf70b1ca372d0cb71ddb5ebcbd66e5984dc649"
+    },
+    {
+      "path": "rai-web/web/src/screens/case/view-model.test.ts",
+      "gitMode": "100644",
+      "gitObject": "99e0e5c1184186562cafa315c9f87b4bafc0a07a"
+    },
+    {
+      "path": "rai-web/web/src/screens/case/view-model.ts",
+      "gitMode": "100644",
+      "gitObject": "f0d7cdb70b562e0fb0e8ecff45b5ce7d41574847"
+    },
+    {
+      "path": "rai-web/web/src/screens/cases/case-list-screen.tsx",
+      "gitMode": "100644",
+      "gitObject": "0d251f5d2807b360390ad0be3c971fdb0804f3b2"
+    },
+    {
+      "path": "rai-web/web/src/screens/cases/case-list.view-model.test.ts",
+      "gitMode": "100644",
+      "gitObject": "b22dbfe5b29a1a8e66b71a0a0e978ed0e3a740b2"
+    },
+    {
+      "path": "rai-web/web/src/screens/cases/case-list.view-model.ts",
+      "gitMode": "100644",
+      "gitObject": "a2944e11df4ecc13384a529c263b18bea5d92c4f"
+    },
+    {
+      "path": "rai-web/web/src/screens/cases/new-case-screen.tsx",
+      "gitMode": "100644",
+      "gitObject": "1654d53a3cd98e71a80bb3a1de86aa47d9442448"
+    },
+    {
+      "path": "rai-web/web/src/screens/cases/new-case.view-model.test.ts",
+      "gitMode": "100644",
+      "gitObject": "3d99b26e9e3eda81e910e735f1c05a2fce5e3667"
+    },
+    {
+      "path": "rai-web/web/src/screens/cases/new-case.view-model.ts",
+      "gitMode": "100644",
+      "gitObject": "9688b4efd84c989df5172be2d6d419e0ae8bcbc6"
+    },
+    {
+      "path": "rai-web/web/src/screens/not-found-screen.tsx",
+      "gitMode": "100644",
+      "gitObject": "01875638a070297b1f270aa11c212b8342d251e6"
+    },
+    {
+      "path": "rai-web/web/src/screens/operator/desk-health-sections.tsx",
+      "gitMode": "100644",
+      "gitObject": "ba2aa957d419b5ef43c9aad05be86cd09a2079c3"
+    },
+    {
+      "path": "rai-web/web/src/screens/operator/desk-health.css",
+      "gitMode": "100644",
+      "gitObject": "7a462700d2a897afb939f982b654f4014811750a"
+    },
+    {
+      "path": "rai-web/web/src/screens/operator/desk-health.tsx",
+      "gitMode": "100644",
+      "gitObject": "3358171c5ba06d4cd7c00c9c0478599f462f1414"
+    },
+    {
+      "path": "rai-web/web/src/screens/operator/desk-health.view-model.test.ts",
+      "gitMode": "100644",
+      "gitObject": "333a8c098dec4cfee20508dfedc0bf3b29d09e99"
+    },
+    {
+      "path": "rai-web/web/src/screens/operator/desk-health.view-model.ts",
+      "gitMode": "100644",
+      "gitObject": "b283b4fe8a37abb2e79590a0385cc7607dbe89b4"
+    },
+    {
+      "path": "rai-web/web/src/screens/queue/queue-screen.tsx",
+      "gitMode": "100644",
+      "gitObject": "937988556330486f7f8c6bd0662907e96540a8de"
+    },
+    {
+      "path": "rai-web/web/src/screens/queue/queue.css",
+      "gitMode": "100644",
+      "gitObject": "a578e02258b92954dc9f479c4480b069c0646f8e"
+    },
+    {
+      "path": "rai-web/web/src/screens/queue/view-model.test.ts",
+      "gitMode": "100644",
+      "gitObject": "5685e863a2e4b70db9693051ba73eb12f296698e"
+    },
+    {
+      "path": "rai-web/web/src/screens/queue/view-model.ts",
+      "gitMode": "100644",
+      "gitObject": "05732d921ef07d847cd3c590efd523b0ac6de527"
+    },
+    {
+      "path": "rai-web/web/src/screens/shell/app-shell.tsx",
+      "gitMode": "100644",
+      "gitObject": "44592e806cfd4f72c94b0b09a749342ef3de5757"
+    },
+    {
+      "path": "rai-web/web/src/screens/sign-in/sign-in-screen.tsx",
+      "gitMode": "100644",
+      "gitObject": "b5903fca009c2c48b6aef65972e41a82a555e0c3"
+    },
+    {
+      "path": "rai-web/web/src/session/session-provider.tsx",
+      "gitMode": "100644",
+      "gitObject": "563976eb3c56e0cac30229d361cae1c435a27753"
+    },
+    {
+      "path": "rai-web/web/src/styles.css",
+      "gitMode": "100644",
+      "gitObject": "c68ce86d368bcd48ada085fe2ccf4eaba9acbca9"
+    },
+    {
+      "path": "rai-web/web/src/vite-env.d.ts",
+      "gitMode": "100644",
+      "gitObject": "11f02fe2a0061d6e6e1f271b21da95423b448b32"
+    },
+    {
+      "path": "rai-web/web/tsconfig.json",
+      "gitMode": "100644",
+      "gitObject": "9bbb8564fcc37a358c5642b15c3d9f12dac40143"
+    },
+    {
+      "path": "rai-web/web/vite.config.ts",
+      "gitMode": "100644",
+      "gitObject": "e5505cbc3db003d53651f8d2a97e743af9d51852"
+    }
+  ],
+  "pathScope": [
+    "rai-web/server",
+    "rai-web/shared",
+    "rai-web/web",
+    "rai-web/fixtures",
+    "rai-web/scripts",
+    "rai-web/package-lock.json",
+    "rai-web/tsconfig.json",
+    "rai-web/tsconfig.base.json",
+    "rai-web/.nvmrc",
+    "rai-web/.env.example",
+    "docker",
+    "docker-compose.yml"
+  ],
+  "inventorySha256": "65a85427876c2ecb6bb85a279e35116775106a2e12c3dd69e0c92f96f3f40bd1",
+  "rootPackageException": {
+    "path": "rai-web/package.json",
+    "candidateBlob": "63fa52f7b0ad1d8bc31e514d9b3cc389a66cac96",
+    "harnessBlob": "f87529fa7d6779ed2cfc110dd85079fb6ab27a5b",
+    "onlyApprovedVerificationScriptsDiffer": true,
+    "test:unit": "NODE_ENV=test RAI_IDENTITY_MODE=fixture node --import tsx --conditions=rai-source --test 'server/src/**/*.test.ts' 'shared/src/**/*.test.ts' 'web/src/**/*.test.ts' 'fixtures/src/**/*.test.ts' 'tests/performance/*.test.ts'",
+    "typecheck": "tsc -b . tests/performance"
+  },
+  "actualMergedMainReconciliation": "pending"
+}

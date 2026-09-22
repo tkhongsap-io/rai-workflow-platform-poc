@@ -1,6 +1,6 @@
 # RAI Workflow Platform PoC
 
-**Working product name: RAI web. Status: M2 reached 2026-09-22; W3 is in progress: working-day SLA and the scoped queue API are on main; UI, notifications and M3 acceptance are still in progress. Production release remains gated. W4–W8 are not authorized.**
+**Working product name: RAI web. Status: W3 synthetic implementation and engineering exit recorded 2026-09-23; Ta’s package review remains pending. Production release and W4–W8 remain gated.**
 
 A review desk for one submitted AI-use-case pack, with parallel AI/COE, DPO and IT/Security review, versioned send-back and soft document QC. This is not True's official AI register and does not operate the eight-stage AI lifecycle.
 
@@ -9,7 +9,7 @@ A review desk for one submitted AI-use-case pack, with parallel AI/COE, DPO and 
 - **[PRD.md](PRD.md)** — problem, users, scope, requirements and success criteria.
 - **[BUILD_PLAN.md](BUILD_PLAN.md)** — ordered work packages, dependencies, deliverables and evidence required to finish each one.
 
-- **[docs/delivery/](docs/delivery/README.md)** — delegation pack: decision briefs, team roles, W0 contract and W1-W3 tickets. Planning only.
+- **[docs/delivery/](docs/delivery/README.md)** — delivery pack: decision briefs, team roles, W0 contract and W1-W3 tickets, with implementation tracked in reviewed PRs.
 - **[docs/board/](docs/board/README.md)** — append-only build board: one stream per lane, claim before working.
 
 These are the starting points for the future app build. The plan under changes/2026-09-20-documentation-foundation covers repository setup only.
@@ -78,17 +78,17 @@ Sources: [product requirements](PRD.md), [authoritative v1 rules](docs/product/s
 |---|---|
 | [AGENTS.md](AGENTS.md) | Agent authority and context |
 | [DEVLOG.md](DEVLOG.md), [CHANGELOG.md](CHANGELOG.md) | Current state and change history |
-| [TESTING.md](TESTING.md) | Documentation checks now; runtime gates later |
+| [TESTING.md](TESTING.md) | Repository checks, product unit/integration/browser commands and evidence boundaries |
 | [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md) | Change and security handling |
 | [docs/sources.md](docs/sources.md) | Source identity, hashes and precedence |
 | [docs/engineering/adoption.md](docs/engineering/adoption.md) | Pinned playbook and adoption gaps |
 | [adr/README.md](adr/README.md) | Architecture decisions |
 | [changes/2026-09-20-documentation-foundation/intent.md](changes/2026-09-20-documentation-foundation/intent.md) | Intent, spec, plan and verification trail |
 
-Run the local design with `python3 demo/serve.py`, then open http://127.0.0.1:5173/. See the [demo PRD](changes/2026-09-21-local-design-demo/PRD.md), [demo plan](changes/2026-09-21-local-design-demo/plan.md) and [verification report](changes/2026-09-21-local-design-demo/review.md). Production stack, model provider, database and hosting decisions remain open.
+Run the local design with `python3 demo/serve.py`, then open http://127.0.0.1:5173/. See the [demo PRD](changes/2026-09-21-local-design-demo/PRD.md), [demo plan](changes/2026-09-21-local-design-demo/plan.md) and [verification report](changes/2026-09-21-local-design-demo/review.md). The implemented product lives in `rai-web/`; follow [Product build in TESTING](TESTING.md#product-build-w0-w3) for its local setup and verification. The Node/Fastify/React/Postgres stack is recorded in ADR-0003; real model/data handling and production hosting remain gated.
 
 ## Build status
 
-G0 closed on 2026-09-21. W0, W1, and W2 exits are recorded (Milestones M1 and M2). W3-05 working-day SLA (PR #104), W3-01 scoped queue API (PR #109) and the W1-11 mail dependency (PR #107) are on `main`. Queue UI, notification composition/digest/retries, observability, real-server integration and the M3 exit remain in progress. The queue UI contract is merged (PR #110); that alone does not implement the screen. Issue #35 and epic #53 stay open. The live notes are [DEVLOG.md](DEVLOG.md) and [CHANGELOG.md](CHANGELOG.md). W4–W8 are not authorized.
+G0, W0, W1 and W2 exits are recorded. W3 delivers the scoped queue, working-day SLA, committed notifications, daily digest, bounded retries, Admin diagnostics and the real-server keyboard journey. The [W3 engineering exit](changes/2026-09-23-w3-exit/review.md) records exact test, performance and walkthrough evidence and remaining limitations. The application uses a real local API/database with explicit synthetic identity, QC and file-mail adapters; the historical API substitute is confined to its separate test harness. Ta’s package review, workload/target confirmation and manual Google loopback sign-in remain pending. Issue #35 and epic #53 remain open for unresolved finding ownership. W4–W8 are not authorized; Ready means desk completion, not deployment permission.
 
 Production identity is True AD/Entra on True's network; any Google account is allowed only on localhost. A networked test deployment needs an allow-list or AD. Ready for launch means review-desk completion only; it is not Council approval or an ITSM deployment authorization.

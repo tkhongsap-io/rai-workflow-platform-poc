@@ -1,6 +1,6 @@
 # Product Requirements Document: RAI Workflow Platform PoC
 
-Version: 1.0, 2026-09-21 (draft 1 was 2026-09-20). Product owner: Ta. Operator: Nakhun (confirmed under D01, 2026-09-21). Status: G0 closed; W0-W3 authorized on synthetic data under D03. Stack (D04) is decided inside W0.
+Version: 1.0, 2026-09-21 (draft 1 was 2026-09-20). Product owner: Ta. Operator: Nakhun (confirmed under D01, 2026-09-21). Status: G0 closed; W0-W3 authorized on synthetic data under D03. Stack (D04) is recorded in ADR-0003. Current engineering evidence and remaining acceptance boundaries are in the [W3 exit](changes/2026-09-23-w3-exit/review.md).
 
 This is the product anchor: **what we are building and why**. The [build plan](BUILD_PLAN.md) defines delivery order. The frozen [v1 specification](docs/product/source-spec.md) remains authoritative for product rules; this PRD consolidates it without changing scope. Proposed technical semantics are explicitly separated in the supporting contracts.
 
@@ -50,7 +50,7 @@ AI/COE's second document is BRD (5), decided under D02 on 2026-09-21; the lane m
 
 ## Requirements and acceptance
 
-All requirements are planned, not implemented. Detailed observable tests A01-A10 are in [acceptance.md](docs/acceptance.md).
+The table defines the product requirements across all packages. W1–W3 synthetic implementation has recorded engineering evidence; the [W3 exit](changes/2026-09-23-w3-exit/review.md) distinguishes proved behavior from partial and future acceptance. Detailed observable tests are in [acceptance.md](docs/acceptance.md).
 
 | ID | Required product behavior | Acceptance | Build package |
 |---|---|---|---|
@@ -83,7 +83,7 @@ Use the inherited fields and proposed entities in [data contract](docs/product/d
 
 SLAs: DPO 3 working days (D01), other lanes 5 as Admin configuration. Display and report only, no automatic escalation. Calendar, clock and retry policy are set by D06 (Asia/Bangkok, clock restarts on resubmit, daily breach digest, three retries). Notifications are not approval records.
 
-Required quality properties: server-side authorization; immutable evidence; attributable actions (tested by A11, accepted 2026-09-21); consistent concurrent transitions; observable extraction/mail failures; reproducible config versions. Quantitative latency, volume, storage and QC-quality budgets must be agreed before their release gates; none are measured or committed today.
+Required quality properties: server-side authorization; immutable evidence; attributable actions (tested by A11, accepted 2026-09-21); consistent concurrent transitions; observable extraction/mail failures; reproducible config versions. Quantitative latency, volume, storage and QC-quality budgets must be agreed before their release gates; the W3 exit records bounded synthetic measurements; workload and target acceptance remain with Ta and the operator.
 
 ## Success and release boundaries
 
@@ -93,6 +93,6 @@ Production additionally requires True hosting/AD, approved operational controls 
 
 ## Non-goals and open decisions
 
-No official register, tracker dual-write, eight-stage lifecycle, post-deploy control tower, Council e-vote, ITSM replacement or SharePoint file integration. Application build is authorized for W0-W3 on synthetic data (D03, 2026-09-21); no stack is selected in this PRD (D04, inside W0).
+No official register, tracker dual-write, eight-stage lifecycle, post-deploy control tower, Council e-vote, ITSM replacement or SharePoint file integration. Application build is authorized for W0-W3 on synthetic data (D03, 2026-09-21); the selected stack is recorded in ADR-0003 (D04).
 
-[The decision register](docs/product/decisions.md) records D01-D03, D05, D06, D11 and D12 as decided on 2026-09-21 and keeps D04, D07-D10 open. The [source provenance](docs/sources.md) identifies supporting evidence. Changes to locked scope require explicit owner decision and a versioned PRD/source update; do not quietly resolve a conflict in implementation.
+[The decision register](docs/product/decisions.md) records D01-D06, D11 and D12, including D04 in ADR-0003 and the D03 merge-authority amendment; D07-D10 remain open. The [source provenance](docs/sources.md) identifies supporting evidence. Changes to locked scope require explicit owner decision and a versioned PRD/source update; do not quietly resolve a conflict in implementation.

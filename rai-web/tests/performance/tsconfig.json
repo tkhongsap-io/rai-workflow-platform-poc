@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "../dist/performance",
+    "tsBuildInfoFile": "../dist/performance.tsbuildinfo"
+  },
+  "include": ["*.ts"],
+  "references": [{ "path": "../../shared" }, { "path": "../../server" }, { "path": "../../fixtures" }]
+}

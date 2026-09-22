@@ -1,0 +1,41 @@
+{
+  "measurementHead": "9b8a2ea2f5ac2a51774c2e0008752c3b49132faa",
+  "sourceDir": "/private/tmp/rai-w3-performance/rai-web/.local/performance/w306_20260923_a01",
+  "outputDir": "/private/tmp/rai-w3-performance/rai-web/.local/performance/w306_20260923_pages_b02",
+  "expectedContainerId": "cc7d0137ffede4c8b72f4cb6dfdf4b90722c3bbd0f3602cab023c4a58c4f5011",
+  "go": {
+    "diagnostic": "HELD_FOR_DESCARTES",
+    "measure": "HELD_FOR_PARENT_TIMING_GO"
+  },
+  "localTestsIdle": false,
+  "review": {
+    "clean": false,
+    "driverSha256": "4bd0b933aa06b01c37744e1912925d64ceacfbc6fd9e5bb8fbd9a7494796fe9c",
+    "diagnosticClean": false,
+    "diagnosticSha256": "PENDING_ACTUAL_DIAGNOSTIC"
+  },
+  "sourceHashes": {
+    "measurement-plan.json": "e524a76b0700b492ce1808d290ef7d190029aa5a8fd19c6a9e2ade8a851ad1f2",
+    "setup-complete.json": "936eb2417518fcecee0134ba05fad597548fe87de3c921d18129aa97e24466b4",
+    "queue-manifest.json": "d7970707541efa5018458e1f146b3f5462d248190d6dac52e5cc2acf9aff1fcd",
+    "mutation-bindings.json": "ebba8377fae6a4ac21d67026f8a1ae8c45b5d1711c5402ef3b49b1043d710941",
+    "queue-launch.json": "37699ab7fd90c3637e8c6c077361c564a0991d4ea230889b590b79e4ed466221",
+    "mutation-launch.json": "c6eb53b9c20b29e84033c947b254d9caa7fc77d4bc1fe91fc6c62bcbba95947d",
+    "source-fingerprint.json": "97a304ff5da524a0aef9fcfd86ae0b1b4e636294fae75d11cf9bf1c84b899f8b",
+    "build-assets.json": "cfca9072dc8dc909ee25447b7f9bd141deec5befc6698a0536643eafa1ee8b2a",
+    "queue-samples.jsonl": "ba5793ea916d2c1e0eab00cae592a50527d4a463effd4e93f41d5f7bfbb6898a",
+    "profiles-download.jsonl": "fd4dddd6e3aafbd20cb4e19ee5122c86d2f3f0d2246713270710a01bb4b9f368",
+    "profiles-json-case.jsonl": "ba56f3018142cd8e91fc65fa36d6b32af2efa4729abeb389540ba1d807489425",
+    "profiles-json-draft.jsonl": "3a010b26ae04e77d26f3401824e5953e7f1cbc458f6d79bda69167aa3f79af8d",
+    "profiles-json-history.jsonl": "d48467357ed485d8fc7dae693fc09aa36ed8725d8b24d8d9855cc3fd211a1027",
+    "profiles-json-operator.jsonl": "04ff96a8b73a91e500ba2c14135cb9ef3e4dfafb93bc6a9569db3141a730e639",
+    "profiles-json-session.jsonl": "dfd0275f5e6cbdc164aeb62e21f65c57a1c4f7adb64584d93041d30b658518d5",
+    "profiles-json-version.jsonl": "4d6b0a3227ae9e173a00901c49b6c53ce890ec9cb4b9aa84c48df57e497c4de1",
+    "profiles-page-overview.jsonl": "f78b4dd10d53ff01c915617804431601c3eea4582590164e42eb615c474ee7e0",
+    "profiles-page-queue.jsonl": "2c688f4a983683d9fedbb80f0cde86802226a72fd11d28f02376cf231e668b83",
+    "profiles-ready-cached.jsonl": "c59538b153aeb3ee661c4c7f0f084cd31eb34e33a15e2245533346449d34443c",
+    "profiles-ready-uncached.jsonl": "55977757c159eecd35666619829824391e51670f0dc063de6ff8331e6426474c",
+    "profiles-submit.jsonl": "8a54ee919ab103f3b67c6c725ad958981833746605a857aae015835e5a67f252",
+    "profiles-upload.jsonl": "0225d7bb7d45a3403dae3aef2638a6fe9e22f5cca4606af7dd0a780cce095e9e"
+  }
+}

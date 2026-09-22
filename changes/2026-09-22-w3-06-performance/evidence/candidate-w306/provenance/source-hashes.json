@@ -1,0 +1,237 @@
+{
+  "seedHead": "0c99d61a61585dca51b333e95886476830419053",
+  "measurementHead": "9b8a2ea2f5ac2a51774c2e0008752c3b49132faa",
+  "productHead": "27ad01b1ba8179f286660959043c0e178fd51b35",
+  "a01SeedManifestRawSha256": "d7970707541efa5018458e1f146b3f5462d248190d6dac52e5cc2acf9aff1fcd",
+  "a01SeedManifestContentHash": "56c46fe5c8cb088f6bce9bed99eaac611924d528b18e612c812d08e5eb475dea",
+  "b02DiagnosticCompleteRawSha256": "c7872715658b832684a20302ee9033a96c1f372d77c6e92ba60a324581214fe3",
+  "b02MeasureCompleteRawSha256": "124b225f123ab28ee7b3c7be10563051d0dd2314c2ccff36f6eb482f65108903",
+  "sealedA01Sources": {
+    "measurement-plan.json": "e524a76b0700b492ce1808d290ef7d190029aa5a8fd19c6a9e2ade8a851ad1f2",
+    "setup-complete.json": "936eb2417518fcecee0134ba05fad597548fe87de3c921d18129aa97e24466b4",
+    "queue-manifest.json": "d7970707541efa5018458e1f146b3f5462d248190d6dac52e5cc2acf9aff1fcd",
+    "mutation-bindings.json": "ebba8377fae6a4ac21d67026f8a1ae8c45b5d1711c5402ef3b49b1043d710941",
+    "queue-launch.json": "37699ab7fd90c3637e8c6c077361c564a0991d4ea230889b590b79e4ed466221",
+    "mutation-launch.json": "c6eb53b9c20b29e84033c947b254d9caa7fc77d4bc1fe91fc6c62bcbba95947d",
+    "source-fingerprint.json": "97a304ff5da524a0aef9fcfd86ae0b1b4e636294fae75d11cf9bf1c84b899f8b",
+    "build-assets.json": "cfca9072dc8dc909ee25447b7f9bd141deec5befc6698a0536643eafa1ee8b2a",
+    "queue-samples.jsonl": "ba5793ea916d2c1e0eab00cae592a50527d4a463effd4e93f41d5f7bfbb6898a",
+    "profiles-download.jsonl": "fd4dddd6e3aafbd20cb4e19ee5122c86d2f3f0d2246713270710a01bb4b9f368",
+    "profiles-json-case.jsonl": "ba56f3018142cd8e91fc65fa36d6b32af2efa4729abeb389540ba1d807489425",
+    "profiles-json-draft.jsonl": "3a010b26ae04e77d26f3401824e5953e7f1cbc458f6d79bda69167aa3f79af8d",
+    "profiles-json-history.jsonl": "d48467357ed485d8fc7dae693fc09aa36ed8725d8b24d8d9855cc3fd211a1027",
+    "profiles-json-operator.jsonl": "04ff96a8b73a91e500ba2c14135cb9ef3e4dfafb93bc6a9569db3141a730e639",
+    "profiles-json-session.jsonl": "dfd0275f5e6cbdc164aeb62e21f65c57a1c4f7adb64584d93041d30b658518d5",
+    "profiles-json-version.jsonl": "4d6b0a3227ae9e173a00901c49b6c53ce890ec9cb4b9aa84c48df57e497c4de1",
+    "profiles-page-overview.jsonl": "f78b4dd10d53ff01c915617804431601c3eea4582590164e42eb615c474ee7e0",
+    "profiles-page-queue.jsonl": "2c688f4a983683d9fedbb80f0cde86802226a72fd11d28f02376cf231e668b83",
+    "profiles-ready-cached.jsonl": "c59538b153aeb3ee661c4c7f0f084cd31eb34e33a15e2245533346449d34443c",
+    "profiles-ready-uncached.jsonl": "55977757c159eecd35666619829824391e51670f0dc063de6ff8331e6426474c",
+    "profiles-submit.jsonl": "8a54ee919ab103f3b67c6c725ad958981833746605a857aae015835e5a67f252",
+    "profiles-upload.jsonl": "0225d7bb7d45a3403dae3aef2638a6fe9e22f5cca4606af7dd0a780cce095e9e"
+  },
+  "copiedArtifacts": [
+    {
+      "archive": "a01/profiles-download.jsonl",
+      "source": ".local/performance/w306_20260923_a01/profiles-download.jsonl",
+      "sha256": "fd4dddd6e3aafbd20cb4e19ee5122c86d2f3f0d2246713270710a01bb4b9f368",
+      "copy": "byte-identical raw latency journal"
+    },
+    {
+      "archive": "a01/profiles-json-case.jsonl",
+      "source": ".local/performance/w306_20260923_a01/profiles-json-case.jsonl",
+      "sha256": "ba56f3018142cd8e91fc65fa36d6b32af2efa4729abeb389540ba1d807489425",
+      "copy": "byte-identical raw latency journal"
+    },
+    {
+      "archive": "a01/profiles-json-draft.jsonl",
+      "source": ".local/performance/w306_20260923_a01/profiles-json-draft.jsonl",
+      "sha256": "3a010b26ae04e77d26f3401824e5953e7f1cbc458f6d79bda69167aa3f79af8d",
+      "copy": "byte-identical raw latency journal"
+    },
+    {
+      "archive": "a01/profiles-json-history.jsonl",
+      "source": ".local/performance/w306_20260923_a01/profiles-json-history.jsonl",
+      "sha256": "d48467357ed485d8fc7dae693fc09aa36ed8725d8b24d8d9855cc3fd211a1027",
+      "copy": "byte-identical raw latency journal"
+    },
+    {
+      "archive": "a01/profiles-json-operator.jsonl",
+      "source": ".local/performance/w306_20260923_a01/profiles-json-operator.jsonl",
+      "sha256": "04ff96a8b73a91e500ba2c14135cb9ef3e4dfafb93bc6a9569db3141a730e639",
+      "copy": "byte-identical raw latency journal"
+    },
+    {
+      "archive": "a01/profiles-json-session.jsonl",
+      "source": ".local/performance/w306_20260923_a01/profiles-json-session.jsonl",
+      "sha256": "dfd0275f5e6cbdc164aeb62e21f65c57a1c4f7adb64584d93041d30b658518d5",
+      "copy": "byte-identical raw latency journal"
+    },
+    {
+      "archive": "a01/profiles-json-version.jsonl",
+      "source": ".local/performance/w306_20260923_a01/profiles-json-version.jsonl",
+      "sha256": "4d6b0a3227ae9e173a00901c49b6c53ce890ec9cb4b9aa84c48df57e497c4de1",
+      "copy": "byte-identical raw latency journal"
+    },
+    {
+      "archive": "a01/profiles-page-overview.jsonl",
+      "source": ".local/performance/w306_20260923_a01/profiles-page-overview.jsonl",
+      "sha256": "f78b4dd10d53ff01c915617804431601c3eea4582590164e42eb615c474ee7e0",
+      "copy": "byte-identical raw latency journal"
+    },
+    {
+      "archive": "a01/profiles-page-queue.jsonl",
+      "source": ".local/performance/w306_20260923_a01/profiles-page-queue.jsonl",
+      "sha256": "2c688f4a983683d9fedbb80f0cde86802226a72fd11d28f02376cf231e668b83",
+      "copy": "byte-identical raw latency journal"
+    },
+    {
+      "archive": "a01/profiles-ready-cached.jsonl",
+      "source": ".local/performance/w306_20260923_a01/profiles-ready-cached.jsonl",
+      "sha256": "c59538b153aeb3ee661c4c7f0f084cd31eb34e33a15e2245533346449d34443c",
+      "copy": "byte-identical raw latency journal"
+    },
+    {
+      "archive": "a01/profiles-ready-uncached.jsonl",
+      "source": ".local/performance/w306_20260923_a01/profiles-ready-uncached.jsonl",
+      "sha256": "55977757c159eecd35666619829824391e51670f0dc063de6ff8331e6426474c",
+      "copy": "byte-identical raw latency journal"
+    },
+    {
+      "archive": "a01/profiles-submit.jsonl",
+      "source": ".local/performance/w306_20260923_a01/profiles-submit.jsonl",
+      "sha256": "8a54ee919ab103f3b67c6c725ad958981833746605a857aae015835e5a67f252",
+      "copy": "byte-identical raw latency journal"
+    },
+    {
+      "archive": "a01/profiles-upload.jsonl",
+      "source": ".local/performance/w306_20260923_a01/profiles-upload.jsonl",
+      "sha256": "0225d7bb7d45a3403dae3aef2638a6fe9e22f5cca4606af7dd0a780cce095e9e",
+      "copy": "byte-identical raw latency journal"
+    },
+    {
+      "archive": "a01/queue-samples.jsonl",
+      "source": ".local/performance/w306_20260923_a01/queue-samples.jsonl",
+      "sha256": "ba5793ea916d2c1e0eab00cae592a50527d4a463effd4e93f41d5f7bfbb6898a",
+      "copy": "byte-identical raw latency journal"
+    },
+    {
+      "archive": "b02/profiles-page-editor.jsonl",
+      "source": ".local/performance/w306_20260923_pages_b02/profiles-page-editor.jsonl",
+      "sha256": "ad052ca0d1d847a72e7ba0aa01d6fa133ff35952b39a5a660f3a8524fc7322b5",
+      "copy": "byte-identical raw latency journal"
+    },
+    {
+      "archive": "b02/profiles-page-history.jsonl",
+      "source": ".local/performance/w306_20260923_pages_b02/profiles-page-history.jsonl",
+      "sha256": "8ee27f2d2dfe272fabbcfcfef7ea79d91337a7714e83ee629ed70f938a084932",
+      "copy": "byte-identical raw latency journal"
+    },
+    {
+      "archive": "b02/profiles-page-overview.jsonl",
+      "source": ".local/performance/w306_20260923_pages_b02/profiles-page-overview.jsonl",
+      "sha256": "1e46ddf0e8da862c6d6e45092351f2c9a6759d9930df9599e7d96a35611325d7",
+      "copy": "byte-identical raw latency journal"
+    },
+    {
+      "archive": "b02/profiles-page-queue.jsonl",
+      "source": ".local/performance/w306_20260923_pages_b02/profiles-page-queue.jsonl",
+      "sha256": "3d9224b90b96a008834e2138e61f0c98287744a204f6e1af1561e31b18352645",
+      "copy": "byte-identical raw latency journal"
+    },
+    {
+      "archive": "b02/profiles-page-reviewer.jsonl",
+      "source": ".local/performance/w306_20260923_pages_b02/profiles-page-reviewer.jsonl",
+      "sha256": "530a99230f3e9e103913f2e74c25998a0e59ab188f24427fdad544d06ea3d792",
+      "copy": "byte-identical raw latency journal"
+    },
+    {
+      "archive": "provenance/a01-source-fingerprint.json",
+      "source": ".local/performance/w306_20260923_a01/source-fingerprint.json",
+      "sha256": "97a304ff5da524a0aef9fcfd86ae0b1b4e636294fae75d11cf9bf1c84b899f8b",
+      "copy": "byte-identical metadata"
+    },
+    {
+      "archive": "provenance/a01-built-assets.json",
+      "source": ".local/performance/w306_20260923_a01/build-assets.json",
+      "sha256": "cfca9072dc8dc909ee25447b7f9bd141deec5befc6698a0536643eafa1ee8b2a",
+      "copy": "byte-identical metadata"
+    },
+    {
+      "archive": "provenance/a01-environment.json",
+      "source": ".local/performance/w306_20260923_a01/environment.json",
+      "sha256": "0a49a7a4dfb798850a7a96d66e59a63649d3888306699d3fa0c7321157f1a9f2",
+      "copy": "byte-identical metadata"
+    },
+    {
+      "archive": "provenance/a01-idle.json",
+      "source": ".local/performance/w306_20260923_a01/resume-idle.json",
+      "sha256": "8d9f1d0cb93cf8cd8e2fb0dd02d32cfd99ce93153c0f5ad6fd4bac79b5a07dab",
+      "copy": "byte-identical metadata"
+    },
+    {
+      "archive": "provenance/b02-idle.json",
+      "source": ".local/performance/w306_20260923_pages_b02/measure-idle.json",
+      "sha256": "e11e42950b504e72b54db952bbce0c0c4b9d79e5c11bf4c97ecf87ddce937a1f",
+      "copy": "byte-identical metadata"
+    },
+    {
+      "archive": "provenance/b02-result-cleanup.json",
+      "source": ".local/performance/w306_20260923_pages_b02/measurement-summary.json",
+      "sha256": "d94cbc0d8e47381bbab683af904a0a8de7a8f18e80c4f5a62cd0e27a6fe41a16",
+      "copy": "byte-identical metadata"
+    },
+    {
+      "archive": "reproduction/original-v1/driver.mjs",
+      "source": ".local/performance-review-v1/driver.mjs",
+      "sha256": "907e9868fb1bb230c4165fa151350756872044f22b2b2b479342a4fe42653c09",
+      "copy": "byte-identical reviewed source/template"
+    },
+    {
+      "archive": "reproduction/original-v1/input.template.json",
+      "source": ".local/performance-review-v1/input.template.json",
+      "sha256": "1fcda34f352ff681252c8ed41943bd227f1f6f949968a03bc2897cb0dfbe8ddf",
+      "copy": "byte-identical reviewed source/template"
+    },
+    {
+      "archive": "reproduction/original-v1/selectors.template.json",
+      "source": ".local/performance-review-v1/selectors.template.json",
+      "sha256": "f43258bb1fa403936283e227522e738ddf99c3bfff9ebe865cacce58495a8ace",
+      "copy": "byte-identical reviewed source/template"
+    },
+    {
+      "archive": "reproduction/resume-v2/resume.mjs",
+      "source": ".local/performance-page-resume-v2/resume.mjs",
+      "sha256": "4bd0b933aa06b01c37744e1912925d64ceacfbc6fd9e5bb8fbd9a7494796fe9c",
+      "copy": "byte-identical reviewed source/template"
+    },
+    {
+      "archive": "reproduction/resume-v2/input.template.json",
+      "source": ".local/performance-page-resume-v2/input.template.json",
+      "sha256": "785b714542fe97ecdfcacc394ee26094f0517b505debd78dce04c7e805d6e09f",
+      "copy": "byte-identical reviewed source/template"
+    },
+    {
+      "archive": "reproduction/resume-v2/README.md",
+      "source": ".local/performance-page-resume-v2/README.md",
+      "sha256": "6ee8cb47ffa756a13d291caf3956a692fa94e82f274d867eff10314fff18c8a0",
+      "copy": "byte-identical reviewed source/template"
+    }
+  ],
+  "mergedMainComparison": {
+    "actualMergedMain": "6d60181a9e3ee6f24c39883a4b77c6d12cde1a12",
+    "replayedHarnessHeadBeforeArchive": "73dd1de07996a54214b12560911e110db7ec7579",
+    "originalSeedHead": "0c99d61a61585dca51b333e95886476830419053",
+    "originalPageMeasurementHead": "9b8a2ea2f5ac2a51774c2e0008752c3b49132faa",
+    "inventoryEntries": 345,
+    "differingInventoryEntries": [],
+    "productTreeDifference": [],
+    "verificationScriptDelta": [
+      "test:unit includes tests/performance/*.test.ts",
+      "typecheck changes tsc -b to tsc -b . tests/performance"
+    ],
+    "otherManifestFieldsIdentical": true,
+    "remeasurementRequired": false,
+    "classification": "local synthetic measurements of production/config source identical to merged main; not owner acceptance or production capacity proof"
+  }
+}

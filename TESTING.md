@@ -51,7 +51,7 @@ Run git diff --check, inspect git status, run the two zero-dependency scripts W1
 
 ## Product build (W0-W3)
 
-Authorized on 2026-09-21 (D03). The commands below are specified by the [W0-02 file-level plan](docs/engineering/implementation-plan-w1-w3.md#3-commands) and become runnable when W1-00 creates `rai-web/` and W1-12 wires CI; until those tickets merge, none of them runs and no runtime success is claimed. W0-09 verified on 2026-09-21 that this section matches the plan after the W0 exit reconciliation ([exit review](changes/2026-09-21-w0-exit/review.md)); the [performance targets](docs/engineering/performance-targets.md) are targets, not measurements. The demo suite above stays separate from the product suite; no command is shared.
+Authorized on 2026-09-21 (D03). The commands below are implemented under the [W0-02 file-level plan](docs/engineering/implementation-plan-w1-w3.md#3-commands), W1-00 and W1-12. The [W3 exit](changes/2026-09-23-w3-exit/review.md) records executed commands, exact source identities and remaining acceptance boundaries. W0-09 verified on 2026-09-21 that this section matches the plan after the W0 exit reconciliation ([exit review](changes/2026-09-21-w0-exit/review.md)); the [performance targets](docs/engineering/performance-targets.md) remain advisory; bounded synthetic measurements are recorded separately in the W3 exit. The demo suite above stays separate from the product suite; no command is shared.
 
 All `npm` commands run from `rai-web/` with Node 24 (`export PATH=$HOME/.nvm/versions/node/v24.21.0/bin:$PATH` or `nvm use`). Docker must be running for anything that touches Postgres.
 

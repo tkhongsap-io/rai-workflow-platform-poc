@@ -98,3 +98,9 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Takes over from: none (reason: parent-delegated #49 planning only; parent retains lead/exit authority)
 - What: Isolated `/tmp/rai-w3-integration`, `codex/w3-int` at `fe65fc1`; no code or other agents' ownership taken. W3-06/performance and 03b/04/07a/07b remain separately owned.
 - Next: Lead review of [file-level plan](../../changes/2026-09-22-w3-int/plan.md) before implementation; separate final reviewer due to queue UI authorship.
+
+## 2026-09-22 — CLAIM W3-06 performance harness preparation only
+- Author: operator=Codex session=w3-06-performance
+- Takes over from: none; parent delegates only isolated harness preparation, not lead-lane integration ownership.
+- Scope: guards, real-API seed and measurement functions, pure tests; no DB actions, benchmark, PR or M3 acceptance.
+- Evidence: [plan](../../changes/2026-09-22-w3-06-performance/plan.md).

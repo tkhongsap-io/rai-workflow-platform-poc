@@ -1,8 +1,8 @@
 # Build Plan: RAI Workflow Platform PoC
 
-Version: 1.0, 2026-09-21 (draft 1 was 2026-09-20). **Canonical implementation anchor. G0 closed 2026-09-21; W0-W3 authorized on synthetic data (D03). Package text below stays as written. Current status is the dated section at the end: M2 reached; W3 queue API and SLA are on main, with UI, mail, observability and M3 acceptance still in progress.**
+Version: 1.0, 2026-09-21 (draft 1 was 2026-09-20). **Canonical implementation anchor. G0 closed 2026-09-21; W0-W3 authorized on synthetic data (D03). Package text below stays as written. Current status is the dated section at the end: W3 synthetic engineering exit recorded; Ta’s package review remains pending.**
 
-Read [PRD](PRD.md) for product scope, [acceptance](docs/acceptance.md) for expected behavior and [decisions](docs/product/decisions.md) for the recorded rules (D01-D03, D05, D06, D11, D12) and the open items (D04, D07-D10). The older repository-foundation plan describes documentation setup only. This document governs the future product build.
+Read [PRD](PRD.md) for product scope, [acceptance](docs/acceptance.md) for expected behavior and [decisions](docs/product/decisions.md) for the recorded rules (D01-D06, D11, D12, including the D03 merge-authority amendment) and the open items (D07-D10). The older repository-foundation plan describes documentation setup only. This document governs the staged product build.
 
 ## Authorized design demonstrator
 
@@ -155,7 +155,7 @@ All recorded on 2026-09-21 in the [register](docs/product/decisions.md); the [br
 3. D03 — Ta: W0-W3 authorized, synthetic only, `codex/<ticket-id>-<topic>` branches, reviewed PRs, Ta merges, GitHub issues as tracker.
 4. D05, D06, D11, D12 — Ta: brief defaults.
 
-Still open: D04 (inside W0-01), D07-D10 (gates for W4-W8).
+At G0 close, D04 and D07-D10 were open. D04 was subsequently recorded in ADR-0003; D07-D10 remain gates for W4-W8.
 
 ## Status against this plan — 2026-09-22 (W3 delivery in progress)
 
@@ -181,3 +181,18 @@ None on authorization: W0–W3 remain the synthetic-data scope of D03; W4–W8 s
 The [delivery pack](docs/delivery/README.md) breaks G0, W0 and W1-W3 into decision briefs and assignable tickets; it does not change these packages.
 
 W2 exit is recorded and Milestone M2 is reached. W3 delivery is in progress: SLA (PR #104), scoped queue API (PR #109), mail-sink dependency (PR #107) and the queue UI contract (PR #110) have merged. The W1-11 dependency is resolved; the remaining UI, notification and observability tickets proceed through separate reviewed PRs before W3-INT and the M3 exit. Issue #35 and epic #53 stay open. W4–W8 are not authorized. Supporting [architecture](docs/architecture/README.md), [threat model](docs/security/threat-model.md) and [evaluation](docs/evaluation/plan.md) remain part of the build contract. DEVLOG.md is the live record.
+
+## Status against this plan — 2026-09-23 (W3 engineering exit)
+
+The preceding 2026-09-22 status is historical. W3 implementation and the synthetic engineering evidence are recorded in the [exit review](changes/2026-09-23-w3-exit/review.md). Ta’s package review is still pending; no production or operator acceptance is inferred.
+
+| Area | Current state | Remaining boundary |
+|---|---|---|
+| W3 queue, SLA and notifications | Implemented through reviewed prerequisite PRs and real-server integration | File mail sink only; no external delivery or exactly-once promise |
+| Operator diagnostics and slice-1 journey | Real-server evidence, fault/restart negatives, keyboard walkthrough and scoped views recorded | Synthetic identity/QC adapters; no real model-quality claim |
+| M3 engineering exit | Test, timing and recording evidence recorded in W3-06 | Ta’s package review; Ta/operator confirmation of advisory workload/latency targets |
+| W2 finding ownership | Existing issue #35 and epic #53 stay open | Slot5/9, pack and unavailable owning-lane semantics remain unresolved |
+| Local identity | Automated fixture boundary verified | Manual Google loopback sign-in remains pending Ta |
+| W4–W8 | Not authorized | Separate package gates and D07–D10; operator rehearsal and production release remain future work |
+
+The exit record retains failed/repaired checks, source identities and the PR120 premature-merge exception with subsequent verification. Later merges require all required checks to succeed on the exact independently reviewed head. There is no scope change or authorization to continue into W4 here.
