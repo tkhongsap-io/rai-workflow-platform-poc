@@ -79,6 +79,14 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=agent session=w2-10-w2-shapes model=composer
 - Evidence: branch codex/w2-10-w2-shapes; `fixtures/src/substitutes/api/review.test.ts`
 
+## 2026-09-22 (time not recorded) — CLAIM Lane C: W1-11 main promotion only
+- What: Promote PR #68's mail sink onto main-based `codex/w1-11-main-promotion` in `/tmp/rai-w3-mail-promotion`; other Lane C tickets remain outside this claim.
+- Author: operator=ta session=w1-11-main-promotion model=gpt-6
+- Takes over from: session=w2-10-w2-shapes (reason: handoff; owner assigned this dependency promotion only)
+- Why: PR #68 merged into `codex/w1-00-mail-dedup`; W3-03 needs the sink on main. Shared dedup/types already exist on main.
+- Next: Local validation and commit; parent arranges independent review and PR. No push or merge.
+- Evidence: [promotion plan](../../changes/2026-09-22-w1-11-main-promotion/plan.md)
+
 ## 2026-09-22 — CLAIM Lane C W3-08
 - Author: operator=ta session=codex-w3-queue-substitute model=GPT-6
 - Takes over from: session=w2-10-w2-shapes (reason: handoff; scoped queue substitute, separate worktree from mail promotion)
