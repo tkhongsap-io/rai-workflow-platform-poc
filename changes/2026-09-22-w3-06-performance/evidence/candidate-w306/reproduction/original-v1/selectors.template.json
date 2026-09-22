@@ -1,0 +1,85 @@
+{
+  "sourceInspectedHead": "f4bb4cc9d4158632fa710c09e134deacf684126d",
+  "reviewedBuiltHead": "REPLACE_FINAL_BUILT_HEAD_AFTER_UI_REPAIR",
+  "reviewed": false,
+  "pages": [
+    {
+      "kind": "queue",
+      "actor": "fx-user-dpo",
+      "visible": [
+        "[data-testid=\"queue-count\"]:has-text(\"1000\")",
+        "article[aria-labelledby=\"queue-{firstQueueCaseId}\"]"
+      ],
+      "absent": [".notice-error", ".queue-message", ".empty-state"]
+    },
+    {
+      "kind": "overview",
+      "actor": "fx-user-owner-cm",
+      "visible": [
+        ".case-head h1:has-text(\"SYNTHETIC-PERF-MUT-47\")",
+        ".case-head-status [data-status=\"ready_for_launch\"]",
+        ".versions-nav a[href^=\"/cases/{caseId}/versions/\"]"
+      ],
+      "absent": [
+        ".notice-error",
+        ".case-screen[aria-busy=\"true\"]",
+        "[data-review-qc=\"loading\"]",
+        "[data-review-qc=\"unavailable\"]",
+        "[aria-labelledby=\"pack-heading\"]"
+      ]
+    },
+    {
+      "kind": "editor",
+      "actor": "fx-user-owner-cm",
+      "visible": [
+        ".case-head h1:has-text(\"SYNTHETIC-PERF-MUT-45\")",
+        "[aria-labelledby=\"pack-heading\"] .slot-row[data-slot=\"9\"]",
+        "#pack-template:enabled"
+      ],
+      "absent": [
+        ".notice-error",
+        ".case-screen[aria-busy=\"true\"]",
+        "[data-review-qc=\"loading\"]",
+        "[data-review-qc=\"unavailable\"]",
+        "[aria-labelledby=\"frozen-heading\"]"
+      ]
+    },
+    {
+      "kind": "reviewer",
+      "actor": "fx-user-ai-coe",
+      "visible": [
+        ".case-head h1:has-text(\"SYNTHETIC-PERF-MUT-46\")",
+        "#frozen-heading:has-text(\"เวอร์ชัน 2\")",
+        ".versions-nav a[href=\"/cases/{caseId}/versions/{versionId}\"][aria-current=\"page\"]",
+        "[data-review-qc=\"empty\"]",
+        "[data-review-controls=\"ready\"] button.btn-primary:enabled",
+        "[aria-labelledby=\"frozen-heading\"] .slot-row[data-slot=\"9\"]"
+      ],
+      "absent": [
+        ".notice-error",
+        ".case-screen[aria-busy=\"true\"]",
+        "[data-review-qc=\"loading\"]",
+        "[data-review-qc=\"unavailable\"]",
+        "[aria-labelledby=\"pack-heading\"]"
+      ]
+    },
+    {
+      "kind": "history",
+      "actor": "fx-user-owner-cm",
+      "visible": [
+        ".case-head h1:has-text(\"SYNTHETIC-PERF-MUT-46\")",
+        "#frozen-heading:has-text(\"เวอร์ชัน 1\")",
+        ".versions-nav a[href=\"/cases/{caseId}/versions/{versionId}\"][aria-current=\"page\"]",
+        "[aria-labelledby=\"frozen-heading\"] .slot-row[data-slot=\"9\"]"
+      ],
+      "absent": [
+        ".notice-error",
+        ".case-screen[aria-busy=\"true\"]",
+        "[data-review-qc=\"loading\"]",
+        "[data-review-qc=\"unavailable\"]",
+        "[data-review-controls=\"ready\"]",
+        "[aria-labelledby=\"pack-heading\"]"
+      ]
+    }
+  ]
+}

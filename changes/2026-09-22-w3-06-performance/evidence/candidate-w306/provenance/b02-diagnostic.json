@@ -1,0 +1,321 @@
+{
+  "seedHead": "0c99d61a61585dca51b333e95886476830419053",
+  "measurementHead": "9b8a2ea2f5ac2a51774c2e0008752c3b49132faa",
+  "productHead": "27ad01b1ba8179f286660959043c0e178fd51b35",
+  "candidateEvidenceOnly": true,
+  "queueCases": 1000,
+  "stateBefore": [
+    {
+      "caseId": "01a0ca94-8cb7-7dc9-bd83-2030ec9328e1",
+      "status": "ready_for_launch",
+      "currentVersionId": "01a0ca94-8cb7-7e43-862e-1320c4e1432d",
+      "draftVersionId": null
+    },
+    {
+      "caseId": "01a0ca94-8ca0-71a9-a433-13989b4476b2",
+      "status": "draft",
+      "currentVersionId": null,
+      "draftVersionId": "01a0ca94-8ca0-77a0-8353-c86076685ae8"
+    },
+    {
+      "caseId": "01a0ca94-8cb1-7f11-833a-d3ce759f7105",
+      "status": "in_review",
+      "currentVersionId": "01a0ca94-8d6d-77d0-8254-b5a61af40367",
+      "draftVersionId": null
+    }
+  ],
+  "stateAfter": [
+    {
+      "caseId": "01a0ca94-8cb7-7dc9-bd83-2030ec9328e1",
+      "status": "ready_for_launch",
+      "currentVersionId": "01a0ca94-8cb7-7e43-862e-1320c4e1432d",
+      "draftVersionId": null
+    },
+    {
+      "caseId": "01a0ca94-8ca0-71a9-a433-13989b4476b2",
+      "status": "draft",
+      "currentVersionId": null,
+      "draftVersionId": "01a0ca94-8ca0-77a0-8353-c86076685ae8"
+    },
+    {
+      "caseId": "01a0ca94-8cb1-7f11-833a-d3ce759f7105",
+      "status": "in_review",
+      "currentVersionId": "01a0ca94-8d6d-77d0-8254-b5a61af40367",
+      "draftVersionId": null
+    }
+  ],
+  "routes": [
+    {
+      "kind": "queue",
+      "entry": "/queue",
+      "final": "/queue"
+    },
+    {
+      "kind": "overview",
+      "entry": "/cases/01a0ca94-8cb7-7dc9-bd83-2030ec9328e1",
+      "final": "/cases/01a0ca94-8cb7-7dc9-bd83-2030ec9328e1/versions/01a0ca94-8cb7-7e43-862e-1320c4e1432d"
+    },
+    {
+      "kind": "editor",
+      "entry": "/cases/01a0ca94-8ca0-71a9-a433-13989b4476b2",
+      "final": "/cases/01a0ca94-8ca0-71a9-a433-13989b4476b2"
+    },
+    {
+      "kind": "reviewer",
+      "entry": "/cases/01a0ca94-8cb1-7f11-833a-d3ce759f7105/versions/01a0ca94-8d6d-77d0-8254-b5a61af40367",
+      "final": "/cases/01a0ca94-8cb1-7f11-833a-d3ce759f7105/versions/01a0ca94-8d6d-77d0-8254-b5a61af40367"
+    },
+    {
+      "kind": "history",
+      "entry": "/cases/01a0ca94-8cb1-7f11-833a-d3ce759f7105/versions/01a0ca94-8cb1-71f5-a2d5-973d1be50c46",
+      "final": "/cases/01a0ca94-8cb1-7f11-833a-d3ce759f7105/versions/01a0ca94-8cb1-71f5-a2d5-973d1be50c46"
+    }
+  ],
+  "observations": [
+    {
+      "kind": "queue",
+      "entry": "/queue",
+      "final": "/queue",
+      "finalObserved": "/queue",
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/queue",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/assets/index-BqYcoGMI.css",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/assets/index-Bdjfiktx.js",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/session",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/queue",
+          "status": 200
+        }
+      ],
+      "loadedAssertionsPassed": true
+    },
+    {
+      "kind": "overview",
+      "entry": "/cases/01a0ca94-8cb7-7dc9-bd83-2030ec9328e1",
+      "final": "/cases/01a0ca94-8cb7-7dc9-bd83-2030ec9328e1/versions/01a0ca94-8cb7-7e43-862e-1320c4e1432d",
+      "finalObserved": "/cases/01a0ca94-8cb7-7dc9-bd83-2030ec9328e1/versions/01a0ca94-8cb7-7e43-862e-1320c4e1432d",
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/cases/:id",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/assets/index-BqYcoGMI.css",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/assets/index-Bdjfiktx.js",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/session",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/cases/:id",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/configuration/current",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/cases/:id/versions",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/cases/:id/versions/:id",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/cases/:id/versions/:id/findings",
+          "status": 200
+        }
+      ],
+      "loadedAssertionsPassed": true
+    },
+    {
+      "kind": "editor",
+      "entry": "/cases/01a0ca94-8ca0-71a9-a433-13989b4476b2",
+      "final": "/cases/01a0ca94-8ca0-71a9-a433-13989b4476b2",
+      "finalObserved": "/cases/01a0ca94-8ca0-71a9-a433-13989b4476b2",
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/cases/:id",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/assets/index-BqYcoGMI.css",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/assets/index-Bdjfiktx.js",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/session",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/configuration/current",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/cases/:id",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/cases/:id/versions",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/cases/:id/draft",
+          "status": 200
+        }
+      ],
+      "loadedAssertionsPassed": true
+    },
+    {
+      "kind": "reviewer",
+      "entry": "/cases/01a0ca94-8cb1-7f11-833a-d3ce759f7105/versions/01a0ca94-8d6d-77d0-8254-b5a61af40367",
+      "final": "/cases/01a0ca94-8cb1-7f11-833a-d3ce759f7105/versions/01a0ca94-8d6d-77d0-8254-b5a61af40367",
+      "finalObserved": "/cases/01a0ca94-8cb1-7f11-833a-d3ce759f7105/versions/01a0ca94-8d6d-77d0-8254-b5a61af40367",
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/cases/:id/versions/:id",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/assets/index-BqYcoGMI.css",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/assets/index-Bdjfiktx.js",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/session",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/configuration/current",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/cases/:id/versions",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/cases/:id",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/cases/:id/versions/:id",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "path": "/api/cases/:id/versions/:id/lanes/ai_coe/qc-run",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/cases/:id/versions/:id/findings",
+          "status": 200
+        }
+      ],
+      "loadedAssertionsPassed": true
+    },
+    {
+      "kind": "history",
+      "entry": "/cases/01a0ca94-8cb1-7f11-833a-d3ce759f7105/versions/01a0ca94-8cb1-71f5-a2d5-973d1be50c46",
+      "final": "/cases/01a0ca94-8cb1-7f11-833a-d3ce759f7105/versions/01a0ca94-8cb1-71f5-a2d5-973d1be50c46",
+      "finalObserved": "/cases/01a0ca94-8cb1-7f11-833a-d3ce759f7105/versions/01a0ca94-8cb1-71f5-a2d5-973d1be50c46",
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/cases/:id/versions/:id",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/assets/index-BqYcoGMI.css",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/assets/index-Bdjfiktx.js",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/session",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/configuration/current",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/cases/:id",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/cases/:id/versions",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/cases/:id/versions/:id",
+          "status": 200
+        }
+      ],
+      "loadedAssertionsPassed": true
+    }
+  ]
+}

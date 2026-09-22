@@ -1,0 +1,66 @@
+{
+  "capturedAtUtc": "2026-09-22T19:21:37.976150+00:00",
+  "head": "0c99d61a61585dca51b333e95886476830419053",
+  "loadAverages": [
+    2.72607421875,
+    4.0078125,
+    4.53515625
+  ],
+  "processes": [
+    {
+      "pid": 7007,
+      "cpuPercent": 0.0,
+      "elapsed": "09:28:57",
+      "category": "browser-support-server"
+    },
+    {
+      "pid": 7017,
+      "cpuPercent": 0.0,
+      "elapsed": "09:28:57",
+      "category": "browser-support-server"
+    },
+    {
+      "pid": 7033,
+      "cpuPercent": 0.0,
+      "elapsed": "09:28:56",
+      "category": "browser-support-server"
+    },
+    {
+      "pid": 7034,
+      "cpuPercent": 0.0,
+      "elapsed": "09:28:56",
+      "category": "browser-support-server"
+    },
+    {
+      "pid": 7072,
+      "cpuPercent": 0.0,
+      "elapsed": "09:28:53",
+      "category": "vite-server"
+    },
+    {
+      "pid": 7081,
+      "cpuPercent": 0.0,
+      "elapsed": "09:28:53",
+      "category": "vite-server"
+    },
+    {
+      "pid": 7098,
+      "cpuPercent": 0.0,
+      "elapsed": "09:28:53",
+      "category": "vite-server"
+    }
+  ],
+  "activeTestRunnersOrBrowsers": [],
+  "parentIdleAttestation": true,
+  "node": "v24.21.0",
+  "os": "ProductName:\t\tmacOS\nProductVersion:\t\t26.6.2\nBuildVersion:\t\t25G83",
+  "cpu": "Apple M5 Max",
+  "ramBytes": 137438953472,
+  "docker": {
+    "ServerVersion": "29.8.0",
+    "NCPU": 18,
+    "MemTotal": 8317267968,
+    "OperatingSystem": "Docker Desktop",
+    "Architecture": "aarch64"
+  }
+}

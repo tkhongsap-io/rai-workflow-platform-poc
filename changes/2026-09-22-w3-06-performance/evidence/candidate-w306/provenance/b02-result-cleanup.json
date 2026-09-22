@@ -1,0 +1,87 @@
+{
+  "at": "2026-09-22T20:03:00.836985+00:00",
+  "seedHead": "0c99d61a61585dca51b333e95886476830419053",
+  "measurementHead": "9b8a2ea2f5ac2a51774c2e0008752c3b49132faa",
+  "completeSha256": "124b225f123ab28ee7b3c7be10563051d0dd2314c2ccff36f6eb482f65108903",
+  "candidateEvidenceOnly": true,
+  "quantiles": "nearest rank ceil(p*N), measured samples only; warmups retained separately; no failures omitted",
+  "measured": 1000,
+  "warmups": 150,
+  "failures": 0,
+  "profiles": [
+    {
+      "profile": "page-editor",
+      "warmups": 30,
+      "samples": 200,
+      "failures": 0,
+      "p50Ms": 58.49079199999687,
+      "p95Ms": 75.40504100000544,
+      "p99Ms": 75.85325000000012,
+      "maxMs": 76.49591599999985,
+      "advisoryTargetMs": 1000,
+      "rawSha256": "ad052ca0d1d847a72e7ba0aa01d6fa133ff35952b39a5a660f3a8524fc7322b5"
+    },
+    {
+      "profile": "page-history",
+      "warmups": 30,
+      "samples": 200,
+      "failures": 0,
+      "p50Ms": 57.304667000003974,
+      "p95Ms": 74.29529199999524,
+      "p99Ms": 75.24191599999904,
+      "maxMs": 90.60016600000381,
+      "advisoryTargetMs": 1000,
+      "rawSha256": "8ee27f2d2dfe272fabbcfcfef7ea79d91337a7714e83ee629ed70f938a084932"
+    },
+    {
+      "profile": "page-overview",
+      "warmups": 30,
+      "samples": 200,
+      "failures": 0,
+      "p50Ms": 58.51762500000041,
+      "p95Ms": 75.6463750000039,
+      "p99Ms": 76.23704200000066,
+      "maxMs": 89.85625000000437,
+      "advisoryTargetMs": 1000,
+      "rawSha256": "1e46ddf0e8da862c6d6e45092351f2c9a6759d9930df9599e7d96a35611325d7"
+    },
+    {
+      "profile": "page-queue",
+      "warmups": 30,
+      "samples": 200,
+      "failures": 0,
+      "p50Ms": 127.59566700000141,
+      "p95Ms": 143.99920899999415,
+      "p99Ms": 145.02049999999872,
+      "maxMs": 145.21570799999608,
+      "advisoryTargetMs": 1000,
+      "rawSha256": "3d9224b90b96a008834e2138e61f0c98287744a204f6e1af1561e31b18352645"
+    },
+    {
+      "profile": "page-reviewer",
+      "warmups": 30,
+      "samples": 200,
+      "failures": 0,
+      "p50Ms": 74.7957080000051,
+      "p95Ms": 91.9497080000001,
+      "p99Ms": 94.40066699999443,
+      "maxMs": 109.73695900000166,
+      "advisoryTargetMs": 1000,
+      "rawSha256": "530a99230f3e9e103913f2e74c25998a0e59ab188f24427fdad544d06ea3d792"
+    }
+  ],
+  "cleanup": {
+    "appsStopped": "Both launcher stop calls succeeded before completion file",
+    "container": "exited",
+    "portsNoListeners": [
+      54370,
+      60870,
+      60871
+    ],
+    "reuseAddressBindPassed": true,
+    "initialPlainBindObservation": "Address already in use after shutdown; no listener on independent lsof check; SO_REUSEADDR bind succeeded",
+    "datasetsRetained": true,
+    "trackedClean": true,
+    "a01SealedHashesUnchanged": true
+  }
+}

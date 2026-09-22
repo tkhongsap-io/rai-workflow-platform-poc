@@ -1,0 +1,8 @@
+{"name":"page-overview","head":"0c99d61a61585dca51b333e95886476830419053","target":"mutation","status":200,"warmup":30,"count":200,"budgetMs":1000,"evidence":{"startupVerified":true,"responseFinishVerified":true,"qcScenarioApproved":"perf-enrolled-no-findings-v1","machine":"Apple M5 Max;128 GiB host RAM;macOS26.6.2;Node24.21.0;Docker29.8.0 aarch64 18CPU 8GiB;Postgres16.15;bundled Playwright Chromium;reviewed launcher default pools; environment snapshot retained; no active test runners/browser tests"},"concurrency":1,"acceptance":"not evaluated"}
+{"index":-30,"phase":"warmup","wallMs":145.61824999999953}
+{"index":-29,"phase":"warmup","wallMs":74.26170799997635}
+{"index":-28,"phase":"warmup","wallMs":56.242625000013504}
+{"index":-27,"phase":"warmup","wallMs":73.12020899995696}
+{"index":-26,"phase":"warmup","wallMs":56.08316699997522}
+{"index":-25,"phase":"warmup","wallMs":56.10016700002598}
+{"index":-24,"phase":"warmup","wallMs":5017.119582999963,"error":"expect(page).toHaveURL(expected) failed\n\nExpected: \"http://127.0.0.1:60871/cases/01a0ca94-8cb7-7dc9-bd83-2030ec9328e1\"\nReceived: \"http://127.0.0.1:60871/cases/01a0ca94-8cb7-7dc9-bd83-2030ec9328e1/versions/01a0ca94-8cb7-7e43-862e-1320c4e1432d\"\nTimeout:  5000ms\n\nCall log:\n  - Expect \"toHaveURL\" with timeout 5000ms\n    14 × locator resolved to <html lang=\"th\">…</html>\n       - unexpected value \"http://127.0.0.1:60871/cases/01a0ca94-8cb7-7dc9-bd83-2030ec9328e1/versions/01a0ca94-8cb7-7e43-862e-1320c4e1432d\"\n"}

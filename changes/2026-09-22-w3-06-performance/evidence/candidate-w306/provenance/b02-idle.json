@@ -1,0 +1,25 @@
+{
+  "at": "2026-09-22T20:00:06.779637+00:00",
+  "load": [
+    3.408203125,
+    5.41259765625,
+    5.55810546875
+  ],
+  "processes": [
+    {
+      "pid": 7098,
+      "cpu": 0.0,
+      "elapsed": "10:07:22",
+      "executable": "node",
+      "testRunner": false
+    }
+  ],
+  "portsFree": [
+    54370,
+    60870,
+    60871
+  ],
+  "parentOtherRuntimeHeld": true,
+  "review": "Descartes independent CLEAN diagnostic c7872715;59HTTP/all5routes;22 A01 hashes unchanged",
+  "authority": "B02 page-only measurement once; 5x30warm+200"
+}
