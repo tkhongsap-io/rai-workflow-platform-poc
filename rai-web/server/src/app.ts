@@ -9,6 +9,8 @@
 // `versions` deps are given. W1-INT registers the SPA (static.ts: web/dist, helmet headers, history fallback)
 // when `static` is given; the API routes and the JSON not-found handler are unchanged by it.
 
+import { createNotifications, type NotificationDeps } from './notifications/service.js';
+import { registerNotifications } from './notifications/runtime.js';
 import Fastify, { LogController, type FastifyError, type FastifyInstance } from 'fastify';
 import cookie from '@fastify/cookie';
 import { createDrain, type Drain } from './shutdown.js';
@@ -40,6 +42,8 @@ export interface IdentityDeps {
 }
 
 export interface AppDeps {
+  /** W3-03a initial post-commit notifications; retries and digest remain separate. */
+  notifications?: Omit<NotificationDeps, 'emitter'>;
   config: Pick<AppConfig, 'nodeEnv' | 'log' | 'trustProxy' | 'publicBaseUrl'>;
   /** Absent only in substrate-level tests that register no route; main.ts always passes it. */
   identity?: IdentityDeps;
@@ -106,6 +110,8 @@ export function buildApp(deps: AppDeps): App {
     ajv: { customOptions: { removeAdditional: false } }, // a key an `additionalProperties: false` shape does not list is 422, never stripped
   });
   const emitter = createEmitter(fastify.log, { strict: deps.config.nodeEnv === 'test' });
+  if (deps.notifications !== undefined)
+    registerNotifications(fastify, createNotifications({ ...deps.notifications, emitter }), emitter);
   const drain = createDrain(fastify); // first hook: every accepted request is counted (shutdown.ts)
 
   fastify.addHook('onRequest', (request, reply, done) => {
