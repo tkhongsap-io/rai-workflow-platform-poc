@@ -21,3 +21,7 @@ W3-07a handoff: expose the existing concrete mail `health()` through a server-lo
 ## Browser sink isolation fix planned on d96ba24
 
 Parent observed two file-link browser failures (three JSON files instead of four) with continuous polling. Reproduce focused browser runs while capturing the suite server, then isolate the dedicated file-sink process from the suite-wide memory dispatcher with an ephemeral migrated/fixture-loaded database and separate blob/sink directories. Preserve parent commits/contracts and the exact four-file assertion; no dispatcher semantics, sleeps or weakened assertion. Clean up only the generated database after its server stops. Run focused repeats, then the full suite on DB port 54365 and browser ports 8815/8816/5215 with OBS_MIGRATION_ADMIN_URL enabled; record results and local commit for independent Carver review. Parent prefers one cohesive W3-04 PR including this polling-exposed harness repair, with an explicit bounded size exception after proof; no separate prerequisite PR. Parent will retain main board claims, rebase onto actual main and record the exact final scope.
+
+## Bounded delivery scope exception
+
+The lead accepts approximately 800 changed lines for the cohesive retry dispatcher and its regression proof, including the separate browser-isolation repair discovered by the full run. The original 592-line estimate no longer applies. Splitting away the repair would knowingly publish a racing browser test with the polling worker. No new product feature, lease, migration or mail transport is included.

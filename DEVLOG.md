@@ -1,5 +1,9 @@
 # Development log
 
+## W3-04: bounded notification retries — 2026-09-22
+
+One notification dispatcher records up to four committed attempts with persisted backoff, preserves committed workflow decisions and drains safely. Independent review is clean after a full-run discovery led to isolated file-sink browser databases. Admin visibility and the integrated journey remain W3-07/W3-INT gates.
+
 ## W3-03a: committed case notifications — 2026-09-22
 
 Lane-open, send-back and Ready messages are composed from committed outbox/audit records with scoped synthetic recipients, protected version links and bilingual templates. Thai dates use Gregorian years. Initial delivery cannot undo a committed decision; background shutdown is bounded and retains active transaction locks until settlement or process exit. Independent review is clean after both fixes. Digest, retries and operator visibility remain separate tickets.
