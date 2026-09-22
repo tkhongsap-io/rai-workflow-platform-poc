@@ -1,5 +1,9 @@
 # Development log
 
+## W2-10: API substitute W2 shapes — 2026-09-22
+
+The W1-13 in-memory API substitute now answers the W2 HTTP shapes the real server already serves (lane approve / send-back, lane qc-run, finding dispositions), including forbidden and stale_version / 422 cases, so Lane B can build UI without editing the substitute. Ready is set only inside approve or disposition when three current-version approvals exist and no finding is undispositioned; there is no POST `/ready`. History remains the existing version read; send-back does not mutate version N and reuses one successor draft. Slot-5, pack-level and unavailable findings are not stored. Still absent from non-test builds (`check:substitute-absent`). This is not the W2 exit.
+
 ## W2-06: Ready predicate — 2026-09-22
 
 Ready is a system transition inside `lane.approved` and disposition (same transaction, under the case row lock): three current-version approvals and zero undispositioned findings set `pack_version.ready_at`, `desk_status` / `ai_readiness_status` to `ready`, one `case.ready_for_launch` audit (`triggered_by` the triggering event), and one `ready` notification outbox row (lane `-`). No POST `/ready`. An open finding or a prior-version approval blocks it; `fixed_proposed` alone does not count; mutating approve/disposition after Ready is `409 version_closed`. This is not the W2 exit; UI and mail delivery remain later tickets.

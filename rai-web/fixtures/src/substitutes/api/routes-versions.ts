@@ -105,6 +105,7 @@ export function versionRoutes(): RouteDefinition[] {
         stored.privacyStatus = 'pending';
         stored.securityStatus = 'pending';
         stored.raiStatus = 'pending';
+        stored.aiReadinessStatus = 'not_ready';
         stored.updatedAt = version.submittedAt;
         ctx.emitter.log('workflow.transition', {
           caseId: stored.caseId,

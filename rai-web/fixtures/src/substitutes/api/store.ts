@@ -19,6 +19,7 @@ import { readManifest, type FixtureManifest } from '../../manifest.js';
 import { CONFIGURATION_SEED } from '@rai/server/configuration/seed';
 import { APP_TIMEZONE } from '@rai/shared/constants';
 import type { CaseId, ConfigurationRevisionId, SubjectId } from '@rai/shared/ids';
+import type { Lane } from '@rai/shared/constants';
 import type { ArtifactRef } from '@rai/shared/schemas/artifacts';
 import type {
   CaseStatus,
@@ -29,9 +30,52 @@ import type {
   RiskTier,
 } from '@rai/shared/schemas/cases';
 import { type PackDraft, type SlotNumber, type SlotState } from '@rai/shared/schemas/pack';
+import type { DispositionKind, SendBackFeedback, StoredFindingSummary } from '@rai/shared/schemas/review';
 import type { SubmittedVersion } from '@rai/shared/schemas/versions';
+import { ScriptedQcRunner } from '../qc/scripted-runner.js';
 import type { RecordedLogLine, SubstituteSession } from './types.js';
 import { asContractMediaType, asContractModelType, asContractStageContext } from './contract-cast.js';
+
+/** One lane decision recorded against a submitted version (W2-02). */
+export interface StoredLaneDecision {
+  decisionId: string;
+  versionId: string;
+  lane: Lane;
+  decision: 'approve' | 'send_back';
+  actorSubjectId: string;
+  actorRole: string;
+  feedback: SendBackFeedback | null;
+  observedQcRunId: string | null;
+  decidedAt: string;
+}
+
+/** A persisted single-lane finding from lane QC (W2-05); never rewritten after insert. */
+export interface StoredFinding extends StoredFindingSummary {
+  versionId: string;
+  caseId: CaseId;
+  runId: string;
+}
+
+/** Append-only disposition event (W0-06 4.7); the finding row is never mutated. */
+export interface StoredDisposition {
+  dispositionId: string;
+  findingId: string;
+  kind: DispositionKind;
+  reason: string | null;
+  actorSubjectId: string;
+  actorRole: string;
+  recordedAt: string;
+}
+
+/** Lane QC run row (completed with findings, or unavailable with zero findings). */
+export interface StoredQcRun {
+  runId: string;
+  versionId: string;
+  lane: Lane;
+  status: 'completed' | 'unavailable';
+  reason?: 'timeout' | 'runner_error' | 'not_configured' | 'artifact_unreadable';
+  findings: StoredFindingSummary[];
+}
 
 /** The instant the fixture rows carry (`created_at`, `uploaded_at`); fixed so every read is reproducible. */
 export const FIXTURE_LOADED_AT = '2026-09-21T00:00:00.000Z';
@@ -40,6 +84,8 @@ export const FIXTURE_CONFIGURATION_REVISION_ID = fixtureUuid('configuration/1') 
 
 export interface StoredCase {
   caseId: CaseId;
+  /** W1-09 fixture id; ScriptedQcRunner resolves scripts through this, not the row UUID. */
+  fixtureCaseId: string;
   registryId: string;
   fields: CaseWritableFields;
   status: CaseStatus;
@@ -54,6 +100,8 @@ export interface StoredCase {
   updatedAt: string;
   draft: PackDraft | null; // the one open draft, or null once submitted (W2 reopens with a successor)
   versions: SubmittedVersion[]; // ascending by versionNumber; never mutated after push (immutable, A07)
+  /** ISO timestamp when Ready applied on that versionId; absent until W2-06 fires inside approve/disposition. */
+  readyAtByVersionId: Map<string, string>;
 }
 
 export interface StoredArtifact {
@@ -78,6 +126,12 @@ export class SubstituteStore {
   cases = new Map<string, StoredCase>();
   artifacts = new Map<string, StoredArtifact>();
   idempotency = new Map<string, IdempotencyRecord>();
+  decisions = new Map<string, StoredLaneDecision>(); // `${versionId}\0${lane}`
+  findings = new Map<string, StoredFinding>();
+  dispositions = new Map<string, StoredDisposition[]>(); // findingId → append-only list
+  qcRuns = new Map<string, StoredQcRun>(); // `${versionId}\0${lane}` latest approve_attempt
+  /** W1-10 ScriptedQcRunner; tests may call simulateError / simulateTimeout for unavailable runs. */
+  qcRunner: ScriptedQcRunner;
   /** Every log line the substitute emitted (`authz.denied` and friends), for tests; never written anywhere. */
   logLines: RecordedLogLine[] = [];
   private registryCounter = 0;
@@ -92,21 +146,39 @@ export class SubstituteStore {
       slaWorkingDays: { ...CONFIGURATION_SEED.sla },
       timezone: APP_TIMEZONE,
     });
+    this.qcRunner = new ScriptedQcRunner({
+      fixtureCaseIdOf: (version) => this.cases.get(version.caseId)?.fixtureCaseId,
+      onScriptMismatch: 'unavailable',
+      now: () => new Date(),
+    });
     this.reset();
   }
 
-  /** Rebuilds the fixture state; drops every session, upload, version and idempotency record. */
+  /** Rebuilds the fixture state; drops every session, upload, version, decision, finding and idempotency record. */
   reset(): void {
     this.sessions.clear();
     this.cases.clear();
     this.artifacts.clear();
     this.idempotency.clear();
+    this.decisions.clear();
+    this.findings.clear();
+    this.dispositions.clear();
+    this.qcRuns.clear();
+    this.qcRunner.reset();
     this.logLines = [];
     this.registryCounter = 0;
     for (const document of FIXTURE_DOCUMENTS)
       this.artifacts.set(document.artifactId, this.fixtureArtifact(document));
     for (const fixtureCase of FIXTURE_CASES)
       this.cases.set(fixtureCase.caseId, this.fixtureCase(fixtureCase));
+  }
+
+  decisionKey(versionId: string, lane: Lane): string {
+    return `${versionId}\0${lane}`;
+  }
+
+  qcRunKey(versionId: string, lane: Lane): string {
+    return `${versionId}\0${lane}`;
   }
 
   findUser(fixtureUserId: string): FixtureUser | undefined {
@@ -156,6 +228,7 @@ export class SubstituteStore {
       slots[slot] = toSlotState(fixtureCase.slots[slot]);
     return {
       caseId: fixtureCase.caseId,
+      fixtureCaseId: fixtureCase.fixtureCaseId,
       registryId: fixtureCase.registryId,
       fields: {
         useCaseName: fixtureCase.useCaseName,
@@ -190,6 +263,7 @@ export class SubstituteStore {
         updatedAt: FIXTURE_LOADED_AT,
       },
       versions: [],
+      readyAtByVersionId: new Map(),
     };
   }
 }

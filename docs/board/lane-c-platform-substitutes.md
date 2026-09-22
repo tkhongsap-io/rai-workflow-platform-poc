@@ -64,3 +64,17 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: W2-05 disposition contract for single-lane findings. §7.3 categories stay blocked.
 - Author: operator=ta session=w2 model=grok-4.7
 - Evidence: branch codex/w1-10-qc-substitute-on-main
+
+## 2026-09-22 14:20 — CLAIM W2-10
+- What: Claim W2-10 (issue #37): extend the W1-13 API substitute with W2 shapes (approve, send-back, qc-run, disposition) on branch `codex/w2-10-w2-shapes`.
+- Why: Lane C contract PR so Lane B never edits the substitute inside a UI ticket.
+- Next: Implement routes + unit tests; local commit only.
+- Author: operator=agent session=w2-10-w2-shapes model=composer
+- Evidence: branch codex/w2-10-w2-shapes
+
+## 2026-09-22 14:45 — W2-10 done (local)
+- What: W2-10 substitute extension complete on `codex/w2-10-w2-shapes`: approve / send-back / qc-run / disposition with forbidden, stale_version and 422 cases; Ready only inside approve/disposition; still absent from non-test builds. Not the W2 exit.
+- Why: Ticket W2-10 of the delivery pack (issue #37).
+- Next: Human review PR; W2-07 / W2-09 consume; W2-INT removes the extension from the app path.
+- Author: operator=agent session=w2-10-w2-shapes model=composer
+- Evidence: branch codex/w2-10-w2-shapes; `fixtures/src/substitutes/api/review.test.ts`
