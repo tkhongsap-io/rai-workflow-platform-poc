@@ -20,17 +20,36 @@ export interface PagePlan extends Plan {
     absent: string[];
   }[];
 }
+/** Overview includes the entry redirect; its final version must come from the actual Ready case. */
+export function pagePaths(selection: PagePlan['pages'][number]) {
+  const screen = SCREENS[selection.kind];
+  assert(screen, 'unknown page kind');
+  return {
+    entry: routePath(screen.path, selection.ids),
+    final: routePath(
+      selection.kind === 'overview' ? '/cases/:caseId/versions/:versionId' : screen.path,
+      selection.ids,
+    ),
+  };
+}
+export function validatePages(pages: PagePlan['pages']) {
+  assert.deepEqual(pages.map((p) => p.kind).sort(), Object.keys(SCREENS).sort());
+  for (const selection of pages) {
+    assert(selection.visible.length && selection.absent.length);
+    pagePaths(selection); // Reject incomplete route bindings before browser startup.
+  }
+}
 export async function measurePages(plan: PagePlan, controls: { queue: Controls; mutation: Controls }) {
   guardPlan(plan);
   checkControls(plan.queue, controls.queue);
   checkControls(plan.mutation, controls.mutation);
-  assert.deepEqual(plan.pages.map((p) => p.kind).sort(), Object.keys(SCREENS).sort());
+  validatePages(plan.pages);
   const browser = await chromium.launch();
   try {
     for (const selection of plan.pages) {
       const screen = SCREENS[selection.kind];
       assert(screen && selection.visible.length && selection.absent.length);
-      const path = routePath(screen.path, selection.ids);
+      const paths = pagePaths(selection);
       const target = selection.kind === 'queue' ? 'queue' : 'mutation';
       const origin = plan[target].baseUrl;
       await controls[target].settled();
@@ -61,9 +80,11 @@ export async function measurePages(plan: PagePlan, controls: { queue: Controls; 
           1000,
           () => async () => {
             const started = performance.now();
-            const response = await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+            const response = await page.goto(paths.entry, { waitUntil: 'domcontentloaded', timeout: 30_000 });
             assert.equal(response?.status(), 200);
-            await expect(page).toHaveURL(new URL(path, origin).href);
+            // Wait for the canonical route before checking content; entry URL can be transient.
+            const finalUrl = new URL(paths.final, origin).href;
+            await expect(page).toHaveURL(finalUrl);
             await expect(page.locator('html')).toHaveAttribute('lang', 'th');
             for (const selector of [screen.ready, ...selection.visible])
               await expect(page.locator(selector)).toBeVisible();
@@ -75,6 +96,8 @@ export async function measurePages(plan: PagePlan, controls: { queue: Controls; 
                   requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
                 ),
             );
+            // Readiness must still belong to the final route at the timing endpoint.
+            await expect(page).toHaveURL(finalUrl);
             return { wallMs: performance.now() - started };
           },
           () => controls[target].settled(),
