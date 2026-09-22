@@ -1,28 +1,9 @@
 // Test-owned lifecycle for the built API. Never imported by application code.
 import assert from 'node:assert/strict';
-import { isLoopbackHost, readEnv, type Env } from '@rai/server/config';
+import { readEnv, type Env } from '@rai/server/config';
 import { startTestServer, type TestServerProcess } from '../../support/process.js';
 import { resetToFixtureSet } from './database.js';
-
-export function validateRealBrowserConfig(baseURL: string, env: Env): URL {
-  assert.equal(env.NODE_ENV, 'test', 'real browser lifecycle requires test mode');
-  assert.equal(env.RAI_IDENTITY_MODE, 'fixture', 'real browser lifecycle requires fixture identity');
-  const url = new URL(baseURL);
-  assert(url.protocol === 'http:' && isLoopbackHost(url.hostname), 'loopback HTTP only');
-  assert(
-    url.port && !url.username && !url.password && !url.search && !url.hash && url.pathname === '/',
-    'plain explicit loopback origin required',
-  );
-  for (const key of ['DATABASE_URL', 'DATABASE_MIGRATE_URL', 'DATABASE_OPERATOR_URL'] as const) {
-    if (!env[key]?.trim()) continue;
-    const database = new URL(env[key]);
-    assert(
-      isLoopbackHost(database.hostname) && !database.search && !database.hash,
-      'local database without routing overrides required',
-    );
-  }
-  return url;
-}
+import { validateRealBrowserConfig } from './real-browser-config.js';
 
 export function realServerOptions(baseURL: string, env: Env) {
   const url = validateRealBrowserConfig(baseURL, env);
