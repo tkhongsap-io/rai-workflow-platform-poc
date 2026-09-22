@@ -80,3 +80,14 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - What: W3-03a issue #44 approved split, on `codex/w3-03a-notifications` from `44c5517`; queue UI and other Lane B tickets outside claim.
 - Next: Shared locale prerequisite, composer and initial local sink attempt, tests, local commit; parent arranges independent review and PR.
 - Evidence: [plan](../../changes/2026-09-22-w3-03a-notifications/plan.md)
+## 2026-09-22 (time not recorded) — CLAIM W3-03b provenance planning only
+- Author: operator=ta session=w3-03b-provenance-plan model=codex
+- Scope: separate documentation-only proposal; no consumer or shared-code edits, no takeover of other Lane B work.
+- Evidence: changes/2026-09-22-w3-03b-provenance-proposal/plan.md
+- Next: parent reviews proposed mail/sink boundary against W3-07a aabee4c before implementation.
+
+## 2026-09-22 (time not recorded) — W3-03b shared provenance implementation authorized
+- Author: operator=ta session=w3-03b-provenance-plan model=codex
+- What: parent accepted proposal; isolated branch rebased onto W3-07a d931cea. Implemented shared mail union and synthetic sink validation only.
+- Evidence: changes/2026-09-22-w3-03b-provenance-proposal/review.md
+- Next: independent contract review; no consumer before parent coordinates W3-04 integration.

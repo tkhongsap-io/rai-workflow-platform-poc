@@ -313,7 +313,9 @@ forEachSink(
     assert.ok(r1.error!.message.includes('auditEventId'));
     assert.ok(!r1.error!.message.includes(CASE_ID));
 
-    const noDay = digestRequest(['RAI-2000-0001'], { event: digestEvent({ digestDay: null }) });
+    const noDay = digestRequest(['RAI-2000-0001'], {
+      event: digestEvent({ digestDay: null as unknown as string }),
+    });
     const r2 = await h.sink.deliver(noDay);
     assertFailed(r2, 'malformed_request');
     assert.ok(r2.error!.message.includes('digestDay'));
