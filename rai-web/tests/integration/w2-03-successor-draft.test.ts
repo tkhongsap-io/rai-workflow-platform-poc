@@ -389,7 +389,7 @@ describe(`W2-03 successor draft concurrency and stale actions — ${SET}`, () =>
     assert.equal(created.length, 1);
   });
 
-  it('stale send-back on a non-latest or Ready version is 409 with guidance and writes nothing', async () => {
+  it('unknown versionId is not_found; Ready version is version_closed; both write nothing', async () => {
     const owner = await signIn(OWNER_A);
     const version = await submitOk(owner, NONVENDOR.caseId);
     const revision = await caseRevision(NONVENDOR.caseId);
@@ -399,17 +399,18 @@ describe(`W2-03 successor draft concurrency and stale actions — ${SET}`, () =>
     const beforeDecisions = await db.owner.execute(sql`SELECT count(*)::int AS n FROM lane_decision`);
     const beforeAudit = (await auditStore.read(db.owner)).length;
 
+    // A UUID that was never a version is not_found, not version_superseded (W2-04 covers a real older submitted).
     const otherId = randomUUID();
-    const superseded = await sendBack(dpo, NONVENDOR.caseId, otherId, 'dpo', {
+    const missing = await sendBack(dpo, NONVENDOR.caseId, otherId, 'dpo', {
       expectedVersion: { versionId: otherId, revision },
-      feedback: { items: [{ slot: 2, deficiency: 'stale target' }] },
+      feedback: { items: [{ slot: 2, deficiency: 'unknown target' }] },
     });
-    assert.equal(superseded.statusCode, 409, superseded.body);
-    const supersededDetails = staleOf(superseded);
-    assert.equal(supersededDetails.reason, 'version_superseded');
-    assert.equal(supersededDetails.guidanceKey, 'error.stale_version.guidance.version_superseded');
-    assert.equal(supersededDetails.current.versionId, version.versionId);
-    assert.ok(supersededDetails.refreshPath.includes(version.versionId));
+    assert.equal(missing.statusCode, 404, missing.body);
+    assert.equal(missing.json<ErrorResponse>().error.code, 'not_found');
+    assert.equal(
+      (missing.json<ErrorResponse>().error.details as ErrorDetails['not_found'] | undefined)?.resource,
+      'version',
+    );
 
     // Close N by Ready (W2-06 applies ready_at; here we set it under the owner role to prove the gate).
     await db.owner.execute(sql`UPDATE pack_version SET ready_at = ${now()} WHERE id = ${version.versionId}`);

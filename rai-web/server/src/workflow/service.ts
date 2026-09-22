@@ -100,6 +100,9 @@ async function assertDecideTarget(
   }
 
   if (current.id !== expected.versionId) {
+    // Unknown id → not_found; a real but non-current version of this case → version_superseded (§5.2).
+    const named = await readVersionRow(tx, expected.versionId);
+    if (named === undefined || named.caseId !== row.id) throw new NotFoundError('version');
     throw new StaleVersionError(
       staleDetails(
         'version_superseded',
