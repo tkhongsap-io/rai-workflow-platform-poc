@@ -68,9 +68,11 @@ export interface OpenLanesInput {
   idempotencyKeyRef: string;
   occurredAt: Date;
   recipients: LaneOpenRecipients;
+  /** From AppConfig.nodeEnv (via VersionServiceDeps); never read from process.env here. */
+  nodeEnv: string;
   /**
    * Test-only: throws after the first notification insert has been attempted, so a rollback assertion
-   * fails if notification writes were outside the transaction. Ignored unless NODE_ENV is `test`.
+   * fails if notification writes were outside the transaction. Ignored unless `nodeEnv` is `test`.
    */
   failAfterFirstLaneOpenNotification?: () => void;
 }
@@ -103,12 +105,13 @@ export async function openLanesOnSubmit(input: OpenLanesInput): Promise<void> {
     idempotencyKeyRef,
     occurredAt,
     recipients,
+    nodeEnv,
     failAfterFirstLaneOpenNotification,
   } = input;
   const mapping = mappingForVersion(laneMappingVersion);
   const deepLinkPath = laneOpenDeepLinkPath(caseId, versionId);
   const injectFailure =
-    process.env.NODE_ENV === 'test' && failAfterFirstLaneOpenNotification !== undefined
+    nodeEnv === 'test' && failAfterFirstLaneOpenNotification !== undefined
       ? failAfterFirstLaneOpenNotification
       : undefined;
 

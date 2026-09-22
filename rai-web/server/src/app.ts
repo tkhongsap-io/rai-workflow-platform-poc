@@ -46,8 +46,9 @@ export interface AppDeps {
   artifacts?: Omit<ArtifactRouteDeps, 'emitter'>;
   /** W1-04: the pack draft routes' dependencies (database, pack limit, the W0-07 upload hook). Needs `identity`. */
   pack?: Omit<PackRouteDeps, 'emitter'>;
-  /** W1-05: the submit and version-navigation routes' dependencies (database). Needs `identity`. */
-  versions?: VersionRouteDeps;
+  /** W1-05: the submit and version-navigation routes' dependencies (database). Needs `identity`.
+   * `nodeEnv` is taken from `config` when the routes are registered (never from process.env in versions/). */
+  versions?: Omit<VersionRouteDeps, 'nodeEnv'>;
   /** W1-INT: the built SPA to serve from web/dist (static.ts); absent when there is no web build (API only). */
   static?: StaticOptions;
   /** Test seam: where the pino lines go instead of stdout, so a suite can assert on emitted events. */
@@ -189,7 +190,7 @@ export function buildApp(deps: AppDeps): App {
     const versionDeps = deps.versions;
     if (versionDeps !== undefined) {
       void fastify.register((instance, _opts, done) => {
-        registerVersionRoutes(instance, versionDeps);
+        registerVersionRoutes(instance, { ...versionDeps, nodeEnv: deps.config.nodeEnv });
         done();
       });
     }
