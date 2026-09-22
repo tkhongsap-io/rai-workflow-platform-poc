@@ -280,3 +280,39 @@ test('W1-06: a 409 stale_version exposes its guidance and refresh path; other co
     (err: unknown) => err instanceof ApiError && err.stale === undefined,
   );
 });
+
+test('queue client preserves literal Thai filters, pagination and server response without applying scope', async () => {
+  const response = {
+    items: [],
+    total: 0,
+    page: 2,
+    pageSize: 10,
+    filterOptions: { statuses: [], owners: [], useCaseGroups: [] },
+    statusCounts: { draft: 0, in_review: 0, sent_back: 0, awaiting_disposition: 0, ready_for_launch: 0 },
+  };
+  const client = createApiClient((input, init) => {
+    const url = new URL(input, 'http://localhost');
+    assert.equal(url.pathname, '/api/queue');
+    assert.equal(url.searchParams.get('search'), 'ชื่อ%_');
+    assert.equal(url.searchParams.get('searchBy'), 'owner');
+    assert.equal(url.searchParams.get('owner'), 'synthetic:owner');
+    assert.equal(url.searchParams.get('status'), 'sent_back');
+    assert.equal(url.searchParams.get('useCaseGroup'), 'group');
+    assert.equal(url.searchParams.get('page'), '2');
+    assert.equal(url.searchParams.get('pageSize'), '10');
+    assert.equal(init?.credentials, 'same-origin');
+    return Promise.resolve(new Response(JSON.stringify(response)));
+  });
+  assert.deepEqual(
+    await client.getQueue({
+      search: 'ชื่อ%_',
+      searchBy: 'owner',
+      owner: 'synthetic:owner',
+      status: 'sent_back',
+      useCaseGroup: 'group',
+      page: 2,
+      pageSize: 10,
+    }),
+    response,
+  );
+});
