@@ -25,6 +25,8 @@ import { registerCaseRoutes, type CaseRouteDeps } from './cases/routes.js';
 import { registerQueueRoutes } from './queue/routes.js';
 import { registerPackRoutes, type PackRouteDeps } from './pack/routes.js';
 import { registerVersionRoutes, type VersionRouteDeps } from './versions/routes.js';
+import { createSubmitTrigger } from './qc/submit-trigger.js';
+import type { QcOrchestratorDeps } from './qc/orchestrator.js';
 import { registerDecideRoutes, type DecideRouteDeps } from './workflow/routes.js';
 import { registerFindingsRoutes, type FindingsRouteDeps } from './findings/routes.js';
 import { staticPlugin, type StaticOptions } from './static.js';
@@ -67,7 +69,9 @@ export interface AppDeps {
   pack?: Omit<PackRouteDeps, 'emitter'>;
   /** W1-05: the submit and version-navigation routes' dependencies (database). Needs `identity`.
    * `nodeEnv` is taken from `config` when the routes are registered (never from process.env in versions/). */
-  versions?: Omit<VersionRouteDeps, 'nodeEnv'>;
+  versions?: Omit<VersionRouteDeps, 'nodeEnv' | 'afterSubmit'> & {
+    qc?: Pick<QcOrchestratorDeps, 'runner' | 'timeoutMs'>;
+  };
   /** W2-02: lane approve / send-back. Needs `identity`. */
   decide?: DecideRouteDeps;
   /** W2-05: findings disposition + lane QC run. Needs `identity`. */
@@ -267,7 +271,24 @@ export function buildApp(deps: AppDeps): App {
     const versionDeps = deps.versions;
     if (versionDeps !== undefined) {
       void fastify.register((instance, _opts, done) => {
-        registerVersionRoutes(instance, { ...versionDeps, nodeEnv: deps.config.nodeEnv });
+        registerVersionRoutes(instance, {
+          ...versionDeps,
+          nodeEnv: deps.config.nodeEnv,
+          ...(versionDeps.qc === undefined
+            ? {}
+            : {
+                afterSubmit: createSubmitTrigger(
+                  {
+                    ...versionDeps.qc,
+                    db: versionDeps.db,
+                    emitter,
+                    errors,
+                    ...(versionDeps.now === undefined ? {} : { now: versionDeps.now }),
+                  },
+                  drain,
+                ),
+              }),
+        });
         done();
       });
     }

@@ -18,7 +18,7 @@ import {
   type BusinessUnitDirectory,
 } from './cases/business-units.js';
 import { createSubjectDirectory } from './cases/subject-directory.js';
-import { ConfigError, EXIT_CONFIG, isLoopbackHost, parseConfig, type Env } from './config.js';
+import { ConfigError, EXIT_CONFIG, parseConfig, type Env } from './config.js';
 import { createDb, type DbHandle } from './db/client.js';
 import { currentRevision } from './configuration/store.js';
 import { createIdentityAdapter, type Discovery, type GroupMappingSource } from './identity/adapter.js';
@@ -239,6 +239,7 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
             sink: mailSink,
             identities: knownIdentities,
             publicBaseUrl: config.publicBaseUrl,
+            ...(overrides.now === undefined ? {} : { now: overrides.now }),
           },
         }),
     config,
@@ -268,6 +269,7 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
     versions: {
       db: db.db,
       laneOpenRecipients: laneOpenRecipientsFromIdentities(knownIdentities),
+      qc: qcRunner === undefined ? {} : { runner: qcRunner },
       ...(overrides.now === undefined ? {} : { now: overrides.now }),
     },
     // W2-02: lane approve / send-back; owner email for send_back notices from identity data.

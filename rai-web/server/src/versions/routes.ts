@@ -13,8 +13,11 @@ import { StageContextSchema } from '@rai/shared/schemas/slots';
 import { FrozenSlotSchema, SubmitRequestSchema, VersionSummarySchema } from '@rai/shared/schemas/versions';
 import { IDEMPOTENCY_HEADER, requireIdempotencyKey } from '../cases/idempotency.js';
 import { latestVersion, listVersions, readVersion, submitDraft, type VersionServiceDeps } from './service.js';
+import type { RunSubmitQcInput } from '../qc/orchestrator.js';
 
-export type VersionRouteDeps = VersionServiceDeps;
+export interface VersionRouteDeps extends VersionServiceDeps {
+  afterSubmit?: (input: RunSubmitQcInput) => void;
+}
 
 const CaseParamsSchema = Type.Object({ caseId: Type.String({ minLength: 1 }) });
 
@@ -69,6 +72,12 @@ export function registerVersionRoutes(fastify: FastifyInstance, deps: VersionRou
         request.body,
         key,
       );
+      if (!result.replayed)
+        deps.afterSubmit?.({
+          caseId: result.body.caseId,
+          versionId: result.body.versionId,
+          correlationId: request.id,
+        });
       return reply.status(201).send(result.body); // a replay is the original 201 (W0-06 5.3)
     },
   );

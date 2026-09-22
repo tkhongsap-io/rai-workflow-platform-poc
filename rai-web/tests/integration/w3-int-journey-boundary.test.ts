@@ -40,3 +40,22 @@ for (const [env, ipc] of [
       clearTimeout(timer);
     }
   });
+
+test('IPC whitelist rejects arbitrary paths, unbounded clocks, unknown commands and malformed values', async () => {
+  const { isJourneyCommand } = await import('../browser/support/journey-controls.js');
+  const id = '11111111-1111-4111-8111-111111111111';
+  assert.equal(isJourneyCommand({ id, command: 'mailFailure', enabled: true }), true);
+  assert.equal(
+    isJourneyCommand({ id, command: 'advanceRetry', notificationId: id, expectedAttempts: 1 }),
+    true,
+  );
+  for (const command of [
+    { id, command: 'mailFailure', enabled: true, path: '/tmp/other' },
+    { id, command: 'mailFailure', enabled: 'true' },
+    { id, command: 'advanceRetry', notificationId: id, expectedAttempts: 4 },
+    { id, command: 'advanceRetry', notificationId: id, expectedAttempts: 1, milliseconds: 999999 },
+    { id, command: 'eval', code: 'anything' },
+    { id, command: 'bindCase', caseId: 'not-a-uuid' },
+  ])
+    assert.equal(isJourneyCommand(command), false);
+});

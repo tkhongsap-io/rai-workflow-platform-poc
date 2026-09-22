@@ -137,6 +137,7 @@ jobs:
       - name: integration including historical observability migration (no opt-in skip)
         env:
           OBS_MIGRATION_ADMIN_URL: postgres://postgres:postgres-local@127.0.0.1:54320/rai # disposable CI service only
+          DATABASE_OPERATOR_URL: postgres://rai_operator:rai_operator@127.0.0.1:54320/rai # explicit isolated role for OBS sidecar
         run: |
           test -n "$OBS_MIGRATION_ADMIN_URL"
           npm run test:integration
