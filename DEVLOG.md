@@ -1,5 +1,11 @@
 # Development log
 
+## W3-INT: integrated synthetic review journey — 2026-09-23
+
+The real-server assembly connects queue discovery, committed notifications/retries, submit-trigger QC and Admin diagnostics. API-substitute selection is removed from application configuration; historical UI rehearsals remain isolated in their test-owned harness. One keyboard-driven synthetic case covers upload, submit, process restart, queue and protected mail links, send-back, successor submission, disposition and three-lane completion. Real worker failures and a submit timeout are checked through the Admin page at three widths.
+
+The complete local run at `2ed4fd2` passed 536 unit, 280 integration, 168 real-server browser and 171 UI rehearsal tests, zero skips, plus 40 repository checks. The added late-QC regression uses real permitted transitions and verifies durable refusal after restart; its production/configuration tree is identical to that full run. After the test-only late-QC and reset-lifecycle repairs, the final integration rerun passed 281 tests with zero skips; independent re-reviews were clean. Exact source identities and commands are recorded in [the integration review](changes/2026-09-22-w3-int/review.md). This is synthetic engineering evidence; W3-06 timing/walkthrough exit review and owner acceptance remain separate. No owning-lane decision for #35, real QC, external mail or W4 authorization is implied.
+
 ## W3-07b: Admin operator UI finalization — 2026-09-23
 
 Replayed only the reviewed UI consumer and its review record onto main `4fa14d6`, after API #123 merged. The resulting `rai-web` tree exactly matches the combined full-verification tree: 530 unit, 256 integration, 126 real-server browser and 171 substitute browser tests passed, zero skips. The page provides bilingual read-only diagnostics, manual refresh and immediate removal of stale Admin data after session changes. Controlled operator browser rehearsals remain separate from real OBS-17 acceptance in W3-INT. Local delivery awaits independent review before any push; PR #119 remains draft and parent owns CI/merge. See `changes/2026-09-22-w3-07b-operator-ui/review.md` for exact provenance and focused checks.

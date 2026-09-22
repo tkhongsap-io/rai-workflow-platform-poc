@@ -2,6 +2,8 @@
 
 ## 2026-09-23
 
+- W3-INT: Integrated real-server queue, protected notification links, postcommit submit QC and Admin diagnostics with a single-case keyboard/restart journey. Added actual worker-failure, late-QC/restart and suite-wide integration log-privacy regression coverage; moved the API substitute entirely into the test harness. Synthetic package exit evidence remains separate from production acceptance.
+
 - W3-07b: Bilingual Admin operator desk-health page for readiness, failed mail, unavailable/late QC, digest and safe error counters. Manual refresh and session guards prevent stale Admin reports from remaining visible. Local finalization on merged API #123 is ready for independent review; real OBS-17 acceptance remains W3-INT.
 
 - W3-07a: Dependency-aware health/readiness, Admin desk-health API, safe correlated errors and durable unavailable/late-QC diagnostics. Notification delivery remains on the existing worker.

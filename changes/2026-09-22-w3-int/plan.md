@@ -130,3 +130,9 @@ Hypatia identified the remaining plan-line-46 race coverage gap at `2ed4fd2`. Ad
 ### Integration reset lifecycle repair — 2026-09-23
 
 The completed `bea6278` integration rerun had one real 40P01 failure: W2-INT negatives reset while its child remained alive between tests. Owned Postgres logs identify TRUNCATE versus the child's SELECT of pack_version; unlike the earlier cancelled run, this is a genuine harness failure. Stop/drain the child before each reset, load fixtures while it is stopped, then restart. Keep capture/authorization assertions unchanged; no retries, suppression, shared DB helpers or product changes. Run the affected suite repeatedly, rerun full integration, and obtain independent review of this small repair.
+
+## Lead publication size exception — 2026-09-23
+
+The lead accepts one cohesive W3-INT PR under the declared cross-lane integration exception. The runtime/configuration delta is 14 files, 79 additions and 49 deletions; the larger remainder consists of required journey, fault, privacy and restart proofs plus their dated plans/reviews. Shared public contracts, migrations and component features were already delivered in separate reviewed prerequisite PRs. No new owning-lane policy is chosen here.
+
+Independent whole-change review recommended keeping this evidence with its integration wiring. Its missing late-QC/restart proof was added and re-reviewed; the subsequent negative-suite reset race received a separate lifecycle repair and review. The exception is to PR size only: final independent review, relevant local verification and all required CI checks on the exact published head still gate merge. W3-06 measurements, walkthrough handoff and owner acceptance remain separate.
