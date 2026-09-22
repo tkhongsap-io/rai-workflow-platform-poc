@@ -14,6 +14,7 @@ import {
   LaneQcRunRequestSchema,
   LaneQcRunResponseSchema,
   LaneSchema,
+  VersionFindingsResponseSchema,
   type DispositionKind,
 } from '@rai/shared/schemas/review';
 import { actorOf } from '../authz/middleware.js';
@@ -21,8 +22,9 @@ import { authorize, type Action, type CaseScopeFacts } from '../authz/policy.js'
 import type { Emitter } from '../observability/log.js';
 import { IDEMPOTENCY_HEADER, requireIdempotencyKey } from '../cases/idempotency.js';
 import { createScopeFactsSource } from '../authz/facts.js';
+import { readVersionRow } from '../cases/repository.js';
 import { runAndPersistLaneQc, type QcOrchestratorDeps } from '../qc/orchestrator.js';
-import { owningLaneOf, readFindingForCase } from './repository.js';
+import { listFindingsForVersion, owningLaneOf, readFindingForCase } from './repository.js';
 import { recordDisposition, type DispositionServiceDeps } from './service.js';
 
 export interface FindingsRouteDeps extends DispositionServiceDeps {
@@ -48,6 +50,11 @@ const LaneQcParams = Type.Object({
   caseId: Type.String({ minLength: 1 }),
   versionId: Type.String({ minLength: 1 }),
   lane: LaneSchema,
+});
+
+const VersionFindingsParams = Type.Object({
+  caseId: Type.String({ minLength: 1 }),
+  versionId: Type.String({ minLength: 1 }),
 });
 
 export function registerFindingsRoutes(fastify: FastifyInstance, deps: FindingsRouteDeps): void {
@@ -81,6 +88,37 @@ export function registerFindingsRoutes(fastify: FastifyInstance, deps: FindingsR
     }
     return decision;
   }
+
+  // GET …/versions/:versionId/findings — version.view; returns stored findings + latestDisposition (no qc_run write).
+  app.get(
+    '/api/cases/:caseId/versions/:versionId/findings',
+    {
+      config: { auth: { kind: 'action', action: 'version.view', target: 'case' } },
+      schema: {
+        params: VersionFindingsParams,
+        response: { 200: VersionFindingsResponseSchema },
+      },
+    },
+    async (request) => {
+      const version = await readVersionRow(deps.db, request.params.versionId);
+      if (version === undefined || version.caseId !== request.params.caseId) {
+        throw new NotFoundError('version');
+      }
+      const findings = await listFindingsForVersion(deps.db, request.params.caseId, request.params.versionId);
+      return {
+        findings: findings.map((f) => ({
+          findingId: f.findingId,
+          ruleId: f.ruleId,
+          slot: f.slot as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | null,
+          severity: f.severity as 'high' | 'medium' | 'low' | 'info',
+          owningLane: f.owningLane,
+          messageKey: f.messageKey,
+          latestDisposition: f.latestDisposition,
+          ...(f.messageParams === undefined ? {} : { messageParams: f.messageParams }),
+        })),
+      };
+    },
+  );
 
   // POST …/findings/:findingId/dispositions — session only in middleware; kind→action authorize here.
   app.post(

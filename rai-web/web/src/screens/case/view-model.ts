@@ -171,6 +171,27 @@ export function isSelfExcludedOnCase(
   );
 }
 
+/**
+ * Owner/BU-SPOC who may propose fixed on findings (W2-09). Requires an owner grant whose subject is the
+ * case business owner, or a bu_spoc grant for the case's BU — not subjectId alone.
+ */
+export function canProposeFixedOnCase(
+  roles: readonly RoleScope[],
+  subjectId: string,
+  view: Pick<CaseView, 'businessOwner' | 'businessUnitId'>,
+): boolean {
+  const isOwner =
+    view.businessOwner === subjectId &&
+    roles.some((grant) => grant.role === 'owner' && grant.scope.kind === 'own_cases');
+  if (isOwner) return true;
+  return roles.some(
+    (grant) =>
+      grant.role === 'bu_spoc' &&
+      grant.scope.kind === 'business_unit' &&
+      grant.scope.businessUnit === view.businessUnitId,
+  );
+}
+
 export function laneProjectionStatus(view: CaseView, lane: Lane): LaneProjectionStatus {
   switch (lane) {
     case 'ai_coe':
@@ -221,10 +242,9 @@ export function decidableLane(args: {
 
 /**
  * Disposition kinds this actor may offer on a finding the UI already shows.
- * Owner/BU SPOC → fixed_proposed only (when they can see the finding list). Owning-lane reviewer who is not
- * owner/SPOC → fixed, waived, not_applicable, plus fixed_confirmed when this visit's overlay says the latest
- * kind is fixed_proposed. Admin and the wrong lane → none. When canSeeFindings is false (qc-run 403 for the
- * owner), returns [] — propose-fixed is covered by unit tests and a substitute API path (W2-09).
+ * Owner/BU SPOC (canProposeFixedOnCase) → fixed_proposed only. Owning-lane reviewer who is not that
+ * proposer → fixed, waived, not_applicable, plus fixed_confirmed when latestDisposition is fixed_proposed.
+ * Admin and the wrong lane → none.
  */
 export function dispositionKindsForActor(args: {
   roles: readonly RoleScope[];
@@ -235,11 +255,12 @@ export function dispositionKindsForActor(args: {
   canSeeFindings: boolean;
 }): DispositionKind[] {
   if (!args.canSeeFindings) return [];
-  if (isSelfExcludedOnCase(args.roles, args.subjectId, args.view)) {
+  if (canProposeFixedOnCase(args.roles, args.subjectId, args.view)) {
     return ['fixed_proposed'];
   }
   const lane = reviewerLaneOf(args.roles);
   if (lane === null || lane !== args.findingOwningLane) return [];
+  if (isSelfExcludedOnCase(args.roles, args.subjectId, args.view)) return [];
   const kinds: DispositionKind[] = ['fixed', 'waived', 'not_applicable'];
   if (args.latestKind === 'fixed_proposed') kinds.push('fixed_confirmed');
   return kinds;

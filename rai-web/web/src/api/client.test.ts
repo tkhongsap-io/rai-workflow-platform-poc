@@ -235,6 +235,22 @@ test('W2-09: recordDisposition path carries expectedVersion, kind and the mint k
   assert.equal(body.expectedVersion.revision, 1);
 });
 
+test('W2-09: listVersionFindings path is a GET under the version', async () => {
+  const calls: { input: string; init: RequestInit | undefined }[] = [];
+  const client = createApiClient((input, init) => {
+    calls.push({ input, init });
+    return Promise.resolve(
+      new Response(JSON.stringify({ findings: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+  });
+  await client.listVersionFindings('c1', 'v/1');
+  assert.equal(calls[0]?.input, '/api/cases/c1/versions/v%2F1/findings');
+  assert.equal(calls[0]?.init?.method ?? 'GET', 'GET');
+});
+
 test('W1-06: a 409 stale_version exposes its guidance and refresh path; other codes expose none', async () => {
   const client = createApiClient(
     fetchAnswering(409, {

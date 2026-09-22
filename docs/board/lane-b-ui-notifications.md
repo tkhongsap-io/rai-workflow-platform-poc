@@ -50,8 +50,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Takes over from: session=w2-07 (reason: W2-09 disposition UI)
 
 ## 2026-09-22 15:46 — W2-09 findings and disposition UI
-- What: Disposition buttons on each finding in the reviewer workspace (fixed / waived / N/A for the owning lane; fixed_confirmed only when this visit's overlay is fixed_proposed). Waived and N/A open the shared reason dialog. Finding rows stay after disposition via an in-session overlay from the POST response (qc-run still has no latest kind). Owner cannot load qc-run (`lane.approve`), so propose-fixed is unit-tested plus one substitute API path; Admin/wrong lane get no controls. Keyboard-only substitute Playwright path; axe zero critical and zero serious. Locale keys in th.json and en.json. Not the W2 exit; W2-INT wires a latest-event read.
-- Why: Ticket W2-09 of the delivery pack; proves A09 for the disposition UI layer on the W2-10 substitute.
-- Next: W2-INT wires to the real server and adds a latest-disposition read.
+- What: Disposition UI on the reviewer workspace. Owning-lane reviewer: qc-run then GET …/findings for latestDisposition; fixed_confirmed when that kind is fixed_proposed. Owner/BU SPOC: GET …/findings (version.view, no qc_run write) with propose-fixed only. Waived/N/A require the reason dialog. After each disposition POST the GET is refetched. Every kind is reachable on the substitute. qc-run auth unchanged. Issue #35 stays open. Locale keys in th.json and en.json. Not the W2 exit.
+- Why: Ticket W2-09 of the delivery pack; proves A09 for the disposition UI layer on the W2-10 substitute. Spec fix: GET makes propose/confirm reachable without weakening qc-run.
+- Next: W2-INT wires to the real server.
 - Author: operator=ta session=w2-09 model=composer
 - Evidence: branch codex/w2-09-disposition-ui

@@ -38,6 +38,7 @@ import type {
   LaneQcRunRequest,
   LaneQcRunResponse,
   SendBackLaneRequest,
+  VersionFindingsResponse,
 } from '@rai/shared/schemas/review';
 import type { Lane } from '@rai/shared/constants';
 import type { SubmitRequest, SubmittedVersion, VersionListResponse } from '@rai/shared/schemas/versions';
@@ -272,6 +273,12 @@ export function createApiClient(fetchImpl: FetchLike = (input, init) => fetch(in
         'POST',
         `${API_PATHS.cases}/${enc(caseId)}/findings/${enc(findingId)}/dispositions`,
         { body, idempotencyKey },
+      ),
+    /** Stored findings for a version with latestDisposition (version.view; no qc_run write). */
+    listVersionFindings: (caseId: string, versionId: string) =>
+      request<VersionFindingsResponse>(
+        'GET',
+        `${API_PATHS.cases}/${enc(caseId)}/versions/${enc(versionId)}/findings`,
       ),
   };
 }

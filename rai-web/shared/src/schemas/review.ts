@@ -157,6 +157,43 @@ export const StoredFindingSummarySchema = Type.Object({
 });
 export type StoredFindingSummary = Static<typeof StoredFindingSummarySchema>;
 
+/**
+ * GET …/versions/{versionId}/findings — read-only list of stored findings for a version with each finding's
+ * latest disposition kind (W2-09). Separate from StoredFindingSummary so qc-run stays unchanged.
+ */
+export const FindingWithDispositionSchema = Type.Object({
+  findingId: Type.String(),
+  ruleId: Type.String(),
+  slot: Type.Union([
+    Type.Literal(1),
+    Type.Literal(2),
+    Type.Literal(3),
+    Type.Literal(4),
+    Type.Literal(5),
+    Type.Literal(6),
+    Type.Literal(7),
+    Type.Literal(8),
+    Type.Literal(9),
+    Type.Null(),
+  ]),
+  severity: Type.Union([
+    Type.Literal('high'),
+    Type.Literal('medium'),
+    Type.Literal('low'),
+    Type.Literal('info'),
+  ]),
+  owningLane: LaneSchema,
+  messageKey: Type.String(),
+  messageParams: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()]))),
+  latestDisposition: Type.Union([DispositionKindSchema, Type.Null()]),
+});
+export type FindingWithDisposition = Static<typeof FindingWithDispositionSchema>;
+
+export const VersionFindingsResponseSchema = Type.Object({
+  findings: Type.Array(FindingWithDispositionSchema),
+});
+export type VersionFindingsResponse = Static<typeof VersionFindingsResponseSchema>;
+
 export const LaneQcRunResponseSchema = Type.Object({
   runId: Type.Union([Type.String(), Type.Null()]),
   status: Type.Union([Type.Literal('completed'), Type.Literal('unavailable')]),

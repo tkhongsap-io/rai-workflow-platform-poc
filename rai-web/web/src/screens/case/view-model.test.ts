@@ -20,6 +20,7 @@ import {
   expectedVersionOf,
   findingMessageParams,
   findingsLane,
+  canProposeFixedOnCase,
   isSelfExcludedOnCase,
   laneKey,
   laneProjectionStatus,
@@ -447,7 +448,10 @@ test('W2-09: dispositionKindsForActor — lane kinds, confirm after propose, own
     }),
     [],
   );
-  // Owner cannot load qc-run (lane.approve 403) → no UI controls.
+  // Owner with grant + matching subjectId → propose-fixed when findings are visible (GET …/findings).
+  assert.equal(canProposeFixedOnCase([owner], 'fixture:fx-user-owner-cm', view), true);
+  assert.equal(canProposeFixedOnCase([aiCoe], 'fixture:fx-user-owner-cm', view), false);
+  assert.equal(canProposeFixedOnCase([spocCm], 'fixture:fx-user-spoc-cm', view), true);
   assert.deepEqual(
     dispositionKindsForActor({
       roles: [owner],
@@ -459,7 +463,6 @@ test('W2-09: dispositionKindsForActor — lane kinds, confirm after propose, own
     }),
     [],
   );
-  // Propose-fixed authority when the owner can already see the finding list (unit coverage; UI path is absent).
   assert.deepEqual(
     dispositionKindsForActor({
       roles: [owner],

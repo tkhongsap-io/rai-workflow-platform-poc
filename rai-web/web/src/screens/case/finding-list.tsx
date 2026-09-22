@@ -1,5 +1,5 @@
 // Findings list for the reviewer workspace (W2-07 / W2-09): unavailable / empty / finding rows with
-// disposition controls. Kind overlay is in-session from the disposition POST (qc-run has no latest kind).
+// disposition controls. latestKind comes from GET …/findings (and optional in-session overlay).
 
 import type { JSX } from 'react';
 import { isLocaleKey } from '@rai/shared/locales/keys';
@@ -30,9 +30,9 @@ const SEVERITY_TONE: Readonly<Record<StoredFindingSummary['severity'], BadgeTone
   info: 'neutral',
 };
 
-export interface FindingsBlockProps {
-  run: LaneQcRunResponse;
-  overlay: ReadonlyMap<string, DispositionKind>;
+export interface FindingsListProps {
+  findings: readonly StoredFindingSummary[];
+  latestKinds: ReadonlyMap<string, DispositionKind | null>;
   caseId: string;
   expectedVersion: ExpectedVersion;
   session: SessionInfo;
@@ -41,33 +41,19 @@ export interface FindingsBlockProps {
   onUnauthenticated: (err: unknown) => boolean;
 }
 
-export function FindingsBlock({
-  run,
-  overlay,
+/** Render stored findings (from qc-run or GET …/findings) with disposition controls. */
+export function FindingsList({
+  findings,
+  latestKinds,
   caseId,
   expectedVersion,
   session,
   view,
   onDisposition,
   onUnauthenticated,
-}: FindingsBlockProps): JSX.Element {
+}: FindingsListProps): JSX.Element {
   const { t } = useLocale();
-  if (run.status === 'unavailable') {
-    return (
-      <div className={'review-qc-unavailable'} data-review-qc={'unavailable'} role={'status'}>
-        <Badge status={'unavailable'} tone={'warn'} label={t('review.qc.unavailable_badge')} />
-        <p>
-          {t('review.qc.unavailable_body', {
-            reason: t(qcUnavailableReasonKey(run.reason)),
-          })}
-        </p>
-        {run.runId !== null ? (
-          <p className={'muted small'}>{t('review.qc.run_id', { runId: run.runId })}</p>
-        ) : null}
-      </div>
-    );
-  }
-  if (run.findings.length === 0) {
+  if (findings.length === 0) {
     return (
       <p className={'muted'} role={'status'} data-review-qc={'empty'}>
         {t('review.findings.empty')}
@@ -76,11 +62,11 @@ export function FindingsBlock({
   }
   return (
     <ul className={'findings-list'} data-review-qc={'findings'} aria-label={t('review.findings.list_label')}>
-      {run.findings.map((finding) => (
+      {findings.map((finding) => (
         <FindingRow
           key={finding.findingId}
           finding={finding}
-          latestKind={overlay.get(finding.findingId) ?? null}
+          latestKind={latestKinds.get(finding.findingId) ?? null}
           caseId={caseId}
           expectedVersion={expectedVersion}
           session={session}
@@ -90,6 +76,23 @@ export function FindingsBlock({
         />
       ))}
     </ul>
+  );
+}
+
+export function QcUnavailableBlock({ run }: { run: LaneQcRunResponse }): JSX.Element {
+  const { t } = useLocale();
+  return (
+    <div className={'review-qc-unavailable'} data-review-qc={'unavailable'} role={'status'}>
+      <Badge status={'unavailable'} tone={'warn'} label={t('review.qc.unavailable_badge')} />
+      <p>
+        {t('review.qc.unavailable_body', {
+          reason: t(qcUnavailableReasonKey(run.reason)),
+        })}
+      </p>
+      {run.runId !== null ? (
+        <p className={'muted small'}>{t('review.qc.run_id', { runId: run.runId })}</p>
+      ) : null}
+    </div>
   );
 }
 
