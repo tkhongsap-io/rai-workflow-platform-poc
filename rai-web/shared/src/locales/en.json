@@ -117,6 +117,7 @@
   "lane.ai_coe": "AI/COE",
   "lane.dpo": "Privacy (DPO)",
   "lane.it_security": "IT/Security",
+  "mail.lane_opened": "A review lane is open",
   "model_type.classic_ml": "Classic ML",
   "model_type.llm": "LLM",
   "model_type.other": "Other",

@@ -26,6 +26,7 @@ import type { Emitter } from './observability/log.js';
 import { noopUploadTrigger } from './pack/qc-trigger.js';
 import { startedFields } from './observability/started.js';
 import { WEB_DIST_DIR, webDistPresent } from './static.js';
+import { laneOpenRecipientsFromIdentities } from './versions/open-lanes.js';
 
 export interface StartOverrides {
   /** S16 seam: what the adapter reads after listen; defaults to fastify.server.address(). */
@@ -175,9 +176,11 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
       uploadTrigger: noopUploadTrigger,
       ...(overrides.now === undefined ? {} : { now: overrides.now }),
     },
-    // W1-05: submit/freeze and version navigation (W0-02 7.6).
+    // W1-05 / W2-01: submit/freeze, lane open, and version navigation (W0-02 7.6). Recipients are the fixture
+    // identities that hold each lane (slice 1); AD resolution is W8.
     versions: {
       db: db.db,
+      laneOpenRecipients: laneOpenRecipientsFromIdentities(knownIdentities),
       ...(overrides.now === undefined ? {} : { now: overrides.now }),
     },
     ...(serveWeb ? { static: { root: webDistDir } } : {}),

@@ -47,6 +47,7 @@ import { createIdentityAdapter } from '@rai/server/identity/adapter';
 import { createFixtureIdentityProvider } from '@rai/server/identity/fixture';
 import { createPgSessionStore } from '@rai/server/identity/session';
 import { manifestHash } from '@rai/server/versions/manifest';
+import { laneOpenRecipientsFromIdentities } from '@rai/server/versions/open-lanes';
 import { AuditEventMissing, withWorkflowTransaction } from '@rai/server/versions/transaction';
 import { FIXTURE_CASES, findFixtureCase } from '@rai/fixtures/data/cases/index';
 import { FIXTURE_USERS, findFixtureUser } from '@rai/fixtures/data/users';
@@ -130,7 +131,7 @@ before(async () => {
     },
     artifacts: { store, db: db.app, limits: LIMITS },
     pack: { db: db.app, limits: { maxPackBytes: LIMITS.maxPackBytes }, now },
-    versions: { db: db.app, now },
+    versions: { db: db.app, now, laneOpenRecipients: laneOpenRecipientsFromIdentities(FIXTURE_USERS) },
   });
   app = built.fastify;
   const original = built.emitter.log.bind(built.emitter);
@@ -498,7 +499,7 @@ describe(`W1-05 submit freezes an immutable version (A07) — ${SET}, fx-case-no
     assert.equal(view.privacyStatus, 'pending');
     assert.equal(view.aiReadinessStatus, 'not_ready');
     assert.equal(view.riskTier, null);
-    assert.equal((await audit('lane.opened')).length, 0); // (d) is W2-01, not this ticket
+    assert.equal((await audit('lane.opened')).length, 3); // W2-01 (d): three lanes open with submit
   });
 });
 
@@ -961,9 +962,12 @@ describe(`W1-05 version navigation (A07) — ${SET}, fx-case-nonvendor, fx-case-
     }
     assert.equal(
       (await audit()).filter(
-        (e) => !['version.submitted', 'identity.signed_in', 'configuration.published'].includes(e.action),
+        (e) =>
+          !['version.submitted', 'lane.opened', 'identity.signed_in', 'configuration.published'].includes(
+            e.action,
+          ),
       ).length,
-      0, // reads write no audit row; the seed and the sign-ins are the only other events
+      0, // reads write no audit row; the seed, the sign-ins and the submit lanes are the only other events
     );
   });
 });

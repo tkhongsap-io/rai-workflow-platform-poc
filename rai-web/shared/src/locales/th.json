@@ -117,6 +117,7 @@
   "lane.ai_coe": "AI/COE",
   "lane.dpo": "ความเป็นส่วนตัว (DPO)",
   "lane.it_security": "IT/Security",
+  "mail.lane_opened": "ช่องทางตรวจสอบเปิดแล้ว",
   "model_type.classic_ml": "Classic ML",
   "model_type.llm": "LLM",
   "model_type.other": "อื่น ๆ",
