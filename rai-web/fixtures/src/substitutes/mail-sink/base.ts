@@ -25,6 +25,7 @@ export abstract class BaseMailSink implements MailSink, MailSinkControl {
   protected readonly now: () => Date;
   protected readonly accepted = new Set<string>();
   readonly #forced = new ForcedFailure();
+  readonly #pending = new Map<string, Promise<void>>();
   readonly #sent: DeliveryRequest[] = [];
   readonly #receipts: DeliveryReceipt[] = [];
 
@@ -82,6 +83,24 @@ export abstract class BaseMailSink implements MailSink, MailSinkControl {
   }
 
   async deliver(request: DeliveryRequest): Promise<DeliveryReceipt> {
+    const key = request.dedupKey;
+    const previous = this.#pending.get(key);
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.#pending.set(key, pending);
+    try {
+      await previous;
+      // Recheck accepted state after the preceding attempt has finished recording.
+      return await this.#deliverAttempt(request);
+    } finally {
+      release();
+      if (this.#pending.get(key) === pending) this.#pending.delete(key);
+    }
+  }
+
+  async #deliverAttempt(request: DeliveryRequest): Promise<DeliveryReceipt> {
     const at = this.now().toISOString();
     const base = { dedupKey: request.dedupKey, attempt: request.attempt, at };
 
