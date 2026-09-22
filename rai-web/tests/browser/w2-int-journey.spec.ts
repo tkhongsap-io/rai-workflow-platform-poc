@@ -204,6 +204,13 @@ test.describe(`W2-INT journey on the real server: v1 → send-back → v2 → di
     expect(viewAfterResubmit.raiStatus).toBe('pending');
     expect(viewAfterResubmit.privacyStatus).toBe('pending');
     expect(viewAfterResubmit.securityStatus).toBe('pending');
+    const lanes = page.getByRole('group', { name: t('th', 'case.lane_status.heading') });
+    await expect(lanes).toBeVisible();
+    await expect(lanes).toContainText(t('th', 'case.lane.rai'));
+    await expect(lanes).toContainText(t('th', 'case.lane.privacy'));
+    await expect(lanes).toContainText(t('th', 'case.lane.security'));
+    await expect(lanes.locator('[data-status="pending"]')).toHaveCount(3);
+    await expect(lanes.getByText(t('th', 'projection.pending'), { exact: true })).toHaveCount(3);
     const laneOpens = await queryRows<Row>(
       "SELECT target_ref->>'lane' AS lane FROM audit_event WHERE action = 'lane.opened' AND target_case_id = $1 AND target_version_id = $2 ORDER BY seq",
       [caseId, v2Id],

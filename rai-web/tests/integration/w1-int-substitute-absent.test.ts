@@ -150,7 +150,7 @@ describe('W1-INT: the evidence configuration cannot load the substitute', () => 
     for (const name of Object.keys(env)) assert.doesNotMatch(name, /SUBSTITUTE/i, name);
     assert.equal(env.RAI_IDENTITY_MODE, 'fixture');
     assert.equal(env.NODE_ENV, 'test');
-    assert.equal(env.QC_MODE, 'substitute'); // the W1-10 QC substitute is the slice-1 QC implementation by design (section 1.1); it is not the W1-13 API substitute
+    assert.equal(env.QC_MODE, 'substitute'); // the W1-10 QC substitute is the slice-1 substitute stand-in (section 1.1); real QC is W4; it is not the W1-13 API substitute
     const source = readFileSync(path.join(TESTS_DIR, 'browser', 'playwright.config.ts'), 'utf8');
     assert.doesNotMatch(source, /substitute-server|substitutes\/api|VITE_API_SUBSTITUTE/);
     // The build the web server runs forces the product bundle: web/package.json's build script.

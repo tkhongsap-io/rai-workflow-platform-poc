@@ -361,6 +361,18 @@ describe(`W2-INT exit negatives over HTTP against the real server process — ${
     assert.equal((after.rows[0] as { n: number }).n, (before.rows[0] as { n: number }).n);
   });
 
+  it('the case owner cannot approve a lane on their own case (403) and writes nothing', async () => {
+    const owner = await signIn(OWNER);
+    const version = await submitOk(owner, NONVENDOR.caseId);
+    const revision = await caseRevision(NONVENDOR.caseId);
+    const before = await db.owner.execute(sql`SELECT count(*)::int AS n FROM lane_decision`);
+    const deny = await approve(owner, NONVENDOR.caseId, version.versionId, 'ai_coe', revision);
+    assert.equal(deny.status, 403, deny.text);
+    assert.equal(deny.json<ErrorResponse>().error.code, 'forbidden');
+    const after = await db.owner.execute(sql`SELECT count(*)::int AS n FROM lane_decision`);
+    assert.equal((after.rows[0] as { n: number }).n, (before.rows[0] as { n: number }).n);
+  });
+
   it('a reviewer who is the BU SPOC of the case cannot approve that lane (403)', async () => {
     const owner = await signIn(OWNER);
     const hrVersion = await submitOk(owner, HR_DUAL.caseId);

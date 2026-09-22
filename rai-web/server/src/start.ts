@@ -188,7 +188,11 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
   ]);
   const store = createFilesystemBlobStore(path.resolve(config.blobDir));
   await store.init(); // root 0700, tmp/ emptied at process start (W0-08 section 6)
-  const qcRunner = config.qc.mode === 'substitute' ? await loadQcSubstituteRunner(overrides.now) : undefined;
+  // Bind the QC substitute only outside production: a production process stays unbound even if fixtures can import.
+  const qcRunner =
+    config.qc.mode === 'substitute' && config.nodeEnv !== 'production'
+      ? await loadQcSubstituteRunner(overrides.now)
+      : undefined;
   const { fastify, emitter, drain } = buildApp({
     config,
     artifacts: { store, db: db.db, limits: config.upload },
@@ -227,8 +231,8 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
       knownIdentities,
       ...(overrides.now === undefined ? {} : { now: overrides.now }),
     },
-    // W2-05 / W2-06 / W2-INT: disposition + lane QC. QC_MODE=substitute binds ScriptedQcRunner when fixtures
-    // are installed (slice-1 evidence path); a production install without fixtures stays unbound.
+    // W2-05 / W2-06 / W2-INT: disposition + lane QC. QC_MODE=substitute binds ScriptedQcRunner outside
+    // production when fixtures are installed (slice-1 evidence path); production stays unbound.
     findings: {
       db: db.db,
       readyRecipientsForOwner: (ownerSubjectId) =>
