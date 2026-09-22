@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-22
+
+- W1-08 (W1 exit, Milestone M1): evidence record changes/2026-09-22-w1-exit/review.md from a clean checkout — 347 unit, 135 integration, 108 evidence browser tests, exit negatives and the restart journey quoted against the built server, fixture set slice1-synthetic@1 7c80ccd43663; A01 (local), A02, A07 mapped to their tests; Google loopback sign-in runbook in TESTING.md, pending Ta; BUILD_PLAN W1 exit recorded, M1 reached, W2 ready.
+
 ## 2026-09-21
 
 - W1-INT (PR #87): SPA served by the real server; Lane B journeys promoted to evidence against real Postgres (108 browser tests); create→attach→submit→restart→reopen journey with byte-identical download; SPOC-on-behalf positive; all exit negatives; fixed a graceful-shutdown hang on idle sockets found by the restart test; 347 unit + 135 integration.

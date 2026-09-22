@@ -137,7 +137,7 @@ $ HOST=127.0.0.1 RAI_IDENTITY_MODE=local-google node server/dist/main.js   (clie
 exit=78
 ```
 
-The `0.0.0.0` run exercises W0-03 S2 (refused before `listen`), as the spec's section 5 says it does; S16 (post-listen address check) is proved by ID-02 in `rai-web/server/src/identity/adapter.test.ts` inside `npm run test:unit`, not by this run. The dummy client values `x` prove only that the bind check fires before the client is used; the placeholder run proves a forgotten placeholder is a refusal, never an empty secret.
+The `0.0.0.0` run exercises W0-03 S2 (refused before `listen`), as the spec's section 5 says it does; S16 (post-listen address check) is proved by `rai-web/server/src/identity/adapter.test.ts` › `S16 verifyBoundAddress: a non-loopback bound address refuses with bind_not_loopback in local-google and fixture only` inside `npm run test:unit`, not by this run. The dummy client values `x` prove only that the bind check fires before the client is used; the placeholder run proves a forgotten placeholder is a refusal, never an empty secret.
 
 ### 4.2 Wrong role, other BU, direct file URL, unsafe upload (over HTTP, `curl`)
 
