@@ -35,3 +35,15 @@ test('every key uses the dotted lower-case namespace convention', () => {
     assert.match(key, /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/, key);
   }
 });
+
+test('operator labels have matching placeholders in both languages', () => {
+  for (const key of LOCALE_KEYS.filter((key) => key.startsWith('operator.'))) {
+    const params = (value: string) => [...value.matchAll(/\{(\w+)\}/g)].map((match) => match[1]).sort();
+    assert.deepEqual(params(th[key]), params(en[key]), key);
+  }
+  for (const locale of ['th', 'en'] as const) {
+    const rendered = t(locale, 'operator.correlation_copy', { recordId: 'notification-1' });
+    assert.ok(rendered.includes('notification-1'));
+    assert.doesNotMatch(rendered, /\{\w+\}/);
+  }
+});

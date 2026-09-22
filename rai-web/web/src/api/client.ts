@@ -5,6 +5,8 @@
 // W1-06 adds the case-flow calls: the pack draft (7.5), artifact upload as multipart with one `file` part and
 // artifact metadata (7.4), submit and version navigation (7.6).
 
+import { Value } from 'typebox/value';
+import { DeskHealthReportSchema, type DeskHealthReport } from '@rai/shared/schemas/observability';
 import {
   isErrorCode,
   type ErrorCode,
@@ -53,6 +55,7 @@ export const API_PATHS = Object.freeze({
   fixtureSignIn: '/auth/fixture/sign-in',
   cases: '/api/cases',
   queue: '/api/queue',
+  operatorDeskHealth: '/api/operator/desk-health',
   configuration: '/api/configuration/current',
   artifacts: '/api/artifacts',
 });
@@ -87,6 +90,15 @@ export class ApiError extends Error {
   get stale(): ErrorDetails['stale_version'] | undefined {
     if (this.code !== 'stale_version' || this.details === undefined) return undefined;
     return this.details as ErrorDetails['stale_version'];
+  }
+}
+
+/** A successful HTTP response did not match its declared report schema. Never retains the payload. */
+export class InvalidResponseError extends Error {
+  readonly messageKey = 'operator.invalid_response' as const;
+  constructor() {
+    super('invalid_response');
+    this.name = 'InvalidResponseError';
   }
 }
 
@@ -199,6 +211,12 @@ export function createApiClient(fetchImpl: FetchLike = (input, init) => fetch(in
     /** `local-google`, `network`, `production`: returns the provider redirect the browser must follow. */
     startSignIn: (body: SignInRequest) => request<SignInResponse>('POST', API_PATHS.signIn, { body }),
     signOut: () => request<undefined>('POST', API_PATHS.signOut),
+    /** W3-07b contract only: Admin authorization belongs to the server; no report is cached here. */
+    getDeskHealth: async (): Promise<DeskHealthReport> => {
+      const report = await request<unknown>('GET', API_PATHS.operatorDeskHealth);
+      if (!Value.Check(DeskHealthReportSchema, report)) throw new InvalidResponseError();
+      return report;
+    },
     getQueue: (query: QueueQuery = {}) =>
       request<QueueResponse>('GET', API_PATHS.queue, {
         query: {
