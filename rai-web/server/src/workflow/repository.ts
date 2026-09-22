@@ -1,4 +1,5 @@
-// W2-02: lane decision store helpers — insert decision, write lane projection, create successor draft on send-back.
+// W2-02 / W2-03: lane decision store helpers — insert decision, write lane projection, create or reuse
+// successor draft on send-back (D05 / W0-06 4.5: concurrent send-backs share one N+1 under the case lock).
 import { and, eq } from 'drizzle-orm';
 import { uuidv7 } from '@rai/shared/ids';
 import type { Lane } from '@rai/shared/constants';
@@ -98,7 +99,9 @@ export interface SuccessorDraftResult {
 
 /**
  * D05 / W0-06 4.5: if no open draft exists, create N+1 with parent = N, copy stage_context,
- * checklist_template_version and all nine slots; set case.draft_version_id. If a draft already exists, reuse it.
+ * checklist_template_version and all nine slots (caller sets case.draft_version_id). If
+ * case.draft_version_id is already set, reuse that draft. Concurrent send-backs share one draft
+ * because withWorkflowTransaction locks the case row before this runs.
  */
 export async function ensureSuccessorDraft(
   tx: Tx,

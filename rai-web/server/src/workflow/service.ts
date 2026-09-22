@@ -74,6 +74,9 @@ function caseRef(row: CaseRow): Record<string, AuditRefValue> {
  * Shared expected-version / precondition checks for decide (W0-06 4.4 / 4.5 / 5.2).
  * Does **not** compare `expected.revision` to `case.row_version`: §5.1 freezes revision for submitted
  * versions, and §5.2 names version_superseded / version_closed / lane_already_decided for these actions.
+ * Order matches W0-06 §4 / §5.2: existence (check 3), then Ready → version_closed for any mutating
+ * action, then named-vs-current / submitted / successor checks. An unknown UUID stays not_found even
+ * when Ready; a real non-current version of a Ready case is version_closed, not version_superseded.
  * `requireNoSuccessor`: approve only — a successor draft closes the version for further approvals.
  */
 async function assertDecideTarget(
@@ -84,9 +87,14 @@ async function assertDecideTarget(
 ): Promise<PackVersionRow> {
   if (!isUuid(expected.versionId)) throw new NotFoundError('version');
 
+  // Check 3 — existence: the referenced version exists and belongs to this case.
+  const named = await readVersionRow(tx, expected.versionId);
+  if (named === undefined || named.caseId !== row.id) throw new NotFoundError('version');
+
   const current = row.currentVersionId === null ? undefined : await readVersionRow(tx, row.currentVersionId);
   if (current === undefined) throw new NotFoundError('version');
 
+  // Check 6 — Ready closes every mutating action (§5.2), before named-vs-current.
   if (current.readyAt != null) {
     throw new StaleVersionError(
       staleDetails(
@@ -99,7 +107,7 @@ async function assertDecideTarget(
     );
   }
 
-  if (current.id !== expected.versionId) {
+  if (current.id !== named.id) {
     throw new StaleVersionError(
       staleDetails(
         'version_superseded',
@@ -111,14 +119,14 @@ async function assertDecideTarget(
     );
   }
 
-  if (current.submittedAt === null) {
+  if (named.submittedAt === null) {
     throw new StaleVersionError(
       staleDetails(
         'version_superseded',
         'error.stale_version.guidance.version_superseded',
-        current,
+        named,
         row.rowVersion,
-        refreshPathFor(row.id, current),
+        refreshPathFor(row.id, named),
       ),
     );
   }
@@ -128,14 +136,14 @@ async function assertDecideTarget(
       staleDetails(
         'version_closed',
         'error.stale_version.guidance.version_closed',
-        current,
+        named,
         row.rowVersion,
-        refreshPathFor(row.id, current),
+        refreshPathFor(row.id, named),
       ),
     );
   }
 
-  return current;
+  return named;
 }
 
 async function assertLanePending(

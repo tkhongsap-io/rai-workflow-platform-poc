@@ -68,7 +68,7 @@ export const LaneDecisionResponseSchema = Type.Object({
   lane: LaneSchema,
   decision: Type.Union([Type.Literal('approve'), Type.Literal('send_back')]),
   decidedAt: Type.String(),
-  /** Present when this send-back created or reused a successor draft; null on approve. */
+  /** Successor draft id when this send-back created or reused N+1; null on approve. */
   successorDraftVersionId: Type.Union([Type.String(), Type.Null()]),
   /** case.row_version at decision time (unchanged by the decision; W0-06 5.1 frozen for submitted versions). */
   caseRevision: Type.Integer({ minimum: 1 }),

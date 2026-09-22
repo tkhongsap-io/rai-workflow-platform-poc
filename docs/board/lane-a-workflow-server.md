@@ -58,3 +58,28 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: W2-03 concurrent send-backs share one draft — not this session.
 - Author: operator=ta session=w2-02 model=composer
 - Evidence: branch codex/w2-02-lane-decision
+
+## 2026-09-22 11:58 — CLAIM Lane A
+- Author: operator=ta session=w2-03 model=composer
+- Takes over from: session=w2-02 (reason: handoff)
+
+## 2026-09-22 11:58 — W2-03 successor draft concurrency
+- What: Concurrent send-backs share one N+1 draft (case row lock + draft_version_id reuse); stale decide/send-back returns 409 with refresh guidance and writes nothing; wrong-revision and post-draft-edit regressions; N stays readable and frozen.
+- Why: Ticket W2-03 (#33); proves A07; decision D05. Completes the concurrent-send-back half of W0-06 4.5 / 5.2.
+- Next: W2-04 resubmit reopens all lanes — not this session.
+- Author: operator=ta session=w2-03 model=composer
+- Evidence: branch codex/w2-03-successor-draft
+
+## 2026-09-22 12:12 — W2-03 fix: drop UniqueViolation reclaim
+- What: Correction to the prior W2-03 entry — sharing one draft is the case lock plus draft_version_id reuse, not UniqueViolation reclaim (removed). Unknown version UUID → not_found.
+- Why: Independent review of PR #92.
+- Next: W2-04 resubmit — not this session.
+- Author: operator=ta session=w2-03 model=composer
+- Evidence: branch codex/w2-03-successor-draft
+
+## 2026-09-22 12:17 — W2-03 note: §4.5 unique-index retry not implemented
+- What: W0-06 §4.5's "retry the transaction once from the lock" if the one-draft unique index fires is not implemented. The case lock makes that path unreachable for send-back; a retry belongs at the transaction boundary only if a later ticket creates a draft without the lock.
+- Why: Independent review of PR #92 (existence-before-Ready reorder in the same fix).
+- Next: W2-04 resubmit — not this session.
+- Author: operator=ta session=w2-03 model=composer
+- Evidence: branch codex/w2-03-successor-draft

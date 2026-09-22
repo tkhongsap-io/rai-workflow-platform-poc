@@ -257,23 +257,20 @@ describe(`W2-02 lane decision — ${SET}`, () => {
     assert.equal((decisions.rows[0] as { n: number }).n, 0);
   });
 
-  it('stale versionId is version_superseded; missing qcRunId hits lane_qc_not_run in the service', async () => {
+  it('unknown versionId is not_found; missing qcRunId hits lane_qc_not_run in the service', async () => {
     const owner = await signIn(OWNER_A);
     const version = await submitOk(owner, NONVENDOR.caseId);
     const revision = await caseRevision(NONVENDOR.caseId);
     const dpo = await signIn(DPO);
 
-    // Path and body must agree; the id must not be the latest submitted version (§5.2 version_superseded).
+    // Path and body must agree; a UUID that was never a version is not_found (not version_superseded).
     const otherVersionId = randomUUID();
-    const stale = await decide(dpo, NONVENDOR.caseId, otherVersionId, 'dpo', 'approve', {
+    const missing = await decide(dpo, NONVENDOR.caseId, otherVersionId, 'dpo', 'approve', {
       expectedVersion: { versionId: otherVersionId, revision },
       qcRunId: randomUUID(),
     });
-    assert.equal(stale.statusCode, 409, stale.body);
-    assert.equal(
-      stale.json<{ error: { code: string; details: { reason: string } } }>().error.details.reason,
-      'version_superseded',
-    );
+    assert.equal(missing.statusCode, 404, missing.body);
+    assert.equal(missing.json<{ error: { code: string } }>().error.code, 'not_found');
 
     // Omit qcRunId so Ajv accepts the body and requireQcRunId throws lane_qc_not_run.
     const noQc = await decide(dpo, NONVENDOR.caseId, version.versionId, 'dpo', 'approve', {

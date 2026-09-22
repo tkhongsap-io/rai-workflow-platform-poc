@@ -1,5 +1,13 @@
 # Development log
 
+## W2-03: successor draft concurrency — 2026-09-22
+
+Concurrent send-backs on the same submitted version share one editable N+1 draft because the case row lock serialises decide and `ensureSuccessorDraft` reuses `case.draft_version_id` when set; version N stays readable and frozen; stale actions return 409 with refresh guidance and write nothing. This is not the W2 exit; resubmit (W2-04), findings/dispositions, Ready, UI and mail delivery remain later tickets.
+
+### Fix round 1
+
+Removed the SAVEPOINT / UniqueViolation reclaim (unreachable under the case lock and would skip setting `draft_version_id`). An unknown version UUID is `not_found`, not `version_superseded`.
+
 ## W2-02: lane decision — 2026-09-22
 
 Lane approve and send-back are live (own lane only, expected version, idempotency, D05 self-exclusion, decision audit, successor draft on first send-back). This is not the W2 exit; concurrent send-back (W2-03), resubmit, findings/dispositions, Ready, UI and mail delivery remain later tickets.
