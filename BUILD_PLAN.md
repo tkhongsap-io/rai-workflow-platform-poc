@@ -1,6 +1,6 @@
 # Build Plan: RAI Workflow Platform PoC
 
-Version: 1.0, 2026-09-21 (draft 1 was 2026-09-20). **Canonical implementation anchor. G0 closed 2026-09-21; W0-W3 authorized on synthetic data (D03); W0 is Ready; nothing is built yet.**
+Version: 1.0, 2026-09-21 (draft 1 was 2026-09-20). **Canonical implementation anchor. G0 closed 2026-09-21; W0-W3 authorized on synthetic data (D03). Package text below stays as written. Current status is the dated section at the end: M2 reached, W3-05 on main, next ticket W3-01.**
 
 Read [PRD](PRD.md) for product scope, [acceptance](docs/acceptance.md) for expected behavior and [decisions](docs/product/decisions.md) for the recorded rules (D01-D03, D05, D06, D11, D12) and the open items (D04, D07-D10). The older repository-foundation plan describes documentation setup only. This document governs the future product build.
 
@@ -157,7 +157,7 @@ All recorded on 2026-09-21 in the [register](docs/product/decisions.md); the [br
 
 Still open: D04 (inside W0-01), D07-D10 (gates for W4-W8).
 
-## Status against this plan — 2026-09-22 (W2 exit)
+## Status against this plan — 2026-09-22 (W3-05 on main)
 
 A dated read, not a rewrite. Packages above stay as written. DEVLOG.md is the live record; where they disagree, DEVLOG is newer.
 
@@ -171,7 +171,7 @@ A dated read, not a rewrite. Packages above stay as written. DEVLOG.md is the li
 | M1 (W1) | **Reached** (2026-09-22) | changes/2026-09-22-w1-exit/review.md | — |
 | W2 | **Exit recorded 2026-09-22** | changes/2026-09-22-w2-exit/review.md (lint, typecheck; 15 W2-INT evidence browser tests; 6 W2-INT negatives; check:substitute-absent 463/0; fixture set slice1-synthetic@1 7c80ccd43663) | — |
 | M2 (W2) | **Reached** (2026-09-22) | changes/2026-09-22-w2-exit/review.md | — |
-| M3 (W3, slice 1) | Authorized (D03), **unblocked** by W2 exit; next package | BUILD_PLAN W3; docs/delivery/slice-1-work-breakdown.md | W3-01 / W3 contract path |
+| M3 (W3, slice 1) | Authorized (D03). **W3-05 landed** (`39bbf0a`, PR #104). Rest of W3 open | DEVLOG W3-05; `rai-web/shared/src/schemas/sla.ts`; `rai-web/server/src/sla/` | W3-01 queue, using the W3-05 due-date shape. W3-03/W3-04 wait on the W1-11 mail sink, which is not on `main` |
 | W4-W8 | **Not authorized** | — | D07-D10 and package gate entries |
 
 ### Where the build diverged from the plan
@@ -180,4 +180,4 @@ None on authorization: W0–W3 remain the synthetic-data scope of D03; W4–W8 s
 
 The [delivery pack](docs/delivery/README.md) breaks G0, W0 and W1-W3 into decision briefs and assignable tickets; it does not change these packages.
 
-W2 exit is recorded and Milestone M2 is reached; **next is W3** (queue, notification links and SLA reporting). W4–W8 are not authorized. Supporting [architecture](docs/architecture/README.md), [threat model](docs/security/threat-model.md) and [evaluation](docs/evaluation/plan.md) remain part of the build contract. DEVLOG.md is the live record.
+W2 exit is recorded and Milestone M2 is reached. W3 has started: W3-05 (working-day SLA) is on `main` at `39bbf0a`. **Next ticket is W3-01** (role-scoped queue). It can read the due-date shape now. W3-03 and W3-04 still need the W1-11 mail sink on `main`; that substitute is on `codex/w1-00-mail-dedup` (PR #68), not `main`. Issue #35 and epic #53 stay open. W4–W8 are not authorized. Supporting [architecture](docs/architecture/README.md), [threat model](docs/security/threat-model.md) and [evaluation](docs/evaluation/plan.md) remain part of the build contract. DEVLOG.md is the live record.

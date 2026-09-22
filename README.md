@@ -1,6 +1,6 @@
 # RAI Workflow Platform PoC
 
-**Working product name: RAI web. Status: design and synthetic demo complete; G0 closed 2026-09-21; product build authorized for W0-W3 on synthetic data. Production release remains gated.**
+**Working product name: RAI web. Status: M2 reached 2026-09-22; W3-05 (working-day SLA) is on main. Next ticket is W3-01. Production release remains gated. W4–W8 are not authorized.**
 
 A review desk for one submitted AI-use-case pack, with parallel AI/COE, DPO and IT/Security review, versioned send-back and soft document QC. This is not True's official AI register and does not operate the eight-stage AI lifecycle.
 
@@ -89,6 +89,6 @@ Run the local design with `python3 demo/serve.py`, then open http://127.0.0.1:51
 
 ## Build status
 
-G0 closed on 2026-09-21: Nakhun confirmed the review-desk scope, the operator role and the DPO SLA (D01); Ta set the AI/COE mapping (D02), the workflow rules (D05), the calendar and notification policy (D06), the group and stage fields (D11), the language (D12) and authorized W0-W3 (D03). The [decision register](docs/product/decisions.md) has the exact answers. Next step is W0: the [technical contract](docs/delivery/w0-technical-contract.md), starting with the stack ADR (D04).
+G0 closed on 2026-09-21. W0, W1, and W2 exits are recorded (Milestones M1 and M2). W3-05, the working-day SLA, is on `main` at `39bbf0a` (PR #104). **Next ticket is W3-01**, the role-scoped queue, which can use the due-date shape in `rai-web/shared/src/schemas/sla.ts`. W3-03 and W3-04 need the mail sink from PR #68, which is not on `main` yet. Issue #35 and epic #53 stay open. The live notes are [DEVLOG.md](DEVLOG.md) and [CHANGELOG.md](CHANGELOG.md). W4–W8 are not authorized.
 
 Production identity is True AD/Entra on True's network; any Google account is allowed only on localhost. A networked test deployment needs an allow-list or AD. Ready for launch means review-desk completion only; it is not Council approval or an ITSM deployment authorization.

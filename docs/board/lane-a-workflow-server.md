@@ -146,3 +146,10 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: review this PR, then W3-01 can take the due-date shape. Mail sink stays off main until just before W3-03.
 - Author: operator=ta session=w3-05 model=grok-4.7
 - Evidence: branch codex/w3-05-working-day-sla
+
+## 2026-09-22 20:45 — W3-05 merged; handoff
+- What: PR #104 squash-merged to main as 39bbf0a. CHANGELOG, BUILD_PLAN status, and README build status now name W3-01 as the next ticket and the mail sink as still off main. Issue #46 closed. Issue #35 and epic #53 stay open.
+- Why: The lane entry above stopped at "review this PR". The team log has to say what to pick up.
+- Next: W3-01 (queue), using the W3-05 due-date shape. W3-03 waits on the W1-11 mail sink.
+- Author: operator=ta session=w3-05 model=grok-4.7
+- Evidence: https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/104

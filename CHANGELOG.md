@@ -2,6 +2,12 @@
 
 ## 2026-09-22
 
+- W3-05 (PR #104, `39bbf0a`): Working-day SLA due dates from the SLA and holiday list frozen at submit (Asia/Bangkok; weekends and holidays skipped; the open day is not counted). A later SLA revision does not move an already submitted version. Resubmit starts a new clock. `listSlaBreaches` returns only pending lanes on the current review target that are past due. No SLA HTTP route, no mail, no escalation. Issue #46 closed. Next ticket is W3-01 (queue), which can use the due-date shape. W3-03 and W3-04 still need the W1-11 mail sink on `main` (PR #68 merged only onto `codex/w1-00-mail-dedup`).
+
+- Case-row lock (PR #103, `7382222`): Lane QC no longer holds `SELECT … FOR UPDATE` across the QC runner. Persist re-locks, treats an open successor draft as `version_closed`, and replays a completed run that landed during the call.
+
+- W2-08 (W2 exit, Milestone M2, PR #102): Evidence in changes/2026-09-22-w2-exit/review.md. Three parallel lanes, send-back, dispositions, Ready, and the real-server journey. Issue #35 and epic #53 stay open (owning lane for slot 5, slot 9, pack-level, and unavailable findings is unrecorded). Ticket-level notes are in DEVLOG.md.
+
 - W1-08 (W1 exit, Milestone M1): evidence record changes/2026-09-22-w1-exit/review.md from a clean checkout — 347 unit, 135 integration, 108 evidence browser tests, exit negatives and the restart journey quoted against the built server, fixture set slice1-synthetic@1 7c80ccd43663; A01 (local), A02, A07 mapped to their tests; Google loopback sign-in runbook in TESTING.md, pending Ta; BUILD_PLAN W1 exit recorded, M1 reached, W2 ready.
 
 ## 2026-09-21

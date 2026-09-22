@@ -53,8 +53,9 @@ rai-workflow-platform-poc/
     │       │   ├── artifacts.ts           #   upload/download (7.4)
     │       │   ├── pack.ts                #   pack draft (7.5)
     │       │   ├── versions.ts            #   submit and version navigation (7.6); ExpectedVersion (W0-06 5.1)
-    │       │   ├── review.ts              #   W2 shapes — added by the W2-02 / W2-05 contract PRs (empty until then)
-    │       │   └── queue.ts               #   W3 shapes — added by the W3-01 / W3-05 contract PRs (empty until then)
+    │       │   ├── review.ts              #   W2 shapes (7.7)
+    │       │   ├── sla.ts                 #   W3-05 due date and breach query (7.8); on main
+    │       │   └── queue.ts               #   W3-01 scoped queue (not written yet)
     │       ├── qc/types.ts                # typed finding, unavailable result, owning lane (W0-07)
     │       ├── mail/types.ts              # committed event, recipients, deep link, dedup key, delivery status (W0-07)
     │       └── locales/                   # section 10: th.json (default), en.json, keys.ts (typed key union)
@@ -78,7 +79,8 @@ rai-workflow-platform-poc/
     │       ├── versions/                  # submit/freeze, version navigation, idempotency keys (W1-05)
     │       ├── workflow/                  # W0-06 transitions, lanes, decisions, Ready predicate (W2-01 to W2-04, W2-06)
     │       ├── findings/                  # dispositions contract (W2-05, Lane B server half via contract PR)
-    │       ├── queue/                     # W3-01 scoped query; sla/ for W3-05
+    │       ├── sla/                       # W3-05 due dates and breach query (on main)
+    │       ├── queue/                     # W3-01 scoped query (not written yet)
     │       ├── notifications/             # W3-03/W3-04 composer, templates by locale key, retry, dedup
     │       ├── qc/                        # QC port; slice 1 binds the W1-10 substitute, marked as such
     │       ├── configuration/             # configuration revisions, seed, activation rule (W1-00)
