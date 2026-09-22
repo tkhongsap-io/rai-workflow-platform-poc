@@ -68,7 +68,27 @@ export const EVENT_CATALOGUE = Object.freeze({
   'health.readiness': { level: 'info', fields: ['status', 'report'] },
   'error.captured': {
     level: 'error',
-    fields: ['category', 'code', 'httpStatus', 'route', 'stackHash', 'stack'],
+    fields: [
+      'category',
+      'code',
+      'httpStatus',
+      'route',
+      'stackHash',
+      'stack',
+      'fieldPaths',
+      'reason',
+      'caseId',
+      'expectedVersionId',
+      'currentVersionId',
+      'qcRunId',
+      'versionId',
+      'notificationId',
+      'attempts',
+      'errorCode',
+      'targetType',
+      'slot',
+      'sizeBytes',
+    ],
   },
 } as const satisfies Record<string, { level: LogLevel; fields: readonly string[] }>);
 

@@ -674,3 +674,7 @@ Passwords above are local Docker placeholders for synthetic data only; networked
 - [Acceptance](../acceptance.md) — A07, A09, A11; [threat model](../security/threat-model.md)
 - [Architecture](../architecture/README.md) — boundary table; "Path in repo" filled by W0-02
 - [Slice 1 work breakdown](../delivery/slice-1-work-breakdown.md) — consuming tickets; [later packages](../delivery/later-packages-outline.md) — W6, W7-00, W8
+
+## W3-07a additive observability persistence — 2026-09-22
+
+Migration 0007 adds operational job runs, day/recipient-unique notification linkage, append-only late-QC refusals and nullable unavailable reasons without rewriting frozen rows. The [prerequisite contract](../../changes/2026-09-22-w3-07a-observability-contract/spec.md) records columns, guards, role grants, producer ownership and tests. Historical null reasons stay unknown. These records are neither business audit events nor approval authority.

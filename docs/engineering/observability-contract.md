@@ -427,3 +427,7 @@ Variable names are W0-02 section 5's (W0-09 aligned them); W1-00 creates the sam
 - [ ] Fields W0-07 section 10 still proposes for `qc.run.*` (`runKey`, `alreadyRecordedCount`, `runner`, `runnerVersion`) and the durable `lateQc` record: W3-07.
 - [ ] D08/D10: log retention on the host, alongside audit retention; the redaction rule is designed so that this is an operational question, not a personal-data one, but the DPO review confirms it before real data.
 - [ ] W8: collector, alert channel and any exposure of `/readyz` beyond loopback.
+
+## W3-07a engineering reconciliation — 2026-09-22
+
+The [prerequisite contract](../../changes/2026-09-22-w3-07a-observability-contract/spec.md) supersedes the illustrative shared shapes and error-field examples above: typed safe errors, historical unknown QC reasons, persisted Bangkok-day digest identity/linkage, mandatory lateQc, and HTTP-versus-job OBS semantics. Shared schemas are in `rai-web/shared/src/schemas/observability.ts`, re-exported from `queue.ts`. Migration 0007 reserves the persistence contract. No health/operator route, composer, retry worker or QC execution is implemented by this amendment. Submit-trigger and late-result synthetic-runner acceptance are W3-INT gates; owning-lane decisions stay open. The four additional QC diagnostic fields proposed by W0-07 remain unregistered and are not needed for the mandatory existing qc.run.late event.

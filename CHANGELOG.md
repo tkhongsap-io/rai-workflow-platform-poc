@@ -84,3 +84,7 @@
 - Pinned AI Engineering Playbook adoption record and implementation gates.
 
 No application or operational capability is implemented.
+
+## 2026-09-22 — W3-07a prerequisite contract
+
+Added shared observability shapes and additive persistence for digest provenance/dedup, truthful QC unavailable reasons and durable late-QC refusals. Reconciled HTTP/job error capture and synthetic integration gates. Runtime consumers remain separate work.

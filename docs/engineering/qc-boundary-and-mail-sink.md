@@ -630,3 +630,7 @@ Other:
 | Local substitute writes to a file or in-memory sink; no external mail | 4.6, 4.7, 4.8 |
 | Interface, error contract and test substitute (W0 section text) | 3.3/4.2, 3.8/4.5/5, 3.9/4.7 |
 | Cross-links to consuming tickets | 9 |
+
+## W3-07a observability reconciliation — 2026-09-22
+
+The [W3-07a contract](../../changes/2026-09-22-w3-07a-observability-contract/spec.md) implements the persistence prerequisite for the required lateQc list, preserves unknown historical unavailable reasons and requires synthetic submit-trigger/late-result integration proof in W3-INT. The owning-lane question remains unresolved. Digest job provenance requires a separate coordinated mail contract and sink regression tests; ordinary audit provenance remains mandatory. Existing CommittedEvent/sink validation is unchanged by this prerequisite.

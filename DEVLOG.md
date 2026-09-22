@@ -175,3 +175,7 @@ The [G0 close record](changes/2026-09-21-g0-close/review.md) records the verific
 ## W2-INT: real-server journey and negatives — 2026-09-22
 
 W2-07/W2-09 wired to the real server: promoted evidence browser specs, the automated W2 journey (v1 → send-back → v2 → disposition → three approvals → Ready), and the W2 exit negatives (concurrent send-back, stale approval, undispositioned finding, Admin and self-approval 403s) against the built deployable and fixture set slice1-synthetic@1. The deployable binds the W1-10 ScriptedQcRunner via dynamic import when `QC_MODE=substitute` so lane QC findings exist on the real server; W2-10 API substitute specs remain for Lane B/W3 and stay out of the evidence app path. Not the W2 exit (W2-08 runs this suite and records evidence). Issue #35 stays open.
+
+## W3-07a prerequisite contract — 2026-09-22
+
+Isolated branch from 5fe59ad; shared observability schemas and additive migration 0007 only. [Plan](changes/2026-09-22-w3-07a-observability-contract/plan.md) and [contract](changes/2026-09-22-w3-07a-observability-contract/spec.md). No consumer implementation or OBS acceptance claimed; parent reviews before any publication.
