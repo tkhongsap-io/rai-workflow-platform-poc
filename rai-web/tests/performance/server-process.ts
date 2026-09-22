@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { guardLaunch, validCommand, type LaunchConfig, type Query } from './server-contract.js';
+import { serverEnv } from './server-env.js';
 import { scenario } from './qc-scenario.js';
 import { settlement } from './settlement.js';
 import { readManifest } from '@rai/fixtures/manifest';
@@ -77,25 +78,7 @@ async function main() {
       (await operator.query(text, values)).rows as Record<string, unknown>[];
     const control = scenario(config, query),
       settle = settlement(query, control.ids);
-    const port = new URL(target.baseUrl).port;
-    const env = {
-      NODE_ENV: 'test',
-      RAI_IDENTITY_MODE: 'fixture',
-      HOST: '127.0.0.1',
-      PORT: port,
-      PUBLIC_BASE_URL: new URL(target.baseUrl).origin,
-      DATABASE_URL: target.urls.app,
-      DATABASE_MIGRATE_URL: target.urls.owner,
-      DATABASE_OPERATOR_URL: target.urls.operator,
-      BLOB_DIR: path.join(root, 'blobs'),
-      MAIL_SINK_DIR: path.join(root, 'mail'),
-      MAIL_MODE: 'sink-file',
-      QC_MODE: 'substitute',
-      BUILD_COMMIT: target.finalHead,
-      TRUST_PROXY: 'false',
-      LOG_PRETTY: 'false',
-      LOG_LEVEL: 'info',
-    };
+    const env = serverEnv(config, root);
     const built = (await import(pathToFileURL(path.join(serverRoot, 'server/dist/start.js')).href)) as {
       startServer(
         env: Record<string, string>,

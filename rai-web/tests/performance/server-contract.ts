@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import { FIXTURE_USERS } from '@rai/fixtures/data/users';
 import { guard, type RunConfig } from './core.js';
 import { recipe } from './seed-recipe.js';
 export const SCENARIO = 'perf-enrolled-no-findings-v1';
@@ -30,6 +31,11 @@ export interface LaunchConfig {
 }
 export const uuid = (value: string) =>
   /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(value);
+export function ownerDisplayName(subjectId: string): string {
+  const owner = FIXTURE_USERS.find((user) => user.subjectId === subjectId);
+  assert(owner, 'unknown fixture owner');
+  return owner.displayName;
+}
 export function guardLaunch(c: LaunchConfig) {
   assert(c.target === 'queue' || c.target === 'mutation');
   for (const config of [c.queue, c.mutation]) {
@@ -48,7 +54,7 @@ export function guardLaunch(c: LaunchConfig) {
     assert(/^TPM-SYNTHETIC-PERF-MUT-[0-9]+$/.test(row.source_record_id));
     assert(row.use_case_name.startsWith('SYNTHETIC-PERF-MUT-'));
     assert(['fixture:fx-user-owner-cm', 'fixture:fx-user-owner-cm-2'].includes(row.owner_subject_id));
-    assert.equal(row.business_owner, row.owner_subject_id);
+    assert.equal(row.business_owner, ownerDisplayName(row.owner_subject_id));
     assert.equal(row.created_by, row.owner_subject_id);
     assert(['CM', 'HR'].includes(row.business_unit_id));
     assert.equal(row.business_unit, row.business_unit_id);
@@ -67,7 +73,7 @@ export function expectedCase(c: LaunchConfig, key: number): ExpectedCase {
     source_record_id: r.sourceRecordId.value,
     use_case_name: r.name,
     owner_subject_id: owner,
-    business_owner: owner,
+    business_owner: ownerDisplayName(owner),
     business_unit_id: r.bu,
     business_unit: r.bu,
     technical_owner: 'Synthetic performance owner',

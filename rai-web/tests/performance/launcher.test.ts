@@ -1,3 +1,7 @@
+import { parseConfig, UPLOAD_LIMIT_DEFAULTS } from '../../server/src/config.js';
+import { serverEnv } from './server-env.js';
+import { FIXTURE_USERS } from '@rai/fixtures/data/users';
+import { createStaticSubjectDirectory } from '../../server/src/cases/subject-directory.js';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { randomUUID } from 'node:crypto';
@@ -30,7 +34,7 @@ const mutationCase = {
   source_record_id: 'TPM-SYNTHETIC-PERF-MUT-0',
   use_case_name: 'SYNTHETIC-PERF-MUT-0',
   owner_subject_id: 'fixture:fx-user-owner-cm',
-  business_owner: 'fixture:fx-user-owner-cm',
+  business_owner: 'ณัฐพร ส. (Nattaporn S.)',
   created_by: 'fixture:fx-user-owner-cm',
   business_unit: 'CM',
   business_unit_id: 'CM',
@@ -165,4 +169,99 @@ test('settlement requires committed clean QC plus original audit/correlation and
     poll(() => Promise.resolve(false), 1),
     /settlement deadline/,
   );
+});
+
+test('complete launcher environment passes real config parser with bounded limits for both targets', () => {
+  for (const target of ['queue', 'mutation'] as const) {
+    const launch = { ...config, target };
+    const env = serverEnv(launch, '/tmp/rai-perf-test');
+    const parsed = parseConfig(env);
+    assert.equal(parsed.nodeEnv, 'test');
+    assert.equal(parsed.identity.mode, 'fixture');
+    assert.equal(parsed.publicBaseUrl.origin, launch[target].baseUrl);
+    assert.deepEqual(parsed.upload, {
+      maxFileBytes: UPLOAD_LIMIT_DEFAULTS.UPLOAD_MAX_FILE_BYTES,
+      maxPackBytes: UPLOAD_LIMIT_DEFAULTS.UPLOAD_MAX_PACK_BYTES,
+      maxImagePixels: UPLOAD_LIMIT_DEFAULTS.UPLOAD_MAX_IMAGE_PIXELS,
+    });
+    assert.equal(parsed.idempotencyTtlHours, 72);
+    assert.equal(parsed.blobOrphanMinAgeHours, 24);
+    assert.equal(parsed.blobTmpMaxAgeHours, 1);
+    for (const key of [
+      'UPLOAD_MAX_FILE_BYTES',
+      'UPLOAD_MAX_PACK_BYTES',
+      'UPLOAD_MAX_IMAGE_PIXELS',
+      'IDEMPOTENCY_TTL_HOURS',
+      'BLOB_ORPHAN_MIN_AGE_HOURS',
+      'BLOB_TMP_MAX_AGE_HOURS',
+    ]) {
+      const incomplete = { ...env };
+      delete incomplete[key];
+      assert.throws(() => parseConfig(incomplete));
+    }
+  }
+});
+
+test('enrollment accepts API-resolved fixture display names and rejects subject text as business_owner', async () => {
+  const directory = createStaticSubjectDirectory(FIXTURE_USERS);
+  for (const key of [0, 1]) {
+    const expected = expectedCase(config, key);
+    const resolved = await directory.resolve(expected.owner_subject_id);
+    assert(resolved);
+    assert.notEqual(resolved.displayName, resolved.subjectId);
+    assert.equal(expected.business_owner, resolved.displayName);
+    proveCase(expected, { ...expected, business_owner: resolved.displayName });
+    assert.throws(() => proveCase(expected, { ...expected, business_owner: resolved.subjectId }));
+  }
+  guardLaunch({ ...config, target: 'mutation' });
+  const wrong = structuredClone(config);
+  wrong.mutationCases[0]!.business_owner = wrong.mutationCases[0]!.owner_subject_id;
+  assert.throws(() => guardLaunch(wrong));
+});
+
+test('successor settlement includes resubmitted audits with exact version/correlation, including aggregate failures', async () => {
+  const caseId = randomUUID(),
+    versionId = randomUUID(),
+    correlationId = randomUUID();
+  const proof = { caseId, versionId, correlationId };
+  let aggregateGood = true;
+  const control = settlement(
+    async (sql, values) => {
+      await Promise.resolve(); // Preserve the asynchronous query boundary without a DB.
+      if (sql.includes('FROM audit_event')) {
+        assert(sql.includes("'version.submitted'"));
+        assert(sql.includes("'version.resubmitted'"));
+        if (sql.includes('GROUP BY')) {
+          assert(sql.includes('q.version_id=a.target_version_id'));
+          assert(sql.includes('q.correlation_id=a.correlation_id'));
+          assert.deepEqual(values, [[caseId], ENGINE]);
+          return [{ target_version_id: versionId, runs: 1, good: aggregateGood }];
+        }
+        assert(sql.includes('target_version_id=$2 AND correlation_id=$3'));
+        return JSON.stringify(values) === JSON.stringify([caseId, versionId, correlationId])
+          ? [{ id: randomUUID() }]
+          : [];
+      }
+      if (sql.includes('FROM qc_run')) {
+        assert.deepEqual(values, [versionId]);
+        return [{ status: 'completed', engine_id: ENGINE, correlation_id: correlationId, findings: 0 }];
+      }
+      if (sql.includes('GROUP BY status')) return [{ status: 'sent', count: 4 }];
+      assert.deepEqual(values, [caseId, versionId, correlationId]);
+      return ['ai_coe', 'dpo', 'it_security'].map((lane) => ({ lane, status: 'sent' }));
+    },
+    () => [caseId],
+  );
+  await control.submit(proof);
+  await assert.rejects(
+    control.submit({ ...proof, correlationId: randomUUID() }),
+    /missing original submission audit/,
+  );
+  await assert.rejects(
+    control.submit({ ...proof, versionId: randomUUID() }),
+    /missing original submission audit/,
+  );
+  await control.settled();
+  aggregateGood = false;
+  await assert.rejects(control.settled(), /non-clean submit outcome/);
 });

@@ -13,7 +13,7 @@ export function settlement(query: Query, ids: () => string[]) {
   async function qc(proof: SubmitProof) {
     assert(ids().includes(proof.caseId) && uuid(proof.versionId) && uuid(proof.correlationId));
     const audit = await query(
-      "SELECT id FROM audit_event WHERE action='version.submitted' AND target_case_id=$1 AND target_version_id=$2 AND correlation_id=$3",
+      "SELECT id FROM audit_event WHERE action IN ('version.submitted','version.resubmitted') AND target_case_id=$1 AND target_version_id=$2 AND correlation_id=$3",
       [proof.caseId, proof.versionId, proof.correlationId],
     );
     assert.equal(audit.length, 1, 'missing original submission audit');
@@ -47,7 +47,7 @@ export function settlement(query: Query, ids: () => string[]) {
         bool_and(q.status='completed' AND q.engine_id=$2 AND q.correlation_id=a.correlation_id
           AND f.id IS NULL) AS good
         FROM audit_event a LEFT JOIN qc_run q ON q.version_id=a.target_version_id AND q.trigger='submit' AND q.lane IS NULL LEFT JOIN qc_finding f ON f.run_id=q.id
-        WHERE a.action='version.submitted' AND a.target_case_id=ANY($1::uuid[])
+        WHERE a.action IN ('version.submitted','version.resubmitted') AND a.target_case_id=ANY($1::uuid[])
         GROUP BY a.id,a.target_version_id`,
           [all, ENGINE],
         );
