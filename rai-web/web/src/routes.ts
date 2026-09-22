@@ -6,6 +6,7 @@ export const ROUTES = Object.freeze({
   signIn: '/sign-in',
   cases: '/cases',
   queue: '/queue',
+  operatorDeskHealth: '/operator/desk-health',
   newCase: '/cases/new',
   case: (caseId: string) => `/cases/${encodeURIComponent(caseId)}`,
   /** A frozen submitted version of a case (W1-06; W0-02 7.6 deep link). */

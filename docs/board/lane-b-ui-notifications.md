@@ -91,6 +91,19 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=codex-w3-04-retries model=GPT-6
 - What: Parent supplied committed W3-03a `36dcee9`; integrate retry dispatch only in `/tmp/rai-w3-retries`, preserving Hypatia's composition. Review fixes and final dependency rebase remain parent-coordinated. Isolated DB 54365.
 - Evidence: [integration plan](../../changes/2026-09-22-w3-04-retries/plan.md)
+## 2026-09-22 — CLAIM Lane B: W3-07b operator UI planning only
+- Author: operator=ta session=codex-w3-07b-operator-ui model=GPT-6
+- Scope: owner-assigned parallel slice under #48; operator page planning only in `/tmp/rai-w3-operator-ui`, branch `codex/w3-07b-operator-ui`, base `89f7de9`. Does not take over or edit the active W3-02 queue UI slice.
+- Boundaries: change documents and this scoped claim only. No shared/UI code until parent provides the committed W3-07a contract. No server, fixture endpoint, migration, database, push, PR or merge.
+- Next: reconcile the committed W3-07a types, then prepare a separate shared locale/routes/client prerequisite before the consumer.
+- Evidence: [operator UI plan](../../changes/2026-09-22-w3-07b-operator-ui/plan.md)
+
+## 2026-09-22 — W3-07b UI prerequisite authorized
+- Author: operator=ta session=codex-w3-07b-operator-ui model=GPT-6
+- What: Parent accepted the plan and supplied W3-07a schema commit `d931cea` with combined base `9980c7e`. Planning work is preserved on `codex/w3-07b-operator-ui`; first local commit is locale/routes/client contract, consumer follows separately.
+- Boundaries: Admin presentation guard and session isolation in consumer; no automatic refresh, new permissions, API handler guesses, database, push, PR or merge. Rehearsal browser ports reserved: 60788, substitute 60789, web 60175.
+- Next: report the verified prerequisite commit to parent before consumer implementation; real OBS-17 stays with W3-INT.
+- Evidence: [plan](../../changes/2026-09-22-w3-07b-operator-ui/plan.md)
 
 ## 2026-09-22 (time not recorded) — CLAIM W3-03b provenance planning only
 - Author: operator=ta session=w3-03b-provenance-plan model=codex
