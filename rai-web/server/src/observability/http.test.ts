@@ -8,6 +8,9 @@ import {
   UnsafeUploadError,
   StaleVersionError,
 } from '@rai/shared/errors';
+import type { ReadinessReport } from '@rai/shared/schemas/observability';
+import { createFixtureIdentityProvider } from '../identity/fixture.js';
+import type { IdentityDeps } from '../app.js';
 import { buildApp } from '../app.js';
 import type { Db } from '../db/client.js';
 import { computeReadiness } from './health.js';
@@ -15,7 +18,7 @@ import { createStoreProbes } from './probes.js';
 
 const canary = 'RAI-DESK-SYNTHETIC-FIXTURE';
 const id = '11111111-1111-4111-8111-111111111111';
-function setup() {
+function setup(identity?: IdentityDeps, readiness?: () => Promise<ReadinessReport>) {
   let text = '';
   const logStream = new Writable({
     write(chunk: Buffer, _encoding, done) {
@@ -31,26 +34,29 @@ function setup() {
       publicBaseUrl: new URL('http://127.0.0.1:18788'),
     },
     logStream,
+    ...(identity === undefined ? {} : { identity }),
     observability: {
       db: {} as Db,
-      readiness: () =>
-        computeReadiness(
-          {
-            identity: () => ({ mode: 'fixture', ready: true }),
-            loopbackBind: true,
-            mailKind: 'memory',
-            qcKind: 'substitute',
-            build: { commit: 'dev', schemaVersion: 'unknown' },
-          },
-          {
-            ...createStoreProbes(
-              'postgres://synthetic:synthetic@127.0.0.1:1/rai',
-              '/nonexistent-synthetic-blob',
-            ),
-            mailSink: () => Promise.resolve('ok'),
-            qc: () => Promise.resolve('disabled'),
-          },
-        ),
+      readiness:
+        readiness ??
+        (() =>
+          computeReadiness(
+            {
+              identity: () => ({ mode: 'fixture', ready: true }),
+              loopbackBind: true,
+              mailKind: 'memory',
+              qcKind: 'substitute',
+              build: { commit: 'dev', schemaVersion: 'unknown' },
+            },
+            {
+              ...createStoreProbes(
+                'postgres://synthetic:synthetic@127.0.0.1:1/rai',
+                '/nonexistent-synthetic-blob',
+              ),
+              mailSink: () => Promise.resolve('ok'),
+              qc: () => Promise.resolve('disabled'),
+            },
+          )),
     },
   });
   return {
@@ -182,6 +188,82 @@ test('successful static routes are silent while errors retain request traces', a
     assert.equal((await app.fastify.inject('/missing')).statusCode, 404);
     const completed = app.lines().find((line) => line.event === 'request.completed')!;
     assert.equal(completed.fields.errorCode, 'not_found');
+  } finally {
+    await app.fastify.close();
+  }
+});
+
+test('health probes bypass a failing cookie session lookup while protected routes still resolve it', async () => {
+  let calls = 0;
+  const unavailable = (): Promise<never> => Promise.reject(new Error(canary));
+  const app = setup({
+    fixtureProvider: createFixtureIdentityProvider([]),
+    adapter: {
+      mode: 'fixture',
+      verifier: undefined,
+      start: async () => {},
+      verifyBoundAddress: () => {},
+      resolvePrincipal: unavailable,
+      health: () => ({ mode: 'fixture', ready: true }),
+      sessionPolicy: () => ({ absoluteHours: 12, idleMinutes: 30 }),
+    },
+    sessionStore: {
+      create: unavailable,
+      revoke: unavailable,
+      setLocale: unavailable,
+      recordSignInRefused: unavailable,
+      resolve: async () => {
+        calls++;
+        return unavailable();
+      },
+    },
+    facts: { byCaseId: unavailable, byArtifactId: unavailable },
+  });
+  try {
+    const headers = { cookie: `rai_session=${canary}` };
+    assert.equal((await app.fastify.inject({ url: '/healthz', headers })).statusCode, 200);
+    assert.equal(app.text(), '');
+    assert.equal((await app.fastify.inject({ url: '/readyz', headers })).statusCode, 503);
+    assert.equal(calls, 0);
+    assert.equal(app.lines().filter((line) => line.event === 'error.captured').length, 0);
+    assert.equal((await app.fastify.inject({ url: '/api/operator/desk-health', headers })).statusCode, 500);
+    assert.equal(calls, 1);
+    assert.equal(app.text().includes(canary), false);
+  } finally {
+    await app.fastify.close();
+  }
+});
+
+test('readiness emits its first status and transitions, not repeated polls', async () => {
+  let db: 'ok' | 'unreachable' = 'ok';
+  const app = setup(undefined, () =>
+    computeReadiness(
+      {
+        identity: () => ({ mode: 'fixture', ready: true }),
+        loopbackBind: true,
+        mailKind: 'memory',
+        qcKind: 'substitute',
+        build: { commit: 'dev', schemaVersion: 'unknown' },
+      },
+      {
+        db: () => Promise.resolve(db),
+        migrations: () => Promise.resolve('current'),
+        blob: () => Promise.resolve('ok'),
+        mailSink: () => Promise.resolve('ok'),
+        qc: () => Promise.resolve('disabled'),
+      },
+    ),
+  );
+  try {
+    for (const status of ['ok', 'ok', 'unreachable', 'unreachable', 'ok'] as const) {
+      db = status;
+      assert.equal((await app.fastify.inject('/readyz')).statusCode, db === 'ok' ? 200 : 503);
+    }
+    const events = app.lines().filter((line) => line.event === 'health.readiness');
+    assert.deepEqual(
+      events.map((line) => line.fields.status),
+      ['ready', 'not_ready', 'ready'],
+    );
   } finally {
     await app.fastify.close();
   }

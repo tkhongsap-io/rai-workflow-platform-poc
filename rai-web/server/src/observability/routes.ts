@@ -19,6 +19,7 @@ export function registerHealthRoutes(
   read: ObservabilityDeps['readiness'],
   emitter: Emitter,
 ): void {
+  let lastStatus: ReadinessReport['status'] | undefined;
   app.get('/healthz', { config: { auth: { kind: 'public' } } }, () => ({
     status: 'alive',
     processId: PROCESS_ID,
@@ -31,7 +32,10 @@ export function registerHealthRoutes(
     },
     async (_request, reply) => {
       const report = await read();
-      emitter.log('health.readiness', { status: report.status, report });
+      if (report.status !== lastStatus) {
+        lastStatus = report.status;
+        emitter.log('health.readiness', { status: report.status, report });
+      }
       return reply.code(report.status === 'ready' ? 200 : 503).send(report);
     },
   );

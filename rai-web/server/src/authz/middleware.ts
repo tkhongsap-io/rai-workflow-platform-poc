@@ -181,6 +181,12 @@ export function registerAuthorization(fastify: FastifyInstance, deps: Authorizat
   fastify.addHook('onRequest', async (request: FastifyRequest, _reply: FastifyReply) => {
     const auth = request.routeOptions.config.auth;
     if (auth === undefined) return; // no route matched: the not-found handler answers
+    // W0-10: probes must survive a session-store outage, even with a browser cookie.
+    if (
+      auth.kind === 'public' &&
+      (request.routeOptions.url === '/healthz' || request.routeOptions.url === '/readyz')
+    )
+      return;
     // @fastify/cookie's own onRequest hook may run after this one (plugins load after root hooks are added).
     const cookies =
       (request.cookies as Record<string, string | undefined> | null) ??

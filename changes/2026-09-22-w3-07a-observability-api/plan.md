@@ -29,3 +29,13 @@ Parent explicitly authorized 07a to adapt `server/src/notifications/runtime.ts` 
 ## Separate authorization prerequisite
 
 Real HTTP testing found operator.view declared in ACTIONS but absent from POLICY_ROWS. Per owner's explicit shared-policy gate, commit f595405 contains only the existing-authority Admin row, focused policy tests and its own [change record](../2026-09-22-w3-07a-operator-policy-contract/intent.md). Parent cherry-picks it onto main for a separate contract PR. The API consumer depends on that merge; its action declaration alone was insufficient. No new role or scope is decided by the consumer.
+
+## Approved integration preparation and submit API
+
+Owner authorized preparation against retry head d96ba24 (composer plus main f5c17fc) while its final checks run; actual-main rebase remains mandatory before PR. Local preparation merge preserves both root log entries, both engineering amendments and both app dependency fields. No pending dependency is represented as merged acceptance.
+
+Direct coordination: Hypatia owns digest filter/loader/daily-producer wiring; registerDailyDigest accepts onError(err: unknown), supplied by app-owned errors.internal. Heisenberg owns after-newly-committed-submit binding/drain/soft response. 07a owns server-local runAndPersistSubmitQc with the same dependencies as lane QC, input caseId/versionId/correlationId, trigger submit and lane null. It reuses unlocked runner waiting and locked persistence/refusal, replays terminal submit runs without duplicate stored outcome/log, retains bounded new unavailable reasons and truthful unknown for legacy nulls, and adds no unavailable finding or lane. Exact signature and tests precede W3-INT binding. Repository helpers gain trigger-aware lookup; existing lane API behavior remains unchanged. No second runner is created.
+
+### Confucius review correction scope
+
+Update authz/middleware.ts to bypass session lookup only for the two public health routes. Update observability/routes.ts with per-app last-status tracking. Add actual HTTP regressions in observability/http.test.ts for a cookie plus throwing session resolver (including a protected-route control), and repeated readiness statuses with recovery. Keep this fix commit separate from the in-progress submit-QC adapter.
