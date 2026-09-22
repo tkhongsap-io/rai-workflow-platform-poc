@@ -135,3 +135,14 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: W3 (after Ta accepts this exit) — not this session.
 - Author: operator=ta session=w2-08 model=composer
 - Evidence: branch codex/w2-08-w2-exit; changes/2026-09-22-w2-exit/review.md
+
+## 2026-09-22 19:55 — CLAIM Lane A
+- Author: operator=ta session=w3-05 model=grok-4.7
+- Takes over from: session=w2-08 (reason: handoff; W3 starts at W3-05)
+
+## 2026-09-22 19:55 — W3-05 working-day SLA
+- What: Due dates from the frozen SLA and calendar (Asia/Bangkok, weekends and holidays skipped). Breach query returns pending lanes on the current review target that are past due. No mail sink, no HTTP SLA route, no escalation.
+- Why: Ticket W3-05 (#46); proves A05's due-date and breach-query half. D06. Issue #35 and epic #53 stay open.
+- Next: review this PR, then W3-01 can take the due-date shape. Mail sink stays off main until just before W3-03.
+- Author: operator=ta session=w3-05 model=grok-4.7
+- Evidence: branch codex/w3-05-working-day-sla
