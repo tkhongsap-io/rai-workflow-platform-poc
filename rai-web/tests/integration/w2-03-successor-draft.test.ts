@@ -395,6 +395,7 @@ describe(`W2-03 successor draft concurrency and stale actions — ${SET}`, () =>
     const revision = await caseRevision(NONVENDOR.caseId);
     const dpo = await signIn(DPO);
     const ai = await signIn(AI_COE);
+    const it = await signIn(IT_SEC);
 
     const beforeDecisions = await db.owner.execute(sql`SELECT count(*)::int AS n FROM lane_decision`);
     const beforeAudit = (await auditStore.read(db.owner)).length;
@@ -414,6 +415,20 @@ describe(`W2-03 successor draft concurrency and stale actions — ${SET}`, () =>
 
     // Close N by Ready (W2-06 applies ready_at; here we set it under the owner role to prove the gate).
     await db.owner.execute(sql`UPDATE pack_version SET ready_at = ${now()} WHERE id = ${version.versionId}`);
+
+    // Existence (check 3) still wins after Ready: unknown UUID → not_found, not version_closed.
+    const unknownAfterReady = await sendBack(it, NONVENDOR.caseId, otherId, 'it_security', {
+      expectedVersion: { versionId: otherId, revision },
+      feedback: { items: [{ slot: 6, deficiency: 'unknown after ready' }] },
+    });
+    assert.equal(unknownAfterReady.statusCode, 404, unknownAfterReady.body);
+    assert.equal(unknownAfterReady.json<ErrorResponse>().error.code, 'not_found');
+    assert.equal(
+      (unknownAfterReady.json<ErrorResponse>().error.details as ErrorDetails['not_found'] | undefined)
+        ?.resource,
+      'version',
+    );
+
     const closed = await sendBack(ai, NONVENDOR.caseId, version.versionId, 'ai_coe', {
       expectedVersion: { versionId: version.versionId, revision },
       feedback: { items: [{ slot: 1, deficiency: 'should not write' }] },
