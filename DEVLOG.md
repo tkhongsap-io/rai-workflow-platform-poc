@@ -1,5 +1,9 @@
 # Development log
 
+## W2-03: successor draft concurrency — 2026-09-22
+
+Concurrent send-backs on the same submitted version share one editable N+1 draft; version N stays readable and frozen; stale actions return 409 with refresh guidance and write nothing. This is not the W2 exit; resubmit (W2-04), findings/dispositions, Ready, UI and mail delivery remain later tickets.
+
 ## W2-02: lane decision — 2026-09-22
 
 Lane approve and send-back are live (own lane only, expected version, idempotency, D05 self-exclusion, decision audit, successor draft on first send-back). This is not the W2 exit; concurrent send-back (W2-03), resubmit, findings/dispositions, Ready, UI and mail delivery remain later tickets.

@@ -1,5 +1,6 @@
-// W2-02: lane decision store helpers — insert decision, write lane projection, create successor draft on send-back.
-import { and, eq } from 'drizzle-orm';
+// W2-02 / W2-03: lane decision store helpers — insert decision, write lane projection, create or reuse
+// successor draft on send-back (D05 / W0-06 4.5: concurrent send-backs share one N+1).
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { uuidv7 } from '@rai/shared/ids';
 import type { Lane } from '@rai/shared/constants';
 import type { SendBackFeedback } from '@rai/shared/schemas/review';
@@ -10,6 +11,18 @@ import { cases } from '../db/schema/case.js';
 import { laneDecision } from '../db/schema/lane-decision.js';
 import { packVersion } from '../db/schema/pack-version.js';
 import { CaseRowChanged } from '../versions/repository.js';
+
+/** Postgres unique_violation (W0-06 4.5 / 9.3 backstop when two successor inserts race). */
+function isUniqueViolation(err: unknown): boolean {
+  let cur: unknown = err;
+  for (let i = 0; i < 5 && cur != null; i += 1) {
+    if (typeof cur !== 'object') return false;
+    const record = cur as { code?: unknown; cause?: unknown };
+    if (record.code === '23505') return true;
+    cur = record.cause;
+  }
+  return false;
+}
 
 export type LaneProjectionValue = 'pending' | 'approved' | 'sent_back';
 
@@ -99,6 +112,7 @@ export interface SuccessorDraftResult {
 /**
  * D05 / W0-06 4.5: if no open draft exists, create N+1 with parent = N, copy stage_context,
  * checklist_template_version and all nine slots; set case.draft_version_id. If a draft already exists, reuse it.
+ * Unique-violation on the one-draft-per-case index is recovered via SAVEPOINT (never surfaced as a duplicate).
  */
 export async function ensureSuccessorDraft(
   tx: Tx,
@@ -119,36 +133,51 @@ export async function ensureSuccessorDraft(
 
   const draftId = uuidv7(now.getTime());
   const nextNumber = parent.versionNumber + 1;
-  const [draft] = await tx
-    .insert(packVersion)
-    .values({
-      id: draftId,
-      caseId: before.id,
-      versionNumber: nextNumber,
-      parentVersionId: parent.id,
-      createdBy,
-      createdAt: now,
-      stageContext: parent.stageContext,
-      checklistTemplateVersion: parent.checklistTemplateVersion,
-    })
-    .returning();
-  if (draft === undefined) throw new CaseRowChanged(before.id);
+  await tx.execute(sql.raw(`SAVEPOINT successor_draft`));
+  try {
+    const [draft] = await tx
+      .insert(packVersion)
+      .values({
+        id: draftId,
+        caseId: before.id,
+        versionNumber: nextNumber,
+        parentVersionId: parent.id,
+        createdBy,
+        createdAt: now,
+        stageContext: parent.stageContext,
+        checklistTemplateVersion: parent.checklistTemplateVersion,
+      })
+      .returning();
+    if (draft === undefined) throw new CaseRowChanged(before.id);
 
-  const parentSlots = await tx.select().from(artifactSlot).where(eq(artifactSlot.versionId, parent.id));
-  if (parentSlots.length > 0) {
-    await tx.insert(artifactSlot).values(
-      parentSlots.map((s) => ({
-        id: uuidv7(now.getTime()),
-        versionId: draftId,
-        slot: s.slot,
-        state: s.state,
-        reason: s.reason,
-        artifactId: s.artifactId,
-        updatedBy: createdBy,
-        updatedAt: now,
-      })),
-    );
+    const parentSlots = await tx.select().from(artifactSlot).where(eq(artifactSlot.versionId, parent.id));
+    if (parentSlots.length > 0) {
+      await tx.insert(artifactSlot).values(
+        parentSlots.map((s) => ({
+          id: uuidv7(now.getTime()),
+          versionId: draftId,
+          slot: s.slot,
+          state: s.state,
+          reason: s.reason,
+          artifactId: s.artifactId,
+          updatedBy: createdBy,
+          updatedAt: now,
+        })),
+      );
+    }
+
+    await tx.execute(sql.raw(`RELEASE SAVEPOINT successor_draft`));
+    return { draft, created: true };
+  } catch (err) {
+    await tx.execute(sql.raw(`ROLLBACK TO SAVEPOINT successor_draft`));
+    if (!isUniqueViolation(err)) throw err;
+    // W0-06 4.5: lock bypass backstop — reclaim the one open draft rather than failing the second send-back.
+    const [existing] = await tx
+      .select()
+      .from(packVersion)
+      .where(and(eq(packVersion.caseId, before.id), isNull(packVersion.submittedAt)))
+      .limit(1);
+    if (existing === undefined) throw err;
+    return { draft: existing, created: false };
   }
-
-  return { draft, created: true };
 }
