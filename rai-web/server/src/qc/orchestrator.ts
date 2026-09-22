@@ -311,10 +311,73 @@ async function persistUnavailable(
   return runId;
 }
 
+/** Case lock plus W0-06 4.4 preconditions: submitted, current, not Ready. */
+async function loadOpenSubmittedTarget(
+  tx: Tx,
+  input: RunLaneQcInput,
+): Promise<{ caseRow: CaseRow; version: PackVersionRow }> {
+  if (!(await lockCase(tx, input.caseId))) throw new NotFoundError('case');
+  const caseRow = await readCaseRow(tx, input.caseId);
+  if (caseRow === undefined) throw new NotFoundError('case');
+
+  const version = await readVersionRow(tx, input.versionId);
+  if (version === undefined || version.caseId !== input.caseId) {
+    throw new NotFoundError('version');
+  }
+
+  const current =
+    caseRow.currentVersionId === null ? undefined : await readVersionRow(tx, caseRow.currentVersionId);
+  if (current === undefined) throw new NotFoundError('version');
+
+  if (current.readyAt != null) {
+    throw new StaleVersionError(
+      staleDetails(
+        'version_closed',
+        'error.stale_version.guidance.ready',
+        current,
+        caseRow.rowVersion,
+        refreshPathFor(input.caseId, current),
+      ),
+    );
+  }
+  if (current.id !== version.id) {
+    throw new StaleVersionError(
+      staleDetails(
+        'version_superseded',
+        'error.stale_version.guidance.version_superseded',
+        current,
+        caseRow.rowVersion,
+        refreshPathFor(input.caseId, current),
+      ),
+    );
+  }
+  if (version.submittedAt === null) {
+    throw new NotFoundError('version');
+  }
+  // Send-back sets draft_version_id and leaves current_version_id on N (W0-06 §5.2 approve row).
+  if (caseRow.draftVersionId !== null) {
+    throw new StaleVersionError(
+      staleDetails(
+        'version_closed',
+        'error.stale_version.guidance.version_closed',
+        version,
+        caseRow.rowVersion,
+        refreshPathFor(input.caseId, version),
+      ),
+    );
+  }
+  return { caseRow, version };
+}
+
 /**
  * Runs lane QC (approve_attempt) and persists storeable defect findings or an unavailable run row.
  * Replay of a completed run for the same input returns the existing rows (W0-07 3.4 step 2 / 3.7).
  * An unbound runner persists `unbound` / unavailable and replays that row while still unbound.
+ *
+ * The runner is awaited outside the case-row lock. `lock_timeout` is 5s and the runner may take up to
+ * {@link QC_TIMEOUT_MS}, so holding `FOR UPDATE` across `runner.run` makes every other action on the
+ * case fail. Persist re-locks and re-checks the target so a send-back during the run does not store
+ * findings, and a concurrent completed run is replayed instead of inserted twice.
  */
 export async function runAndPersistLaneQc(
   deps: QcOrchestratorDeps,
@@ -323,53 +386,18 @@ export async function runAndPersistLaneQc(
   const clock = deps.now ?? (() => new Date());
   const timeoutMs = deps.timeoutMs ?? QC_TIMEOUT_MS;
 
-  return withTransaction(deps.db, async (tx) => {
+  const prepared = await withTransaction(deps.db, async (tx) => {
     await setWorkflowWrite(tx);
-    if (!(await lockCase(tx, input.caseId))) throw new NotFoundError('case');
-    const caseRow = await readCaseRow(tx, input.caseId);
-    if (caseRow === undefined) throw new NotFoundError('case');
-
-    const version = await readVersionRow(tx, input.versionId);
-    if (version === undefined || version.caseId !== input.caseId) {
-      throw new NotFoundError('version');
-    }
-
-    const current =
-      caseRow.currentVersionId === null ? undefined : await readVersionRow(tx, caseRow.currentVersionId);
-    if (current === undefined) throw new NotFoundError('version');
-
-    // W0-06 4.4 preconditions for the lane-QC read: submitted, current, not Ready.
-    if (current.readyAt != null) {
-      throw new StaleVersionError(
-        staleDetails(
-          'version_closed',
-          'error.stale_version.guidance.ready',
-          current,
-          caseRow.rowVersion,
-          refreshPathFor(input.caseId, current),
-        ),
-      );
-    }
-    if (current.id !== version.id) {
-      throw new StaleVersionError(
-        staleDetails(
-          'version_superseded',
-          'error.stale_version.guidance.version_superseded',
-          current,
-          caseRow.rowVersion,
-          refreshPathFor(input.caseId, current),
-        ),
-      );
-    }
-    if (version.submittedAt === null) {
-      throw new NotFoundError('version');
-    }
+    const { caseRow, version } = await loadOpenSubmittedTarget(tx, input);
 
     const ruleRevision = ruleRevisionOf(version);
     const prior = await findLatestApproveAttemptRun(tx, version.id, input.lane, ruleRevision);
     if (prior !== undefined && prior.status === 'completed') {
       const findings = await listFindingsForRun(tx, prior.id);
-      return { status: 'completed', runId: prior.id, findings };
+      return {
+        kind: 'outcome' as const,
+        outcome: { status: 'completed' as const, runId: prior.id, findings },
+      };
     }
     if (
       prior !== undefined &&
@@ -377,7 +405,15 @@ export async function runAndPersistLaneQc(
       prior.engineId === UNBOUND_ENGINE_ID &&
       deps.runner === undefined
     ) {
-      return { status: 'unavailable', reason: 'not_configured', runId: prior.id, findings: [] };
+      return {
+        kind: 'outcome' as const,
+        outcome: {
+          status: 'unavailable' as const,
+          reason: 'not_configured',
+          runId: prior.id,
+          findings: [] as [],
+        },
+      };
     }
 
     const stamp = nextMonotonicStamp(clock);
@@ -400,37 +436,55 @@ export async function runAndPersistLaneQc(
         stamp,
         input.correlationId,
       );
-      return { status: 'unavailable', reason: 'not_configured', runId, findings: [] };
+      return {
+        kind: 'outcome' as const,
+        outcome: { status: 'unavailable' as const, reason: 'not_configured', runId, findings: [] as [] },
+      };
     }
 
-    const runner = deps.runner;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    let result: QcRunResult;
-    try {
-      result = await runner.run(request, controller.signal);
-    } catch {
-      clearTimeout(timer);
-      const runId = await persistUnavailable(
-        tx,
-        version,
-        request,
-        runner.identity.runner,
-        stamp,
-        input.correlationId,
-      );
-      return { status: 'unavailable', reason: 'timeout', runId, findings: [] };
-    } finally {
-      clearTimeout(timer);
+    return { kind: 'ready' as const, request, stamp };
+  });
+
+  if (prepared.kind === 'outcome') return prepared.outcome;
+
+  const runner = deps.runner;
+  if (runner === undefined) {
+    throw new Error('lane QC prepared a run without a runner');
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let result: QcRunResult;
+  try {
+    result = await runner.run(prepared.request, controller.signal);
+  } catch {
+    result = {
+      status: 'unavailable',
+      reason: 'timeout',
+      detail: null,
+      startedAt: prepared.stamp.toISOString(),
+      finishedAt: prepared.stamp.toISOString(),
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+
+  return withTransaction(deps.db, async (tx) => {
+    await setWorkflowWrite(tx);
+    const { version } = await loadOpenSubmittedTarget(tx, input);
+    const prior = await findLatestApproveAttemptRun(tx, version.id, input.lane, ruleRevisionOf(version));
+    if (prior !== undefined && prior.status === 'completed') {
+      const findings = await listFindingsForRun(tx, prior.id);
+      return { status: 'completed', runId: prior.id, findings };
     }
 
     if (result.status === 'unavailable') {
       const runId = await persistUnavailable(
         tx,
         version,
-        request,
+        prepared.request,
         runner.identity.runner,
-        stamp,
+        prepared.stamp,
         input.correlationId,
       );
       return { status: 'unavailable', reason: result.reason, runId, findings: [] };
@@ -439,10 +493,10 @@ export async function runAndPersistLaneQc(
     const persisted = await persistCompleted(
       tx,
       version,
-      request,
+      prepared.request,
       result,
       runner,
-      stamp,
+      prepared.stamp,
       input.correlationId,
     );
     return { status: 'completed', runId: persisted.runId, findings: persisted.findings };

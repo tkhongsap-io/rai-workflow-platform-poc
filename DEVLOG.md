@@ -1,5 +1,9 @@
 # Development log
 
+## QC case lock: 2026-09-22
+
+Lane QC no longer holds `SELECT … FOR UPDATE` on the case row while `runner.run` is in flight. `lock_timeout` is 5s and the runner may take up to 10s, so the old transaction turned every other action on that case into a lock-timeout 500. The runner is awaited after the prepare transaction commits. Persist takes a new short transaction, re-checks that the version is still the open submitted target, and replays a completed run that landed while QC was in flight. A send-back during the run sets `draft_version_id` and leaves `current_version_id` on N; persist treats that open draft as `version_closed` and writes no `qc_run`. Issue #35 stays open.
+
 ## Milestone M2 / W2 exit: 2026-09-22
 
 W2 exit recorded from `origin/main` at `2f919eb` ([review](changes/2026-09-22-w2-exit/review.md), ticket W2-08 / issue #41). Fixture set `slice1-synthetic@1 7c80ccd43663`. From `rai-web/`: `npm run lint` and `npm run typecheck` green; W2-INT Playwright evidence `15 passed (31.0s)` (journey + reviewer workspace + disposition at three widths); W2-INT negatives `6 pass / 0 fail` (concurrent send-back one draft, stale approval, undispositioned finding blocks Ready, Admin 403, owner 403, BU SPOC self-approval 403); `npm run build && npm run check:substitute-absent` scanned 463 files, 0 with the marker; `w1-00-audit.test.ts` 4 pass / 0 fail (A11 UPDATE/DELETE refusal). Journey: v1 → one send-back → v2 → three approvals → Ready after disposition. A11: journey asserts only `lane.opened`; related types cited from W2 ticket tests. QC remains the slice-1 substitute stand-in; real QC is W4; issue #35 stays open. Google loopback sign-in stays the W1 pending item (not a W2 blocker). M2 reached; M3 unblocked; next is W3. W4–W8 not authorized. Epic #53 not closed by this record.

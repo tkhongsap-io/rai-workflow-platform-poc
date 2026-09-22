@@ -13,7 +13,7 @@ import path from 'node:path';
 import { Writable } from 'node:stream';
 import { sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
-import type { ErrorResponse } from '@rai/shared/errors';
+import { StaleVersionError, type ErrorResponse } from '@rai/shared/errors';
 import type { DispositionResponse, LaneQcRunResponse } from '@rai/shared/schemas/review';
 import type { PackDraft } from '@rai/shared/schemas/pack';
 import type { SubmitRequest, SubmittedVersion } from '@rai/shared/schemas/versions';
@@ -33,7 +33,8 @@ import { FIXTURE_CASES, findFixtureCase } from '@rai/fixtures/data/cases/index';
 import { loadFixtures } from '@rai/fixtures/load';
 import { fixtureSetLabel, readManifest } from '@rai/fixtures/manifest';
 import { ScriptedQcRunner } from '@rai/fixtures/substitutes/qc/index';
-import type { VersionRef } from '@rai/shared/qc/types';
+import type { QcRunner, VersionRef } from '@rai/shared/qc/types';
+import { runAndPersistLaneQc } from '@rai/server/qc/orchestrator';
 import { openTestDatabase, type TestDatabase } from '../support/db.js';
 import { asUser, signInAsFixture, type FixtureSession } from '../support/sign-in.js';
 
@@ -217,6 +218,131 @@ function dispose(
 }
 
 describe(`W2-05 findings and dispositions — ${SET}`, () => {
+  it('releases the case row lock before the QC runner returns', async () => {
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, VENDOR.caseId);
+    let releaseRun: () => void = () => {};
+    const runGate = new Promise<void>((resolve) => {
+      releaseRun = resolve;
+    });
+    let markEntered: () => void = () => {};
+    const entered = new Promise<void>((resolve) => {
+      markEntered = resolve;
+    });
+    const runner: QcRunner = {
+      identity: { runner: 'lock-probe', runnerVersion: '1' },
+      async run() {
+        markEntered();
+        await runGate;
+        return {
+          status: 'unavailable',
+          reason: 'timeout',
+          detail: null,
+          startedAt: new Date(0).toISOString(),
+          finishedAt: new Date(0).toISOString(),
+        };
+      },
+    };
+    const pending = runAndPersistLaneQc(
+      { db: db.app, runner, now, timeoutMs: 30_000 },
+      {
+        caseId: VENDOR.caseId,
+        versionId: version.versionId,
+        lane: 'ai_coe',
+        correlationId: randomUUID(),
+      },
+    );
+    try {
+      await entered;
+      const started = Date.now();
+      await db.raw('app', async (client) => {
+        await client.query('BEGIN');
+        try {
+          await client.query("SET LOCAL lock_timeout = '750ms'");
+          await client.query('SELECT id FROM "case" WHERE id = $1 FOR UPDATE', [VENDOR.caseId]);
+          await client.query('COMMIT');
+        } catch (err) {
+          await client.query('ROLLBACK');
+          throw err;
+        }
+      });
+      const waited = Date.now() - started;
+      assert.ok(waited < 750, `case lock held during QC for ${waited}ms`);
+    } finally {
+      releaseRun();
+      await pending.catch(() => undefined);
+    }
+    const outcome = await pending;
+    assert.equal(outcome.status, 'unavailable');
+  });
+
+  it('does not persist lane QC when a send-back opens a successor draft during the run', async () => {
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, VENDOR.caseId);
+    const revision = await caseRevision(VENDOR.caseId);
+    let releaseRun: () => void = () => {};
+    const runGate = new Promise<void>((resolve) => {
+      releaseRun = resolve;
+    });
+    let markEntered: () => void = () => {};
+    const entered = new Promise<void>((resolve) => {
+      markEntered = resolve;
+    });
+    const runner: QcRunner = {
+      identity: { runner: 'lock-probe', runnerVersion: '1' },
+      async run() {
+        markEntered();
+        await runGate;
+        return {
+          status: 'completed',
+          findings: [],
+          rulesEvaluated: [],
+          startedAt: new Date(0).toISOString(),
+          finishedAt: new Date(0).toISOString(),
+        };
+      },
+    };
+    const pending = runAndPersistLaneQc(
+      { db: db.app, runner, now, timeoutMs: 30_000 },
+      {
+        caseId: VENDOR.caseId,
+        versionId: version.versionId,
+        lane: 'ai_coe',
+        correlationId: randomUUID(),
+      },
+    );
+    try {
+      await entered;
+      const dpo = await signIn(DPO);
+      const sent = await app.inject({
+        method: 'POST',
+        url: `/api/cases/${VENDOR.caseId}/versions/${version.versionId}/lanes/dpo/send-back`,
+        headers: {
+          'content-type': 'application/json',
+          'idempotency-key': randomUUID(),
+          ...asUser(dpo),
+        },
+        payload: {
+          expectedVersion: { versionId: version.versionId, revision },
+          feedback: { items: [{ slot: 2, deficiency: 'purpose is missing' }] },
+        },
+      });
+      assert.equal(sent.statusCode, 201, sent.body);
+    } finally {
+      releaseRun();
+      await pending.catch(() => undefined);
+    }
+    await assert.rejects(pending, (err: unknown) => {
+      assert.ok(err instanceof StaleVersionError);
+      assert.equal(err.details?.reason, 'version_closed');
+      return true;
+    });
+    const runs = await db.owner.execute(
+      sql`SELECT count(*)::int AS n FROM qc_run WHERE version_id = ${version.versionId} AND lane = 'ai_coe'`,
+    );
+    assert.equal(Number((runs.rows[0] as { n: number }).n), 0);
+  });
+
   it('records a single-lane AI/COE defect on fx-case-vendor slot 1 via the injected substitute', async () => {
     const owner = await signIn(OWNER_A);
     const version = await submitOk(owner, VENDOR.caseId);
