@@ -4,3 +4,4 @@ export * from './data/ids.js';
 export * from './data/cases/index.js';
 export * from './data/documents/index.js';
 export { SUBSTITUTE_MARKER } from './substitute-marker.js';
+export * as qcSubstitute from './substitutes/qc/index.js';

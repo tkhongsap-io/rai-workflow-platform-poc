@@ -1,0 +1,88 @@
+{
+  "fixtureCaseId": "fx-case-vendor",
+  "laneMappingVersion": "lane-mapping/v1",
+  "checklistTemplateVersion": "v2.0",
+  "entries": [
+    {
+      "trigger": "approve_attempt",
+      "lane": "ai_coe",
+      "findings": [
+        {
+          "ruleId": "ACC-METRIC-CITED",
+          "scope": { "kind": "artifact", "slot": 1, "fixtureArtifactId": "fx-doc-0002-01" },
+          "severity": "medium",
+          "owningLane": "ai_coe",
+          "evidence": [
+            {
+              "fixtureArtifactId": "fx-doc-0002-01",
+              "slot": 1,
+              "locator": { "kind": "section", "heading": "4. Hallucination and accuracy" }
+            }
+          ],
+          "measure": {
+            "metric": "hallucination_rate",
+            "value": null,
+            "denominator": null,
+            "threshold": null,
+            "unit": "percent",
+            "thresholdSource": "v2.0"
+          },
+          "message": { "key": "qc.finding.acc_metric_cited", "params": { "slot": 1 } }
+        },
+        {
+          "ruleId": "ACC-EXTRACTION-NOT-HALLUCINATION",
+          "scope": { "kind": "artifact", "slot": 1, "fixtureArtifactId": "fx-doc-0002-01" },
+          "severity": "high",
+          "owningLane": "ai_coe",
+          "evidence": [
+            {
+              "fixtureArtifactId": "fx-doc-0002-01",
+              "slot": 1,
+              "locator": { "kind": "page", "page": 3 },
+              "excerptHash": "0cb00095daeff1cf47996a236d9551eae358c081aeafc54d36039d7d592920fd"
+            }
+          ],
+          "measure": {
+            "metric": "extraction_accuracy",
+            "value": 97.5,
+            "denominator": 400,
+            "threshold": null,
+            "unit": "percent",
+            "thresholdSource": "v2.0"
+          },
+          "message": {
+            "key": "qc.finding.acc_extraction_not_hallucination",
+            "params": { "slot": 1, "metric": "extraction_accuracy" }
+          }
+        }
+      ]
+    },
+    {
+      "trigger": "upload",
+      "findings": [
+        {
+          "ruleId": "ACC-METRIC-CITED",
+          "scope": { "kind": "artifact", "slot": 1, "fixtureArtifactId": "fx-doc-0002-01" },
+          "severity": "medium",
+          "owningLane": "ai_coe",
+          "evidence": [
+            {
+              "fixtureArtifactId": "fx-doc-0002-01",
+              "slot": 1,
+              "locator": { "kind": "section", "heading": "4. Hallucination and accuracy" }
+            }
+          ],
+          "measure": {
+            "metric": "hallucination_rate",
+            "value": null,
+            "denominator": null,
+            "threshold": null,
+            "unit": "percent",
+            "thresholdSource": "v2.0"
+          },
+          "message": { "key": "qc.finding.acc_metric_cited", "params": { "slot": 1 } }
+        }
+      ]
+    }
+  ]
+}
