@@ -137,6 +137,15 @@ export function parseDatabaseConfig(env: Env): DatabaseConfig {
   return { url, migrateUrl, operatorUrl };
 }
 
+/** The retention thresholds the server and the operator cleanup commands share: an empty value refuses, never deletes all. */
+export function parseRetentionConfig(env: Env) {
+  return {
+    idempotencyTtlHours: integer(env, 'IDEMPOTENCY_TTL_HOURS', { min: 1 }),
+    blobOrphanMinAgeHours: integer(env, 'BLOB_ORPHAN_MIN_AGE_HOURS', { min: 0 }),
+    blobTmpMaxAgeHours: integer(env, 'BLOB_TMP_MAX_AGE_HOURS', { min: 0 }),
+  };
+}
+
 export function parseNodeEnv(env: Env): NodeEnv {
   return oneOf(env, 'NODE_ENV', ['development', 'test', 'production'] as const);
 }
@@ -202,9 +211,7 @@ export function parseConfig(env: Env): AppConfig {
     database: parseDatabaseConfig(env),
     blobDir: required(env, 'BLOB_DIR'),
     upload,
-    idempotencyTtlHours: integer(env, 'IDEMPOTENCY_TTL_HOURS', { min: 1 }),
-    blobOrphanMinAgeHours: integer(env, 'BLOB_ORPHAN_MIN_AGE_HOURS', { min: 0 }),
-    blobTmpMaxAgeHours: integer(env, 'BLOB_TMP_MAX_AGE_HOURS', { min: 0 }),
+    ...parseRetentionConfig(env),
     identity: { mode, env: Object.freeze(identityEnv) },
     mail: {
       mode: oneOf(env, 'MAIL_MODE', ['sink-file', 'sink-memory'] as const),

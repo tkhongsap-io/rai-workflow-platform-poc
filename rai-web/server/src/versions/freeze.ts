@@ -82,13 +82,15 @@ export function resolveFrozenConfiguration(revisions: readonly RevisionInForce[]
     const row = revisions.find((r) => r.kind === kind);
     if (row !== undefined) byKind[kind] = row.id;
   }
+  // The version freezes the due-date clock it was submitted under (D06); without sla and calendar the queue and
+  // the breach digest could not compute its due dates, so the submit refuses instead.
+  if (byKind.sla === undefined || byKind.calendar === undefined) throw new NoConfigurationInForce();
   const qc = byKind.qc_rules;
   if (qc !== undefined) return { byKind, configurationRevisionId: qc };
   // The same rows in the same order and with the same tie-break as `effectiveConfiguration` (configuration/store.ts).
   const viewRows = VIEW_KINDS.map((kind) => revisions.find((r) => r.kind === kind)).filter(
     (r): r is RevisionInForce => r !== undefined,
   );
-  if (viewRows.length === 0) throw new NoConfigurationInForce();
   const latest = viewRows.reduce((a, b) => (a.publishedAt.getTime() >= b.publishedAt.getTime() ? a : b));
   return { byKind, configurationRevisionId: latest.id };
 }

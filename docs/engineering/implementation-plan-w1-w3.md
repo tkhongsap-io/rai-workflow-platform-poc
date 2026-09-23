@@ -330,9 +330,9 @@ Rules: no secret in Git, ever; `.env` is gitignored; `.env.example` (created by 
 | `UPLOAD_MAX_FILE_BYTES` | `26214400` | server | Per-file limit (25 MiB, W0-08 section 3) enforced by `@fastify/multipart` before hashing; a configured value larger than the default is refused at start in `local-google` and test modes (W0-08); D08 revisits before real data. |
 | `UPLOAD_MAX_PACK_BYTES` | `157286400` | server | Per-pack total (150 MiB, W0-08 section 3) across a draft's attached artifacts plus the file being uploaded. |
 | `UPLOAD_MAX_IMAGE_PIXELS` | `40000000` | server | Width × height cap for PNG and JPEG (W0-08 section 3). |
-| `IDEMPOTENCY_TTL_HOURS` | `72` | `db:cleanup` | Idempotency-key expiry (W0-04). |
-| `BLOB_ORPHAN_MIN_AGE_HOURS` | `24` | `store:cleanup` | Orphan-blob age threshold (W0-04); removal itself waits for D08. |
-| `BLOB_TMP_MAX_AGE_HOURS` | `1` | `store:cleanup` | Stale temp-file threshold (W0-04). |
+| `IDEMPOTENCY_TTL_HOURS` | `72` | `db:cleanup` | Idempotency-key expiry (W0-04). Integer ≥ 1; an empty or invalid value is refused, never replaced by a fallback. |
+| `BLOB_ORPHAN_MIN_AGE_HOURS` | `24` | `store:cleanup` | Orphan-blob age threshold (W0-04); removal itself waits for D08. Integer ≥ 0. |
+| `BLOB_TMP_MAX_AGE_HOURS` | `1` | `store:cleanup` | Stale temp-file threshold (W0-04). Integer ≥ 0; empty is refused, not read as 0. |
 | `RAI_IDENTITY_MODE` | `local-google` | server | `local-google` (loopback only; the L11 development login) \| `fixture` (only when `NODE_ENV=test` and the bind is loopback; W0-03 S13, S14) \| `network` \| `production`. Missing or unknown value: refuse to start (`mode_unknown`). Name and values: W0-03 section 9.1. |
 | `RAI_IDENTITY_GOOGLE_CLIENT_ID` | `set-locally` | server | Required in `local-google` (S4); forbidden in `production` and `network`/`ad` (S10). The issuer is fixed at `https://accounts.google.com` in that mode (W0-03 section 4.1) and is not a variable. |
 | `RAI_IDENTITY_GOOGLE_CLIENT_SECRET` | `set-in-custody` | server | Same; held in the developer's local `.env`, never committed. `set-in-custody`, empty or whitespace counts as absent (S15). |
