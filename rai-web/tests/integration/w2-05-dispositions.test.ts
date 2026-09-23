@@ -603,6 +603,62 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
     assert.deepEqual(after.rows, before.rows);
   });
 
+  it('a disposition on a finding of N after N+1 is submitted is 409 version_superseded; nothing written', async () => {
+    const owner = await signIn(OWNER_A);
+    const n = await submitOk(owner, VENDOR.caseId);
+    const revision = await caseRevision(VENDOR.caseId);
+    const ai = await signIn(AI_COE);
+    const qc = await runLaneQc(ai, VENDOR.caseId, n.versionId, 'ai_coe', revision);
+    const findingId = (qc.body as LaneQcRunResponse).findings[0]!.findingId;
+
+    const dpo = await signIn(DPO);
+    const sent = await app.inject({
+      method: 'POST',
+      url: `/api/cases/${VENDOR.caseId}/versions/${n.versionId}/lanes/dpo/send-back`,
+      headers: { 'content-type': 'application/json', 'idempotency-key': randomUUID(), ...asUser(dpo) },
+      payload: {
+        expectedVersion: { versionId: n.versionId, revision },
+        feedback: { items: [{ slot: 2, deficiency: 'purpose is missing' }] },
+      },
+    });
+    assert.equal(sent.statusCode, 201, sent.body);
+    const draft = (
+      await app.inject({ method: 'GET', url: `/api/cases/${VENDOR.caseId}/draft`, headers: asUser(owner) })
+    ).json<PackDraft>();
+    const resubmitted = await app.inject({
+      method: 'POST',
+      url: `/api/cases/${VENDOR.caseId}/draft/submit`,
+      headers: { 'content-type': 'application/json', 'idempotency-key': randomUUID(), ...asUser(owner) },
+      payload: { expectedVersion: { versionId: draft.draftId, revision: draft.draftRevision } },
+    });
+    assert.equal(resubmitted.statusCode, 201, resubmitted.body);
+    const n1 = resubmitted.json<SubmittedVersion>();
+
+    const finding = await db.owner.execute(sql`SELECT * FROM qc_finding WHERE id = ${findingId}`);
+    const audits = await db.owner.execute(sql`SELECT count(*)::int AS n FROM audit_event`);
+    const stale = await dispose(ai, VENDOR.caseId, findingId, {
+      expectedVersion: { versionId: n.versionId, revision },
+      kind: 'waived',
+      reason: 'accepted residual risk',
+    });
+    assert.equal(stale.statusCode, 409, stale.body);
+    const err = stale.json<ErrorResponse>().error;
+    assert.equal(err.code, 'stale_version');
+    const details = err.details as { reason: string; current: { versionId: string } };
+    assert.equal(details.reason, 'version_superseded');
+    assert.equal(details.current.versionId, n1.versionId);
+
+    assert.deepEqual(
+      (await db.owner.execute(sql`SELECT * FROM qc_finding WHERE id = ${findingId}`)).rows,
+      finding.rows,
+    );
+    assert.equal((await db.owner.execute(sql`SELECT id FROM disposition_event`)).rows.length, 0);
+    assert.deepEqual(
+      (await db.owner.execute(sql`SELECT count(*)::int AS n FROM audit_event`)).rows,
+      audits.rows,
+    );
+  });
+
   it("owner's fixed stays proposed until the owning lane confirms; second disposition appends", async () => {
     const owner = await signIn(OWNER_A);
     const version = await submitOk(owner, VENDOR.caseId);

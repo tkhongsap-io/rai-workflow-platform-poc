@@ -138,14 +138,16 @@ async function caseRevision(caseId: string): Promise<number> {
   return Number((r.rows[0] as { row_version: number }).row_version);
 }
 
+/** Approves on the lane-QC run the reviewer just saw, unless the caller names one. */
 async function approve(
   session: Session,
   caseId: string,
   versionId: string,
   lane: string,
   revision: number,
-  qcRunId: string = randomUUID(),
+  qcRunId?: string,
 ) {
+  qcRunId ??= await laneQcRunId(session, caseId, versionId, lane, revision);
   return call(session, 'POST', `/api/cases/${caseId}/versions/${versionId}/lanes/${lane}/approve`, {
     expectedVersion: { versionId, revision },
     qcRunId,
@@ -191,6 +193,20 @@ async function runLaneQc(
       return JSON.parse(text) as T;
     },
   };
+}
+
+async function laneQcRunId(
+  session: Session,
+  caseId: string,
+  versionId: string,
+  lane: string,
+  revision: number,
+): Promise<string> {
+  const qc = await runLaneQc(session, caseId, versionId, lane, revision);
+  assert.equal(qc.status, 200, qc.text);
+  const { runId } = qc.json<LaneQcRunResponse>();
+  assert.ok(runId);
+  return runId;
 }
 
 function dispose(session: Session, caseId: string, findingId: string, body: unknown) {
@@ -250,6 +266,8 @@ describe(`W2-INT exit negatives over HTTP against the real server process — ${
     const owner = await signIn(OWNER);
     const v1 = await submitOk(owner, NONVENDOR.caseId);
     const revisionAtV1 = await caseRevision(NONVENDOR.caseId);
+    const it = await signIn(IT_SEC);
+    const itRunId = await laneQcRunId(it, NONVENDOR.caseId, v1.versionId, 'it_security', revisionAtV1);
     const dpo = await signIn(DPO);
     const sent = await sendBack(
       dpo,
@@ -273,13 +291,13 @@ describe(`W2-INT exit negatives over HTTP against the real server process — ${
     assert.equal(v2Body.versionNumber, 2);
 
     const beforeCount = await db.owner.execute(sql`SELECT count(*)::int AS n FROM lane_decision`);
-    const it = await signIn(IT_SEC);
     const deny = await approve(
       it,
       NONVENDOR.caseId,
       v1.versionId,
       'it_security',
       await caseRevision(NONVENDOR.caseId),
+      itRunId,
     );
     assert.equal(deny.status, 409, deny.text);
     const err = deny.json<ErrorResponse>().error;
@@ -359,8 +377,15 @@ describe(`W2-INT exit negatives over HTTP against the real server process — ${
     const version = await submitOk(owner, NONVENDOR.caseId);
     const revision = await caseRevision(NONVENDOR.caseId);
     const admin = await signIn(ADMIN);
+    const dpoRunId = await laneQcRunId(
+      await signIn(DPO),
+      NONVENDOR.caseId,
+      version.versionId,
+      'dpo',
+      revision,
+    );
     const before = await db.owner.execute(sql`SELECT count(*)::int AS n FROM lane_decision`);
-    const deny = await approve(admin, NONVENDOR.caseId, version.versionId, 'dpo', revision);
+    const deny = await approve(admin, NONVENDOR.caseId, version.versionId, 'dpo', revision, dpoRunId);
     assert.equal(deny.status, 403, deny.text);
     assert.equal(deny.json<ErrorResponse>().error.code, 'forbidden');
     const after = await db.owner.execute(sql`SELECT count(*)::int AS n FROM lane_decision`);
@@ -371,8 +396,15 @@ describe(`W2-INT exit negatives over HTTP against the real server process — ${
     const owner = await signIn(OWNER);
     const version = await submitOk(owner, NONVENDOR.caseId);
     const revision = await caseRevision(NONVENDOR.caseId);
+    const aiRunId = await laneQcRunId(
+      await signIn(AI_COE),
+      NONVENDOR.caseId,
+      version.versionId,
+      'ai_coe',
+      revision,
+    );
     const before = await db.owner.execute(sql`SELECT count(*)::int AS n FROM lane_decision`);
-    const deny = await approve(owner, NONVENDOR.caseId, version.versionId, 'ai_coe', revision);
+    const deny = await approve(owner, NONVENDOR.caseId, version.versionId, 'ai_coe', revision, aiRunId);
     assert.equal(deny.status, 403, deny.text);
     assert.equal(deny.json<ErrorResponse>().error.code, 'forbidden');
     const after = await db.owner.execute(sql`SELECT count(*)::int AS n FROM lane_decision`);
@@ -384,8 +416,15 @@ describe(`W2-INT exit negatives over HTTP against the real server process — ${
     const hrVersion = await submitOk(owner, HR_DUAL.caseId);
     const hrRevision = await caseRevision(HR_DUAL.caseId);
     const dual = await signIn(DUAL);
+    const dpoRunId = await laneQcRunId(
+      await signIn(DPO),
+      HR_DUAL.caseId,
+      hrVersion.versionId,
+      'dpo',
+      hrRevision,
+    );
     const before = await db.owner.execute(sql`SELECT count(*)::int AS n FROM lane_decision`);
-    const deny = await approve(dual, HR_DUAL.caseId, hrVersion.versionId, 'dpo', hrRevision);
+    const deny = await approve(dual, HR_DUAL.caseId, hrVersion.versionId, 'dpo', hrRevision, dpoRunId);
     assert.equal(deny.status, 403, deny.text);
     assert.equal(deny.json<ErrorResponse>().error.code, 'forbidden');
     const after = await db.owner.execute(sql`SELECT count(*)::int AS n FROM lane_decision`);

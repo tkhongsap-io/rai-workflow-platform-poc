@@ -33,11 +33,12 @@ import { laneOpenRecipientsFromIdentities } from '@rai/server/versions/open-lane
 import { sendBackRecipientsFromIdentities } from '@rai/server/workflow/send-back-notice';
 import type { ReadyKnownIdentity } from '@rai/server/workflow/ready';
 import { FIXTURE_USERS, findFixtureUser } from '@rai/fixtures/data/users';
-import { FIXTURE_CASES, findFixtureCase } from '@rai/fixtures/data/cases/index';
+import { findFixtureCase } from '@rai/fixtures/data/cases/index';
 import { loadFixtures } from '@rai/fixtures/load';
 import { fixtureSetLabel, readManifest } from '@rai/fixtures/manifest';
-import { ScriptedQcRunner } from '@rai/fixtures/substitutes/qc/index';
-import type { VersionRef } from '@rai/shared/qc/types';
+import { BUNDLED_QC_SCRIPTS, ScriptedQcRunner } from '@rai/fixtures/substitutes/qc/index';
+import type { QcRunner } from '@rai/shared/qc/types';
+import { runAndPersistSubmitQc } from '@rai/server/qc/orchestrator';
 import { openTestDatabase, type TestDatabase } from '../support/db.js';
 import { asUser, signInAsFixture, type FixtureSession } from '../support/sign-in.js';
 import { upload } from './w1-03-helpers.js';
@@ -62,8 +63,9 @@ const NONVENDOR = findFixtureCase('fx-case-nonvendor')!;
 const VENDOR = findFixtureCase('fx-case-vendor')!;
 const emailOf = (id: string) => findFixtureUser(id)!.email;
 const subjectOf = (id: string) => findFixtureUser(id)!.subjectId;
-
-const fixtureCaseIdByRowId = new Map(FIXTURE_CASES.map((c) => [c.caseId, c.fixtureCaseId]));
+const VENDOR_AI_DEFECTS = BUNDLED_QC_SCRIPTS.find(
+  (s) => s.fixtureCaseId === VENDOR.fixtureCaseId,
+)!.entries.find((e) => e.lane === 'ai_coe')!.findings;
 
 let db: TestDatabase;
 let app: FastifyInstance;
@@ -74,14 +76,12 @@ let runner: ScriptedQcRunner;
 let clock = Date.parse('2026-09-22T07:00:00Z');
 const now = () => new Date(clock);
 
-async function rebuildApp(
-  withQc: boolean,
-  opts: { knownIdentities?: readonly ReadyKnownIdentity[] } = {},
-): Promise<void> {
+async function rebuildApp(opts: { knownIdentities?: readonly ReadyKnownIdentity[] } = {}): Promise<void> {
   if (app !== undefined) await app.close();
   const knownForReady = opts.knownIdentities ?? FIXTURE_USERS;
+  // Only the vendor case carries scripted defects; lane QC on every other case is clean.
   runner = new ScriptedQcRunner({
-    fixtureCaseIdOf: (version: VersionRef) => fixtureCaseIdByRowId.get(version.caseId),
+    fixtureCaseIdOf: (version) => (version.caseId === VENDOR.caseId ? VENDOR.fixtureCaseId : undefined),
     now,
   });
   const adapter = createIdentityAdapter({
@@ -130,7 +130,7 @@ async function rebuildApp(
       now,
       readyRecipientsForOwner: ownerRecipients,
       knownIdentities: knownForReady,
-      ...(withQc ? { qc: { runner, now } } : {}),
+      qc: { runner, now },
     },
   });
   app = built.fastify;
@@ -143,7 +143,7 @@ before(async () => {
   outputDir = await mkdtemp(path.join(tmpdir(), 'rai-w2-06-out-'));
   store = createFilesystemBlobStore(blobDir);
   await store.init();
-  await rebuildApp(true);
+  await rebuildApp();
 });
 beforeEach(async () => {
   clock = Date.parse('2026-09-22T07:00:00Z');
@@ -159,7 +159,7 @@ beforeEach(async () => {
     now: now(),
   });
   clock += 60_000;
-  await rebuildApp(true);
+  await rebuildApp();
 });
 after(async () => {
   await app.close();
@@ -200,6 +200,7 @@ async function caseRevision(caseId: string): Promise<number> {
   return Number((r.rows[0] as { row_version: number }).row_version);
 }
 
+/** Approves on the lane-QC run the reviewer just saw, unless the caller names one. */
 async function approve(
   session: FixtureSession,
   caseId: string,
@@ -207,8 +208,9 @@ async function approve(
   lane: string,
   revision: number,
   key: string = randomUUID(),
-  qcRunId: string = randomUUID(),
+  qcRunId?: string,
 ) {
+  qcRunId ??= await laneQcRunId(session, caseId, versionId, lane, revision);
   return app.inject({
     method: 'POST',
     url: `/api/cases/${caseId}/versions/${versionId}/lanes/${lane}/approve`,
@@ -260,6 +262,32 @@ async function runLaneQc(
     payload: { expectedVersion: { versionId, revision } },
   });
   return { statusCode: res.statusCode, body: res.json() };
+}
+
+async function laneQcRunId(
+  session: FixtureSession,
+  caseId: string,
+  versionId: string,
+  lane: string,
+  revision: number,
+): Promise<string> {
+  const qc = await runLaneQc(session, caseId, versionId, lane, revision);
+  assert.equal(qc.statusCode, 200, JSON.stringify(qc.body));
+  const { runId } = qc.body as LaneQcRunResponse;
+  assert.ok(runId);
+  return runId;
+}
+
+/** Waits until `n` backends are queued on a lock (the case row here). */
+async function lockWaiters(n: number): Promise<void> {
+  for (let i = 0; i < 200; i += 1) {
+    const r = await db.owner.execute(
+      sql`SELECT count(DISTINCT pid)::int AS n FROM pg_locks WHERE NOT granted`,
+    );
+    if ((r.rows[0] as { n: number }).n >= n) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  assert.fail(`expected ${n} lock waiters`);
 }
 
 function dispose(
@@ -461,7 +489,18 @@ describe(`W2-06 Ready predicate — ${SET}`, () => {
     const beforeAudits = (await auditStore.read(db.owner, { caseId: NONVENDOR.caseId })).length;
 
     const dpo = await signIn(DPO);
-    const again = await approve(dpo, NONVENDOR.caseId, version.versionId, 'dpo', revision);
+    const dpoRun = await db.owner.execute(
+      sql`SELECT id FROM qc_run WHERE version_id = ${version.versionId} AND lane = 'dpo'`,
+    );
+    const again = await approve(
+      dpo,
+      NONVENDOR.caseId,
+      version.versionId,
+      'dpo',
+      revision,
+      randomUUID(),
+      (dpoRun.rows[0] as { id: string }).id,
+    );
     assert.equal(again.statusCode, 409, again.body);
     const err = again.json<ErrorResponse>();
     assert.equal(err.error.code, 'stale_version');
@@ -491,7 +530,7 @@ describe(`W2-06 Ready predicate — ${SET}`, () => {
     );
 
     const key = randomUUID();
-    const qcRunId = randomUUID();
+    const qcRunId = await laneQcRunId(it, NONVENDOR.caseId, version.versionId, 'it_security', revision);
     const first = await approve(
       it,
       NONVENDOR.caseId,
@@ -522,10 +561,81 @@ describe(`W2-06 Ready predicate — ${SET}`, () => {
     assert.equal(state.readyNotices.length, 1);
   });
 
+  it('a submit-QC finding persisted under the case lock just before the third approval blocks Ready', async () => {
+    // The vendor's AI/COE defects arrive from a late submit run instead of lane QC.
+    runner.script({ fixtureCaseId: VENDOR.fixtureCaseId, trigger: 'approve_attempt', lane: 'ai_coe' }, []);
+    runner.script({ fixtureCaseId: VENDOR.fixtureCaseId, trigger: 'submit' }, [...VENDOR_AI_DEFECTS]);
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, VENDOR.caseId);
+    const revision = await caseRevision(VENDOR.caseId);
+    const dpo = await signIn(DPO);
+    const ai = await signIn(AI_COE);
+    const it = await signIn(IT_SEC);
+    assert.equal((await approve(dpo, VENDOR.caseId, version.versionId, 'dpo', revision)).statusCode, 201);
+    assert.equal((await approve(ai, VENDOR.caseId, version.versionId, 'ai_coe', revision)).statusCode, 201);
+    const itRunId = await laneQcRunId(it, VENDOR.caseId, version.versionId, 'it_security', revision);
+
+    let entered!: () => void;
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const gated: QcRunner = {
+      identity: runner.identity,
+      async run(request, signal) {
+        entered();
+        await gate;
+        return runner.run(request, signal);
+      },
+    };
+    const submitQc = runAndPersistSubmitQc(
+      { db: db.app, runner: gated, now },
+      { caseId: VENDOR.caseId, versionId: version.versionId, correlationId: randomUUID() },
+    );
+    await started;
+    // Hold the case lock so the QC persist queues first and the third approval queues behind it.
+    const [qc, third] = await db.raw('owner', async (client) => {
+      await client.query('BEGIN');
+      await client.query('SELECT id FROM "case" WHERE id = $1 FOR UPDATE', [VENDOR.caseId]);
+      release();
+      await lockWaiters(1);
+      const approval = approve(
+        it,
+        VENDOR.caseId,
+        version.versionId,
+        'it_security',
+        revision,
+        randomUUID(),
+        itRunId,
+      );
+      await lockWaiters(2);
+      await client.query('COMMIT');
+      return Promise.all([submitQc, approval]);
+    });
+    assert.equal(qc.status, 'completed');
+    assert.ok(qc.findings.length >= 1);
+    assert.equal(third.statusCode, 201, third.body);
+    assert.equal(third.json<LaneDecisionResponse>().ready, false);
+
+    const state = await readyState(VENDOR.caseId, version.versionId);
+    assert.equal(state.version.ready_at, null);
+    assert.equal(state.readyAudits.length, 0);
+  });
+
   it('a BU SPOC approval inserted by SQL (simulated policy bug) blocks Ready even with two real lane approvals', async () => {
     const owner = await signIn(OWNER_A);
     const version = await submitOk(owner, NONVENDOR.caseId);
     const revision = await caseRevision(NONVENDOR.caseId);
+    const dpoRunId = await laneQcRunId(
+      await signIn(DPO),
+      NONVENDOR.caseId,
+      version.versionId,
+      'dpo',
+      revision,
+    );
 
     // Simulated policy bug: CM BU SPOC recorded as the DPO lane approver.
     await db.owner.execute(sql`
@@ -534,7 +644,7 @@ describe(`W2-06 Ready predicate — ${SET}`, () => {
         feedback, observed_qc_run_id, decided_at, correlation_id
       ) VALUES (
         ${randomUUID()}::uuid, ${version.versionId}::uuid, 'dpo', 'approve',
-        ${subjectOf(SPOC_CM)}, 'dpo', NULL, ${randomUUID()}::uuid,
+        ${subjectOf(SPOC_CM)}, 'dpo', NULL, ${dpoRunId}::uuid,
         ${now()}, ${randomUUID()}
       )
     `);
@@ -555,7 +665,7 @@ describe(`W2-06 Ready predicate — ${SET}`, () => {
   });
 
   it('empty knownIdentities (local-google shape) still sets Ready when lane reviewers have sessions', async () => {
-    await rebuildApp(true, { knownIdentities: [] });
+    await rebuildApp({ knownIdentities: [] });
 
     const owner = await signIn(OWNER_A);
     const version = await submitOk(owner, NONVENDOR.caseId);

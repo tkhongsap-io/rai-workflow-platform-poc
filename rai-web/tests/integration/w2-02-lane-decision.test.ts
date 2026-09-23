@@ -12,7 +12,8 @@ import path from 'node:path';
 import { Writable } from 'node:stream';
 import { sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
-import type { LaneDecisionResponse } from '@rai/shared/schemas/review';
+import type { ErrorResponse } from '@rai/shared/errors';
+import type { LaneDecisionResponse, LaneQcRunResponse } from '@rai/shared/schemas/review';
 import type { SubmitRequest, SubmittedVersion } from '@rai/shared/schemas/versions';
 import type { PackDraft } from '@rai/shared/schemas/pack';
 import { buildApp } from '../support/observed-app.js';
@@ -31,6 +32,7 @@ import { FIXTURE_USERS, findFixtureUser } from '@rai/fixtures/data/users';
 import { findFixtureCase } from '@rai/fixtures/data/cases/index';
 import { loadFixtures } from '@rai/fixtures/load';
 import { fixtureSetLabel, readManifest } from '@rai/fixtures/manifest';
+import { ScriptedQcRunner } from '@rai/fixtures/substitutes/qc/index';
 import { openTestDatabase, type TestDatabase } from '../support/db.js';
 import { asUser, signInAsFixture, type FixtureSession } from '../support/sign-in.js';
 
@@ -59,11 +61,13 @@ let app: FastifyInstance;
 let store: FilesystemBlobStore;
 let blobDir: string;
 let outputDir: string;
+let runner: ScriptedQcRunner;
 let clock = Date.parse('2026-09-22T04:00:00Z');
 const now = () => new Date(clock);
 
 async function rebuildApp(): Promise<void> {
   if (app !== undefined) await app.close();
+  runner = new ScriptedQcRunner({ now }); // unscripted: lane QC completes clean unless a test simulates an error
   const adapter = createIdentityAdapter({
     env: { RAI_IDENTITY_MODE: 'fixture', RAI_SESSION_ABSOLUTE_HOURS: '12', RAI_SESSION_IDLE_MINUTES: '120' },
     nodeEnv: 'test',
@@ -105,6 +109,7 @@ async function rebuildApp(): Promise<void> {
       sendBackRecipientsForOwner: (ownerSubjectId) =>
         sendBackRecipientsFromIdentities(FIXTURE_USERS, ownerSubjectId),
     },
+    findings: { db: db.app, now, qc: { runner, now } },
   });
   app = built.fastify;
   await app.ready();
@@ -174,6 +179,32 @@ async function caseRevision(caseId: string): Promise<number> {
   return Number((r.rows[0] as { row_version: number }).row_version);
 }
 
+async function laneQc(
+  session: FixtureSession,
+  caseId: string,
+  versionId: string,
+  lane: string,
+  revision: number,
+): Promise<LaneQcRunResponse> {
+  const res = await app.inject({
+    method: 'POST',
+    url: `/api/cases/${caseId}/versions/${versionId}/lanes/${lane}/qc-run`,
+    headers: { 'content-type': 'application/json', ...asUser(session) },
+    payload: { expectedVersion: { versionId, revision } },
+  });
+  assert.equal(res.statusCode, 200, res.body);
+  return res.json<LaneQcRunResponse>();
+}
+
+async function rowCounts() {
+  const r = await db.owner.execute(sql`
+    SELECT (SELECT count(*)::int FROM lane_decision) AS decisions,
+           (SELECT count(*)::int FROM audit_event) AS audits,
+           (SELECT count(*)::int FROM notification) AS notices
+  `);
+  return r.rows[0];
+}
+
 function decide(
   session: FixtureSession,
   caseId: string,
@@ -201,7 +232,7 @@ describe(`W2-02 lane decision — ${SET}`, () => {
     const version = await submitOk(owner, NONVENDOR.caseId);
     const revision = await caseRevision(NONVENDOR.caseId);
     const dpo = await signIn(DPO);
-    const qcRunId = randomUUID();
+    const { runId: qcRunId } = await laneQc(dpo, NONVENDOR.caseId, version.versionId, 'dpo', revision);
     const res = await decide(dpo, NONVENDOR.caseId, version.versionId, 'dpo', 'approve', {
       expectedVersion: { versionId: version.versionId, revision },
       qcRunId,
@@ -240,11 +271,11 @@ describe(`W2-02 lane decision — ${SET}`, () => {
     const owner = await signIn(OWNER_A);
     const version = await submitOk(owner, NONVENDOR.caseId);
     const revision = await caseRevision(NONVENDOR.caseId);
+    const dpo = await signIn(DPO);
     const payload = {
       expectedVersion: { versionId: version.versionId, revision },
-      qcRunId: randomUUID(),
+      qcRunId: (await laneQc(dpo, NONVENDOR.caseId, version.versionId, 'dpo', revision)).runId,
     };
-    const dpo = await signIn(DPO);
     const wrong = await decide(dpo, NONVENDOR.caseId, version.versionId, 'it_security', 'approve', payload);
     assert.equal(wrong.statusCode, 403, wrong.body);
     assert.equal(wrong.json<{ error: { code: string } }>().error.code, 'forbidden');
@@ -262,12 +293,13 @@ describe(`W2-02 lane decision — ${SET}`, () => {
     const version = await submitOk(owner, NONVENDOR.caseId);
     const revision = await caseRevision(NONVENDOR.caseId);
     const dpo = await signIn(DPO);
+    const { runId } = await laneQc(dpo, NONVENDOR.caseId, version.versionId, 'dpo', revision);
 
     // Path and body must agree; a UUID that was never a version is not_found (not version_superseded).
     const otherVersionId = randomUUID();
     const missing = await decide(dpo, NONVENDOR.caseId, otherVersionId, 'dpo', 'approve', {
       expectedVersion: { versionId: otherVersionId, revision },
-      qcRunId: randomUUID(),
+      qcRunId: runId,
     });
     assert.equal(missing.statusCode, 404, missing.body);
     assert.equal(missing.json<{ error: { code: string } }>().error.code, 'not_found');
@@ -297,7 +329,7 @@ describe(`W2-02 lane decision — ${SET}`, () => {
     const key = randomUUID();
     const body = {
       expectedVersion: { versionId: version.versionId, revision },
-      qcRunId: randomUUID(),
+      qcRunId: (await laneQc(dpo, NONVENDOR.caseId, version.versionId, 'dpo', revision)).runId,
     };
     const first = await decide(dpo, NONVENDOR.caseId, version.versionId, 'dpo', 'approve', body, key);
     assert.equal(first.statusCode, 201, first.body);
@@ -318,14 +350,11 @@ describe(`W2-02 lane decision — ${SET}`, () => {
     const dpo = await signIn(DPO);
     const body = {
       expectedVersion: { versionId: version.versionId, revision },
-      qcRunId: randomUUID(),
+      qcRunId: (await laneQc(dpo, NONVENDOR.caseId, version.versionId, 'dpo', revision)).runId,
     };
     const first = await decide(dpo, NONVENDOR.caseId, version.versionId, 'dpo', 'approve', body);
     assert.equal(first.statusCode, 201, first.body);
-    const again = await decide(dpo, NONVENDOR.caseId, version.versionId, 'dpo', 'approve', {
-      ...body,
-      qcRunId: randomUUID(),
-    });
+    const again = await decide(dpo, NONVENDOR.caseId, version.versionId, 'dpo', 'approve', body);
     assert.equal(again.statusCode, 409, again.body);
     assert.equal(
       again.json<{ error: { details: { reason: string } } }>().error.details.reason,
@@ -333,6 +362,80 @@ describe(`W2-02 lane decision — ${SET}`, () => {
     );
     const n = await db.owner.execute(sql`SELECT count(*)::int AS n FROM lane_decision`);
     assert.equal((n.rows[0] as { n: number }).n, 1);
+  });
+
+  it('approve must name the latest lane-QC run: none is 422, an earlier one is 409; nothing written', async () => {
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, NONVENDOR.caseId);
+    const revision = await caseRevision(NONVENDOR.caseId);
+    const dpo = await signIn(DPO);
+    const expectedVersion = { versionId: version.versionId, revision };
+    // A run for another lane is not a DPO lane-QC run.
+    const aiRun = await laneQc(await signIn(AI_COE), NONVENDOR.caseId, version.versionId, 'ai_coe', revision);
+    const counts = await rowCounts();
+
+    const notRun = await decide(dpo, NONVENDOR.caseId, version.versionId, 'dpo', 'approve', {
+      expectedVersion,
+      qcRunId: aiRun.runId,
+    });
+    assert.equal(notRun.statusCode, 422, notRun.body);
+    const invalid = notRun.json<ErrorResponse>().error;
+    assert.equal(invalid.code, 'invalid_input');
+    assert.deepEqual(invalid.details, {
+      fields: [{ path: 'body.qcRunId', messageKey: 'error.invalid_input.lane_qc_not_run' }],
+    });
+    assert.deepEqual(await rowCounts(), counts);
+
+    runner.simulateError('runner_error');
+    const earlier = await laneQc(dpo, NONVENDOR.caseId, version.versionId, 'dpo', revision);
+    assert.equal(earlier.status, 'unavailable');
+    const latest = await laneQc(dpo, NONVENDOR.caseId, version.versionId, 'dpo', revision);
+    assert.notEqual(latest.runId, earlier.runId);
+    const afterRuns = await rowCounts();
+
+    const superseded = await decide(dpo, NONVENDOR.caseId, version.versionId, 'dpo', 'approve', {
+      expectedVersion,
+      qcRunId: earlier.runId,
+    });
+    assert.equal(superseded.statusCode, 409, superseded.body);
+    const stale = superseded.json<ErrorResponse>().error;
+    assert.equal(stale.code, 'stale_version');
+    assert.deepEqual(stale.details, {
+      reason: 'qc_run_superseded',
+      guidanceKey: 'error.stale_version.guidance.qc_run_superseded',
+      current: {
+        versionId: version.versionId,
+        versionNumber: version.versionNumber,
+        revision,
+        state: 'submitted',
+        ready: false,
+      },
+      refreshPath: `/cases/${NONVENDOR.caseId}/versions/${version.versionId}`,
+    });
+    assert.deepEqual(await rowCounts(), afterRuns);
+
+    const ok = await decide(dpo, NONVENDOR.caseId, version.versionId, 'dpo', 'approve', {
+      expectedVersion,
+      qcRunId: latest.runId,
+    });
+    assert.equal(ok.statusCode, 201, ok.body);
+  });
+
+  it('an unavailable latest lane-QC run is a valid run to approve on', async () => {
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, NONVENDOR.caseId);
+    const revision = await caseRevision(NONVENDOR.caseId);
+    const dpo = await signIn(DPO);
+    runner.simulateError('runner_error');
+    const run = await laneQc(dpo, NONVENDOR.caseId, version.versionId, 'dpo', revision);
+    assert.equal(run.status, 'unavailable');
+    const res = await decide(dpo, NONVENDOR.caseId, version.versionId, 'dpo', 'approve', {
+      expectedVersion: { versionId: version.versionId, revision },
+      qcRunId: run.runId,
+    });
+    assert.equal(res.statusCode, 201, res.body);
+    const stored = await db.owner.execute(sql`SELECT observed_qc_run_id FROM lane_decision`);
+    assert.deepEqual(stored.rows, [{ observed_qc_run_id: run.runId }]);
   });
 
   it('send-back without named artifact is rejected; with feedback creates successor copying stage, template and slots', async () => {
@@ -449,9 +552,11 @@ describe(`W2-02 lane decision — ${SET}`, () => {
     const hrVersion = await submitOk(owner, HR_DUAL.caseId);
     const hrRevision = await caseRevision(HR_DUAL.caseId);
     const dual = await signIn(DUAL);
+    // A real latest run (seen by the DPO reviewer) does not lift D05 self-exclusion.
+    const hrRun = await laneQc(await signIn(DPO), HR_DUAL.caseId, hrVersion.versionId, 'dpo', hrRevision);
     const hrDeny = await decide(dual, HR_DUAL.caseId, hrVersion.versionId, 'dpo', 'approve', {
       expectedVersion: { versionId: hrVersion.versionId, revision: hrRevision },
-      qcRunId: randomUUID(),
+      qcRunId: hrRun.runId,
     });
     assert.equal(hrDeny.statusCode, 403, hrDeny.body);
 
@@ -459,7 +564,7 @@ describe(`W2-02 lane decision — ${SET}`, () => {
     const cmRevision = await caseRevision(NONVENDOR.caseId);
     const cmOk = await decide(dual, NONVENDOR.caseId, cmVersion.versionId, 'dpo', 'approve', {
       expectedVersion: { versionId: cmVersion.versionId, revision: cmRevision },
-      qcRunId: randomUUID(),
+      qcRunId: (await laneQc(dual, NONVENDOR.caseId, cmVersion.versionId, 'dpo', cmRevision)).runId,
     });
     assert.equal(cmOk.statusCode, 201, cmOk.body);
 
@@ -478,14 +583,14 @@ describe(`W2-02 lane decision — ${SET}`, () => {
     const ai = await signIn(AI_COE);
     const aiOk = await decide(ai, NONVENDOR.caseId, version.versionId, 'ai_coe', 'approve', {
       expectedVersion: { versionId: version.versionId, revision },
-      qcRunId: randomUUID(),
+      qcRunId: (await laneQc(ai, NONVENDOR.caseId, version.versionId, 'ai_coe', revision)).runId,
     });
     assert.equal(aiOk.statusCode, 201, aiOk.body);
     assert.equal(await caseRevision(NONVENDOR.caseId), revision, 'lane decide must not bump row_version');
     const it = await signIn(IT_SEC);
     const itOk = await decide(it, NONVENDOR.caseId, version.versionId, 'it_security', 'approve', {
       expectedVersion: { versionId: version.versionId, revision },
-      qcRunId: randomUUID(),
+      qcRunId: (await laneQc(it, NONVENDOR.caseId, version.versionId, 'it_security', revision)).runId,
     });
     assert.equal(itOk.statusCode, 201, itOk.body);
     assert.equal(await caseRevision(NONVENDOR.caseId), revision);

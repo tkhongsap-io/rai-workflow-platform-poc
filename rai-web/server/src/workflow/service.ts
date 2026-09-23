@@ -21,6 +21,7 @@ import { requestDigest } from '../cases/idempotency.js';
 import { readVersionRow, type CaseRow, type PackVersionRow } from '../cases/repository.js';
 import { staleDetails } from '../cases/service.js';
 import type { Db, Tx } from '../db/client.js';
+import { findLatestApproveAttemptRun, ruleRevisionOf } from '../qc/repository.js';
 import {
   ensureSuccessorDraft,
   findLaneDecision,
@@ -54,7 +55,6 @@ export const APPROVE_ACTION = 'lane.approve' as const;
 export const SEND_BACK_ACTION = 'lane.send_back' as const;
 
 const AUDIT_REF = /^[A-Za-z0-9_.:/@-]{1,64}$/;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function keyRef(key: string): string {
   return AUDIT_REF.test(key) ? key : createHash('sha256').update(key).digest('hex');
@@ -173,9 +173,9 @@ async function assertLanePending(
   }
 }
 
-/** Reject approve without a qc_run_id (W0-06 4.4 `lane_qc_not_run`). Accepts any UUID without a QC lookup. */
+/** Format check before the transaction (W0-06 4.4 `lane_qc_not_run`); approveLane checks the run itself. */
 export function requireQcRunId(qcRunId: string | undefined): string {
-  if (typeof qcRunId !== 'string' || qcRunId.trim() === '' || !UUID.test(qcRunId.trim())) {
+  if (typeof qcRunId !== 'string' || !isUuid(qcRunId.trim())) {
     throw new InvalidInputError([
       { path: 'body.qcRunId', messageKey: 'error.invalid_input.lane_qc_not_run' },
     ]);
@@ -259,6 +259,26 @@ export async function approveLane(
           requireNoSuccessor: true,
         });
         await assertLanePending(tx, version, lane, before);
+
+        // W0-06 4.4 / 5.2: name the latest lane-QC run, so no one approves past a defect they never saw.
+        // An `unavailable` run is a valid run to have seen.
+        const latest = await findLatestApproveAttemptRun(tx, version.id, lane, ruleRevisionOf(version));
+        if (latest === undefined) {
+          throw new InvalidInputError([
+            { path: 'body.qcRunId', messageKey: 'error.invalid_input.lane_qc_not_run' },
+          ]);
+        }
+        if (latest.id !== qcRunId) {
+          throw new StaleVersionError(
+            staleDetails(
+              'qc_run_superseded',
+              'error.stale_version.guidance.qc_run_superseded',
+              version,
+              before.rowVersion,
+              refreshPathFor(before.id, version),
+            ),
+          );
+        }
 
         const decisionId = uuidv7(now.getTime());
         await insertLaneDecision(tx, {

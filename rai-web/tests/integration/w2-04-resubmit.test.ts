@@ -13,7 +13,7 @@ import { Writable } from 'node:stream';
 import { sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import type { ErrorDetails, ErrorResponse } from '@rai/shared/errors';
-import type { LaneDecisionResponse } from '@rai/shared/schemas/review';
+import type { LaneDecisionResponse, LaneQcRunResponse } from '@rai/shared/schemas/review';
 import type { PackDraft } from '@rai/shared/schemas/pack';
 import type { SubmitRequest, SubmittedVersion } from '@rai/shared/schemas/versions';
 import { buildApp } from '../support/observed-app.js';
@@ -102,6 +102,7 @@ async function rebuildApp(): Promise<void> {
       sendBackRecipientsForOwner: (ownerSubjectId) =>
         sendBackRecipientsFromIdentities(FIXTURE_USERS, ownerSubjectId),
     },
+    findings: { db: db.app, now },
   });
   app = built.fastify;
   await app.ready();
@@ -222,6 +223,25 @@ function sendBack(
   });
 }
 
+async function laneQcRunId(
+  session: FixtureSession,
+  caseId: string,
+  versionId: string,
+  lane: string,
+  revision: number,
+): Promise<string> {
+  const res = await app.inject({
+    method: 'POST',
+    url: `/api/cases/${caseId}/versions/${versionId}/lanes/${lane}/qc-run`,
+    headers: { 'content-type': 'application/json', ...asUser(session) },
+    payload: { expectedVersion: { versionId, revision } },
+  });
+  assert.equal(res.statusCode, 200, res.body);
+  const { runId } = res.json<LaneQcRunResponse>();
+  assert.ok(runId);
+  return runId;
+}
+
 function approve(
   session: FixtureSession,
   caseId: string,
@@ -267,7 +287,10 @@ function staleOf(res: Res): ErrorDetails['stale_version'] {
   return err.details as ErrorDetails['stale_version'];
 }
 
-/** Submit N, DPO approves, AI/COE send-back creates N+1; returns N and the open successor draft. */
+/**
+ * Submit N, DPO approves, IT/Security runs lane QC without deciding, AI/COE send-back creates N+1; returns N,
+ * the open successor draft and IT/Security's run on N.
+ */
 async function reachSuccessorDraft() {
   const owner = await signIn(OWNER_A);
   const { version: n } = await submitOk(owner, NONVENDOR.caseId);
@@ -277,9 +300,16 @@ async function reachSuccessorDraft() {
 
   const approved = await approve(dpo, NONVENDOR.caseId, n.versionId, 'dpo', {
     expectedVersion: { versionId: n.versionId, revision: revisionAtSubmit },
-    qcRunId: randomUUID(),
+    qcRunId: await laneQcRunId(dpo, NONVENDOR.caseId, n.versionId, 'dpo', revisionAtSubmit),
   });
   assert.equal(approved.statusCode, 201, approved.body);
+  const itQcRunId = await laneQcRunId(
+    await signIn(IT_SEC),
+    NONVENDOR.caseId,
+    n.versionId,
+    'it_security',
+    revisionAtSubmit,
+  );
 
   const sent = await sendBack(ai, NONVENDOR.caseId, n.versionId, 'ai_coe', {
     expectedVersion: { versionId: n.versionId, revision: revisionAtSubmit },
@@ -299,12 +329,12 @@ async function reachSuccessorDraft() {
   assert.equal(draft.draftId, draftId);
   assert.equal(draft.parentVersionId, n.versionId);
 
-  return { owner, n, draft, revisionAtSubmit };
+  return { owner, n, draft, revisionAtSubmit, itQcRunId };
 }
 
 describe(`W2-04 resubmit N+1 under D05 — ${SET}`, () => {
   it('owner resubmits N+1: version.resubmitted, three lane.opened, projections pending, N frozen and GET-readable; approve N is version_superseded', async () => {
-    const { owner, n, draft } = await reachSuccessorDraft();
+    const { owner, n, draft, itQcRunId } = await reachSuccessorDraft();
     const beforeN = await nSnapshot(n.versionId);
     const nApprovals = await db.owner.execute(
       sql`SELECT lane, decision FROM lane_decision WHERE version_id = ${n.versionId} ORDER BY lane`,
@@ -415,7 +445,7 @@ describe(`W2-04 resubmit N+1 under D05 — ${SET}`, () => {
     const beforeDecideCount = await db.owner.execute(sql`SELECT count(*)::int AS n FROM lane_decision`);
     const deny = await approve(it, NONVENDOR.caseId, n.versionId, 'it_security', {
       expectedVersion: { versionId: n.versionId, revision: await caseRevision(NONVENDOR.caseId) },
-      qcRunId: randomUUID(),
+      qcRunId: itQcRunId,
     });
     assert.equal(deny.statusCode, 409, deny.body);
     const details = staleOf(deny);

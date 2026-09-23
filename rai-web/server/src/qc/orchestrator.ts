@@ -37,6 +37,7 @@ import {
   insertQcFinding,
   insertQcRun,
   listFindingsForRun,
+  ruleRevisionOf,
   type InsertFindingInput,
 } from './repository.js';
 
@@ -103,11 +104,6 @@ function slotOfFinding(finding: QcFinding): Slot | null {
 
 function refreshPathFor(caseId: string, version: PackVersionRow): string {
   return `/cases/${caseId}/versions/${version.id}`;
-}
-
-function ruleRevisionOf(version: PackVersionRow): string {
-  const frozen = (version.frozenConfiguration ?? {}) as Record<string, string>;
-  return frozen.qc_rules ?? version.configurationRevisionId ?? '';
 }
 
 /** Keep only defect findings whose slot maps to a real owning lane under the version's mapping. */
