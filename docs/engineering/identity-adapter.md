@@ -301,7 +301,7 @@ W0-09 confirmed this mechanism (section 14 b): the cookie is an opaque random va
 - A request is authenticated when the hash matches a row with `revokedAt IS NULL`, `expiresAt > now()` and `lastSeenAt > now() - RAI_SESSION_IDLE_MINUTES` (default 120). `lastSeenAt` is updated at most once per minute to avoid a write per request.
 - Roles are a snapshot. A change in the allow-list or the group mapping takes effect at the next sign-in; the absolute TTL bounds the staleness. Revoking all sessions of a subject on a mapping change is a W6 operator action, not slice 1.
 - Sign-in always creates a new session row (no fixation: an existing cookie is ignored and replaced).
-- Expired and revoked rows are deleted by the `reset` and a periodic sweep (W1-01); session rows are operational data, not audit, and are not retained.
+- Expired and revoked rows are deleted by the `reset` and a periodic sweep (W1-01); session rows are operational data, not audit, and are not retained. The periodic sweep is `npm run db:cleanup`, run by the operator as `rai_operator` on the schedule in the W8 runbook ([later packages](../delivery/later-packages-outline.md)); the server never runs it. It deletes rows whose `expiresAt` has passed or whose `revokedAt` is set. No idle predicate is added: a row that is only idle-expired can no longer authenticate, but it keeps its `principal` snapshot (email and display name) until its absolute expiry (at most `RAI_SESSION_ABSOLUTE_HOURS`, 24 h) and is removed by the first sweep after that.
 
 ### 6.4 Error contract
 
