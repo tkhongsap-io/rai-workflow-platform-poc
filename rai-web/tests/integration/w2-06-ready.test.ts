@@ -687,6 +687,10 @@ describe(`W2-06 Ready predicate — ${SET}`, () => {
     const revision = await caseRevision(NONVENDOR.caseId);
     const dpo = await approve(await signIn(DPO), NONVENDOR.caseId, version.versionId, 'dpo', revision);
     assert.equal(dpo.statusCode, 201, dpo.body);
+    const stored = await db.owner.execute(
+      sql`SELECT actor_scopes FROM lane_decision WHERE version_id = ${version.versionId} AND lane = 'dpo'`,
+    );
+    assert.deepEqual(stored.rows, [{ actor_scopes: findFixtureUser(DPO)!.roles }]);
 
     // After approving, the DPO reviewer also becomes BU SPOC of the case's BU (a routine grant sync).
     await db.owner.execute(sql`

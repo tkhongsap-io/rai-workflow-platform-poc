@@ -30,7 +30,7 @@ import { createFixtureIdentityProvider } from '@rai/server/identity/fixture';
 import { createPgSessionStore } from '@rai/server/identity/session';
 import { laneOpenRecipientsFromIdentities } from '@rai/server/versions/open-lanes';
 import { sendBackRecipientsFromIdentities } from '@rai/server/workflow/send-back-notice';
-import { FIXTURE_USERS } from '@rai/fixtures/data/users';
+import { FIXTURE_USERS, findFixtureUser } from '@rai/fixtures/data/users';
 import { findFixtureCase } from '@rai/fixtures/data/cases/index';
 import { loadFixtures } from '@rai/fixtures/load';
 import { fixtureSetLabel, readManifest } from '@rai/fixtures/manifest';
@@ -310,13 +310,13 @@ describe(`W2-03 successor draft concurrency and stale actions — ${SET}`, () =>
     assert.equal(draft.id, dpoBody.successorDraftVersionId);
 
     const decisions = await db.owner.execute(
-      sql`SELECT lane, decision FROM lane_decision WHERE version_id = ${version.versionId} ORDER BY lane`,
+      sql`SELECT lane, decision, actor_scopes FROM lane_decision
+          WHERE version_id = ${version.versionId} ORDER BY lane`,
     );
-    assert.deepEqual(
-      decisions.rows.map((r) => (r as { lane: string; decision: string }).lane),
-      ['ai_coe', 'dpo'],
-    );
-    assert.ok((decisions.rows as Array<{ decision: string }>).every((r) => r.decision === 'send_back'));
+    assert.deepEqual(decisions.rows, [
+      { lane: 'ai_coe', decision: 'send_back', actor_scopes: findFixtureUser(AI_COE)!.roles },
+      { lane: 'dpo', decision: 'send_back', actor_scopes: findFixtureUser(DPO)!.roles },
+    ]);
 
     const after = await nSnapshot(version.versionId);
     assert.equal(String(after.version.submitted_at), String(before.version.submitted_at));
