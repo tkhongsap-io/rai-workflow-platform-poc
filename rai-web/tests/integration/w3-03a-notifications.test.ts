@@ -15,6 +15,7 @@ import { notification } from '@rai/server/db/schema/notification';
 import { operatorJobRun, operatorJobNotification } from '@rai/server/db/schema/operator-job-run';
 import type { FastifyInstance } from 'fastify';
 import type { PackDraft } from '@rai/shared/schemas/pack';
+import type { LaneQcRunResponse } from '@rai/shared/schemas/review';
 import type { SubmittedVersion } from '@rai/shared/schemas/versions';
 import { buildApp } from '../support/observed-app.js';
 import { createScopeFactsSource } from '@rai/server/authz/facts';
@@ -34,6 +35,7 @@ import { createDb } from '@rai/server/db/client';
 import type { QueryConfig, QueryResult } from 'pg';
 import type { MailSink } from '@rai/shared/mail/types';
 import { FileMailSink, MemoryMailSink } from '@rai/fixtures/substitutes/mail-sink/index';
+import { ScriptedQcRunner } from '@rai/fixtures/substitutes/qc/index';
 import { FIXTURE_USERS } from '@rai/fixtures/data/users';
 import { findFixtureCase } from '@rai/fixtures/data/cases/index';
 import { loadFixtures } from '@rai/fixtures/load';
@@ -124,6 +126,8 @@ async function build(options: { auto?: boolean; rollback?: boolean } = {}) {
       knownIdentities: FIXTURE_USERS,
       sendBackRecipientsForOwner: (subject) => sendBackRecipientsFromIdentities(FIXTURE_USERS, subject),
     },
+    // Unscripted substitute QC: every lane-QC run completes clean.
+    findings: { db: db.app, now, qc: { runner: new ScriptedQcRunner({ now }) } },
     ...(options.auto === false ? {} : { notifications: deps }),
   });
   emitter = built.emitter;
@@ -231,14 +235,24 @@ async function decide(
   feedback?: object,
 ) {
   const r = await db.owner.execute(sql`SELECT row_version FROM "case" WHERE id = ${caseId}`);
+  const expectedVersion = { versionId, revision: (r.rows[0] as { row_version: number }).row_version };
+  const lanePath = `/api/cases/${caseId}/versions/${versionId}/lanes/${lane}`;
+  let decision: object = { feedback };
+  if (feedback === undefined) {
+    const qc = await app.inject({
+      method: 'POST',
+      url: `${lanePath}/qc-run`,
+      headers: asUser(user),
+      payload: { expectedVersion },
+    });
+    assert.equal(qc.statusCode, 200, qc.body);
+    decision = { qcRunId: qc.json<LaneQcRunResponse>().runId };
+  }
   return app.inject({
     method: 'POST',
-    url: `/api/cases/${caseId}/versions/${versionId}/lanes/${lane}/${kind}`,
+    url: `${lanePath}/${kind}`,
     headers: { ...asUser(user), 'idempotency-key': randomUUID() },
-    payload: {
-      expectedVersion: { versionId, revision: (r.rows[0] as { row_version: number }).row_version },
-      ...(feedback ? { feedback } : { qcRunId: randomUUID() }),
-    },
+    payload: { expectedVersion, ...decision },
   });
 }
 

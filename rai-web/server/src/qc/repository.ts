@@ -2,6 +2,7 @@
 import { and, asc, desc, eq, isNull } from 'drizzle-orm';
 import type { Lane } from '@rai/shared/constants';
 import type { QcTrigger, QcUnavailableReason } from '@rai/shared/qc/types';
+import type { PackVersionRow } from '../cases/repository.js';
 import type { Executor, Tx } from '../db/client.js';
 import { qcFinding } from '../db/schema/qc-finding.js';
 import { qcRun } from '../db/schema/qc-run.js';
@@ -76,6 +77,11 @@ export async function insertQcFinding(tx: Tx, input: InsertFindingInput): Promis
     messageParams: input.messageParams,
     createdAt: input.createdAt,
   });
+}
+
+export function ruleRevisionOf(version: PackVersionRow): string {
+  const frozen = (version.frozenConfiguration ?? {}) as Record<string, string>;
+  return frozen.qc_rules ?? version.configurationRevisionId ?? '';
 }
 
 /** Latest approve_attempt run for the frozen input identity (W0-07 §3.7); order by monotonic requested_at. */

@@ -29,7 +29,7 @@ export const laneDecision = pgTable(
     actorRole: text('actor_role').notNull(),
     /** Send-back feedback JSON; NULL on approve. Shape: { items: [...], summary? }. */
     feedback: jsonb('feedback'),
-    /** Approve: the qc_run_id the reviewer saw (W0-06 4.4). NULL on send_back. No FK until qc_run lands (W2-05/W4). */
+    /** Approve: the latest lane-QC run the reviewer saw (W0-06 4.4), checked by approveLane. NULL on send_back. */
     observedQcRunId: uuid('observed_qc_run_id'),
     decidedAt: timestamp('decided_at', { withTimezone: true }).notNull(),
     correlationId: text('correlation_id').notNull(),

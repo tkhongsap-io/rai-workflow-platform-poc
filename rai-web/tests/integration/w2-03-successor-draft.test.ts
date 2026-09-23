@@ -15,7 +15,7 @@ import { Writable } from 'node:stream';
 import { sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import type { ErrorDetails, ErrorResponse } from '@rai/shared/errors';
-import type { LaneDecisionResponse } from '@rai/shared/schemas/review';
+import type { LaneDecisionResponse, LaneQcRunResponse } from '@rai/shared/schemas/review';
 import type { PackDraft, PackDraftUpdateRequest } from '@rai/shared/schemas/pack';
 import type { SubmitRequest, SubmittedVersion } from '@rai/shared/schemas/versions';
 import { buildApp } from '../support/observed-app.js';
@@ -103,6 +103,7 @@ async function rebuildApp(): Promise<void> {
       sendBackRecipientsForOwner: (ownerSubjectId) =>
         sendBackRecipientsFromIdentities(FIXTURE_USERS, ownerSubjectId),
     },
+    findings: { db: db.app, now },
   });
   app = built.fastify;
   await app.ready();
@@ -218,6 +219,25 @@ function sendBack(
     },
     payload: body as object,
   });
+}
+
+async function laneQcRunId(
+  session: FixtureSession,
+  caseId: string,
+  versionId: string,
+  lane: string,
+  revision: number,
+): Promise<string> {
+  const res = await app.inject({
+    method: 'POST',
+    url: `/api/cases/${caseId}/versions/${versionId}/lanes/${lane}/qc-run`,
+    headers: { 'content-type': 'application/json', ...asUser(session) },
+    payload: { expectedVersion: { versionId, revision } },
+  });
+  assert.equal(res.statusCode, 200, res.body);
+  const { runId } = res.json<LaneQcRunResponse>();
+  assert.ok(runId);
+  return runId;
 }
 
 function approve(
@@ -454,6 +474,7 @@ describe(`W2-03 successor draft concurrency and stale actions — ${SET}`, () =>
     const revision = await caseRevision(NONVENDOR.caseId);
     const dpo = await signIn(DPO);
     const ai = await signIn(AI_COE);
+    const aiRunId = await laneQcRunId(ai, NONVENDOR.caseId, version.versionId, 'ai_coe', revision);
 
     const sent = await sendBack(dpo, NONVENDOR.caseId, version.versionId, 'dpo', {
       expectedVersion: { versionId: version.versionId, revision },
@@ -474,7 +495,7 @@ describe(`W2-03 successor draft concurrency and stale actions — ${SET}`, () =>
     // Name the successor draft (exists on this case, not current) — Ready wins over version_superseded.
     const closed = await approve(ai, NONVENDOR.caseId, draftId, 'ai_coe', {
       expectedVersion: { versionId: draftId, revision },
-      qcRunId: randomUUID(),
+      qcRunId: aiRunId,
     });
     assert.equal(closed.statusCode, 409, closed.body);
     const details = staleOf(closed);
@@ -496,6 +517,7 @@ describe(`W2-03 successor draft concurrency and stale actions — ${SET}`, () =>
     const revision = await caseRevision(NONVENDOR.caseId);
     const dpo = await signIn(DPO);
     const ai = await signIn(AI_COE);
+    const aiRunId = await laneQcRunId(ai, NONVENDOR.caseId, version.versionId, 'ai_coe', revision);
 
     const sent = await sendBack(dpo, NONVENDOR.caseId, version.versionId, 'dpo', {
       expectedVersion: { versionId: version.versionId, revision },
@@ -506,7 +528,7 @@ describe(`W2-03 successor draft concurrency and stale actions — ${SET}`, () =>
     const beforeCount = await db.owner.execute(sql`SELECT count(*)::int AS n FROM lane_decision`);
     const deny = await approve(ai, NONVENDOR.caseId, version.versionId, 'ai_coe', {
       expectedVersion: { versionId: version.versionId, revision },
-      qcRunId: randomUUID(),
+      qcRunId: aiRunId,
     });
     assert.equal(deny.statusCode, 409, deny.body);
     const details = staleOf(deny);
