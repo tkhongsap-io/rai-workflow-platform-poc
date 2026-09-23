@@ -1,18 +1,17 @@
-// W0-04 `withWorkflowTransaction`, the recipe every keyed business action runs (submit / resubmit here; W2
-// decisions, send-back, disposition reuse it): one transaction that marks itself a workflow write (the W1-00
-// projection gate admits projection changes only here), locks the case row (W0-06 9.1: the serialisation point
-// for every action on one case), runs the store-backed part of step 4, answers a replay for (actor, key) with the
-// stored response (step 5; a different digest under the same key is 422 `idempotency_key_reused`), runs the
-// action (steps 6 and 7), refuses to commit when the action wrote no audit event (W0-04 "Audit log": written in the
-// same transaction as the state change), and stores the key with the response (W0-04: only on success; `storeAction`
-// lets submit record `case.resubmit` when the locked draft had a parent without forking a second helper). A
-// contract error thrown anywhere rolls everything back, so a failed action leaves no row and can be retried under
-// the same key.
+// W0-04 `withWorkflowTransaction`, the recipe every keyed business action runs: one transaction that marks itself a
+// workflow write (the projection gate admits projection changes only here), locks the case row (W0-06 9.1: the
+// serialisation point for every action on one case) and then the (actor, key) pair (one key reused on two cases
+// would otherwise race to the key's primary key), runs the store-backed part of step 4, answers a replay for
+// (actor, key) with the stored response (step 5; a different digest under the same key is 422
+// `idempotency_key_reused`), runs the action (steps 6 and 7), refuses to commit when the action wrote no audit event
+// (W0-04 "Audit log"), and stores the key with the response (W0-04: only on success; `storeAction` lets submit record
+// `case.resubmit`). A contract error thrown anywhere rolls everything back, so a failed action leaves no row and can
+// be retried under the same key. Lock order is case then key; create-case takes only the key lock, on a new case.
 
 import { NotFoundError } from '@rai/shared/errors';
 import type { Principal, Role } from '@rai/shared/schemas/auth';
 import { auditStore, type AuditEventInput } from '../audit/store.js';
-import { findReplay, storeIdempotencyKey } from '../cases/idempotency.js';
+import { findReplay, lockIdempotencyKey, storeIdempotencyKey } from '../cases/idempotency.js';
 import { readCaseRow, type CaseRow } from '../cases/repository.js';
 import type { Db, Tx } from '../db/client.js';
 import { lockCase, setWorkflowWrite, withTransaction } from '../db/transaction.js';
@@ -76,6 +75,7 @@ export async function withWorkflowTransaction<T>(
     await setWorkflowWrite(tx);
     if (!(await lockCase(tx, caseId))) throw new NotFoundError('case'); // resolved by the middleware; a race
     const caseRow = (await readCaseRow(tx, caseId))!;
+    await lockIdempotencyKey(tx, ctx.actor.subjectId, ctx.idempotencyKey);
     if (action.validate !== undefined) await action.validate(tx, caseRow);
     const replay = await findReplay(tx, ctx.actor.subjectId, ctx.idempotencyKey, ctx.requestDigest);
     if (replay !== undefined) return { status: replay.status, body: replay.body as T, replayed: true };

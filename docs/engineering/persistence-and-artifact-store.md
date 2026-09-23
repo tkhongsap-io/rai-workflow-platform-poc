@@ -381,6 +381,7 @@ All business actions run through one helper:
 withWorkflowTransaction(ctx, caseId, async (tx) => {
   await tx.execute(sql`SET LOCAL rai.workflow_write = 'on'`);
   const c = await tx.lockCase(caseId);            // SELECT … FROM "case" WHERE id = $1 FOR UPDATE
+  await tx.lockIdempotencyKey(ctx.actor, ctx.idempotencyKey); // pg_advisory_xact_lock on (actor, key)
   const replay = await tx.idempotency.find(ctx.actor, ctx.idempotencyKey);
   if (replay) return replay.matches(ctx) ? replay.response : invalidInput('idempotency_key_reused');
   if (ctx.expectedVersionId && c.current_version_id !== ctx.expectedVersionId) return staleVersion(c.current_version_id);
@@ -391,7 +392,7 @@ withWorkflowTransaction(ctx, caseId, async (tx) => {
 });
 ```
 
-Isolation is `READ COMMITTED` (the Postgres default); correctness comes from the per-case row lock, which serialises every business action on one case, including concurrent send-backs, and from the unique constraints as a second line. Actions on different cases do not block each other. Lock wait is bounded by `SET LOCAL lock_timeout = '5s'`; a timeout surfaces as an internal error with the correlation ID, never as a partial write.
+Isolation is `READ COMMITTED` (the Postgres default); correctness comes from the per-case row lock, which serialises every business action on one case, including concurrent send-backs, and from the unique constraints as a second line. Actions on different cases do not block each other unless one actor sends them under the same idempotency key: the (actor, key) advisory lock, always taken after the case lock, makes the later one answer 422 `idempotency_key_reused` rather than fail on the key's primary key. Lock wait is bounded by `SET LOCAL lock_timeout = '5s'`; a timeout surfaces as an internal error with the correlation ID, never as a partial write.
 
 | Action (ticket) | Atomic statements, in order, after lock + idempotency + expected-version checks | Idempotency key | Expected version |
 |---|---|---|---|
