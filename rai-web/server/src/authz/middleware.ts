@@ -22,6 +22,7 @@ import {
   type Actor,
   type CaseScopeFacts,
   type Decision,
+  type DenyReason,
   type Target,
 } from './policy.js';
 
@@ -86,6 +87,7 @@ export function parseCookieHeader(header: string | undefined): Record<string, st
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const LANE_SET: ReadonlySet<string> = new Set(LANES);
+const SAFE_METHODS: ReadonlySet<string> = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 export function actorOf(principal: Principal): Actor {
   return { subjectId: principal.subjectId, roles: principal.roles };
@@ -104,13 +106,13 @@ function isLane(value: string | undefined): value is Lane {
 function emitDenied(
   deps: Pick<AuthorizationDeps, 'emitter'>,
   actor: Actor,
-  auth: Extract<RouteAuth, { kind: 'action' }>,
+  auth: Extract<RouteAuth, { kind: 'action' }> | undefined, // undefined: a session route, no policy action
   targetId: string | undefined,
-  reason: 'role' | 'scope' | 'lane' | 'self_approval',
+  reason: DenyReason | 'cross_site',
 ): never {
   deps.emitter.log('authz.denied', {
-    action: auth.action,
-    targetType: auth.target,
+    action: auth?.action,
+    targetType: auth?.target,
     targetId,
     actorSubjectId: actor.subjectId,
     actorRole: actor.roles.map((r) => r.role).join(','),
@@ -204,6 +206,18 @@ export function registerAuthorization(fastify: FastifyInstance, deps: Authorizat
     }
     if (auth.kind === 'public') return;
     if (request.principal === undefined) throw new UnauthenticatedError(); // 401 before anything else
+    // CSRF: SameSite=Lax still sends the cookie on same-site requests (another loopback port, a sibling subdomain),
+    // so a write a browser marks as not same-origin is refused here, before its body is read. An absent header is
+    // a non-browser client, which carries no ambient cookie.
+    const site = request.headers['sec-fetch-site'];
+    if (site !== undefined && site !== 'same-origin' && site !== 'none' && !SAFE_METHODS.has(request.method))
+      emitDenied(
+        deps,
+        actorOf(request.principal),
+        auth.kind === 'action' ? auth : undefined,
+        undefined,
+        'cross_site',
+      );
   });
 
   // preParsing, not preValidation: the body is parsed after this hook, so a wrong-role or out-of-scope actor is 403
