@@ -88,6 +88,12 @@ describe('W1-05 frozen configuration (W0-04 frozen_configuration / configuration
       (e: unknown) => e instanceof NoConfigurationInForce,
     );
   });
+  it('refuses to freeze without an sla revision: the due-date clock needs both sla and calendar (D06)', () => {
+    assert.throws(
+      () => resolveFrozenConfiguration(inForce.filter((r) => r.kind !== 'sla')),
+      (e: unknown) => e instanceof NoConfigurationInForce,
+    );
+  });
 });
 
 describe('W1-05 lane mapping content and the SubmittedVersion view', () => {

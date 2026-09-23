@@ -7,16 +7,15 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { sql } from 'drizzle-orm';
 import { createFilesystemBlobStore } from '../artifacts/blob-store.js';
-import { parseDatabaseConfig, readEnv } from '../config.js';
+import { parseDatabaseConfig, parseRetentionConfig, readEnv, type Env } from '../config.js';
 import { createDb } from '../db/client.js';
 import { sweepSessions } from '../identity/session.js';
 
 const DRAFT_STALE_DAYS = 180; // proposed; D08 decides
 
-export async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
-  const env = readEnv();
+export async function main(argv: string[] = process.argv.slice(2), env: Env = readEnv()): Promise<void> {
   const { operatorUrl } = parseDatabaseConfig(env);
-  const ttlHours = Number(env.IDEMPOTENCY_TTL_HOURS ?? '72');
+  const { idempotencyTtlHours: ttlHours } = parseRetentionConfig(env);
   const report = argv.includes('--report');
   const handle = createDb(operatorUrl, { max: 1 });
   try {

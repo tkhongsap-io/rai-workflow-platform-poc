@@ -5,16 +5,15 @@
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { createFilesystemBlobStore } from '../artifacts/blob-store.js';
-import { readEnv } from '../config.js';
+import { parseRetentionConfig, readEnv, type Env } from '../config.js';
 
-export async function main(): Promise<number> {
-  const env = readEnv();
+export async function main(env: Env = readEnv()): Promise<number> {
   const blobDir = env.BLOB_DIR?.trim();
   if (blobDir === undefined || blobDir === '') {
     console.error('store:cleanup: BLOB_DIR is not set');
     return 1;
   }
-  const maxAgeHours = Number(env.BLOB_TMP_MAX_AGE_HOURS ?? '1');
+  const { blobTmpMaxAgeHours: maxAgeHours } = parseRetentionConfig(env);
   const store = createFilesystemBlobStore(path.resolve(blobDir));
   const removed = await store.cleanupTemp(maxAgeHours * 3_600_000);
   console.log(

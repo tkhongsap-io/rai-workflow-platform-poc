@@ -82,6 +82,7 @@ test('a misconfiguration is a start-up failure with a code naming the variable, 
   assert.equal(reasonOf(withEnv({ PORT: '5173x' })), 'invalid:PORT');
   assert.equal(reasonOf(withEnv({ DATABASE_URL: 'mysql://x' })), 'invalid:DATABASE_URL');
   assert.equal(reasonOf(withEnv({ BLOB_DIR: undefined })), 'missing:BLOB_DIR');
+  assert.equal(reasonOf(withEnv({ IDEMPOTENCY_TTL_HOURS: '' })), 'missing:IDEMPOTENCY_TTL_HOURS');
   assert.equal(
     reasonOf(withEnv({ MAIL_MODE: 'smtp' })),
     'invalid:MAIL_MODE',
