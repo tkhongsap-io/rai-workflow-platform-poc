@@ -88,11 +88,13 @@ describe('W1-05 frozen configuration (W0-04 frozen_configuration / configuration
       (e: unknown) => e instanceof NoConfigurationInForce,
     );
   });
-  it('refuses to freeze without an sla revision: the due-date clock needs both sla and calendar (D06)', () => {
-    assert.throws(
-      () => resolveFrozenConfiguration(inForce.filter((r) => r.kind !== 'sla')),
-      (e: unknown) => e instanceof NoConfigurationInForce,
-    );
+  it('refuses to freeze without an sla or a calendar revision: the due-date clock needs both (D06)', () => {
+    for (const kind of ['sla', 'calendar'] as const) {
+      assert.throws(
+        () => resolveFrozenConfiguration(inForce.filter((r) => r.kind !== kind)),
+        (e: unknown) => e instanceof NoConfigurationInForce,
+      );
+    }
   });
 });
 
