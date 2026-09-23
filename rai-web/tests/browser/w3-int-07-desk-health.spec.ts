@@ -1,7 +1,7 @@
 // OBS09/10/17: worker-produced records through real HTTP, SQL, file sink and Admin UI.
 // Workflow setup uses HTTP; operator refresh, correlation selection and locale use the keyboard.
 import { randomUUID } from 'node:crypto';
-import { test, expect, type Locator, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import pg from 'pg';
 import { findFixtureCase } from '@rai/fixtures/data/cases/index';
 import { t } from '@rai/shared/locales/keys';
@@ -9,21 +9,9 @@ import type { PackDraft } from '@rai/shared/schemas/pack';
 import type { CaseView } from '@rai/shared/schemas/cases';
 import type { DeskHealthReport } from '@rai/shared/schemas/observability';
 import { expectAccessible, expectStatusElementsHaveText } from './support/axe.js';
-import { expectVisibleFocus } from './support/keyboard.js';
+import { tabTo } from './support/keyboard.js';
 import { withIsolatedFixtureDatabase } from './support/isolated-database.js';
 import { startJourneyServer } from './support/journey-server.js';
-
-async function reach(page: Page, target: Locator) {
-  await expect(target).toBeVisible();
-  for (let step = 0; step < 60; step++) {
-    if (await target.evaluate((element) => element === document.activeElement)) {
-      await expectVisibleFocus(page);
-      return;
-    }
-    await page.keyboard.press('Tab');
-  }
-  throw new Error('Operator control unreachable by keyboard');
-}
 
 test('OBS17: failed send-back and submit timeout correlate once; Admin keyboard and owner denial', async ({
   page,
@@ -149,7 +137,7 @@ test('OBS17: failed send-back and submit timeout correlate once; Admin keyboard 
       await page.goto(url('/operator/desk-health'));
       for (const locale of ['th', 'en'] as const) {
         if (locale === 'en') {
-          await reach(page, page.getByRole('button', { name: t('th', 'shell.locale.en'), exact: true }));
+          await tabTo(page, page.getByRole('button', { name: t('th', 'shell.locale.en'), exact: true }));
           await page.keyboard.press('Enter');
         }
         await expect(
@@ -170,7 +158,7 @@ test('OBS17: failed send-back and submit timeout correlate once; Admin keyboard 
           });
           await expect(input).toHaveValue(correlation!);
           await expect(input).toHaveAttribute('readonly', '');
-          await reach(page, input);
+          await tabTo(page, input);
           expect(
             await input.evaluate((element: HTMLInputElement) =>
               element.value.slice(element.selectionStart ?? 0, element.selectionEnd ?? 0),
@@ -178,7 +166,7 @@ test('OBS17: failed send-back and submit timeout correlate once; Admin keyboard 
           ).toBe(correlation);
         }
         const refresh = page.getByRole('button', { name: t(locale, 'operator.refresh'), exact: true });
-        await reach(page, refresh);
+        await tabTo(page, refresh);
         const refreshed = page.waitForResponse(
           (response) =>
             response.url() === url('/api/operator/desk-health') && response.request().method() === 'GET',

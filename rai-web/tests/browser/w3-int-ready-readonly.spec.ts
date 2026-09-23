@@ -9,20 +9,11 @@ import type { VersionFindingsResponse } from '@rai/shared/schemas/review';
 import { withIsolatedFixtureDatabase } from './support/isolated-database.js';
 import { startJourneyServer } from './support/journey-server.js';
 import { expectAccessible } from './support/axe.js';
-import { expectVisibleFocus } from './support/keyboard.js';
-import { assertNoLeak } from '../support/log-capture.js';
+import { tabTo } from './support/keyboard.js';
 
 async function activate(page: Page, target: Locator) {
-  await expect(target).toBeVisible();
-  for (let i = 0; i < 120; i++) {
-    if (await target.evaluate((el) => el === document.activeElement)) {
-      await expectVisibleFocus(page);
-      await page.keyboard.press('Enter');
-      return;
-    }
-    await page.keyboard.press('Tab');
-  }
-  throw new Error('Keyboard target unreachable');
+  await tabTo(page, target);
+  await page.keyboard.press('Enter');
 }
 const actors = { ai_coe: 'fx-user-ai-coe', dpo: 'fx-user-dpo', it_security: 'fx-user-it-security' } as const;
 for (const completion of ['approval', 'disposition'] as const) {
@@ -31,7 +22,7 @@ for (const completion of ['approval', 'disposition'] as const) {
   }, info) => {
     test.setTimeout(120000);
     await withIsolatedFixtureDatabase(async (env) => {
-      const server = await startJourneyServer(env, 58859);
+      const server = await startJourneyServer(env);
       const db = new pg.Client({ connectionString: env.DATABASE_OPERATOR_URL });
       await db.connect();
       const origin = server.baseUrl;
@@ -215,7 +206,6 @@ for (const completion of ['approval', 'disposition'] as const) {
       } finally {
         try {
           await server.stop();
-          assertNoLeak({ text: () => JSON.stringify(server.capturedLines()) });
         } finally {
           await db.end();
         }

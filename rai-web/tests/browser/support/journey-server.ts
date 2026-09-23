@@ -1,7 +1,14 @@
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { randomUUID } from 'node:crypto';
-import { RAI_WEB_ROOT, freeLoopbackPort, testServerEnv, type CapturedLine } from '../../support/process.js';
+import {
+  RAI_WEB_ROOT,
+  attachCapture,
+  freeLoopbackPort,
+  testServerEnv,
+  type CapturedLine,
+} from '../../support/process.js';
+import { assertNoLeak } from '../../support/log-capture.js';
 import type { JourneyCommand } from './journey-controls.js';
 type Control = JourneyCommand extends infer C ? (C extends JourneyCommand ? Omit<C, 'id'> : never) : never;
 export async function startJourneyServer(env: Record<string, string>, requestedPort?: number) {
@@ -15,36 +22,14 @@ export async function startJourneyServer(env: Record<string, string>, requestedP
       stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     },
   );
-  let output = '';
-  const lines: CapturedLine[] = [];
-  for (const [stream, name] of [
-    [child.stdout!, 'stdout'],
-    [child.stderr!, 'stderr'],
-  ] as const) {
-    let pending = '';
-    stream.on('data', (data: Buffer) => {
-      const text = data.toString();
-      output += text;
-      pending += text;
-      const split = pending.split('\n');
-      pending = split.pop()!;
-      for (const line of split) {
-        try {
-          lines.push({ ...(JSON.parse(line) as Record<string, unknown>), stream: name });
-        } catch {
-          lines.push({ stream: name, raw: line });
-        }
-      }
-    });
-  }
-  const exited = once(child, 'exit') as Promise<[number | null, NodeJS.Signals | null]>;
+  const capture = attachCapture(child);
   const message = async (matches: (v: Record<string, unknown>) => boolean) => {
     const signal = AbortSignal.timeout(30000);
     while (true) {
       const [value] = await Promise.race([
         once(child, 'message', { signal }) as Promise<[unknown]>,
-        exited.then(() => {
-          throw new Error(`Journey process exited: ${output}`);
+        capture.exited.then(() => {
+          throw new Error(`Journey process exited; captured line count ${capture.lines.length}`);
         }),
       ]);
       if (typeof value === 'object' && value !== null && matches(value as Record<string, unknown>))
@@ -55,7 +40,7 @@ export async function startJourneyServer(env: Record<string, string>, requestedP
     await message((m) => m.ready === true);
   } catch (error) {
     child.kill('SIGKILL');
-    await exited;
+    await capture.exited;
     throw error;
   }
   const command = async (control: Control) => {
@@ -73,18 +58,12 @@ export async function startJourneyServer(env: Record<string, string>, requestedP
     setSubmitTimeout: (enabled: boolean) => command({ command: 'submitTimeout', enabled }),
     advanceRetry: (notificationId: string, expectedAttempts: 1 | 2 | 3) =>
       command({ command: 'advanceRetry', notificationId, expectedAttempts }),
-    capturedLines: (): readonly CapturedLine[] => structuredClone(lines),
+    capturedLines: (): readonly CapturedLine[] => structuredClone(capture.lines),
     async stop() {
-      if (child.exitCode !== null) return child.exitCode;
-      child.kill('SIGTERM');
-      const timer = setTimeout(() => child.kill('SIGKILL'), 20000);
-      try {
-        const [code] = await exited;
-        if (code !== 0) throw new Error(`Journey shutdown failed: ${output}`);
-        return code;
-      } finally {
-        clearTimeout(timer);
-      }
+      const exit = await capture.stop();
+      assertNoLeak({ text: () => JSON.stringify(capture.lines) });
+      if (exit.code !== 0) throw new Error(`Journey shutdown failed: ${JSON.stringify(exit)}`);
+      return exit.code;
     },
   };
 }

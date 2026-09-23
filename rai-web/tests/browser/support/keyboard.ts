@@ -2,7 +2,7 @@
 // drives its journey once with the keyboard alone and asserts that the focused element shows a focus ring: a
 // non-zero computed outline width or a box-shadow (section 9, item 4).
 
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 export interface FocusedElementInfo {
   tag: string;
@@ -66,6 +66,21 @@ export async function tabUntil(
     if (predicate(info)) return info;
   }
   throw new Error(`no focusable element matched within ${maxSteps} Tab presses`);
+}
+
+/**
+ * Tabs until `target` holds focus or `maxSteps` presses are spent; every element passed on the way must show a
+ * focus ring. The body may hold focus between the last element and the first when the order wraps around.
+ */
+export async function tabTo(page: Page, target: Locator, maxSteps = 120): Promise<FocusedElementInfo> {
+  await expect(target).toBeVisible();
+  for (let step = 0; ; step += 1) {
+    if (await target.evaluate((element) => element === document.activeElement))
+      return expectVisibleFocus(page);
+    if (step === maxSteps) throw new Error(`target not reached within ${maxSteps} Tab presses`);
+    await pressTab(page);
+    if ((await focusedElement(page)) !== null) await expectVisibleFocus(page);
+  }
 }
 
 /**

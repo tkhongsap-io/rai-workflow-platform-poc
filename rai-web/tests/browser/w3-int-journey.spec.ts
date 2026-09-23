@@ -10,7 +10,7 @@ import type { SubmittedVersion } from '@rai/shared/schemas/versions';
 import { buildPdf } from '@rai/fixtures/generate/pdf';
 import { FIXTURE_THAI_LINE } from '@rai/fixtures/data/documents/index';
 import { expectAccessible } from './support/axe.js';
-import { expectMainFocused, expectVisibleFocus } from './support/keyboard.js';
+import { expectMainFocused, expectVisibleFocus, tabTo } from './support/keyboard.js';
 import { withIsolatedFixtureDatabase } from './support/isolated-database.js';
 import { startJourneyServer } from './support/journey-server.js';
 
@@ -18,28 +18,17 @@ test.use({ video: 'on' });
 
 const label = (key: LocaleKey) => t('th', key);
 const button = (page: Page, key: LocaleKey) => page.getByRole('button', { name: label(key), exact: true });
-async function reach(page: Page, target: Locator) {
-  await expect(target).toBeVisible();
-  for (let i = 0; i < 120; i++) {
-    if (await target.evaluate((el) => el === document.activeElement)) {
-      await expectVisibleFocus(page);
-      return;
-    }
-    await page.keyboard.press('Tab');
-  }
-  throw new Error('Keyboard could not reach target');
-}
 async function activate(page: Page, target: Locator) {
-  await reach(page, target);
+  await tabTo(page, target);
   await page.keyboard.press('Enter');
 }
 async function type(page: Page, target: Locator, value: string) {
-  await reach(page, target);
+  await tabTo(page, target);
   await page.keyboard.press('ControlOrMeta+A');
   await page.keyboard.insertText(value);
 }
 async function select(page: Page, target: Locator, value: string) {
-  await reach(page, target);
+  await tabTo(page, target);
   const text = await target.evaluate(
     (el, wanted) =>
       Array.from((el as HTMLSelectElement).options).find((o) => o.value === wanted)?.textContent,
@@ -61,7 +50,7 @@ async function select(page: Page, target: Locator, value: string) {
 }
 async function radio(page: Page, target: Locator) {
   const name = await target.getAttribute('name');
-  await reach(page, page.locator(`input[name="${name}"]:checked`));
+  await tabTo(page, page.locator(`input[name="${name}"]:checked`));
   for (let i = 0; i < 8 && !(await target.isChecked()); i++) await page.keyboard.press('ArrowRight');
   await expect(target).toBeChecked();
   await expectVisibleFocus(page);
@@ -160,7 +149,7 @@ test('one keyboard case: create/upload/submit/restart/queue/mail/send-back/v2/di
         thaiLine: FIXTURE_THAI_LINE,
         title: 'W3 INT',
       });
-      await reach(page, dialog.locator('input[type="file"]'));
+      await tabTo(page, dialog.locator('input[type="file"]'));
       const chooser = page.waitForEvent('filechooser');
       await page.keyboard.press('Enter');
       await (

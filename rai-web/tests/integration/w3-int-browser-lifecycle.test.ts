@@ -4,6 +4,7 @@ import { ChildProcess } from 'node:child_process';
 import { PassThrough } from 'node:stream';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import pg from 'pg';
 import { readEnv } from '@rai/server/config';
@@ -12,6 +13,7 @@ import type { PackDraft } from '@rai/shared/schemas/pack';
 import { createRealServerLifecycle, realServerOptions } from '../browser/support/real-server-lifecycle.js';
 import { resetToFixtureSet } from '../browser/support/database.js';
 import buildReal from '../browser/support/build-real.js';
+import { startJourneyServer } from '../browser/support/journey-server.js';
 import {
   attachCapture,
   RAI_WEB_ROOT,
@@ -348,4 +350,13 @@ test('missing stdio close fails within the bound without raw captured diagnostic
     return true;
   });
   child.emit('close', 0, null);
+});
+
+test('journey startup failure reports a line count, never the raw captured output', async () => {
+  // The refused sink path lands in the child's stderr stack trace.
+  const sink = path.join(tmpdir(), 'RAI-DESK-SYNTHETIC-FIXTURE', 'mail');
+  await assert.rejects(startJourneyServer({ MAIL_SINK_DIR: sink }), (error: Error) => {
+    assert.match(error.message, /^Journey process exited; captured line count \d+$/);
+    return true;
+  });
 });
