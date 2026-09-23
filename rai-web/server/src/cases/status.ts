@@ -1,25 +1,30 @@
-// W0-06 section 2.4 "Derived case status": stored nowhere, computed from the rows, first match wins. Slice 1 has
-// draft (v1 never submitted) and, once W1-05 lands, in_review; sent_back needs a successor draft (W2-03),
-// ready_for_launch the Ready transition (W2-06), and awaiting_disposition the lane and finding rows W2 adds, which
-// is why that input is optional here and defaults to "not all approved / no findings known" (in_review).
+// W0-06 2.4 derived case status: computed from rows, never stored; first match wins. awaiting_disposition uses the
+// workflow/ready.ts definition of an open finding: the latest disposition is absent or fixed_proposed.
 
+import { sql, type SQL } from 'drizzle-orm';
+import type { alias } from 'drizzle-orm/pg-core';
 import type { CaseStatus } from '@rai/shared/schemas/cases';
+import { cases } from '../db/schema/case.js';
+import type { packVersion } from '../db/schema/pack-version.js';
 
-export interface StatusInputs {
-  /** The open draft, or null when the current version is under review (W0-04 case.draft_version_id). */
-  draft: { parentVersionId: string | null } | null;
-  /** The latest submitted version, or null while never submitted (W0-04 case.current_version_id). */
-  current: { readyAt: Date | null } | null;
-  /** W2: all three lanes approved and at least one undispositioned finding; absent in slice 1. */
-  review?: { allLanesApproved: boolean; undispositionedFindings: number };
-}
+type VersionAlias = ReturnType<typeof alias<typeof packVersion, string>>;
 
-export function deriveCaseStatus(inputs: StatusInputs): CaseStatus {
-  if (inputs.current?.readyAt != null) return 'ready_for_launch';
-  if (inputs.draft !== null) return inputs.draft.parentVersionId === null ? 'draft' : 'sent_back';
-  if (inputs.review?.allLanesApproved === true && inputs.review.undispositionedFindings > 0)
-    return 'awaiting_disposition';
-  return 'in_review';
+/** The status of `case`, left-joined to its current submitted version and its open draft under these aliases. */
+export function caseStatusSql(current: VersionAlias, draft: VersionAlias): SQL<CaseStatus> {
+  return sql<CaseStatus>`CASE
+    WHEN ${current.readyAt} IS NOT NULL THEN 'ready_for_launch'
+    WHEN ${draft.id} IS NOT NULL THEN CASE WHEN ${draft.parentVersionId} IS NULL THEN 'draft' ELSE 'sent_back' END
+    WHEN ${current.submittedAt} IS NOT NULL
+      AND ${cases.raiStatus} = 'approved' AND ${cases.privacyStatus} = 'approved' AND ${cases.securityStatus} = 'approved'
+      AND EXISTS (
+        SELECT 1 FROM qc_finding f
+        LEFT JOIN LATERAL (
+          SELECT kind FROM disposition_event d WHERE d.finding_id = f.id
+          ORDER BY d.created_at DESC, d.id DESC LIMIT 1
+        ) latest ON true
+        WHERE f.version_id = ${current.id} AND (latest.kind IS NULL OR latest.kind = 'fixed_proposed')
+      ) THEN 'awaiting_disposition'
+    ELSE 'in_review' END`;
 }
 
 /** W0-04 `case.desk_status`, the coarse stored mirror of the derived status (never returned as the status value). */

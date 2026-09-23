@@ -214,6 +214,7 @@ test('queue combines filters within BU scope and unions grants for a multiple-ro
     [item.caseId],
   );
   assert.deepEqual(filtered.filterOptions, bu.filterOptions);
+  assert.deepEqual(bu.filterOptions.owners, [{ value: item.businessOwner, label: item.ownerDisplayName }]);
   assert.deepEqual(filtered.statusCounts, bu.statusCounts);
   const all = (await call(api, 'GET', '/api/queue', { cookie: multi })).json<QueueResponse>();
   assert.equal(all.total, 5);

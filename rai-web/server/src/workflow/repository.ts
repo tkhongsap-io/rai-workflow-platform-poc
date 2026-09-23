@@ -5,6 +5,7 @@ import { uuidv7 } from '@rai/shared/ids';
 import type { Lane } from '@rai/shared/constants';
 import type { SendBackFeedback } from '@rai/shared/schemas/review';
 import type { CaseRow, PackVersionRow } from '../cases/repository.js';
+import { deskStatusFor } from '../cases/status.js';
 import type { Executor, Tx } from '../db/client.js';
 import { artifactSlot } from '../db/schema/artifact-slot.js';
 import { cases } from '../db/schema/case.js';
@@ -71,7 +72,7 @@ export async function findLaneDecision(
 /**
  * Writes the lane's projection under the case lock. Does **not** increment `case.row_version`
  * (W0-06 5.1: a submitted version's revision is frozen; sibling lane decisions must not 409 each other).
- * Optionally sets `draft_version_id` when a successor draft was just created (same UPDATE).
+ * A successor draft just created is linked in the same UPDATE, and the case then reads as sent_back.
  */
 export async function writeLaneProjection(
   tx: Tx,
@@ -79,14 +80,13 @@ export async function writeLaneProjection(
   lane: Lane,
   value: LaneProjectionValue,
   now: Date,
-  draftVersionId?: string | null,
+  successorDraftId?: string,
 ): Promise<CaseRow> {
-  const column = projectionColumnForLane(lane);
-  const patch: Record<string, unknown> = {
-    [column]: value,
-    updatedAt: now,
-  };
-  if (draftVersionId !== undefined) patch.draftVersionId = draftVersionId;
+  const patch: Partial<CaseRow> = { [projectionColumnForLane(lane)]: value, updatedAt: now };
+  if (successorDraftId !== undefined) {
+    patch.draftVersionId = successorDraftId;
+    patch.deskStatus = deskStatusFor('sent_back');
+  }
   const [row] = await tx.update(cases).set(patch).where(eq(cases.id, before.id)).returning();
   if (row === undefined) throw new CaseRowChanged(before.id);
   return row;

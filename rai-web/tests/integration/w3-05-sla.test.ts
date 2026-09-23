@@ -12,6 +12,8 @@ import { Writable } from 'node:stream';
 import { sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import type { PackDraft } from '@rai/shared/schemas/pack';
+import type { LaneDecisionResponse, LaneQcRunResponse } from '@rai/shared/schemas/review';
+import type { SlaBreach } from '@rai/shared/schemas/sla';
 import type { SubmitRequest, SubmittedVersion } from '@rai/shared/schemas/versions';
 import { buildApp } from '../support/observed-app.js';
 import { createFilesystemBlobStore, type FilesystemBlobStore } from '@rai/server/artifacts/blob-store';
@@ -32,6 +34,7 @@ import { FIXTURE_USERS } from '@rai/fixtures/data/users';
 import { findFixtureCase } from '@rai/fixtures/data/cases/index';
 import { loadFixtures } from '@rai/fixtures/load';
 import { fixtureSetLabel, readManifest } from '@rai/fixtures/manifest';
+import { ScriptedQcRunner } from '@rai/fixtures/substitutes/qc/index';
 import { openTestDatabase, type TestDatabase } from '../support/db.js';
 import { asUser, signInAsFixture, type FixtureSession } from '../support/sign-in.js';
 
@@ -45,6 +48,8 @@ const LIMITS = {
 const OWNER_A = 'fx-user-owner-cm';
 const DPO = 'fx-user-dpo';
 const VENDOR = findFixtureCase('fx-case-vendor')!;
+const NONVENDOR = findFixtureCase('fx-case-nonvendor')!;
+const REVIEWER = { dpo: DPO, ai_coe: 'fx-user-ai-coe', it_security: 'fx-user-it-security' } as const;
 const OPEN = new Date('2026-04-09T02:00:00.000Z'); // Thursday 09:00 Bangkok, before Songkran
 
 let db: TestDatabase;
@@ -103,7 +108,12 @@ async function rebuildApp(): Promise<void> {
         sendBackRecipientsFromIdentities(FIXTURE_USERS, ownerSubjectId),
       knownIdentities: FIXTURE_USERS,
     },
-    findings: { db: db.app, now, knownIdentities: FIXTURE_USERS },
+    findings: {
+      db: db.app,
+      now,
+      knownIdentities: FIXTURE_USERS,
+      qc: { runner: new ScriptedQcRunner({ fixtureCaseIdOf: () => undefined, now }), now }, // clean lane QC
+    },
   });
   app = built.fastify;
   await app.ready();
@@ -172,6 +182,28 @@ async function caseRevision(caseId: string): Promise<number> {
   return Number((r.rows[0] as { row_version: number }).row_version);
 }
 
+/** Runs the lane QC the reviewer sees, then approves on that run (H2: approve needs the latest lane-QC run). */
+async function approve(caseId: string, versionId: string, lane: keyof typeof REVIEWER) {
+  const reviewer = await signIn(REVIEWER[lane]);
+  const expectedVersion = { versionId, revision: await caseRevision(caseId) };
+  const base = `/api/cases/${caseId}/versions/${versionId}/lanes/${lane}`;
+  const qc = await app.inject({
+    method: 'POST',
+    url: `${base}/qc-run`,
+    headers: { 'content-type': 'application/json', ...asUser(reviewer) },
+    payload: { expectedVersion },
+  });
+  assert.equal(qc.statusCode, 200, qc.body);
+  const res = await app.inject({
+    method: 'POST',
+    url: `${base}/approve`,
+    headers: { 'content-type': 'application/json', 'idempotency-key': randomUUID(), ...asUser(reviewer) },
+    payload: { expectedVersion, qcRunId: qc.json<LaneQcRunResponse>().runId },
+  });
+  assert.equal(res.statusCode, 201, res.body);
+  return res.json<LaneDecisionResponse>();
+}
+
 describe(`W3-05 working-day SLA — ${SET}`, () => {
   it('freezes the due date across a later SLA revision, a holiday, and a resubmit', async () => {
     const owner = await signIn(OWNER_A);
@@ -234,5 +266,38 @@ describe(`W3-05 working-day SLA — ${SET}`, () => {
     );
     const afterRestart = await listSlaBreaches(db.app, new Date('2026-04-21T02:00:00.000Z'));
     assert.equal(afterRestart.filter((row) => row.caseId === VENDOR.caseId).length, 0);
+  });
+
+  it('lists only pending lanes of open review targets, sorted by due date, case and lane', async () => {
+    const owner = await signIn(OWNER_A);
+    const vendor = await submitOk(owner, VENDOR.caseId);
+    const nonvendor = await submitOk(owner, NONVENDOR.caseId);
+    await approve(NONVENDOR.caseId, nonvendor.versionId, 'dpo');
+
+    const asOf = new Date('2026-04-22T02:00:00.000Z'); // every lane of both versions is past due
+    const dpoLate: SlaBreach = {
+      caseId: VENDOR.caseId,
+      versionId: vendor.versionId,
+      lane: 'dpo',
+      dueOn: '2026-04-17',
+    };
+    const late = (caseId: string, v: SubmittedVersion): SlaBreach[] =>
+      (['ai_coe', 'it_security'] as const).map((lane) => ({
+        caseId,
+        versionId: v.versionId,
+        lane,
+        dueOn: '2026-04-21',
+      }));
+    const vendorLate = late(VENDOR.caseId, vendor);
+    const nonvendorLate = late(NONVENDOR.caseId, nonvendor); // its dpo lane is approved, so absent
+    const byCase =
+      VENDOR.caseId < NONVENDOR.caseId
+        ? [...vendorLate, ...nonvendorLate]
+        : [...nonvendorLate, ...vendorLate];
+    assert.deepEqual(await listSlaBreaches(db.app, asOf), [dpoLate, ...byCase]);
+
+    await approve(NONVENDOR.caseId, nonvendor.versionId, 'ai_coe');
+    assert.equal((await approve(NONVENDOR.caseId, nonvendor.versionId, 'it_security')).ready, true);
+    assert.deepEqual(await listSlaBreaches(db.app, asOf), [dpoLate, ...vendorLate]); // Ready drops out
   });
 });

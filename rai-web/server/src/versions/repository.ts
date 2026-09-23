@@ -9,6 +9,7 @@ import { and, asc, eq, isNotNull, sql } from 'drizzle-orm';
 import type { ArtifactRef } from '@rai/shared/schemas/artifacts';
 import { toArtifactRef } from '../artifacts/pipeline.js';
 import type { CaseRow, PackVersionRow } from '../cases/repository.js';
+import { deskStatusFor } from '../cases/status.js';
 import type { Executor, Tx } from '../db/client.js';
 import { artifact } from '../db/schema/artifact.js';
 import { artifactSlot } from '../db/schema/artifact-slot.js';
@@ -90,7 +91,7 @@ export async function closeDraftOnCase(
     .set({
       currentVersionId: versionId,
       draftVersionId: null,
-      deskStatus: 'in_review',
+      deskStatus: deskStatusFor('in_review'),
       privacyStatus: 'pending',
       securityStatus: 'pending',
       raiStatus: 'pending',

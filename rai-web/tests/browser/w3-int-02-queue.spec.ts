@@ -16,6 +16,8 @@ const ids = async (page: Page) =>
   cards(page).evaluateAll((els) => els.map((el) => el.getAttribute('data-registry-id')).sort());
 const ALL = ['RAI-2000-0001', 'RAI-2000-0002', 'RAI-2000-0003', 'RAI-2000-0004', 'RAI-2000-0005'];
 const CM = ['RAI-2000-0001', 'RAI-2000-0003'];
+const OWNER_OPTION = { value: 'fixture:fx-user-owner-cm', label: 'ณัฐพร ส. (Nattaporn S.)' };
+
 async function open(page: Page, user = 'fx-user-owner-cm', url = '/queue') {
   await signInAsFixture(page, user);
   await page.goto(url);
@@ -120,6 +122,7 @@ test('Reset clears unapplied drafts on the bare queue before Apply', async ({ pa
   await search.fill('unapplied');
   await searchBy.selectOption('owner');
   await status.selectOption('draft');
+  await expect(owner.locator('option').nth(1)).toHaveText(OWNER_OPTION.label); // a name, not a subject ID
   await owner.selectOption({ index: 1 });
   await group.selectOption({ index: 1 });
   await pageSize.selectOption('10');
@@ -186,7 +189,7 @@ test('independent scope expectations cover all roles, hidden options/counts, sea
     expect(response.statusCounts.in_review).toBe(0);
     expect(response.filterOptions).toEqual({
       statuses: expected.length === 0 ? [] : ['draft'],
-      owners: expected.length === 0 ? [] : ['fixture:fx-user-owner-cm'],
+      owners: expected.length === 0 ? [] : [OWNER_OPTION],
       useCaseGroups:
         expected.length === 0
           ? []

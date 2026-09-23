@@ -207,10 +207,12 @@ function QueueFilters({
         <label htmlFor={'queue-owner'}>{t('cases.owner')}</label>
         <select id={'queue-owner'} value={owner} onChange={(e) => setOwner(e.target.value)}>
           <option value={''}>{t('queue.any')}</option>
-          {owner !== '' && !options?.owners.includes(owner) ? <option value={owner}>{owner}</option> : null}
-          {options?.owners.map((value) => (
-            <option key={value} value={value}>
-              {value}
+          {owner !== '' && !options?.owners.some((o) => o.value === owner) ? (
+            <option value={owner}>{owner}</option>
+          ) : null}
+          {options?.owners.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
             </option>
           ))}
         </select>

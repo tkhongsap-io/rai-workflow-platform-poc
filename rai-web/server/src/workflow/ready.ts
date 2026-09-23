@@ -8,6 +8,7 @@ import type { AuditRefValue } from '../audit/store.js';
 import { auditStore } from '../audit/store.js';
 import { isOwnerOrSpocOnCase, type Actor, type CaseScopeFacts } from '../authz/policy.js';
 import { readVersionRow, type CaseRow } from '../cases/repository.js';
+import { deskStatusFor } from '../cases/status.js';
 import type { Tx } from '../db/client.js';
 import { cases } from '../db/schema/case.js';
 import { laneDecision } from '../db/schema/lane-decision.js';
@@ -239,7 +240,7 @@ export async function applyReadyIfHeld(
   const [after] = await tx
     .update(cases)
     .set({
-      deskStatus: 'ready',
+      deskStatus: deskStatusFor('ready_for_launch'),
       aiReadinessStatus: 'ready',
       updatedAt: input.occurredAt,
     })

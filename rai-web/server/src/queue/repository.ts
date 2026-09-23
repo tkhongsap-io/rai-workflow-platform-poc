@@ -10,11 +10,12 @@ import {
 } from '@rai/shared/schemas/queue';
 import type { Actor } from '../authz/policy.js';
 import { caseScopeWhere } from '../cases/scope.js';
+import { caseStatusSql } from '../cases/status.js';
 import { fromStoredSourceRecordId } from '../cases/source-record-id.js';
 import type { Db } from '../db/client.js';
 import { cases } from '../db/schema/case.js';
 import { packVersion } from '../db/schema/pack-version.js';
-import { laneDueDates } from '../sla/due-dates.js';
+import { dueDatesFor, type SlaCalendarMemo } from '../sla/due-dates.js';
 import { projectionColumnForLane } from '../workflow/repository.js';
 
 export const NEXT_ACTION: Record<CaseStatus, QueueItem['nextAction']> = {
@@ -38,27 +39,13 @@ export async function readQueue(db: Db, actor: Actor, query: QueueQuery): Promis
     async (tx) => {
       const current = alias(packVersion, 'queue_current');
       const draft = alias(packVersion, 'queue_draft');
-      // Mirrors W0-06 2.4 / cases/status.ts. The latest disposition uses the same ordering and
-      // unresolved definition as workflow/ready.ts: fixed_proposed alone never resolves a finding.
-      const status = sql<CaseStatus>`CASE
-      WHEN ${current.readyAt} IS NOT NULL THEN 'ready_for_launch'
-      WHEN ${draft.id} IS NOT NULL THEN CASE WHEN ${draft.parentVersionId} IS NULL THEN 'draft' ELSE 'sent_back' END
-      WHEN ${current.submittedAt} IS NOT NULL
-        AND ${cases.raiStatus} = 'approved' AND ${cases.privacyStatus} = 'approved' AND ${cases.securityStatus} = 'approved'
-        AND EXISTS (
-          SELECT 1 FROM qc_finding f
-          LEFT JOIN LATERAL (
-            SELECT kind FROM disposition_event d WHERE d.finding_id = f.id
-            ORDER BY d.created_at DESC, d.id DESC LIMIT 1
-          ) latest ON true
-          WHERE f.version_id = ${current.id} AND (latest.kind IS NULL OR latest.kind = 'fixed_proposed')
-        ) THEN 'awaiting_disposition'
-      ELSE 'in_review' END`.as('queue_status');
       const visible = tx
         .select({
           ...getTableColumns(cases),
-          status,
+          status: caseStatusSql(current, draft).as('queue_status'),
           currentVersionNumber: current.versionNumber,
+          currentSubmittedAt: current.submittedAt,
+          currentFrozen: current.frozenConfiguration,
           latestVersionNumber: sql<number>`coalesce(${draft.versionNumber}, ${current.versionNumber})`.as(
             'latest_version_number',
           ),
@@ -111,9 +98,11 @@ export async function readQueue(db: Db, actor: Actor, query: QueueQuery): Promis
         .from(visible)
         .groupBy(visible.status);
       for (const row of counts) statusCounts[row.status] = row.n;
+      // One option per owner subject; the label is the owner name the cards show.
       const owners = await tx
-        .selectDistinct({ value: visible.ownerSubjectId })
+        .select({ value: visible.ownerSubjectId, label: sql<string>`min(${visible.businessOwner})` })
         .from(visible)
+        .groupBy(visible.ownerSubjectId)
         .orderBy(visible.ownerSubjectId);
       const groups = await tx
         .selectDistinct({ value: visible.useCaseGroup })
@@ -127,9 +116,21 @@ export async function readQueue(db: Db, actor: Actor, query: QueueQuery): Promis
         .orderBy(desc(visible.updatedAt), desc(visible.id))
         .limit(pageSize)
         .offset((page - 1) * pageSize);
+      const memo: SlaCalendarMemo = new Map();
       const items: QueueItem[] = [];
       for (const row of rows) {
-        const dueDates = row.currentVersionId === null ? [] : await laneDueDates(tx, row.currentVersionId);
+        const dueDates =
+          row.currentVersionId === null || row.currentSubmittedAt === null
+            ? []
+            : await dueDatesFor(
+                tx,
+                {
+                  id: row.currentVersionId,
+                  submittedAt: row.currentSubmittedAt,
+                  frozenConfiguration: row.currentFrozen,
+                },
+                memo,
+              );
         items.push({
           caseId: row.id,
           registryId: row.registryId,
@@ -160,7 +161,7 @@ export async function readQueue(db: Db, actor: Actor, query: QueueQuery): Promis
         statusCounts,
         filterOptions: {
           statuses: counts.map((row) => row.status).sort(),
-          owners: owners.map((row) => row.value),
+          owners,
           useCaseGroups: groups.map((row) => row.value),
         },
       };

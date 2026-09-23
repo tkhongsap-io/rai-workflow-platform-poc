@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import type { Actor } from '../authz/policy.js';
-import { caseInScope, caseScopeSpec, caseScopeWhere } from './scope.js';
+import { caseScopeSpec, caseScopeWhere } from './scope.js';
 
 const dialect = new PgDialect();
 const render = (actor: Actor) => dialect.sqlToQuery(caseScopeWhere(actor));
@@ -83,15 +83,4 @@ test('the rendered clause never reads the descriptive business_unit text column'
     assert.doesNotMatch(render(actor).sql, /"business_unit"[^_]/);
     assert.doesNotMatch(render(actor).sql, /business_owner/);
   }
-});
-
-test('caseInScope applies the same rule to a single row', () => {
-  const cm = { ownerSubjectId: owner.subjectId, businessUnitId: 'CM' };
-  const hr = { ownerSubjectId: 'fixture:someone', businessUnitId: 'HR' };
-  assert.equal(caseInScope(owner, cm), true);
-  assert.equal(caseInScope(owner, hr), false);
-  assert.equal(caseInScope(spoc, cm), true);
-  assert.equal(caseInScope(spoc, hr), false);
-  assert.equal(caseInScope(dpo, hr), true);
-  assert.equal(caseInScope(nobody, cm), false);
 });

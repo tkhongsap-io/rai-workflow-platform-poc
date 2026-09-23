@@ -4,7 +4,7 @@
 // inside the SQL WHERE before any other filter, LIMIT or COUNT, so counts and pages are computed over in-scope
 // rows only (A06). W1-02 ships `caseScopeWhere` (the clause) and `scopedCases` (the sub-select) as one module.
 
-import { eq, inArray, or, sql, type SQL } from 'drizzle-orm';
+import { inArray, or, sql, type SQL } from 'drizzle-orm';
 import { rowsForAction, type Actor } from '../authz/policy.js';
 import type { Executor } from '../db/client.js';
 import { cases } from '../db/schema/case.js';
@@ -58,25 +58,3 @@ export function caseScopeWhere(actor: Actor): SQL {
 export function scopedCases(exec: Executor, actor: Actor) {
   return exec.select().from(cases).where(caseScopeWhere(actor)).as('scoped_cases');
 }
-
-/** Whether one stored case is in the actor's view scope; the same rule as the clause, for a single row. */
-export function caseInScope(
-  actor: Actor,
-  facts: { ownerSubjectId: string; businessUnitId: string },
-): boolean {
-  const spec = caseScopeSpec(actor);
-  switch (spec.kind) {
-    case 'all':
-      return true;
-    case 'none':
-      return false;
-    case 'filter':
-      return (
-        spec.ownerSubjectIds.includes(facts.ownerSubjectId) ||
-        spec.businessUnitIds.includes(facts.businessUnitId)
-      );
-  }
-}
-
-// `eq` is re-exported for the repository's single-row reads so scope and reads share one import surface.
-export { eq };
