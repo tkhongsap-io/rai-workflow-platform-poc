@@ -125,9 +125,7 @@ describe('W1-INT: no evidence test imports the substitute', () => {
     const substituteSpecs = walk(path.join(TESTS_DIR, 'browser')).filter((f) =>
       /\.substitute\.spec\.ts$/.test(f),
     );
-    assert.ok(substituteSpecs.length >= 4, 'the Lane B development specs still exist (W1 + W2)');
-    assert.ok(substituteSpecs.some((f) => f.endsWith('w2-07-reviewer-workspace.substitute.spec.ts')));
-    assert.ok(substituteSpecs.some((f) => f.endsWith('w2-09-disposition.substitute.spec.ts')));
+    assert.ok(substituteSpecs.some((f) => f.endsWith('w3-07b-operator.rehearsal.substitute.spec.ts')));
     assert.ok(isSubstituteSpecifier('./support/vite.substitute.config.js', undefined));
     const server = path.join(TESTS_DIR, 'browser', 'support', 'substitute-server.ts');
     const serverImports = importsOf(server);
@@ -144,6 +142,15 @@ describe('W1-INT: the evidence configuration cannot load the substitute', () => 
     assert.ok(ignore instanceof RegExp, 'testIgnore is one pattern');
     assert.equal(ignore.test('tests/browser/w1-06-case-pack-versions.substitute.spec.ts'), true);
     assert.equal(ignore.test('tests/browser/w1-int-journey.spec.ts'), false);
+    // A project-level testIgnore replaces the top-level one, so each must still ignore the substitute specs.
+    for (const project of evidenceConfig.projects ?? [])
+      if (project.testIgnore !== undefined)
+        assert.ok(
+          [project.testIgnore]
+            .flat()
+            .some((p) => p instanceof RegExp && p.test('w3-07b-x.substitute.spec.ts')),
+          `${project.name} ignores *.substitute.spec.ts`,
+        );
     assert.equal(evidenceConfig.workers, 1);
     assert.equal(evidenceConfig.forbidOnly, true);
     assert.equal(evidenceConfig.webServer, undefined, 'no persistent child may outlive a reset');
