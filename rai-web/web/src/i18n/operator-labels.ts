@@ -1,4 +1,4 @@
-// W3-07b prerequisite: exhaustive labels for the committed W3-07a report enums.
+// Exhaustive labels for the operator report enums; a new enum value is a type error until it has a label.
 // These maps describe values, never compute readiness, access, scheduling or workflow state.
 import type { LocaleKey } from '@rai/shared/locales/keys';
 import type { DeskHealthReport, ReadinessReport } from '@rai/shared/schemas/observability';

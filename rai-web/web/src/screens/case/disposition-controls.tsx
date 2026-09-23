@@ -1,6 +1,5 @@
-// Disposition controls per finding (W2-09). Buttons for each reachable kind (Tab + Enter); waived / N/A open
-// the reason dialog. Kind overlay comes from the POST response so the finding stays visible (qc-run has no
-// latest disposition). Does not invent slot-5 / pack / unavailable owning-lane disposition.
+// One button per disposition kind the actor may record on a finding; waived and N/A ask for a reason first. The
+// finding's owning lane is the one the server stored; nothing here assigns one.
 
 import { useState, type JSX } from 'react';
 import type { CaseView } from '@rai/shared/schemas/cases';
@@ -20,7 +19,6 @@ export interface DispositionControlsProps {
   session: SessionInfo;
   view: CaseView;
   latestKind: DispositionKind | null;
-  canSeeFindings: boolean;
   onRecorded: (response: DispositionResponse) => void;
   onUnauthenticated: (err: unknown) => boolean;
 }
@@ -32,7 +30,6 @@ export function DispositionControls({
   session,
   view,
   latestKind,
-  canSeeFindings,
   onRecorded,
   onUnauthenticated,
 }: DispositionControlsProps): JSX.Element | null {
@@ -43,7 +40,6 @@ export function DispositionControls({
     view,
     findingOwningLane: finding.owningLane,
     latestKind,
-    canSeeFindings,
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);

@@ -1,15 +1,13 @@
-// W2-INT: the W2-07 reviewer workspace journey promoted to evidence against the REAL server (built SPA served by
-// `node server/dist/main.js` on the real Postgres in fixture identity mode; playwright.config.ts). Same keyboard
-// and axe coverage as the W2-07 substitute spec; the database is reset to fixture set slice1-synthetic@1 through
-// support/database.ts before every test. Proves A09/A07 at the browser layer. Fixture ids: fx-case-nonvendor
-// (RAI-2000-0001); users fx-user-owner-cm, fx-user-ai-coe, fx-user-admin.
+// The reviewer workspace on the real server, by keyboard: findings render before the decision controls, the send-back
+// dialog keeps focus, a decision moves focus to its outcome, and frozen version N is unchanged. Axe in th and en.
+// Fixture set slice1-synthetic@1: fx-case-nonvendor (RAI-2000-0001); fx-user-owner-cm, fx-user-ai-coe, fx-user-admin.
 
 import { test, expect, type Page } from './support/real-test.js';
 import type { CaseListResponse } from '@rai/shared/schemas/cases';
 import type { PackDraft } from '@rai/shared/schemas/pack';
 import { t } from '@rai/shared/locales/keys';
 import { expectAccessible, expectStatusElementsHaveText } from './support/axe.js';
-import { expectVisibleFocus, pressTab, tabUntil } from './support/keyboard.js';
+import { expectVisibleFocus, pressTab, tabTo, tabUntil } from './support/keyboard.js';
 import { signInAsFixture, signOut } from './support/sign-in.js';
 import { FIXTURE_SET } from './support/database.js';
 
@@ -184,18 +182,15 @@ test.describe(`W2-INT reviewer workspace on the real server (${FIXTURE_SET}; fx-
     await expect(dialog).toBeHidden();
     await expect(
       page.getByRole('status').filter({ hasText: t('th', 'review.decided.send_back') }),
-    ).toBeVisible();
+    ).toBeFocused();
 
     const nav = page.getByRole('navigation', { name: t('th', 'version.nav_heading') });
     await expect(nav.getByRole('link')).toHaveCount(2);
     await expect(nav).toContainText(t('th', 'version.nav_draft', { number: 2 }));
     await expect(nav).toContainText(t('th', 'version.nav_submitted', { number: 1 }));
 
-    await tabUntil(
-      page,
-      (info) => info.tag === 'a' && info.text.includes(t('th', 'version.nav_submitted', { number: 1 })),
-      40,
-    );
+    // Focus is on the outcome notice; the version navigation comes before it, so the Tab order wraps around.
+    await tabTo(page, nav.getByRole('link', { name: t('th', 'version.nav_submitted', { number: 1 }) }));
     await page.keyboard.press('Enter');
     await expect(
       page.getByRole('heading', { level: 2, name: t('th', 'version.heading', { number: 1 }) }),
@@ -233,7 +228,7 @@ test.describe(`W2-INT reviewer workspace on the real server (${FIXTURE_SET}; fx-
     expect(typeof body.qcRunId).toBe('string');
     await expect(
       page.getByRole('status').filter({ hasText: t('th', 'review.decided.approve') }),
-    ).toBeVisible();
+    ).toBeFocused();
     await expect(page.locator('[data-review-controls="ready"]')).toHaveCount(0);
     await expectAccessible(page, testInfo, { name: 'w2-int-reviewer-after-approve-th', lang: 'th' });
   });

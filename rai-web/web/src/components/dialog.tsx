@@ -1,9 +1,8 @@
-// W1-07 (Lane B): the dialog of W0-02 section 9 item 3 on the native <dialog> element with showModal(): focus
-// moves into it on open, the browser traps Tab inside a modal dialog, focus returns to the invoking control on
-// close, and Escape closes it unless the caller declares unsaved input, in which case it asks first. Reused by the
-// sign-out confirmation here and by the W1-06 slot dialog. A radio group is one tab stop whose entry is its
-// checked radio, so when the first control is a radio the dialog opens on the checked one and the backward wrap
-// fires from it (Chromium otherwise lets Shift+Tab leave a modal dialog for the browser UI).
+// The dialog of W0-02 section 9 item 3 on the native <dialog> element with showModal(): focus moves into it on
+// open, the browser traps Tab inside a modal dialog, focus returns to the invoking control on close, and Escape
+// closes it unless the caller declares unsaved input, in which case it asks first. A radio group is one tab stop
+// whose entry is its checked radio, so when the first control is a radio the dialog opens on the checked one and
+// the backward wrap fires from it (Chromium otherwise lets Shift+Tab leave a modal dialog for the browser UI).
 
 import { useEffect, useRef, type JSX, type ReactNode } from 'react';
 import { useLocale } from '../i18n/locale-provider.js';
@@ -34,7 +33,7 @@ export interface DialogProps {
   onClose: () => void;
   /** When true, Escape asks for confirmation before discarding the input. */
   hasUnsavedInput?: boolean;
-  /** Extra class on the <dialog> (W1-06: `dialog-wide` for the slot editor). */
+  /** Extra class on the <dialog>, e.g. `dialog-wide`. */
   className?: string;
   children: ReactNode;
 }

@@ -1,4 +1,4 @@
-// Approve / send-back controls for the owning-lane reviewer (W2-07). Shown only when decidableLane is set.
+// Approve and send-back for one lane; the workspace shows them only while laneIsDecidable holds.
 
 import { useCallback, useState, type JSX } from 'react';
 import type { Lane } from '@rai/shared/constants';
