@@ -35,6 +35,7 @@
     "test:browser": "npm run test:browser:server && npm run test:browser:substitute",
     "test:browser:server": "NODE_ENV=test RAI_IDENTITY_MODE=fixture playwright test -c tests/browser/playwright.config.ts",
     "test:browser:substitute": "NODE_ENV=test playwright test -c tests/browser/playwright.substitute.config.ts",
+    "perf:run": "NODE_ENV=test node --import tsx --conditions=rai-source tests/performance/run.ts",
     "lint": "eslint . && prettier --check . && node scripts/check-css.mjs",
     "lint:fix": "eslint --fix . && prettier --write .",
     "typecheck": "tsc -b . tests/performance",

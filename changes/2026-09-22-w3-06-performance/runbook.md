@@ -1,10 +1,20 @@
 # Manual execution after parent authorization only
 
+## Entry point
+
+From `rai-web`, `npm run perf:run -- <plan.json>` runs one step of the harness (`tests/performance/run.ts`). Copy [the synthetic plan template](../../rai-web/tests/performance/plan.template.json) to an ignored mode-0600 file under `rai-web/.local/`, replace every `REPLACE_*` placeholder (local synthetic role passwords, the clean built `git rev-parse HEAD` for both `finalHead` values, run ID, machine record) and pick the step with `mode`:
+
+- `smoke`: starts the mutation server only, creates the 48 mutation cases through the real API, takes one through send-back and resubmit and one to Ready, then settles. Needs only the mutation database.
+- `setup`: the smoke step, then the 995-case queue seed; writes `queue-manifest.json` and `measurement-plan.json` (page selectors bound to the seeded cases).
+- `measure`: the same plan with `mode: "measure"` on the same `artifactDir`; re-enrolls both datasets, then runs the queue, JSON/HTTP and page profiles.
+
+Every output is exclusive-created under `artifactDir`, so a step refuses to overwrite an earlier one; a smoke consumes its mutation database. On failure the command prints only `{event, mode, stage}` (assertion text can contain role URLs) and exits 1, keeping every file and log written so far. Each database must be a fresh `rai_perf_*` database, migrated and fixture-loaded with `BLOB_DIR` set to its resource root's `blobs/` directory; each resource root also needs an empty `mail/` directory. Build (`npm run build`) the clean checkout first. The sealed drivers under `evidence/candidate-w306/reproduction/` are the historical record of the candidate run and are not run from here.
+
 Preparation has not touched a database or measured latency. Parent must first identify the final built W3-INT commit, authorize execution, allocate unused loopback server/DB ports and a dedicated Compose project/database named `rai_perf_<suffix>`. Start the actual built server in test/fixture mode with the approved INT synthetic QC override described below and the configured synthetic mail sink. Keep normal workers enabled. Do not run against the held retry environment or a shared test database.
 
 The measurement harness does not migrate, reset, truncate, load fixtures or ANALYZE. The separately invoked test-only launcher starts the final built process after its guards. Parent separately prepares an empty isolated DB with the canonical fixture loader and all final migrations, using the correct migration/admin credentials for that head. Every destructive helper requires its own reviewed guard. This module's guard checks the three supplied role URLs against explicit host/port/database/role values before HTTP; it cannot attest which database an already running HTTP process uses. Parent must verify the actual server launch environment uses those exact URLs. Do not reuse the general integration reset helper without this check.
 
-From `rai-web`, prepare ignored `.local/performance-config.json` (mode 0600) with `baseUrl`, `target: {host: "127.0.0.1", port, database}`, `urls: {app, owner, operator}`, the full 40-character `finalHead`, and `authorization: "parent-authorized-final-head"`. Use explicit PostgreSQL URLs with rai_app/rai_owner/rai_operator credentials, no URL query parameters. The launcher reserves only the future isolated DB endpoint54370; the parent assigns both unused HTTP ports before execution. Record machine/CPU/RAM, OS, Node and PostgreSQL versions, Docker resource limits, pool size, final server/harness commits, log destination, and startup configuration without passwords.
+The plan's `queue` and `mutation` entries are RunConfigs: `baseUrl`, `target: {host: "127.0.0.1", port, database}`, `urls: {app, owner, operator}`, the full 40-character `finalHead`, and `authorization: "parent-authorized-final-head"`. Use explicit PostgreSQL URLs with rai_app/rai_owner/rai_operator credentials, no URL query parameters. The launcher reserves only the future isolated DB endpoint54370; the parent assigns both unused HTTP ports before execution. Record machine/CPU/RAM, OS, Node and PostgreSQL versions, Docker resource limits, pool size, final server/harness commits, log destination, and startup configuration without passwords.
 
 ## Required QC override and startup evidence
 
@@ -17,18 +27,7 @@ The default substitute maps only seeded fixture IDs; a newly API-created case re
 
 If any prerequisite is missing, stop before seeding. Never skip override approval, weaken queue-seed.ts's QC assertion, bypass findings, fake Ready, disable triggers, or skip any of the three reviewer approvals. INT owns the production startup seam. This harness supplies only the bounded test-owned enrolled-case runner through that approved seam. Neither this correction nor the example commands authorize execution.
 
-After these prerequisites and parent execution authorization, invoke the existing tsx runtime manually; these commands are examples, not an execution record:
-
-```sh
-node --import tsx --conditions=rai-source --input-type=module <<'JS'
-import { readFile } from 'node:fs/promises';
-import { seed } from './tests/performance/queue-seed.ts';
-import { startPerformanceServer } from './tests/performance/server-launcher.ts';
-const server = await startPerformanceServer('.local/queue-launch.json', '.local/performance-queue-seed.jsonl');
-try { await seed(server.target, '.local/performance-manifest.json', server); }
-finally { await server.stop(); }
-JS
-```
+After these prerequisites and parent execution authorization, run the plan with `mode: "setup"` (see Entry point).
 
 Seeding requires exactly the five canonical draft IDs and adds 995 cases through real APIs. It reserves the output file with exclusive creation; failure leaves an INCOMPLETE marker and may leave partial server writes. It never retries/reseeds/resets silently. Diagnose and obtain a separately authorized isolated reset before a fresh attempt. The canonical fixture hash and the expanded manifest hash are distinct evidence.
 
@@ -38,28 +37,7 @@ Wait for setup notifications to settle; document pending jobs, run ANALYZE on th
 
 Select actor/query pairs explicitly; recommended minimum: all-cases DPO pageSize 100, CM SPOC Thai search, each owner's default page, Admin last page and literal search. Add the other searchBy/exact filters and beyond-last-page controls as separate selections. One 30-warmup/200-sample baseline per selection; repeat only to diagnose noise or a miss, retaining the first result. Zero-result controls never dilute populated-query percentiles.
 
-```sh
-node --import tsx --conditions=rai-source --input-type=module <<'JS'
-import { readFile } from 'node:fs/promises';
-import { measure } from './tests/performance/queue-measure.ts';
-import assert from 'node:assert/strict';
-import { startPerformanceServer } from './tests/performance/server-launcher.ts';
-import { recipe } from './tests/performance/seed-recipe.ts';
-const manifest = JSON.parse(await readFile('.local/performance-manifest.json', 'utf8'));
-const selections = [{ actor: 'fx-user-dpo', query: { pageSize: 100 } }];
-const server = await startPerformanceServer('.local/queue-launch.json', '.local/performance-queue-server.jsonl');
-try {
-  for (let key = 0; key < 995; key++) {
-    const source = recipe(key).sourceRecordId.value;
-    const rows = manifest.rows.filter(r => r.sourceRecordId.kind === 'known' && r.sourceRecordId.value === source);
-    assert.equal(rows.length, 1);
-    await server.enroll(key, rows[0].caseId);
-  }
-  await measure(server.target, manifest, selections, '.local/performance-samples.jsonl',
-    () => readFile('.local/performance-queue-server.jsonl', 'utf8'), server);
-} finally { await server.stop(); }
-JS
-```
+`mode: "measure"` runs these queue selections first, then the profiles below.
 
 Supply the actual flushed JSON request log, without pretty formatting. Pass undefined for the log callback only for explicitly HTTP-only evidence: output then says server duration was not requested. A requested join requires exactly one successful `/api/queue` completion for every sample; missing/duplicate/nonfinite duration fails, preserving raw HTTP records. Capture the thrown error with the run record. Transport/HTTP/schema/content failures are recorded and prevent a successful-only percentile. No latency threshold exits with a CI failure; the 300 ms target remains advisory. HTTP wall includes request transport and complete body consumption, excludes JSON parsing/assertions; server duration follows the final W3-07 hook boundary. Record that boundary alongside the evidence, not as an assumed handler-only measurement.
 
@@ -79,32 +57,9 @@ Each page selection has `kind` (exactly one of queue/overview/editor/reviewer/hi
 
 HTTP wall is fetch start through full body consumption; JSON parsing, binary hashing and validation follow that timestamp. Server duration must join exactly one correlation/route/status-matched `request.completed` event: final API `reply.elapsedTime` freezes at response finish, before background delivery hooks. Retain the final-head proof that submit QC also does not hold the response. Never subtract job time. Page wall ends after declared ready controls/data plus paint opportunities; it is not a single-request server duration. HTTP log joins are mandatory in these added profiles; supply flushed JSON logs. All attempted measured failures remain in raw JSONL and prevent a successful-only percentile; missing/duplicate log joins record an error and fail. Files are exclusive-created. Threshold misses remain advisory results, not CI failures.
 
-Create ignored mode-0600 `.local/performance-plan.json` with the two RunConfigs, evidence, outputPrefix, reads/mutation resources/pages above. Keep passwords out of output records. Runtime versions, machine resources, browser version, selected actor/resources and fixture hashes must accompany the run record. After authorization, from `rai-web`:
+The `setup` step writes `measurement-plan.json` with the two RunConfigs, evidence, outputPrefix, reads/mutation resources/pages above. Keep passwords out of output records. Runtime versions, machine resources, browser version, selected actor/resources and fixture hashes must accompany the run record. After authorization, run the same plan with `mode: "measure"`.
 
-```sh
-node --import tsx --conditions=rai-source --input-type=module <<'JS'
-import { readFile } from 'node:fs/promises';
-import { measureSurfaces } from './tests/performance/surface-measure.ts';
-import { measurePages } from './tests/performance/page-measure.ts';
-const config = JSON.parse(await readFile('.local/performance-plan.json', 'utf8'));
-const plan = { ...config, readLog: (target) => readFile(`.local/performance-${target}-server.jsonl`, 'utf8') };
-import { startPerformanceServer } from './tests/performance/server-launcher.ts';
-// Generated from actual API create responses and exact recipe keys during setup.
-const bindings = JSON.parse(await readFile('.local/performance-enrollment.json', 'utf8'));
-const queue = await startPerformanceServer('.local/queue-launch.json', '.local/performance-queue-server.jsonl');
-try {
-  const mutation = await startPerformanceServer('.local/mutation-launch.json', '.local/performance-mutation-server.jsonl');
-  try {
-    for (const [target, control] of Object.entries({ queue, mutation }))
-      for (const row of bindings[target]) await control.enroll(row.key, row.caseId);
-    await measureSurfaces(plan, { queue, mutation });
-    await measurePages(plan, { queue, mutation });
-  } finally { await mutation.stop(); }
-} finally { await queue.stop(); }
-JS
-```
-
-Unmeasured: other JSON routes, mobile/tablet latency, cold-cache performance, ten-user concurrency, dense findings, five-version cases, 150 MiB packs, 3,000 artifacts/50 GiB storage, degraded readiness and external services. This is neither all-budget coverage nor M3 acceptance. Workload confirmation remains with Ta/operator. The queue-only command remains a separate run and its optional server-log mode does not weaken the mandatory joins above. Use unique output/log paths per invocation: examples that reuse a filename are alternative workflows, not commands to run consecutively unchanged.
+Unmeasured: other JSON routes, mobile/tablet latency, cold-cache performance, ten-user concurrency, dense findings, five-version cases, 150 MiB packs, 3,000 artifacts/50 GiB storage, degraded readiness and external services. This is neither all-budget coverage nor M3 acceptance. Workload confirmation remains with Ta/operator. `perf:run` always requires the queue server-duration join. Use a fresh `artifactDir` (and fresh databases) for every smoke or setup.
 
 
 ## Guarded launcher and enrollment contract

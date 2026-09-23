@@ -1,0 +1,109 @@
+{
+  "mode": "smoke",
+  "artifactDir": ".local/performance/REPLACE_RUN_ID",
+  "resourceRoots": {
+    "queue": "/private/tmp/rai-perf-queue-REPLACE_RUN_ID",
+    "mutation": "/private/tmp/rai-perf-mutation-REPLACE_RUN_ID"
+  },
+  "queue": {
+    "baseUrl": "http://127.0.0.1:60870",
+    "target": { "host": "127.0.0.1", "port": 54370, "database": "rai_perf_queue" },
+    "urls": {
+      "app": "postgresql://rai_app:REPLACE_LOCAL_ROLE_PASSWORD@127.0.0.1:54370/rai_perf_queue",
+      "owner": "postgresql://rai_owner:REPLACE_LOCAL_ROLE_PASSWORD@127.0.0.1:54370/rai_perf_queue",
+      "operator": "postgresql://rai_operator:REPLACE_LOCAL_ROLE_PASSWORD@127.0.0.1:54370/rai_perf_queue"
+    },
+    "finalHead": "REPLACE_WITH_GIT_REV_PARSE_HEAD",
+    "authorization": "parent-authorized-final-head"
+  },
+  "mutation": {
+    "baseUrl": "http://127.0.0.1:60871",
+    "target": { "host": "127.0.0.1", "port": 54370, "database": "rai_perf_mutation" },
+    "urls": {
+      "app": "postgresql://rai_app:REPLACE_LOCAL_ROLE_PASSWORD@127.0.0.1:54370/rai_perf_mutation",
+      "owner": "postgresql://rai_owner:REPLACE_LOCAL_ROLE_PASSWORD@127.0.0.1:54370/rai_perf_mutation",
+      "operator": "postgresql://rai_operator:REPLACE_LOCAL_ROLE_PASSWORD@127.0.0.1:54370/rai_perf_mutation"
+    },
+    "finalHead": "REPLACE_WITH_GIT_REV_PARSE_HEAD",
+    "authorization": "parent-authorized-final-head"
+  },
+  "machine": "REPLACE_MACHINE_CPU_RAM_OS_NODE_POSTGRES_DOCKER_LIMITS",
+  "responseFinishVerified": true,
+  "pages": [
+    {
+      "kind": "queue",
+      "actor": "fx-user-dpo",
+      "visible": [
+        "[data-testid=\"queue-count\"]:has-text(\"1000\")",
+        "article[aria-labelledby=\"queue-{firstQueueCaseId}\"]"
+      ],
+      "absent": [".notice-error", ".queue-message", ".empty-state"]
+    },
+    {
+      "kind": "overview",
+      "actor": "fx-user-owner-cm",
+      "visible": [
+        ".case-head h1:has-text(\"SYNTHETIC-PERF-MUT-47\")",
+        ".case-head-status [data-status=\"ready_for_launch\"]",
+        "#frozen-heading:has-text(\"เวอร์ชัน 1\")",
+        ".versions-nav a[href=\"/cases/{caseId}/versions/{versionId}\"][aria-current=\"page\"]"
+      ],
+      "absent": [
+        ".notice-error",
+        ".case-screen[aria-busy=\"true\"]",
+        "[data-review-qc=\"unavailable\"]",
+        "[aria-labelledby=\"pack-heading\"]"
+      ]
+    },
+    {
+      "kind": "editor",
+      "actor": "fx-user-owner-cm",
+      "visible": [
+        ".case-head h1:has-text(\"SYNTHETIC-PERF-MUT-45\")",
+        "[aria-labelledby=\"pack-heading\"] .slot-row[data-slot=\"9\"]",
+        "#pack-template:enabled"
+      ],
+      "absent": [
+        ".notice-error",
+        ".case-screen[aria-busy=\"true\"]",
+        "[data-review-qc=\"unavailable\"]",
+        "[aria-labelledby=\"frozen-heading\"]"
+      ]
+    },
+    {
+      "kind": "reviewer",
+      "actor": "fx-user-ai-coe",
+      "visible": [
+        ".case-head h1:has-text(\"SYNTHETIC-PERF-MUT-46\")",
+        "#frozen-heading:has-text(\"เวอร์ชัน 2\")",
+        ".versions-nav a[href=\"/cases/{caseId}/versions/{versionId}\"][aria-current=\"page\"]",
+        "[data-review-qc=\"empty\"]",
+        "[data-review-controls=\"ready\"] button.btn-primary:enabled",
+        "[aria-labelledby=\"frozen-heading\"] .slot-row[data-slot=\"9\"]"
+      ],
+      "absent": [
+        ".notice-error",
+        ".case-screen[aria-busy=\"true\"]",
+        "[data-review-qc=\"unavailable\"]",
+        "[aria-labelledby=\"pack-heading\"]"
+      ]
+    },
+    {
+      "kind": "history",
+      "actor": "fx-user-owner-cm",
+      "visible": [
+        ".case-head h1:has-text(\"SYNTHETIC-PERF-MUT-46\")",
+        "#frozen-heading:has-text(\"เวอร์ชัน 1\")",
+        ".versions-nav a[href=\"/cases/{caseId}/versions/{versionId}\"][aria-current=\"page\"]",
+        "[aria-labelledby=\"frozen-heading\"] .slot-row[data-slot=\"9\"]"
+      ],
+      "absent": [
+        ".notice-error",
+        ".case-screen[aria-busy=\"true\"]",
+        "[data-review-qc=\"unavailable\"]",
+        "[data-review-controls=\"ready\"]",
+        "[aria-labelledby=\"pack-heading\"]"
+      ]
+    }
+  ]
+}
