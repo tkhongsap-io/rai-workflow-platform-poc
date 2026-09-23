@@ -11,6 +11,7 @@ import { useLocale } from '../../i18n/locale-provider.js';
 import { useSession, useSignedInSession } from '../../session/session-provider.js';
 import { ROUTES } from '../../routes.js';
 import { pageCount } from '../cases/case-list.view-model.js';
+import { canCreateCase } from '../operator/desk-health.view-model.js';
 import { NEXT_ACTION_LABELS, SEARCH_LABELS, parseQueueQuery, queueParams } from './view-model.js';
 import './queue.css';
 
@@ -302,9 +303,11 @@ export function QueueScreen(): JSX.Element {
           <h1>{t('queue.title')}</h1>
           <p className={'lede'}>{t('queue.description')}</p>
         </div>
-        <Link className={'btn btn-primary'} to={ROUTES.newCase}>
-          {t('shell.nav.new_case')}
-        </Link>
+        {canCreateCase(session) ? (
+          <Link className={'btn btn-primary'} to={ROUTES.newCase}>
+            {t('shell.nav.new_case')}
+          </Link>
+        ) : null}
       </div>
       {!parsed.valid ? (
         <div className={'queue-message'}>

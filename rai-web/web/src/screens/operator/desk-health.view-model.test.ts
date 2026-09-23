@@ -1,7 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { SessionInfo, RoleScope } from '@rai/shared/schemas/auth';
-import { isOperatorAdmin, visibleOperatorResult, type OperatorResult } from './desk-health.view-model.js';
+import {
+  canCreateCase,
+  isOperatorAdmin,
+  visibleOperatorResult,
+  type OperatorResult,
+} from './desk-health.view-model.js';
 function session(roles: RoleScope[]): SessionInfo {
   return {
     principal: {
@@ -30,6 +35,24 @@ test('presentation guard requires explicit Admin, including a dual-role non-Admi
     false,
   );
   assert.equal(isOperatorAdmin(admin), true);
+});
+test('New case is offered to owners and BU SPOCs, including a reviewer who also holds a SPOC grant', () => {
+  assert.equal(canCreateCase(owner), true);
+  assert.equal(
+    canCreateCase(session([{ role: 'bu_spoc', scope: { kind: 'business_unit', businessUnit: 'CM' } }])),
+    true,
+  );
+  assert.equal(
+    canCreateCase(
+      session([
+        { role: 'dpo', scope: { kind: 'all_cases', lane: 'dpo' } },
+        { role: 'bu_spoc', scope: { kind: 'business_unit', businessUnit: 'HR' } },
+      ]),
+    ),
+    true,
+  );
+  assert.equal(canCreateCase(admin), false);
+  assert.equal(canCreateCase(session([{ role: 'dpo', scope: { kind: 'all_cases', lane: 'dpo' } }])), false);
 });
 test('render gate invalidates data immediately for logout, role changes, same-subject session replacement and refresh', () => {
   const old: OperatorResult = {

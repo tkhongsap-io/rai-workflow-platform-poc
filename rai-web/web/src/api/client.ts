@@ -91,6 +91,12 @@ export class ApiError extends Error {
     if (this.code !== 'stale_version' || this.details === undefined) return undefined;
     return this.details as ErrorDetails['stale_version'];
   }
+
+  /** The `unsafe_upload` details (W0-08 section 5: the reason key and its limit params), or undefined. */
+  get unsafeUpload(): ErrorDetails['unsafe_upload'] | undefined {
+    if (this.code !== 'unsafe_upload' || this.details === undefined) return undefined;
+    return this.details as ErrorDetails['unsafe_upload'];
+  }
 }
 
 /** A successful HTTP response did not match its declared report schema. Never retains the payload. */

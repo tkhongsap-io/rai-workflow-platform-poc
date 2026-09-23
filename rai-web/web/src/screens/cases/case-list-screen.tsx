@@ -14,6 +14,7 @@ import { formatDateTime } from '../../i18n/format.js';
 import { useLocale } from '../../i18n/locale-provider.js';
 import { useSession, useSignedInSession } from '../../session/session-provider.js';
 import { ROUTES } from '../../routes.js';
+import { canCreateCase } from '../operator/desk-health.view-model.js';
 import { pageCount, scopeLineFor, toRowModel, type CaseRowModel } from './case-list.view-model.js';
 
 /** `key` names the request (page and reload counter) a result belongs to; a stale key means "loading". */
@@ -111,6 +112,11 @@ export function CaseListScreen(): JSX.Element {
   }, [page, requestKey, signedOut]);
 
   const scope = scopeLineFor(session.principal);
+  const newCaseLink = canCreateCase(session) ? (
+    <Link to={ROUTES.newCase} className={'btn btn-primary'}>
+      {t('shell.nav.new_case')}
+    </Link>
+  ) : null;
 
   return (
     <div>
@@ -121,9 +127,7 @@ export function CaseListScreen(): JSX.Element {
             {t(scope.key, scope.params)}
           </p>
         </div>
-        <Link to={ROUTES.newCase} className={'btn btn-primary'}>
-          {t('shell.nav.new_case')}
-        </Link>
+        {newCaseLink}
       </div>
       {created !== undefined ? (
         <p className={'notice notice-success'} role={'status'} style={{ marginTop: 16 }}>
@@ -156,9 +160,7 @@ export function CaseListScreen(): JSX.Element {
             <div className={'empty-state'}>
               <h2>{t('cases.empty_title')}</h2>
               <p className={'muted'}>{t('cases.empty_body')}</p>
-              <Link to={ROUTES.newCase} className={'btn btn-primary'}>
-                {t('shell.nav.new_case')}
-              </Link>
+              {newCaseLink}
             </div>
           ) : (
             <ul className={'case-grid'} aria-label={t('cases.list_label')}>

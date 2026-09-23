@@ -6,6 +6,11 @@ export function isOperatorAdmin(session: SessionInfo | undefined): boolean {
   return session?.principal.roles.some(({ role }) => role === 'admin') === true;
 }
 
+/** Presentation only: offers 'New case' to the roles that hold case.create; the server still decides. */
+export function canCreateCase(session: SessionInfo): boolean {
+  return session.principal.roles.some(({ role }) => role === 'owner' || role === 'bu_spoc');
+}
+
 export type OperatorResult = {
   session: SessionInfo;
   generation: number;

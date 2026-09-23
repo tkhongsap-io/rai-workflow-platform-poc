@@ -289,6 +289,35 @@ test('W1-06: a 409 stale_version exposes its guidance and refresh path; other co
   );
 });
 
+test('a 422 unsafe_upload exposes its reason key and limit params; other codes expose none', async () => {
+  const client = createApiClient(
+    fetchAnswering(422, {
+      error: {
+        code: 'unsafe_upload',
+        messageKey: 'error.unsafe_upload',
+        correlationId: 'c-10',
+        details: { reasonKey: 'error.unsafe_upload.too_large', params: { max_file_mb: 25 } },
+      },
+    }),
+  );
+  await assert.rejects(client.uploadArtifact('c1', new File([], 'a.pdf')), (err: unknown) => {
+    assert.ok(err instanceof ApiError);
+    assert.deepEqual(err.unsafeUpload, {
+      reasonKey: 'error.unsafe_upload.too_large',
+      params: { max_file_mb: 25 },
+    });
+    assert.equal(err.stale, undefined);
+    return true;
+  });
+  const forbidden = createApiClient(
+    fetchAnswering(403, { error: { code: 'forbidden', messageKey: 'error.forbidden', correlationId: 'c' } }),
+  );
+  await assert.rejects(
+    forbidden.uploadArtifact('c1', new File([], 'a.pdf')),
+    (err: unknown) => err instanceof ApiError && err.unsafeUpload === undefined,
+  );
+});
+
 test('queue client preserves literal Thai filters, pagination and server response without applying scope', async () => {
   const response = {
     items: [],
