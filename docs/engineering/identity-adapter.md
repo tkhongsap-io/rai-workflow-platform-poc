@@ -267,6 +267,8 @@ The adapter's HTTP surface is a Fastify plugin registered under `/auth`, plus th
 | `GET /auth/fixture/users` | `fixture` only | The eight fixture users as `{ users: [{ fixtureUserId, displayName, roles }] }` for the test sign-in picker. Not mounted in any other mode (404 `not_found`). |
 | `POST /auth/fixture/sign-in` `{ fixtureUserId }` | `fixture` only | Creates a session for that fixture user (`200 SessionInfo` + cookie). Unknown `fixtureUserId` is 404 `not_found`. Not mounted in any other mode (404). |
 
+Every other state-changing request carries the same CSRF rule, with one difference (amended 2026-09-23, W3 hardening H6). `SameSite=Lax` keeps the session cookie off cross-site requests but still sends it on same-site ones: another app on loopback at a different port, or a sibling subdomain on a True host. The authorization middleware therefore refuses, right after the 401 check and before the body is read, any request to a non-`public` route whose method is not `GET`, `HEAD` or `OPTIONS` when `Sec-Fetch-Site` is present and neither `same-origin` nor `none`: 403 `forbidden`, one `authz.denied` line with reason `cross_site` (W0-10 3.3). An absent header is allowed there, because browsers always send it and a non-browser client carries no ambient cookie. Sign-out keeps its stricter rule and also refuses an absent header. `public` routes (the sign-in surface and the probes) are outside the guard.
+
 The sign-in page is Lane B's (W1-07). It learns the mode without an error detail (W0-06 8.2: `unauthenticated` carries none): it calls `GET /auth/fixture/users`, and a 200 shows the fixture user picker while a 404 shows the Google (or True account) button. The identity mode is not secret; the presence of the fixture routes is what is guarded.
 
 ### 6.2 `openid-client` usage (v6 API; W0-02 pins the version)
@@ -311,6 +313,7 @@ Codes and statuses are the ADR-0003 table that W0-06 confirms. Every response ca
 | Callback with missing or mismatched `state`, `nonce` or transaction cookie; code exchange failed; `iss`/`aud` mismatch; email not verified | 401 `unauthenticated` | `auth.sign_in_failed` | none created | log reason code; audit `identity.sign_in_refused` with subject hash, no email |
 | Verified login with no (role, scope) pair: unlisted (allow-list), no mapped group or groups overage (AD), unmapped in production | 403 `forbidden` | `auth.not_permitted` | none created | audit `identity.sign_in_refused` (reason code, issuer key, sha256 of subject; never the email) |
 | Sign-out without matching `Sec-Fetch-Site` | 403 `forbidden` | `auth.not_permitted` | unchanged | log only |
+| Any other non-`public` write (not `GET`, `HEAD` or `OPTIONS`) with `Sec-Fetch-Site` present and neither `same-origin` nor `none` (section 6.1) | 403 `forbidden` | `error.forbidden` | unchanged | `authz.denied` reason `cross_site`; no audit row |
 | Fixture route in a non-fixture mode | 404 `not_found` | `error.not_found` | — | — |
 | `POST /auth/fixture/sign-in` with an unknown `fixtureUserId` | 404 `not_found` (W0-02 7.2) | `error.not_found`; the picker never offers an unknown id, so `auth.fixture_user_unknown` (section 12) is the SPA's message when a stale picker entry is refused | none | — |
 | Start-up misconfiguration (section 5) | process exits 78 before listening | — | — | log reason code; readiness `identity.ready=false` |
