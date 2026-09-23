@@ -18,7 +18,26 @@ import { sanitizeStack } from './observability/redact.js';
 /** After the drain budget, this much longer for the close to complete before the hard exit. */
 const SHUTDOWN_HARD_EXIT_GRACE_MS = 5_000;
 
+/**
+ * The last word on a crash or a failed shutdown: one redacted error.captured line (module/line stack only, never the
+ * message, which can carry database coordinates or document text), then exit 1. strict:false so it cannot throw.
+ */
+function fatal(err: unknown): never {
+  console.error(
+    JSON.stringify(
+      buildLogLine(
+        'error.captured',
+        { ...sanitizeStack(err), code: 'internal_error', httpStatus: 500 },
+        { strict: false, correlationId: null },
+      ),
+    ),
+  );
+  process.exit(1);
+}
+
 async function main(): Promise<void> {
+  process.on('uncaughtException', fatal);
+  process.on('unhandledRejection', fatal);
   const server = await startServer(readEnv());
   let stopping = false;
   const stop = (signal: NodeJS.Signals) => {
@@ -27,24 +46,10 @@ async function main(): Promise<void> {
     server.emitter.log('process.stopping', { signal });
     const hardExit = setTimeout(() => process.exit(1), SHUTDOWN_DRAIN_MS + SHUTDOWN_HARD_EXIT_GRACE_MS);
     hardExit.unref(); // never the reason the process stays alive
-    server.close().then(
-      () => process.exit(0),
-      () => process.exit(1),
-    );
+    server.close().then(() => process.exit(0), fatal);
   };
   process.on('SIGTERM', stop);
   process.on('SIGINT', stop);
 }
 
-main().catch((err: unknown) => {
-  console.error(
-    JSON.stringify(
-      buildLogLine(
-        'error.captured',
-        { ...sanitizeStack(err), code: 'internal_error', httpStatus: 500 },
-        { strict: true },
-      ),
-    ),
-  );
-  process.exit(1);
-});
+main().catch(fatal);

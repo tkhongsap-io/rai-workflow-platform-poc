@@ -224,7 +224,7 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
       },
     ),
   );
-  const { fastify, emitter, drain } = buildApp({
+  const { fastify, emitter, errors, drain } = buildApp({
     observability: { db: db.db, readiness },
     ...(mailSink === undefined
       ? {}
@@ -292,6 +292,7 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
     },
     ...(serveWeb ? { static: { root: webDistDir } } : {}),
   });
+  db.pool.on('error', (err) => errors.internal(err));
   const close = async () => {
     await drain.close(overrides.drainMs);
     await db.close();
