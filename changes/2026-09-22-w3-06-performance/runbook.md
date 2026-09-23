@@ -2,19 +2,39 @@
 
 ## Entry point
 
-From `rai-web`, `npm run perf:run -- <plan.json>` runs one step of the harness (`tests/performance/run.ts`). Copy [the synthetic plan template](../../rai-web/tests/performance/plan.template.json) to an ignored mode-0600 file under `rai-web/.local/`, replace every `REPLACE_*` placeholder (local synthetic role passwords, the clean built `git rev-parse HEAD` for both `finalHead` values, run ID, machine record) and pick the step with `mode`:
+From `rai-web`, `npm run perf:run -- <plan.json>` runs one step of the harness (`tests/performance/run.ts`).
+
+Perf runs require the dedicated Postgres on port **54370**. `guardLaunch` refuses any other port, so the runner cannot reach the development (54320) or a per-ticket database. Start it from the repository root with `POSTGRES_PORT=54370 docker compose -p rai-perf up -d --wait` and tear it down with `docker compose -p rai-perf down -v`. Prepare each fresh `rai_perf_*` database (the smoke needs only `rai_perf_mutation`), shown here for `<run>` on macOS, where the launcher's child resolves its temporary directory to `/private/tmp` (see "Normal verification and child temp-directory preflight" below):
+
+```sh
+docker compose -p rai-perf exec -T postgres psql -v ON_ERROR_STOP=1 -U postgres -c "CREATE DATABASE rai_perf_mutation OWNER rai_owner"
+docker compose -p rai-perf exec -T postgres psql -v ON_ERROR_STOP=1 -U postgres -d rai_perf_mutation \
+  -c "REVOKE CREATE ON SCHEMA public FROM PUBLIC; GRANT USAGE ON SCHEMA public TO rai_app, rai_operator;"
+mkdir -p /private/tmp/rai-perf-mutation-<run>/blobs /private/tmp/rai-perf-mutation-<run>/mail
+cd rai-web
+DB=127.0.0.1:54370/rai_perf_mutation
+DATABASE_MIGRATE_URL=postgresql://rai_owner:rai_owner@$DB npm run migrate
+NODE_ENV=test RAI_IDENTITY_MODE=fixture BLOB_DIR=/private/tmp/rai-perf-mutation-<run>/blobs \
+  DATABASE_URL=postgresql://rai_app:rai_app@$DB DATABASE_MIGRATE_URL=postgresql://rai_owner:rai_owner@$DB \
+  DATABASE_OPERATOR_URL=postgresql://rai_operator:rai_operator@$DB npm run fixtures:load
+npm run build
+```
+
+Set all three URLs explicitly: the loader connects with `DATABASE_OPERATOR_URL` and would otherwise take it from `.env`. Build the clean checkout whose `git rev-parse HEAD` goes into both `finalHead` values.
+
+Copy [the synthetic plan template](../../rai-web/tests/performance/plan.template.json) to an ignored mode-0600 file under `rai-web/.local/`, replace every `REPLACE_*` placeholder (the local synthetic role passwords, that head, the run ID, the machine record) and pick the step with `mode`:
 
 - `smoke`: starts the mutation server only, creates the 48 mutation cases through the real API, takes one through send-back and resubmit and one to Ready, then settles. Needs only the mutation database.
 - `setup`: the smoke step, then the 995-case queue seed; writes `queue-manifest.json` and `measurement-plan.json` (page selectors bound to the seeded cases).
 - `measure`: the same plan with `mode: "measure"` on the same `artifactDir`; re-enrolls both datasets, then runs the queue, JSON/HTTP and page profiles.
 
-Every output is exclusive-created under `artifactDir`, so a step refuses to overwrite an earlier one; a smoke consumes its mutation database. On failure the command prints only `{event, mode, stage}` (assertion text can contain role URLs) and exits 1, keeping every file and log written so far. Each database must be a fresh `rai_perf_*` database, migrated and fixture-loaded with `BLOB_DIR` set to its resource root's `blobs/` directory; each resource root also needs an empty `mail/` directory. Build (`npm run build`) the clean checkout first. The sealed drivers under `evidence/candidate-w306/reproduction/` are the historical record of the candidate run and are not run from here.
+Every output is exclusive-created under `artifactDir`, so a step refuses to overwrite an earlier one; a smoke consumes its mutation database. On failure the command prints only `{event, mode, stage}` (assertion text can contain role URLs) and exits 1, keeping every file and log written so far. The sealed drivers under `evidence/candidate-w306/reproduction/` are the historical record of the candidate run and are not run from here. The first smoke through this entry point is recorded in [h15.md](../2026-09-23-w3-hardening/h15.md).
 
 Preparation has not touched a database or measured latency. Parent must first identify the final built W3-INT commit, authorize execution, allocate unused loopback server/DB ports and a dedicated Compose project/database named `rai_perf_<suffix>`. Start the actual built server in test/fixture mode with the approved INT synthetic QC override described below and the configured synthetic mail sink. Keep normal workers enabled. Do not run against the held retry environment or a shared test database.
 
 The measurement harness does not migrate, reset, truncate, load fixtures or ANALYZE. The separately invoked test-only launcher starts the final built process after its guards. Parent separately prepares an empty isolated DB with the canonical fixture loader and all final migrations, using the correct migration/admin credentials for that head. Every destructive helper requires its own reviewed guard. This module's guard checks the three supplied role URLs against explicit host/port/database/role values before HTTP; it cannot attest which database an already running HTTP process uses. Parent must verify the actual server launch environment uses those exact URLs. Do not reuse the general integration reset helper without this check.
 
-The plan's `queue` and `mutation` entries are RunConfigs: `baseUrl`, `target: {host: "127.0.0.1", port, database}`, `urls: {app, owner, operator}`, the full 40-character `finalHead`, and `authorization: "parent-authorized-final-head"`. Use explicit PostgreSQL URLs with rai_app/rai_owner/rai_operator credentials, no URL query parameters. The launcher reserves only the future isolated DB endpoint54370; the parent assigns both unused HTTP ports before execution. Record machine/CPU/RAM, OS, Node and PostgreSQL versions, Docker resource limits, pool size, final server/harness commits, log destination, and startup configuration without passwords.
+The plan's `queue` and `mutation` entries are RunConfigs: `baseUrl`, `target: {host: "127.0.0.1", port, database}`, `urls: {app, owner, operator}`, the full 40-character `finalHead`, and `authorization: "parent-authorized-final-head"`. Use explicit PostgreSQL URLs with rai_app/rai_owner/rai_operator credentials, no URL query parameters. Both RunConfigs use the dedicated Postgres on port 54370 (see Entry point); the parent assigns both unused HTTP ports before execution. Record machine/CPU/RAM, OS, Node and PostgreSQL versions, Docker resource limits, pool size, final server/harness commits, log destination, and startup configuration without passwords.
 
 ## Required QC override and startup evidence
 
@@ -45,7 +65,7 @@ Pure preparation checks only: `node --import tsx --conditions=rai-source --test 
 
 ## Approved additional profiles (implementation only; execution still gated)
 
-`profiles.ts` exports the paired preflight, transport and journal. `surface-measure.ts` exports `measureSurfaces(SurfacePlan, controls)`; `page-measure.ts` exports `measurePages(PagePlan, controls)`. Library imports perform no network or DB work; server-process.ts is the explicit child entry point. Both configurations must use distinct `rai_perf_*` names on this task's future loopback container port **54370**, distinct HTTP origins and the same final build SHA. Do not create/start that container until final INT execution authorization. The parent records `evidence: {startupVerified: true, responseFinishVerified: true, qcScenarioApproved, machine}` after inspecting actual launch bindings and proving a held QC runner does not delay the submit response. These are attestations, not remote DB-discovery checks. Keep normal workers enabled; no competing suites, load generators or readiness pollers.
+`profiles.ts` exports the paired preflight, transport and journal. `surface-measure.ts` exports `measureSurfaces(SurfacePlan, controls)`; `page-measure.ts` exports `measurePages(PagePlan, controls)`. Library imports perform no network or DB work; server-process.ts is the explicit child entry point. Both configurations must use distinct `rai_perf_*` names on the dedicated loopback Postgres on port **54370** (see Entry point), distinct HTTP origins and the same final build SHA. The parent records `evidence: {startupVerified: true, responseFinishVerified: true, qcScenarioApproved, machine}` after inspecting actual launch bindings and proving a held QC runner does not delay the submit response. These are attestations, not remote DB-discovery checks. Keep normal workers enabled; no competing suites, load generators or readiness pollers.
 
 Keep the exact-1,000-case queue manifest unchanged. Read-only JSON profiles use its server. Case-page profiles use the mutation server because reviewer page loading can invoke lane QC; queue-page timing alone uses the queue server. On the mutation database, separately prepare **45 distinct editable drafts** using real create/save APIs and the approved new-ID QC scenario; record `{caseId, versionId: draftId, revision: draftRevision}` after saving. Supply their owner as `mutationActor` and a synthetic case owned by that actor as `uploadCaseId`. No test SQL or status writes. Each measured submit rechecks its draft identity/revision outside timing, uses a fresh idempotency key and requires 201 with the matching submitted version. The first five drafts are warmup; every other draft is measured once. Partial state is not automatically reset or replayed. Page resources (including a selected historical version, open editor and reviewer-visible version) must also be prepared through real APIs and recorded separately.
 
@@ -74,7 +94,7 @@ Each seed submit waits for its committed original audit/correlation, exactly one
 
 Enrollment is process-local. After restart, explicitly re-enroll the same proven rows (the queue example derives keys from the saved source IDs); never silently reseed. A crash after submit commit but before post-commit QC can leave no QC result: settlement times out, and the run requires diagnosis. No replay/recovery or exactly-once claim is made. IPC only admits enrollment and settlement, one command at a time, with deadlines; no arbitrary SQL or journey fault controls. Stop requests the actual server close, retains its active-operation semantics, and escalates to process termination on deadline; it never releases a DB lock while pretending a still-running operation has finished.
 
-The pure suite includes negative child-entry guards that exit before reading config or importing built startup. No database, real application startup, runtime smoke, browser or measurement has run for this launcher. Final INT merge, independent review and parent execution authorization remain required.
+The pure suite includes negative child-entry guards that exit before reading config or importing built startup. The `perf:run` smoke in [h15.md](../2026-09-23-w3-hardening/h15.md) has since started the launcher against a real database; no setup or measurement has run through it. Parent execution authorization remains required for those.
 
 
 ### Independent-review corrections
