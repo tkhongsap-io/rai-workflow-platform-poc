@@ -128,7 +128,7 @@ Names are stable identifiers: W8 alert rules and the W3-07 tests match on them, 
 | `sla.digest.completed` | info | `jobRunId`, `breachCount`, `notificationIds` | W3-03/W3-05 |
 | `sla.digest.failed` | error | `jobRunId`, `stage` (`query` / `render` / `enqueue`), `errorCode` | W3-03/W3-05 |
 | `health.readiness` | info on change, `warn` when not ready | `status` and the full §5.3 report (it contains only enumerated codes, so nothing is removed) | Readiness endpoint and the startup gate; emitted only when the status changes, not on every probe |
-| `error.captured` | per §6.1 | `category`, `code`, `httpStatus`, `route?`, `stackHash?`, `stack?` (internal only) | Error handler |
+| `error.captured` | per §6.1 | `category`, `code`, `httpStatus`, `route?`, `stackHash?`, `stack?` (internal only) | Error handler; an idle database client's error (the process stays up); the process fatal handler in `main.ts` (uncaught exception, unhandled rejection, failed start or close: one line on stderr with `correlationId` null, then exit 1) |
 
 Fields named `*Id` are desk-local identifiers (UUIDs or the `registry_id`), never external register IDs with meaning outside the desk and never a `source_record_id` typed by a user. `caseId` is the desk-local case ID, not the use-case name.
 

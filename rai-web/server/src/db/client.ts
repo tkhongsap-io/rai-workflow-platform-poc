@@ -16,7 +16,15 @@ export interface DbHandle {
 }
 
 export function createDb(connectionString: string, options: { max?: number } = {}): DbHandle {
-  const pool = new pg.Pool({ connectionString, max: options.max ?? 10, application_name: 'rai-desk' });
+  const pool = new pg.Pool({
+    connectionString,
+    max: options.max ?? 10,
+    application_name: 'rai-desk',
+    connectionTimeoutMillis: 5_000,
+  });
+  // An unheard 'error' from an idle client (Postgres restart, failover, idle timeout) would crash the process; the
+  // pool drops that client either way. The server adds a listener that reports it; one-shot commands ignore it.
+  pool.on('error', () => {});
   const db = drizzle(pool, { schema });
   return { db, pool, close: () => pool.end() };
 }
