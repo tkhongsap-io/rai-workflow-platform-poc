@@ -124,7 +124,9 @@ export function queueRoutes(): RouteDefinition[] {
           statusCounts,
           filterOptions: {
             statuses: CASE_STATUSES.filter((status) => statusCounts[status] > 0),
-            owners: [...new Set(population.map((item) => item.businessOwner))].sort(),
+            owners: [...new Map(population.map((item) => [item.businessOwner, item.ownerDisplayName]))]
+              .sort(([a], [b]) => (a < b ? -1 : 1))
+              .map(([value, label]) => ({ value, label })),
             useCaseGroups: [...new Set(population.map((item) => item.useCaseGroup))].sort(),
           },
         };

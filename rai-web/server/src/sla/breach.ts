@@ -3,12 +3,12 @@
 import { and, eq, isNotNull, isNull } from 'drizzle-orm';
 import { LANES, type Lane } from '@rai/shared/constants';
 import type { SlaBreach } from '@rai/shared/schemas/sla';
-import { bangkokDate, dueOn } from '@rai/shared/sla/working-days';
+import { bangkokDate } from '@rai/shared/sla/working-days';
 import type { Executor } from '../db/client.js';
 import { cases } from '../db/schema/case.js';
 import { packVersion } from '../db/schema/pack-version.js';
 import { projectionColumnForLane } from '../workflow/repository.js';
-import { frozenSlaCalendar } from './due-dates.js';
+import { dueDatesFor, type SlaCalendarMemo } from './due-dates.js';
 
 export interface OpenLaneTarget {
   caseId: string;
@@ -59,15 +59,13 @@ export async function openReviewTargets(exec: Executor): Promise<OpenLaneTarget[
  */
 export async function listSlaBreaches(exec: Executor, asOf: Date): Promise<SlaBreach[]> {
   const today = bangkokDate(asOf);
-  const targets = await openReviewTargets(exec);
+  const memo: SlaCalendarMemo = new Map();
   const breaches: SlaBreach[] = [];
-  for (const target of targets) {
-    const { sla, holidays } = await frozenSlaCalendar(exec, target.versionId, target.frozenConfiguration);
-    for (const lane of target.pendingLanes) {
-      const due = dueOn(target.submittedAt, sla[lane], holidays);
-      if (due < today) {
-        breaches.push({ caseId: target.caseId, versionId: target.versionId, lane, dueOn: due });
-      }
+  for (const target of await openReviewTargets(exec)) {
+    const { caseId, versionId } = target;
+    for (const { lane, dueOn } of await dueDatesFor(exec, { ...target, id: versionId }, memo)) {
+      if (target.pendingLanes.includes(lane) && dueOn < today)
+        breaches.push({ caseId, versionId, lane, dueOn });
     }
   }
   breaches.sort(

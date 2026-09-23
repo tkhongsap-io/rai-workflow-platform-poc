@@ -84,7 +84,7 @@ test('scope, counts and literal Unicode search precede pagination in the evidenc
     assert.equal(q.total, 1);
     assert.equal(q.items.length, 0);
     assert.equal(q.statusCounts.draft, 1);
-    assert.deepEqual(q.filterOptions.owners, [a.businessOwner]);
+    assert.deepEqual(q.filterOptions.owners, [{ value: a.businessOwner, label: a.ownerDisplayName }]);
   }
   assert.equal(expectedQueue([a, b], 'fx-user-spoc-cm', {}).total, 1);
   assert.equal(expectedQueue([a, b], 'fx-user-dpo', {}).total, 2);

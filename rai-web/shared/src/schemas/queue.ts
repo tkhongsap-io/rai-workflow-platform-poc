@@ -47,6 +47,11 @@ export interface QueueItem extends CaseSummary {
   lanes: QueueLane[];
   nextAction: 'prepare_pack' | 'correct_pack' | 'review_lanes' | 'resolve_findings' | 'review_complete';
 }
+/** `value` is the owner subject ID the `owner` filter matches; `label` is the owner name shown on the cards. */
+export interface QueueOwnerOption {
+  value: string;
+  label: string;
+}
 export interface QueueResponse {
   items: QueueItem[];
   page: number;
@@ -54,7 +59,7 @@ export interface QueueResponse {
   /** All matching rows before pagination, always within actor scope. */
   total: number;
   /** Options are drawn from actor-visible cases before optional filters, never global configuration. */
-  filterOptions: { statuses: CaseStatus[]; owners: string[]; useCaseGroups: string[] };
+  filterOptions: { statuses: CaseStatus[]; owners: QueueOwnerOption[]; useCaseGroups: string[] };
   /** Counts apply to actor-visible cases before optional filters; all statuses are present. */
   statusCounts: Record<CaseStatus, number>;
 }

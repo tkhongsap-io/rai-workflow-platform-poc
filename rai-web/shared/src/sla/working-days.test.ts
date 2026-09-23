@@ -26,4 +26,13 @@ describe('working-day SLA', () => {
     const friday = new Date('2026-09-25T02:00:00.000Z');
     assert.equal(dueOn(friday, 1, []), '2026-09-28');
   });
+
+  it('counts from the Bangkok date: a Friday-evening UTC open is a Saturday open', () => {
+    assert.equal(dueOn(new Date('2026-09-25T17:30:00.000Z'), 3, []), '2026-09-30');
+  });
+
+  it('crosses the year over a holiday open date and a New Year holiday', () => {
+    const newYearEve = new Date('2026-12-31T02:00:00.000Z'); // a holiday itself
+    assert.equal(dueOn(newYearEve, 3, ['2026-12-31', '2027-01-01']), '2027-01-06');
+  });
 });

@@ -1,9 +1,10 @@
 // W0-04 `CaseWriteRepository` for W1-02 (`create`, `updateDraftFields`) plus the reads behind the 7.3 shapes. The
 // editable column set is a Pick (W0-04 fields rule, layer 2): the four projections and `risk_tier` are not in it and
-// cannot be written from here; `applyLaneProjection` / `applyReadiness` arrive with the workflow module (W2) and
-// take a WorkflowTx. Every write takes a transaction handle; the create caller holds the (actor, key) lock and the
-// edit caller holds the case row lock (service.ts). The two scope columns are written only by `updateDraftFields`
-// after the W0-05 post-edit authorization, which is the one W0-05-permitted action that may change them.
+// cannot be written from here; lane projections and readiness are written only by workflow/repository.ts
+// writeLaneProjection and workflow/ready.ts. The status in every read is cases/status.ts caseStatusSql. Every write
+// takes a transaction handle; the create caller holds the (actor, key) lock and the edit caller holds the case row
+// lock (service.ts). The two scope columns are written only by `updateDraftFields` after the W0-05 post-edit
+// authorization, which is the one W0-05-permitted action that may change them.
 
 import { and, count, desc, eq, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
@@ -16,10 +17,10 @@ import { artifactSlot } from '../db/schema/artifact-slot.js';
 import { cases } from '../db/schema/case.js';
 import { packVersion } from '../db/schema/pack-version.js';
 import { registryCounter } from '../db/schema/registry-counter.js';
-import { SLOT_NUMBERS, VENDOR_SLOTS, defaultSlotState, slotStateToColumns } from '../pack/slots.js';
+import { SLOT_NUMBERS, defaultSlotState, slotStateToColumns } from '../pack/slots.js';
 import { caseScopeWhere } from './scope.js';
 import { fromStoredSourceRecordId } from './source-record-id.js';
-import { deriveCaseStatus } from './status.js';
+import { caseStatusSql, deskStatusFor } from './status.js';
 
 export type CaseRow = typeof cases.$inferSelect;
 export type PackVersionRow = typeof packVersion.$inferSelect;
@@ -39,9 +40,6 @@ export type EditableCaseFields = Pick<
 /** The two W0-05 scope columns, writable through `case.edit_draft` only after the post-edit authorization. */
 export type ScopeColumns = Pick<CaseRow, 'ownerSubjectId' | 'businessUnitId'>;
 export type DraftEditableColumns = EditableCaseFields & ScopeColumns;
-
-/** The slot vocabulary and the create-time default live in pack/slots.ts (W1-04); re-exported for readers. */
-export { SLOT_NUMBERS, VENDOR_SLOTS };
 
 export const REGISTRY_ID_MAX_PER_YEAR = 9999;
 
@@ -93,7 +91,7 @@ export async function insertCase(tx: Tx, input: CreateCaseInput): Promise<Create
       ...input.fields,
       ownerSubjectId: input.ownerSubjectId,
       businessUnitId: input.businessUnitId,
-      deskStatus: 'draft',
+      deskStatus: deskStatusFor('draft'),
       currentVersionId: null,
       draftVersionId: draftId, // deferrable FK: the draft row follows in this transaction
       rowVersion: 1,
@@ -172,11 +170,17 @@ export async function readCaseView(exec: Executor, caseId: string): Promise<Case
   return caseViewFrom(exec, row);
 }
 
+/** Reads through `exec`, so inside the caller's write transaction it derives from the row just written. */
 export async function caseViewFrom(exec: Executor, row: CaseRow): Promise<CaseView> {
-  const [draft, current] = await Promise.all([
-    row.draftVersionId === null ? undefined : readVersionRow(exec, row.draftVersionId),
-    row.currentVersionId === null ? undefined : readVersionRow(exec, row.currentVersionId),
-  ]);
+  const currentAlias = alias(packVersion, 'current');
+  const draftAlias = alias(packVersion, 'draft');
+  const [joined] = await exec
+    .select({ status: caseStatusSql(currentAlias, draftAlias), current: currentAlias, draft: draftAlias })
+    .from(cases)
+    .leftJoin(currentAlias, eq(currentAlias.id, cases.currentVersionId))
+    .leftJoin(draftAlias, eq(draftAlias.id, cases.draftVersionId))
+    .where(eq(cases.id, row.id));
+  const { status, current, draft } = joined!;
   return {
     caseId: row.id,
     registryId: row.registryId,
@@ -189,17 +193,14 @@ export async function caseViewFrom(exec: Executor, row: CaseRow): Promise<CaseVi
     useCaseGroup: row.useCaseGroup,
     vendorInvolved: row.vendorInvolved,
     modelType: row.modelType as CaseView['modelType'],
-    status: deriveCaseStatus({
-      draft: draft === undefined ? null : { parentVersionId: draft.parentVersionId },
-      current: current === undefined ? null : { readyAt: current.readyAt },
-    }),
+    status,
     riskTier: row.riskTier, // null throughout slice 1 (D07 before W5)
     privacyStatus: row.privacyStatus as CaseView['privacyStatus'],
     securityStatus: row.securityStatus as CaseView['securityStatus'],
     raiStatus: row.raiStatus as CaseView['raiStatus'],
     aiReadinessStatus: row.aiReadinessStatus as CaseView['aiReadinessStatus'],
     currentVersion:
-      current === undefined || current.submittedAt === null
+      current === null || current.submittedAt === null
         ? null
         : {
             versionId: current.id,
@@ -209,7 +210,7 @@ export async function caseViewFrom(exec: Executor, row: CaseRow): Promise<CaseVi
             isLatest: true,
           },
     draft:
-      draft === undefined
+      draft === null
         ? null
         : { draftId: draft.id, versionNumber: draft.versionNumber, updatedAt: row.updatedAt.toISOString() },
     caseRevision: row.rowVersion,
@@ -238,8 +239,7 @@ export async function listCases(
       .select({
         c: cases,
         currentVersionNumber: current.versionNumber,
-        currentReadyAt: current.readyAt,
-        draftParentVersionId: draft.parentVersionId,
+        status: caseStatusSql(current, draft),
       })
       .from(cases)
       .leftJoin(current, eq(current.id, cases.currentVersionId))
@@ -258,10 +258,7 @@ export async function listCases(
     businessUnit: r.c.businessUnit,
     businessOwner: r.c.ownerSubjectId,
     useCaseGroup: r.c.useCaseGroup,
-    status: deriveCaseStatus({
-      draft: r.c.draftVersionId === null ? null : { parentVersionId: r.draftParentVersionId },
-      current: r.c.currentVersionId === null ? null : { readyAt: r.currentReadyAt },
-    }),
+    status: r.status,
     currentVersionNumber: r.c.currentVersionId === null ? null : r.currentVersionNumber,
     updatedAt: r.c.updatedAt.toISOString(),
   }));

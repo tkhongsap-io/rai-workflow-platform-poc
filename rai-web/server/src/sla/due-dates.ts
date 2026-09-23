@@ -3,7 +3,7 @@
 import { Value } from 'typebox/value';
 import { LANES, type Lane } from '@rai/shared/constants';
 import { NotFoundError } from '@rai/shared/errors';
-import { CalendarBodySchema, SlaBodySchema, type ConfigurationBodies } from '@rai/shared/schemas/cases';
+import { CalendarBodySchema, SlaBodySchema } from '@rai/shared/schemas/cases';
 import type { LaneDue } from '@rai/shared/schemas/sla';
 import { dueOn } from '@rai/shared/sla/working-days';
 import { readVersionRow } from '../cases/repository.js';
@@ -17,47 +17,57 @@ export class FrozenSlaUnavailable extends Error {
   }
 }
 
+/** Frozen (sla, calendar) revision pairs read once per request; nearly every version shares one pair. */
+export type SlaCalendarMemo = Map<string, ReturnType<typeof readSlaCalendar>>;
+
 function frozenId(frozen: unknown, kind: 'sla' | 'calendar'): string | undefined {
   if (frozen === null || typeof frozen !== 'object') return undefined;
   const id = (frozen as Record<string, unknown>)[kind];
   return typeof id === 'string' ? id : undefined;
 }
 
-/** SLA working days and holiday list frozen on this version. Fails closed if either revision is missing. */
-export async function frozenSlaCalendar(
-  exec: Executor,
-  versionId: string,
-  frozen: unknown,
-): Promise<{ sla: ConfigurationBodies['sla']; holidays: readonly string[] }> {
-  const slaId = frozenId(frozen, 'sla');
-  const calendarId = frozenId(frozen, 'calendar');
-  if (slaId === undefined || calendarId === undefined) throw new FrozenSlaUnavailable(versionId);
+async function readSlaCalendar(exec: Executor, slaId: string, calendarId: string) {
   const [slaRow, calendarRow] = await Promise.all([
     readRevisionById(exec, slaId),
     readRevisionById(exec, calendarId),
   ]);
-  if (slaRow === undefined || slaRow.kind !== 'sla' || !Value.Check(SlaBodySchema, slaRow.body)) {
-    throw new FrozenSlaUnavailable(versionId);
-  }
   if (
-    calendarRow === undefined ||
-    calendarRow.kind !== 'calendar' ||
+    slaRow?.kind !== 'sla' ||
+    !Value.Check(SlaBodySchema, slaRow.body) ||
+    calendarRow?.kind !== 'calendar' ||
     !Value.Check(CalendarBodySchema, calendarRow.body)
   ) {
-    throw new FrozenSlaUnavailable(versionId);
+    return undefined;
   }
   return { sla: slaRow.body, holidays: calendarRow.body.holidays };
 }
 
-/** Due date of each lane. The clock is this version's `submitted_at` (D06: it restarts on the next submit). */
-export async function laneDueDates(exec: Executor, versionId: string): Promise<LaneDue[]> {
-  const version = await readVersionRow(exec, versionId);
-  if (version === undefined || version.submittedAt === null) throw new NotFoundError('version');
+/**
+ * Due date of each lane. The clock is this version's `submitted_at` (D06: it restarts on the next submit).
+ * Fails closed if the frozen sla or calendar revision is missing.
+ */
+export async function dueDatesFor(
+  exec: Executor,
+  version: { id: string; submittedAt: Date; frozenConfiguration: unknown },
+  memo: SlaCalendarMemo = new Map(),
+): Promise<LaneDue[]> {
+  const slaId = frozenId(version.frozenConfiguration, 'sla');
+  const calendarId = frozenId(version.frozenConfiguration, 'calendar');
+  if (slaId === undefined || calendarId === undefined) throw new FrozenSlaUnavailable(version.id);
+  const key = `${slaId}:${calendarId}`;
+  if (!memo.has(key)) memo.set(key, readSlaCalendar(exec, slaId, calendarId));
+  const frozen = await memo.get(key);
+  if (frozen === undefined) throw new FrozenSlaUnavailable(version.id);
   const opened = version.submittedAt;
-  const { sla, holidays } = await frozenSlaCalendar(exec, versionId, version.frozenConfiguration);
   return LANES.map((lane: Lane) => ({
     lane,
     openedAt: opened.toISOString(),
-    dueOn: dueOn(opened, sla[lane], holidays),
+    dueOn: dueOn(opened, frozen.sla[lane], frozen.holidays),
   }));
+}
+
+export async function laneDueDates(exec: Executor, versionId: string): Promise<LaneDue[]> {
+  const version = await readVersionRow(exec, versionId);
+  if (version === undefined || version.submittedAt === null) throw new NotFoundError('version');
+  return dueDatesFor(exec, { ...version, submittedAt: version.submittedAt });
 }

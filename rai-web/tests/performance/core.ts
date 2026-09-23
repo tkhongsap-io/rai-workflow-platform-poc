@@ -68,8 +68,9 @@ export function queueShape(value: unknown): asserts value is QueueResponse {
     assert(Number.isFinite(Date.parse(r.updatedAt)));
   }
   for (const s of CASE_STATUSES) assert(Number.isInteger(q.statusCounts[s]) && q.statusCounts[s] >= 0);
-  for (const a of Object.values(q.filterOptions))
-    assert(Array.isArray(a) && a.every((v: unknown) => typeof v === 'string'));
+  const { owners, ...plain } = q.filterOptions;
+  for (const a of Object.values(plain)) assert(Array.isArray(a) && a.every((v) => typeof v === 'string'));
+  assert(owners.every((o) => typeof o.value === 'string' && typeof o.label === 'string'));
 }
 export class Api {
   private cookie = '';
@@ -174,7 +175,10 @@ export function expectedQueue(rows: QueueResponse['items'], user: string, query:
     ) as QueueResponse['statusCounts'],
     filterOptions: {
       statuses: unique(scope.map((r) => r.status)) as QueueResponse['filterOptions']['statuses'],
-      owners: unique(scope.map((r) => r.businessOwner)),
+      owners: unique(scope.map((r) => r.businessOwner)).map((value) => ({
+        value,
+        label: scope.find((r) => r.businessOwner === value)!.ownerDisplayName,
+      })),
       useCaseGroups: unique(scope.map((r) => r.useCaseGroup)),
     },
   };

@@ -9,6 +9,7 @@ import path from 'node:path';
 import { createLogCapture, assertNoLeak, type LogCapture } from '../support/log-capture.js';
 import { sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
+import type { CaseListResponse, CaseView } from '@rai/shared/schemas/cases';
 import type { PackDraft } from '@rai/shared/schemas/pack';
 import type { SubmitRequest, SubmittedVersion } from '@rai/shared/schemas/versions';
 import { buildApp } from '../support/observed-app.js';
@@ -350,7 +351,13 @@ describe(`W3-01 scoped queue — ${SET}`, () => {
     assert.equal(empty.total, 5);
     assert.deepEqual(empty.items, []);
     assert.deepEqual(empty.statusCounts, all.statusCounts);
-    assert.deepEqual(all.filterOptions.owners, [...new Set(all.items.map((x) => x.businessOwner))].sort());
+    assert.deepEqual(
+      all.filterOptions.owners,
+      [...new Set(all.items.map((x) => x.businessOwner))].sort().map((value) => ({
+        value,
+        label: all.items.find((x) => x.businessOwner === value)!.ownerDisplayName,
+      })),
+    );
     assert.deepEqual(
       all.filterOptions.useCaseGroups,
       [...new Set(all.items.map((x) => x.useCaseGroup))].sort(),
@@ -396,6 +403,8 @@ describe(`W3-01 scoped queue — ${SET}`, () => {
       },
     });
     assert.equal(sent.statusCode, 201, sent.body);
+    const mirror = await db.owner.execute(sql`SELECT desk_status FROM "case" WHERE id = ${VENDOR.caseId}`);
+    assert.equal((mirror.rows[0] as { desk_status: string }).desk_status, 'draft');
     const successor = await card();
     assert.equal(successor.status, 'sent_back');
     assert.equal(successor.nextAction, 'correct_pack');
@@ -458,6 +467,14 @@ describe(`W3-01 scoped queue — ${SET}`, () => {
     });
     assert.equal((await card()).status, 'awaiting_disposition');
     assert.equal((await card()).nextAction, 'resolve_findings');
+    // The case page and the case list derive the same status as the queue card.
+    const view = await app.inject({ url: `/api/cases/${VENDOR.caseId}`, headers: asUser(owner) });
+    assert.equal(view.json<CaseView>().status, 'awaiting_disposition');
+    const list = await app.inject({ url: '/api/cases?pageSize=100', headers: asUser(owner) });
+    assert.equal(
+      list.json<CaseListResponse>().items.find((x) => x.caseId === VENDOR.caseId)?.status,
+      'awaiting_disposition',
+    );
     assert.equal((await queue(owner, { status: 'awaiting_disposition' })).total, 1);
     assert.equal((await queue(owner, { searchBy: 'status', search: 'awaiting_disposition' })).total, 1);
     assert.equal((await queue(owner)).statusCounts.awaiting_disposition, 1);
