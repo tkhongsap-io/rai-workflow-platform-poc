@@ -33,7 +33,7 @@ import { FIXTURE_CASES, findFixtureCase } from '@rai/fixtures/data/cases/index';
 import { loadFixtures } from '@rai/fixtures/load';
 import { fixtureSetLabel, readManifest } from '@rai/fixtures/manifest';
 import { ScriptedQcRunner } from '@rai/fixtures/substitutes/qc/index';
-import type { QcRunner, VersionRef } from '@rai/shared/qc/types';
+import type { QcRunRequest, QcRunResult, QcRunner, VersionRef } from '@rai/shared/qc/types';
 import { findingKeyOf } from '@rai/shared/qc/validate';
 import { runAndPersistLaneQc, runAndPersistSubmitQc } from '@rai/server/qc/orchestrator';
 import { computeReadiness } from '@rai/server/observability/health';
@@ -264,6 +264,36 @@ function dispose(
     },
     payload: body as object,
   });
+}
+
+/** A completed run with one PACK-SLOT-MISSING finding; the slot/lane pair decides whether it validates. */
+function slotMissingResult(
+  request: QcRunRequest,
+  slot: 1 | 2 | 5,
+  owningLane: 'ai_coe' | 'dpo',
+): QcRunResult {
+  const scope = { kind: 'slot', slot } as const;
+  return {
+    status: 'completed',
+    rulesEvaluated: ['PACK-SLOT-MISSING'],
+    findings: [
+      {
+        findingKey: findingKeyOf('PACK-SLOT-MISSING', scope),
+        ruleId: 'PACK-SLOT-MISSING',
+        ruleRevision: request.qcRulesRevision,
+        trigger: request.trigger,
+        scope,
+        severity: 'medium',
+        owningLane,
+        evidence: [{ artifactId: null, contentHash: null, slot, locator: { kind: 'absent' } }],
+        measure: null,
+        message: { key: 'qc.finding.slot_missing', params: { slot } },
+        provenance: { runner: 'finding-probe', runnerVersion: '1' },
+      },
+    ],
+    startedAt: now().toISOString(),
+    finishedAt: now().toISOString(),
+  };
 }
 
 describe(`W2-05 findings and dispositions — ${SET}`, () => {
@@ -1019,31 +1049,9 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
       { lane: 'dpo', slot: 2, owningLane: 'dpo', stored: true }, // control: the same finding shape is valid
     ] as const;
     for (const { lane, slot, owningLane, stored } of cases) {
-      const scope = { kind: 'slot', slot } as const;
       const probe: QcRunner = {
         identity: { runner: 'finding-probe', runnerVersion: '1' },
-        run: (request) =>
-          Promise.resolve({
-            status: 'completed',
-            rulesEvaluated: ['PACK-SLOT-MISSING'],
-            findings: [
-              {
-                findingKey: findingKeyOf('PACK-SLOT-MISSING', scope),
-                ruleId: 'PACK-SLOT-MISSING',
-                ruleRevision: request.qcRulesRevision,
-                trigger: request.trigger,
-                scope,
-                severity: 'medium',
-                owningLane,
-                evidence: [{ artifactId: null, contentHash: null, slot, locator: { kind: 'absent' } }],
-                measure: null,
-                message: { key: 'qc.finding.slot_missing', params: { slot } },
-                provenance: { runner: 'finding-probe', runnerVersion: '1' },
-              },
-            ],
-            startedAt: now().toISOString(),
-            finishedAt: now().toISOString(),
-          }),
+        run: (request) => Promise.resolve(slotMissingResult(request, slot, owningLane)),
       };
       const outcome = await runAndPersistLaneQc(
         { db: db.app, runner: probe, now, ...diagnostics },
@@ -1078,6 +1086,55 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
         [['qc.run.unavailable', 'runner_error']],
       );
     }
+  });
+
+  it('an invalid finding that arrives after Ready is recorded late as unavailable with no refused findings', async () => {
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, VENDOR.caseId);
+    let enter!: () => void;
+    let release!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      enter = resolve;
+    });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const correlationId = randomUUID();
+    const pending = runAndPersistLaneQc(
+      {
+        db: db.app,
+        now,
+        ...diagnostics,
+        runner: {
+          identity: { runner: 'finding-probe', runnerVersion: '1' },
+          async run(request) {
+            enter();
+            await gate;
+            return slotMissingResult(request, 5, 'ai_coe'); // slot 5: owning lane pending (#35)
+          },
+        },
+      },
+      { caseId: VENDOR.caseId, versionId: version.versionId, lane: 'ai_coe', correlationId },
+    );
+    const rejected = assert.rejects(pending, { code: 'stale_version' });
+    await entered;
+    try {
+      await db.owner.execute(sql`UPDATE pack_version SET ready_at=now() WHERE id=${version.versionId}`);
+    } finally {
+      release();
+    }
+    await rejected;
+    const late = await db.owner.execute(
+      sql`SELECT status, refused_finding_count FROM qc_late_result WHERE version_id=${version.versionId}`,
+    );
+    assert.deepEqual(late.rows, [{ status: 'unavailable', refused_finding_count: 0 }]);
+    const logged = capture
+      .lines()
+      .filter((line) => line.event === 'qc.run.late' && line.correlationId === correlationId);
+    assert.deepEqual(
+      logged.map((line) => [line.fields?.status, line.fields?.refusedFindingCount]),
+      [['unavailable', 0]],
+    );
   });
 
   it('lane QC is forbidden for owner, BU SPOC, Admin, and a different lane; no rows written', async () => {
