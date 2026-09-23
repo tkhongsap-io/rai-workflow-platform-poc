@@ -127,7 +127,7 @@ export function assertValid<T extends TSchema>(schema: T, value: unknown, contex
   if (fields.length > 0) throw new InvalidInputError(fields);
 }
 
-/** Minimal RFC 6265 parse (values are opaque base64url, never quoted); mirrors W1-01's `parseCookieHeader`. */
+/** Minimal RFC 6265 parse (values are opaque base64url, never quoted). */
 export function parseCookies(header: string | undefined): Record<string, string> {
   const out: Record<string, string> = {};
   if (header === undefined) return out;

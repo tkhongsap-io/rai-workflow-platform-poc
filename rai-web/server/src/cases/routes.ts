@@ -9,7 +9,8 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import { Type } from 'typebox';
-import { ForbiddenError, NotFoundError, UnauthenticatedError } from '@rai/shared/errors';
+import { NotFoundError } from '@rai/shared/errors';
+import type { Principal } from '@rai/shared/schemas/auth';
 import {
   CASE_LIST_DEFAULTS,
   CaseCreateRequestSchema,
@@ -17,8 +18,8 @@ import {
   CaseUpdateRequestSchema,
   type CaseListResponse,
 } from '@rai/shared/schemas/cases';
-import { actorOf } from '../authz/middleware.js';
-import { authorize, type Action, type CaseScopeFacts } from '../authz/policy.js';
+import { actorOf, authorizedActor, denyUnlessAllowed } from '../authz/middleware.js';
+import type { Action, CaseScopeFacts } from '../authz/policy.js';
 import { effectiveConfiguration } from '../configuration/store.js';
 import type { Emitter } from '../observability/log.js';
 import { IDEMPOTENCY_HEADER, requireIdempotencyKey } from './idempotency.js';
@@ -43,24 +44,17 @@ export function registerCaseRoutes(fastify: FastifyInstance, deps: CaseRouteDeps
   const now = deps.now ?? (() => new Date());
 
   /** A body-driven scope evaluation: same `authorize`, same `authz.denied` line, same plain 403 envelope. */
-  function authorizeFacts(request: FastifyRequest, action: Action, facts: CaseScopeFacts) {
-    const principal = request.principal;
-    if (principal === undefined) throw new UnauthenticatedError();
-    const actor = actorOf(principal);
-    const decision = authorize(actor, action, { kind: 'case', facts });
-    if (!decision.allow) {
-      deps.emitter.log('authz.denied', {
-        action,
+  const authorizeFacts = (principal: Principal, action: Action, facts: CaseScopeFacts) =>
+    denyUnlessAllowed(
+      deps.emitter,
+      actorOf(principal),
+      action,
+      { kind: 'case', facts },
+      {
         targetType: 'case',
         targetId: facts.caseId,
-        actorSubjectId: actor.subjectId,
-        actorRole: actor.roles.map((r) => r.role).join(','),
-        reason: decision.reason,
-      });
-      throw new ForbiddenError();
-    }
-    return decision;
-  }
+      },
+    );
 
   // POST /api/cases → 201 CaseView. Role step in the middleware (target none); validation; scope step on the body.
   app.post(
@@ -71,10 +65,10 @@ export function registerCaseRoutes(fastify: FastifyInstance, deps: CaseRouteDeps
       preValidation: projectedFieldsHook,
     },
     async (request, reply) => {
-      const principal = request.principal!;
+      const { principal } = authorizedActor(request);
       const key = requireIdempotencyKey(request.headers[IDEMPOTENCY_HEADER]);
       const { columns } = await validateWritableFields(deps, deps.db, request.body, principal, now());
-      const decision = authorizeFacts(request, 'case.create', {
+      const decision = authorizeFacts(principal, 'case.create', {
         ownerSubjectId: columns.ownerSubjectId!,
         businessUnitId: columns.businessUnitId!,
       });
@@ -99,7 +93,10 @@ export function registerCaseRoutes(fastify: FastifyInstance, deps: CaseRouteDeps
     async (request): Promise<CaseListResponse> => {
       const page = request.query.page ?? CASE_LIST_DEFAULTS.page;
       const pageSize = request.query.pageSize ?? CASE_LIST_DEFAULTS.pageSize;
-      const { items, total } = await listCases(deps.db, actorOf(request.principal!), { page, pageSize });
+      const { items, total } = await listCases(deps.db, actorOf(authorizedActor(request).principal), {
+        page,
+        pageSize,
+      });
       return { items, page, pageSize, total };
     },
   );
@@ -128,9 +125,8 @@ export function registerCaseRoutes(fastify: FastifyInstance, deps: CaseRouteDeps
       preValidation: projectedFieldsHook,
     },
     async (request) => {
-      const principal = request.principal!;
-      const stored = request.authz?.facts;
-      if (stored === undefined) throw new NotFoundError('case');
+      const { principal, role: storedRole, facts } = authorizedActor(request);
+      const stored = facts!; // target 'case': the middleware already answered 404 for a missing case
       const { columns } = await validateWritableFields(
         deps,
         deps.db,
@@ -139,12 +135,12 @@ export function registerCaseRoutes(fastify: FastifyInstance, deps: CaseRouteDeps
         now(),
         'body.fields',
       );
-      let role = request.authz!.decision.via.role;
+      let role = storedRole;
       if (
         request.body.fields.businessOwner !== undefined ||
         request.body.fields.businessUnitId !== undefined
       ) {
-        role = authorizeFacts(request, 'case.edit_draft', {
+        role = authorizeFacts(principal, 'case.edit_draft', {
           caseId: request.params.caseId,
           ownerSubjectId: columns.ownerSubjectId ?? stored.ownerSubjectId,
           businessUnitId: columns.businessUnitId ?? stored.businessUnitId,

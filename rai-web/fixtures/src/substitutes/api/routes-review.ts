@@ -527,15 +527,17 @@ export function reviewRoutes(): RouteDefinition[] {
         if (!UUID_PATTERN.test(ctx.params.findingId ?? '')) throw new NotFoundError('finding');
         const finding = ctx.store.findings.get(ctx.params.findingId ?? '');
         if (finding === undefined || finding.caseId !== stored.caseId) {
-          const probe = authorize(actorOf(ctx.principal), action, {
-            kind: 'finding',
-            facts: {
-              caseId: stored.caseId,
-              ownerSubjectId: stored.fields.businessOwner,
-              businessUnitId: stored.fields.businessUnitId,
-            },
-            owningLane: 'ai_coe',
-          });
+          // No owning lane for an unknown finding (issue #35): 404 when any lane would allow, as the server does.
+          const facts = {
+            caseId: stored.caseId,
+            ownerSubjectId: stored.fields.businessOwner,
+            businessUnitId: stored.fields.businessUnitId,
+          };
+          const actor = actorOf(ctx.principal);
+          const probes = LANES.map((owningLane) =>
+            authorize(actor, action, { kind: 'finding', facts, owningLane }),
+          );
+          const probe = probes.find((p) => p.allow) ?? probes[0]!;
           if (!probe.allow) {
             ctx.emitter.log('authz.denied', {
               action,

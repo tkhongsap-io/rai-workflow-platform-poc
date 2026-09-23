@@ -12,7 +12,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { ForbiddenError, NotFoundError, UnauthenticatedError } from '@rai/shared/errors';
 import { LANES, type Lane } from '@rai/shared/constants';
-import type { Principal } from '@rai/shared/schemas/auth';
+import type { Principal, Role } from '@rai/shared/schemas/auth';
 import type { SessionRecord, SessionStore } from '../identity/session.js';
 import { maybeContext } from '../observability/context.js';
 import type { Emitter } from '../observability/log.js';
@@ -72,19 +72,6 @@ export class RouteWithoutAuthDeclaration extends Error {
   }
 }
 
-/** Minimal RFC 6265 cookie-header parse for the session token only (values are opaque base64url, never quoted). */
-export function parseCookieHeader(header: string | undefined): Record<string, string | undefined> {
-  const out: Record<string, string | undefined> = {};
-  if (header === undefined) return out;
-  for (const part of header.split(';')) {
-    const eq = part.indexOf('=');
-    if (eq <= 0) continue;
-    const name = part.slice(0, eq).trim();
-    if (name !== '' && out[name] === undefined) out[name] = part.slice(eq + 1).trim();
-  }
-  return out;
-}
-
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const LANE_SET: ReadonlySet<string> = new Set(LANES);
 const SAFE_METHODS: ReadonlySet<string> = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -104,21 +91,44 @@ function isLane(value: string | undefined): value is Lane {
 }
 
 function emitDenied(
-  deps: Pick<AuthorizationDeps, 'emitter'>,
+  emitter: Emitter,
   actor: Actor,
-  auth: Extract<RouteAuth, { kind: 'action' }> | undefined, // undefined: a session route, no policy action
-  targetId: string | undefined,
+  log: { action?: Action; targetType?: string; targetId?: string | undefined },
   reason: DenyReason | 'cross_site',
 ): never {
-  deps.emitter.log('authz.denied', {
-    action: auth?.action,
-    targetType: auth?.target,
-    targetId,
+  emitter.log('authz.denied', {
+    action: log.action,
+    targetType: log.targetType,
+    targetId: log.targetId,
     actorSubjectId: actor.subjectId,
     actorRole: actor.roles.map((r) => r.role).join(','),
     reason,
   });
   throw new ForbiddenError();
+}
+
+/** `authorize`, and on a deny the one `authz.denied` line and a 403. Handlers that authorize a body use it too. */
+export function denyUnlessAllowed(
+  emitter: Emitter,
+  actor: Actor,
+  action: Action,
+  target: Target,
+  log: { targetType: string; targetId?: string | undefined },
+): Decision & { allow: true } {
+  const decision = authorize(actor, action, target);
+  if (!decision.allow) emitDenied(emitter, actor, { action, ...log }, decision.reason);
+  return decision;
+}
+
+/** What a handler behind an `action` route reads. Missing means the route skipped the middleware: a wiring bug. */
+export function authorizedActor(request: FastifyRequest): {
+  principal: Principal;
+  role: Role;
+  facts: CaseScopeFacts | undefined;
+} {
+  const { principal, authz } = request;
+  if (principal === undefined || authz === undefined) throw new Error('route reached without authorization');
+  return { principal, role: authz.decision.via.role, facts: authz.facts };
 }
 
 /**
@@ -132,14 +142,14 @@ export async function authorizeRequest(
   ids: { caseId?: string; artifactId?: string; lane?: string },
 ): Promise<AuthzResult> {
   const actor = actorOf(principal);
+  const log: { targetType: string; targetId?: string | undefined } = { targetType: auth.target };
   let target: Target;
   let facts: CaseScopeFacts | undefined;
-  let targetId: string | undefined;
 
   if (auth.target === 'none') {
     target = { kind: 'none' };
   } else if (auth.target === 'lane') {
-    targetId = ids.caseId;
+    log.targetId = ids.caseId;
     if (ids.caseId !== undefined && UUID.test(ids.caseId)) {
       facts = await deps.facts.byCaseId(ids.caseId);
     }
@@ -147,24 +157,21 @@ export async function authorizeRequest(
       target = { kind: 'unresolved' };
     } else if (!isLane(ids.lane)) {
       // Unknown :lane: still authorize so Admin → role and a reviewer → lane (params are not a body 422).
-      target = { kind: 'lane', facts, lane: 'dpo' };
-      const probe = authorize(actor, auth.action, target);
-      if (!probe.allow) emitDenied(deps, actor, auth, targetId, probe.reason);
-      emitDenied(deps, actor, auth, targetId, 'lane');
+      denyUnlessAllowed(deps.emitter, actor, auth.action, { kind: 'lane', facts, lane: 'dpo' }, log);
+      emitDenied(deps.emitter, actor, { action: auth.action, ...log }, 'lane');
     } else {
       target = { kind: 'lane', facts, lane: ids.lane };
     }
   } else {
     const id = auth.target === 'case' ? ids.caseId : ids.artifactId;
-    targetId = id;
+    log.targetId = id;
     if (id !== undefined && UUID.test(id)) {
       facts = auth.target === 'case' ? await deps.facts.byCaseId(id) : await deps.facts.byArtifactId(id);
     }
     target = facts === undefined ? { kind: 'unresolved' } : { kind: 'case', facts };
   }
 
-  const decision = authorize(actor, auth.action, target);
-  if (!decision.allow) emitDenied(deps, actor, auth, targetId, decision.reason);
+  const decision = denyUnlessAllowed(deps.emitter, actor, auth.action, target, log);
   if (target.kind === 'unresolved') {
     throw new NotFoundError(auth.target === 'artifact' ? 'artifact' : 'case');
   }
@@ -183,17 +190,9 @@ export function registerAuthorization(fastify: FastifyInstance, deps: Authorizat
   fastify.addHook('onRequest', async (request: FastifyRequest, _reply: FastifyReply) => {
     const auth = request.routeOptions.config.auth;
     if (auth === undefined) return; // no route matched: the not-found handler answers
-    // W0-10: probes must survive a session-store outage, even with a browser cookie.
-    if (
-      auth.kind === 'public' &&
-      (request.routeOptions.url === '/healthz' || request.routeOptions.url === '/readyz')
-    )
-      return;
-    // @fastify/cookie's own onRequest hook may run after this one (plugins load after root hooks are added).
-    const cookies =
-      (request.cookies as Record<string, string | undefined> | null) ??
-      parseCookieHeader(request.headers.cookie);
-    const token = cookies[deps.sessionCookieName];
+    // Public routes (sign-in, static assets, probes) never touch the session store, so they survive its outage.
+    if (auth.kind === 'public') return;
+    const token = request.cookies[deps.sessionCookieName];
     if (typeof token === 'string' && token !== '') {
       const session = await deps.sessionStore.resolve(token, deps.sessionPolicy(), now());
       if (session !== undefined) {
@@ -204,7 +203,6 @@ export function registerAuthorization(fastify: FastifyInstance, deps: Authorizat
           ctx.actor = { subjectId: session.subjectId, roles: session.principal.roles.map((r) => r.role) };
       }
     }
-    if (auth.kind === 'public') return;
     if (request.principal === undefined) throw new UnauthenticatedError(); // 401 before anything else
     // CSRF: SameSite=Lax still sends the cookie on same-site requests (another loopback port, a sibling subdomain),
     // so a write a browser marks as not same-origin is refused here, before its body is read. An absent header is
@@ -212,10 +210,9 @@ export function registerAuthorization(fastify: FastifyInstance, deps: Authorizat
     const site = request.headers['sec-fetch-site'];
     if (site !== undefined && site !== 'same-origin' && site !== 'none' && !SAFE_METHODS.has(request.method))
       emitDenied(
-        deps,
+        deps.emitter,
         actorOf(request.principal),
-        auth.kind === 'action' ? auth : undefined,
-        undefined,
+        auth.kind === 'action' ? { action: auth.action, targetType: auth.target } : {},
         'cross_site',
       );
   });

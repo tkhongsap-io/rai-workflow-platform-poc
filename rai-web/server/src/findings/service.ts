@@ -90,7 +90,6 @@ export async function recordDisposition(
   idempotencyKey: string,
 ): Promise<WorkflowResult<DispositionResponse>> {
   const stamp = nextMonotonicStamp(deps.now ?? (() => new Date()));
-  if (!isUuid(findingId)) throw new NotFoundError('finding');
   if (request.expectedVersion.versionId !== undefined && !isUuid(request.expectedVersion.versionId)) {
     throw new NotFoundError('version');
   }
