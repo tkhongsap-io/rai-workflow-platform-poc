@@ -160,7 +160,7 @@ export function createEmitter(logger: FastifyBaseLogger, options: EmitterOptions
         fields,
         level === undefined ? { strict: options.strict } : { strict: options.strict, level },
       );
-      const { level: lineLevel, ...rest } = line;
+      const { level: lineLevel, time: _time, ...rest } = line; // pino writes level and time itself (loggerOptions)
       logger[lineLevel](rest);
       return line;
     },
@@ -175,6 +175,9 @@ export function loggerOptions(config: {
   const base = {
     base: null, // The W0-10 processId replaces Pino's pid/hostname; never expose the host account name.
     level: config.level,
+    // The W0-10 section 3.2 line: one ISO `time` key and the level as its label, never pino's epoch and number.
+    timestamp: () => `,"time":"${new Date().toISOString()}"`,
+    formatters: { level: (label: string) => ({ level: label }) },
     redact: {
       paths: [
         'req.headers.authorization',

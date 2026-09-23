@@ -13,11 +13,51 @@ import { createFixtureIdentityProvider } from '../identity/fixture.js';
 import type { IdentityDeps } from '../app.js';
 import { buildApp } from '../app.js';
 import type { Db } from '../db/client.js';
-import { computeReadiness } from './health.js';
+import type { SessionRecord } from '../identity/session.js';
+import { computeReadiness, createReadinessReader, type HealthProbes } from './health.js';
 import { createStoreProbes } from './probes.js';
 
 const canary = 'RAI-DESK-SYNTHETIC-FIXTURE';
 const id = '11111111-1111-4111-8111-111111111111';
+const readinessOf = (probes: HealthProbes) =>
+  computeReadiness(
+    {
+      identity: () => ({ mode: 'fixture', ready: true }),
+      loopbackBind: true,
+      mailKind: 'memory',
+      qcKind: 'substitute',
+      build: { commit: 'dev', schemaVersion: 'unknown' },
+    },
+    probes,
+  );
+const storeProbes = {
+  db: () => Promise.resolve('ok' as const),
+  migrations: () => Promise.resolve('current' as const),
+  blob: () => Promise.resolve('ok' as const),
+  mailSink: () => Promise.resolve('ok' as const),
+  qc: () => Promise.resolve('disabled' as const),
+};
+const unavailable = (): Promise<never> => Promise.reject(new Error(canary));
+const identityResolving = (resolve: () => Promise<SessionRecord | undefined>): IdentityDeps => ({
+  fixtureProvider: createFixtureIdentityProvider([]),
+  adapter: {
+    mode: 'fixture',
+    verifier: undefined,
+    start: async () => {},
+    verifyBoundAddress: () => {},
+    resolvePrincipal: unavailable,
+    health: () => ({ mode: 'fixture', ready: true }),
+    sessionPolicy: () => ({ absoluteHours: 12, idleMinutes: 30 }),
+  },
+  sessionStore: {
+    create: unavailable,
+    revoke: unavailable,
+    setLocale: unavailable,
+    recordSignInRefused: unavailable,
+    resolve,
+  },
+  facts: { byCaseId: unavailable, byArtifactId: unavailable },
+});
 function setup(
   identity?: IdentityDeps,
   readiness?: () => Promise<ReadinessReport>,
@@ -44,23 +84,14 @@ function setup(
       readiness:
         readiness ??
         (() =>
-          computeReadiness(
-            {
-              identity: () => ({ mode: 'fixture', ready: true }),
-              loopbackBind: true,
-              mailKind: 'memory',
-              qcKind: 'substitute',
-              build: { commit: 'dev', schemaVersion: 'unknown' },
-            },
-            {
-              ...createStoreProbes(
-                'postgres://synthetic:synthetic@127.0.0.1:1/rai',
-                '/nonexistent-synthetic-blob',
-              ),
-              mailSink: () => Promise.resolve('ok'),
-              qc: () => Promise.resolve('disabled'),
-            },
-          )),
+          readinessOf({
+            ...createStoreProbes(
+              'postgres://synthetic:synthetic@127.0.0.1:1/rai',
+              '/nonexistent-synthetic-blob',
+            ),
+            mailSink: () => Promise.resolve('ok'),
+            qc: () => Promise.resolve('disabled'),
+          })),
     },
   });
   return {
@@ -76,7 +107,7 @@ function setup(
         .map(
           (line) =>
             JSON.parse(line) as {
-              level: number;
+              level: string;
               event: string;
               correlationId: string;
               fields: Record<string, unknown>;
@@ -204,30 +235,12 @@ test('successful static routes are silent while errors retain request traces', a
 
 test('health probes bypass a failing cookie session lookup while protected routes still resolve it', async () => {
   let calls = 0;
-  const unavailable = (): Promise<never> => Promise.reject(new Error(canary));
-  const app = setup({
-    fixtureProvider: createFixtureIdentityProvider([]),
-    adapter: {
-      mode: 'fixture',
-      verifier: undefined,
-      start: async () => {},
-      verifyBoundAddress: () => {},
-      resolvePrincipal: unavailable,
-      health: () => ({ mode: 'fixture', ready: true }),
-      sessionPolicy: () => ({ absoluteHours: 12, idleMinutes: 30 }),
-    },
-    sessionStore: {
-      create: unavailable,
-      revoke: unavailable,
-      setLocale: unavailable,
-      recordSignInRefused: unavailable,
-      resolve: async () => {
-        calls++;
-        return unavailable();
-      },
-    },
-    facts: { byCaseId: unavailable, byArtifactId: unavailable },
-  });
+  const app = setup(
+    identityResolving(async () => {
+      calls++;
+      return unavailable();
+    }),
+  );
   try {
     const headers = { cookie: `rai_session=${canary}` };
     assert.equal((await app.fastify.inject({ url: '/healthz', headers })).statusCode, 200);
@@ -245,24 +258,7 @@ test('health probes bypass a failing cookie session lookup while protected route
 
 test('readiness emits its first status and transitions, not repeated polls', async () => {
   let db: 'ok' | 'unreachable' = 'ok';
-  const app = setup(undefined, () =>
-    computeReadiness(
-      {
-        identity: () => ({ mode: 'fixture', ready: true }),
-        loopbackBind: true,
-        mailKind: 'memory',
-        qcKind: 'substitute',
-        build: { commit: 'dev', schemaVersion: 'unknown' },
-      },
-      {
-        db: () => Promise.resolve(db),
-        migrations: () => Promise.resolve('current'),
-        blob: () => Promise.resolve('ok'),
-        mailSink: () => Promise.resolve('ok'),
-        qc: () => Promise.resolve('disabled'),
-      },
-    ),
-  );
+  const app = setup(undefined, () => readinessOf({ ...storeProbes, db: () => Promise.resolve(db) }));
   try {
     for (const status of ['ok', 'ok', 'unreachable', 'unreachable', 'ok'] as const) {
       db = status;
@@ -275,8 +271,9 @@ test('readiness emits its first status and transitions, not repeated polls', asy
     );
     assert.deepEqual(
       events.map((line) => line.level),
-      [30, 40, 30],
+      ['info', 'warn', 'info'],
     );
+    for (const line of app.text().split('\n').filter(Boolean)) assert.equal(line.split('"time":').length, 2);
   } finally {
     await app.fastify.close();
   }
@@ -288,8 +285,62 @@ test('readiness outage remains visible at the warn log threshold', async () => {
     assert.equal((await app.fastify.inject('/readyz')).statusCode, 503);
     const events = app.lines().filter((line) => line.event === 'health.readiness');
     assert.equal(events.length, 1);
-    assert.equal(events[0]!.level, 40);
+    assert.equal(events[0]!.level, 'warn');
     assert.equal(events[0]!.fields.status, 'not_ready');
+  } finally {
+    await app.fastify.close();
+  }
+});
+
+test('pending migrations close every route but the health probes, one probe per burst', async () => {
+  let probes = 0;
+  const app = setup(
+    undefined,
+    createReadinessReader(() => {
+      probes++;
+      return readinessOf({ ...storeProbes, migrations: () => Promise.resolve('pending') });
+    }),
+  );
+  app.fastify.get('/test/business', { config: { auth: { kind: 'public' } } }, () => 'served');
+  try {
+    const burst = await Promise.all(Array.from({ length: 5 }, () => app.fastify.inject('/test/business')));
+    for (const response of burst) {
+      assert.equal(response.statusCode, 503);
+      assert.equal(response.json<{ error: { code: string } }>().error.code, 'internal_error');
+    }
+    assert.equal(probes, 1);
+    assert.equal((await app.fastify.inject('/healthz')).statusCode, 200);
+    const ready = await app.fastify.inject('/readyz');
+    assert.equal(ready.statusCode, 503);
+    assert.equal(ready.json<ReadinessReport>().store.migrations, 'pending');
+  } finally {
+    await app.fastify.close();
+  }
+});
+
+test('request.completed names the signed-in actor and a sole role', async () => {
+  const principal = {
+    subjectId: 'fixture:synthetic-owner',
+    displayName: 'Synthetic owner',
+    email: 'owner@rai-desk.example',
+    roles: [{ role: 'owner' as const, scope: { kind: 'own_cases' as const } }],
+  };
+  const app = setup(
+    identityResolving(() =>
+      Promise.resolve({ subjectId: principal.subjectId, principal } as unknown as SessionRecord),
+    ),
+    () => readinessOf(storeProbes),
+  );
+  app.fastify.get('/test/actor', { config: { auth: { kind: 'public' } } }, () => 'served');
+  try {
+    const response = await app.fastify.inject({
+      url: '/test/actor',
+      headers: { cookie: 'rai_session=synthetic' },
+    });
+    assert.equal(response.statusCode, 200);
+    const completed = app.lines().find((line) => line.event === 'request.completed')!;
+    assert.equal(completed.fields.actorSubjectId, principal.subjectId);
+    assert.equal(completed.fields.actorRole, 'owner');
   } finally {
     await app.fastify.close();
   }

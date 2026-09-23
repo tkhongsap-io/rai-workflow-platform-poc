@@ -34,7 +34,7 @@ import type { FixtureIdentityProvider } from './identity/fixture.js';
 import { registerAuthRoutes } from './identity/routes.js';
 import { cookieNames, type SessionStore } from './identity/session.js';
 import type { IdentityAdapter } from './identity/types.js';
-import { mintCorrelationId, runWithContext } from './observability/context.js';
+import { maybeContext, mintCorrelationId, runWithContext } from './observability/context.js';
 import { createEmitter, loggerOptions, type Emitter } from './observability/log.js';
 import type { ErrorCategory } from '@rai/shared/schemas/observability';
 import { createErrorCapture, type ErrorCapture } from './observability/errors.js';
@@ -154,6 +154,7 @@ export function buildApp(deps: AppDeps): App {
       return;
     }
     const errorCode = requestErrors.get(request);
+    const actor = maybeContext()?.actor;
     emitter.log(
       'request.completed',
       {
@@ -163,6 +164,12 @@ export function buildApp(deps: AppDeps): App {
         route: request.routeOptions.url ?? 'unmatched',
         status: reply.statusCode,
         ...(errorCode === undefined ? {} : { errorCode }),
+        ...(actor === undefined
+          ? {}
+          : {
+              actorSubjectId: actor.subjectId,
+              ...(actor.roles.length === 1 ? { actorRole: actor.roles[0] } : {}),
+            }),
         durationMs: reply.elapsedTime, // Fastify freezes this at response finish, before onResponse hooks.
       },
       reply.statusCode >= 500
@@ -227,7 +234,16 @@ export function buildApp(deps: AppDeps): App {
   if (deps.static !== undefined) void fastify.register(staticPlugin(deps.static));
 
   const observability = deps.observability;
-  if (observability !== undefined) registerHealthRoutes(fastify, () => observability.readiness(), emitter);
+  if (observability !== undefined) {
+    registerHealthRoutes(fastify, () => observability.readiness(), emitter);
+    // W0-04: business routes fail closed on an unapplied migration; the reader's 5 s cache keeps this off the DB.
+    fastify.addHook('onRequest', async (request, reply) => {
+      const route = request.routeOptions.url;
+      if (route === '/healthz' || route === '/readyz') return;
+      if ((await observability.readiness()).store.migrations === 'pending')
+        return reply.code(503).send(internalErrorResponse(request.id));
+    });
+  }
 
   if (deps.identity !== undefined) {
     const identity = deps.identity;
