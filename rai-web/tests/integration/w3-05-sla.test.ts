@@ -106,12 +106,10 @@ async function rebuildApp(): Promise<void> {
       now,
       sendBackRecipientsForOwner: (ownerSubjectId) =>
         sendBackRecipientsFromIdentities(FIXTURE_USERS, ownerSubjectId),
-      knownIdentities: FIXTURE_USERS,
     },
     findings: {
       db: db.app,
       now,
-      knownIdentities: FIXTURE_USERS,
       qc: { runner: new ScriptedQcRunner({ fixtureCaseIdOf: () => undefined, now }), now }, // clean lane QC
     },
   });

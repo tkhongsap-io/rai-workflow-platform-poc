@@ -277,7 +277,6 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
       db: db.db,
       sendBackRecipientsForOwner: (ownerSubjectId) =>
         sendBackRecipientsFromIdentities(knownIdentities, ownerSubjectId),
-      knownIdentities,
       ...(overrides.now === undefined ? {} : { now: overrides.now }),
     },
     // W2-05 / W2-06 / W2-INT: disposition + lane QC. QC_MODE=substitute binds ScriptedQcRunner outside
@@ -286,7 +285,6 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
       db: db.db,
       readyRecipientsForOwner: (ownerSubjectId) =>
         sendBackRecipientsFromIdentities(knownIdentities, ownerSubjectId),
-      knownIdentities,
       ...(overrides.now === undefined ? {} : { now: overrides.now }),
       ...(qcRunner === undefined ? {} : { qc: { runner: qcRunner } }),
     },

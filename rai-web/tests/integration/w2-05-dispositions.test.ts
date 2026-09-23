@@ -28,7 +28,7 @@ import { createFixtureIdentityProvider } from '@rai/server/identity/fixture';
 import { createPgSessionStore } from '@rai/server/identity/session';
 import { laneOpenRecipientsFromIdentities } from '@rai/server/versions/open-lanes';
 import { sendBackRecipientsFromIdentities } from '@rai/server/workflow/send-back-notice';
-import { FIXTURE_USERS } from '@rai/fixtures/data/users';
+import { FIXTURE_USERS, findFixtureUser } from '@rai/fixtures/data/users';
 import { FIXTURE_CASES, findFixtureCase } from '@rai/fixtures/data/cases/index';
 import { loadFixtures } from '@rai/fixtures/load';
 import { fixtureSetLabel, readManifest } from '@rai/fixtures/manifest';
@@ -36,6 +36,8 @@ import { ScriptedQcRunner } from '@rai/fixtures/substitutes/qc/index';
 import type { QcRunRequest, QcRunResult, QcRunner, VersionRef } from '@rai/shared/qc/types';
 import { findingKeyOf } from '@rai/shared/qc/validate';
 import { runAndPersistLaneQc, runAndPersistSubmitQc } from '@rai/server/qc/orchestrator';
+import { createDb } from '@rai/server/db/client';
+import { recordDisposition } from '@rai/server/findings/service';
 import { computeReadiness } from '@rai/server/observability/health';
 import { createStoreProbes } from '@rai/server/observability/probes';
 import type { DeskHealthReport } from '@rai/shared/schemas/observability';
@@ -133,13 +135,11 @@ async function rebuildApp(runnerOverride?: QcRunner): Promise<void> {
       now,
       sendBackRecipientsForOwner: (ownerSubjectId) =>
         sendBackRecipientsFromIdentities(FIXTURE_USERS, ownerSubjectId),
-      knownIdentities: FIXTURE_USERS,
     },
     findings: {
       db: db.app,
       now,
       qc: { runner: runnerOverride ?? runner, now },
-      knownIdentities: FIXTURE_USERS,
     },
   });
   diagnostics = built;
@@ -775,6 +775,61 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
     );
   });
 
+  it('a disposition that reads the clock first but commits last is still the latest one', async () => {
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, VENDOR.caseId);
+    const revision = await caseRevision(VENDOR.caseId);
+    const ai = await signIn(AI_COE);
+    const qc = await runLaneQc(ai, VENDOR.caseId, version.versionId, 'ai_coe', revision);
+    const findingId = (qc.body as LaneQcRunResponse).findings[0]!.findingId;
+    const expectedVersion = { versionId: version.versionId, revision };
+
+    // The owner's proposal starts first but waits for a connection on a pool whose only client is held.
+    const slow = createDb(db.urls.app, { max: 1 });
+    const held = await slow.pool.connect();
+    const { subjectId, displayName, email, roles } = findFixtureUser(OWNER_A)!;
+    const proposing = recordDisposition(
+      { db: slow.db, now },
+      {
+        actor: { subjectId, displayName, email, roles: [...roles] },
+        role: 'owner',
+        correlationId: randomUUID(),
+      },
+      VENDOR.caseId,
+      findingId,
+      { expectedVersion, kind: 'fixed_proposed' },
+      randomUUID(),
+    );
+    // The reviewer's waiver starts later and commits first.
+    clock += 1_000;
+    const waived = await dispose(ai, VENDOR.caseId, findingId, {
+      expectedVersion,
+      kind: 'waived',
+      reason: 'Synthetic: accepted for the pilot',
+    });
+    assert.equal(waived.statusCode, 201, waived.body);
+    held.release();
+    try {
+      assert.equal((await proposing).status, 201);
+    } finally {
+      await slow.close();
+    }
+
+    // The proposal committed last, so it is the effective state and the owning lane can confirm it.
+    const confirmed = await dispose(ai, VENDOR.caseId, findingId, {
+      expectedVersion,
+      kind: 'fixed_confirmed',
+    });
+    assert.equal(confirmed.statusCode, 201, confirmed.body);
+    const events = await db.owner.execute(
+      sql`SELECT kind FROM disposition_event WHERE finding_id = ${findingId} ORDER BY created_at, id`,
+    );
+    assert.deepEqual(
+      (events.rows as Array<{ kind: string }>).map((r) => r.kind),
+      ['waived', 'fixed_proposed', 'fixed_confirmed'],
+    );
+  });
+
   it('unavailable not_configured stores one unbound run; a second call returns the same id', async () => {
     const owner = await signIn(OWNER_A);
     const version = await submitOk(owner, VENDOR.caseId);
@@ -823,9 +878,8 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
         now,
         sendBackRecipientsForOwner: (ownerSubjectId) =>
           sendBackRecipientsFromIdentities(FIXTURE_USERS, ownerSubjectId),
-        knownIdentities: FIXTURE_USERS,
       },
-      findings: { db: db.app, now, knownIdentities: FIXTURE_USERS },
+      findings: { db: db.app, now },
     });
     diagnostics = built;
     app = built.fastify;

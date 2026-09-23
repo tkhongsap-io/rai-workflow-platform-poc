@@ -123,7 +123,6 @@ async function build(options: { auto?: boolean; rollback?: boolean } = {}) {
     decide: {
       db: db.app,
       now,
-      knownIdentities: FIXTURE_USERS,
       sendBackRecipientsForOwner: (subject) => sendBackRecipientsFromIdentities(FIXTURE_USERS, subject),
     },
     // Unscripted substitute QC: every lane-QC run completes clean.

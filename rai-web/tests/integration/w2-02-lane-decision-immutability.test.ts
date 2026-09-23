@@ -1,5 +1,5 @@
 // W2-02: lane_decision append-only (W0-04). UPDATE and DELETE raise for rai_app and rai_owner; rai_app has no
-// UPDATE/DELETE grant. Style matches tests/integration/w2-01-notification.test.ts.
+// UPDATE/DELETE grant. observed_qc_run_id references qc_run. Style matches tests/integration/w2-01-notification.test.ts.
 
 import { after, before, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -49,39 +49,54 @@ after(async () => {
 
 async function insertDecision(): Promise<string> {
   const id = uuidv7();
+  const runId = randomUUID();
+  await db.app.execute(sql`
+    INSERT INTO qc_run (id, version_id, trigger, lane, engine_id, rule_revision, status, requested_at, completed_at, correlation_id)
+    VALUES (${runId}, ${NONVENDOR.draftVersionId}, 'approve_attempt', 'dpo', 'substitute', 'v1', 'completed', now(), now(), ${randomUUID()})
+  `);
   await db.app.execute(sql`
     INSERT INTO lane_decision (
-      id, version_id, lane, decision, actor_subject_id, actor_role,
+      id, version_id, lane, decision, actor_subject_id, actor_role, actor_scopes,
       feedback, observed_qc_run_id, decided_at, correlation_id
     ) VALUES (
       ${id}, ${NONVENDOR.draftVersionId}, 'dpo', 'approve',
-      'fixture:fx-user-dpo', 'dpo', NULL, ${randomUUID()}::uuid,
-      now(), ${randomUUID()}
+      'fixture:fx-user-dpo', 'dpo', '[{"role":"dpo","scope":{"kind":"all_cases","lane":"dpo"}}]'::jsonb,
+      NULL, ${runId}::uuid, now(), ${randomUUID()}
     )
   `);
   return id;
 }
 
+test('observed_qc_run_id must name a stored qc_run', async () => {
+  const err = await expectSqlError(
+    db,
+    'app',
+    `INSERT INTO lane_decision (id, version_id, lane, decision, actor_subject_id, actor_role, observed_qc_run_id, decided_at, correlation_id)
+     VALUES ($1, $2, 'dpo', 'approve', 'fixture:fx-user-dpo', 'dpo', $3, now(), 'c')`,
+    [uuidv7(), NONVENDOR.draftVersionId, randomUUID()],
+  );
+  assert.equal(err?.code, '23503'); // foreign_key_violation
+});
+
 test('UPDATE on lane_decision raises for rai_app and for rai_owner (append-only trigger)', async () => {
   const id = await insertDecision();
   for (const role of ['app', 'owner'] as const) {
-    const err = await expectSqlError(
-      db,
-      role,
-      `UPDATE lane_decision SET actor_role = 'admin' WHERE id = $1`,
-      [id],
-    );
-    // rai_app: no UPDATE grant → insufficient_privilege; rai_owner: trigger → rai.append_only
-    if (role === 'app') {
-      assert.equal(err?.code, INSUFFICIENT_PRIVILEGE, role);
-    } else {
-      assert.equal(err?.code, RAISE_EXCEPTION, role);
-      assert.equal(err?.message, 'rai.append_only');
+    for (const set of [`actor_role = 'admin'`, `actor_scopes = '[]'::jsonb`]) {
+      const err = await expectSqlError(db, role, `UPDATE lane_decision SET ${set} WHERE id = $1`, [id]);
+      // rai_app: no UPDATE grant → insufficient_privilege; rai_owner: trigger → rai.append_only
+      if (role === 'app') {
+        assert.equal(err?.code, INSUFFICIENT_PRIVILEGE, role);
+      } else {
+        assert.equal(err?.code, RAISE_EXCEPTION, role);
+        assert.equal(err?.message, 'rai.append_only');
+      }
     }
   }
-  const unchanged = (await db.owner.execute(sql`SELECT actor_role FROM lane_decision WHERE id = ${id}`))
-    .rows[0] as { actor_role: string };
+  const unchanged = (
+    await db.owner.execute(sql`SELECT actor_role, actor_scopes FROM lane_decision WHERE id = ${id}`)
+  ).rows[0] as { actor_role: string; actor_scopes: unknown[] };
   assert.equal(unchanged.actor_role, 'dpo');
+  assert.equal(unchanged.actor_scopes.length, 1);
 });
 
 test('DELETE on lane_decision is denied for rai_app (grant) and raises for rai_owner (trigger)', async () => {

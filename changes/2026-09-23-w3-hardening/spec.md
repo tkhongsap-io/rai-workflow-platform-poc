@@ -9,3 +9,12 @@ Done when:
 5. **Hand-off.** A one-page synthetic walkthrough script for Nakhun and a #35 options brief for Ta and the review leads.
 
 Every PR: own worktree and Postgres port, full suite green (unit, integration, browser, lint, typecheck, build, substitute-absent), two independent reviewer agents posting verdicts on the PR, CI green, base `main`.
+
+## Schema change
+
+The hardening adds one migration, `0008_w3_hardening_lane_decision_scopes` (H8), recorded in the W0-04 `lane_decision` column notes:
+
+- `lane_decision.actor_scopes` (jsonb NULL): the deciding actor's grants at decision time. The Ready predicate's self-approval recheck (W0-06 section 6, condition 4: "at decision time") reads these instead of the approver's current grants.
+- `lane_decision.observed_qc_run_id` references `qc_run(id)`, as W0-04 already documented.
+
+Additive: no frozen row is rewritten, and the append-only trigger and grants are unchanged.

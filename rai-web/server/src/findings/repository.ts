@@ -28,17 +28,17 @@ export async function readFindingForCase(
   return row?.finding;
 }
 
-export async function latestDispositionKind(
+export async function latestDisposition(
   exec: Executor,
   findingId: string,
-): Promise<DispositionKind | undefined> {
+): Promise<{ kind: DispositionKind; createdAt: Date } | undefined> {
   const [row] = await exec
-    .select({ kind: dispositionEvent.kind })
+    .select({ kind: dispositionEvent.kind, createdAt: dispositionEvent.createdAt })
     .from(dispositionEvent)
     .where(eq(dispositionEvent.findingId, findingId))
     .orderBy(desc(dispositionEvent.createdAt), desc(dispositionEvent.id))
     .limit(1);
-  return row?.kind as DispositionKind | undefined;
+  return row === undefined ? undefined : { kind: row.kind as DispositionKind, createdAt: row.createdAt };
 }
 
 function asMessageParams(value: unknown): Record<string, string | number> | undefined {
@@ -93,7 +93,7 @@ export async function listFindingsForVersion(
     latestDisposition: DispositionKind | null;
   }> = [];
   for (const r of rows) {
-    const latest = await latestDispositionKind(exec, r.findingId);
+    const latest = await latestDisposition(exec, r.findingId);
     const entry: (typeof out)[number] = {
       findingId: r.findingId,
       ruleId: r.ruleId,
@@ -101,7 +101,7 @@ export async function listFindingsForVersion(
       severity: r.severity,
       owningLane: r.owningLane as Lane,
       messageKey: r.messageKey,
-      latestDisposition: latest ?? null,
+      latestDisposition: latest?.kind ?? null,
     };
     const params = asMessageParams(r.messageParams);
     if (params !== undefined) entry.messageParams = params;

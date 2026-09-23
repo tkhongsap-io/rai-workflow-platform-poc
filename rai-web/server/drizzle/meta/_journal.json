@@ -57,6 +57,13 @@
       "when": 1790090215761,
       "tag": "0007_w3_07a_observability",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790190827146,
+      "tag": "0008_w3_hardening_lane_decision_scopes",
+      "breakpoints": true
     }
   ]
 }

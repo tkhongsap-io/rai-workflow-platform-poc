@@ -204,8 +204,9 @@ Append-only. One row per (version, lane): a lane decides a submitted version onc
 | `lane` | text NOT NULL | `ai_coe`, `dpo`, `it_security` |
 | `decision` | text NOT NULL | `approve`, `send_back` |
 | `actor_subject_id`, `actor_role` | text NOT NULL | W0-05 forbids Admin, and forbids an actor who is owner or BU SPOC on the case (D05). The store records; it does not check. |
+| `actor_scopes` | jsonb NULL | The deciding actor's `RoleScope` grants at decision time. The Ready predicate (W0-06 section 6, condition 4) judges owner or BU SPOC on these, so a later grant change neither blocks nor admits Ready. A row without them (never written by the decide actions) counts as owner or BU SPOC when it names the case owner or records `actor_role` `owner` or `bu_spoc`. Added by migration 0008 (W3 hardening). |
 | `feedback` | jsonb NULL | Required for `send_back`: `[{slot: 1-9, artifact_id?: uuid, message: text}]`, at least one entry naming a slot (A09). `CHECK (decision <> 'send_back' OR feedback IS NOT NULL)`. |
-| `observed_qc_run_id` | uuid FK NULL | The approve-attempt QC run the reviewer saw before deciding (the W0-06 4.4 `qc_run_id`; W0-07). Required for `approve` (W0-06: `invalid_input` `lane_qc_not_run` without one); NULL permitted for `send_back`. |
+| `observed_qc_run_id` | uuid FK NULL | The approve-attempt QC run the reviewer saw before deciding (the W0-06 4.4 `qc_run_id`; W0-07). Required for `approve` (W0-06: `invalid_input` `lane_qc_not_run` without one); NULL permitted for `send_back`. References `qc_run(id)` from migration 0008 (W3 hardening). |
 | `decided_at`, `correlation_id`, `idempotency_key_id` | | |
 
 ### `qc_run` and `qc_finding`
@@ -218,7 +219,7 @@ Written by the workflow on behalf of the QC boundary (W0-07): the QC substitute 
 
 ### `disposition_event`
 
-Append-only. The effective disposition of a finding is the **latest** event per finding; nothing is ever overwritten (data contract, D05).
+Append-only. The effective disposition of a finding is the **latest** event per finding (`ORDER BY created_at DESC, id DESC`); nothing is ever overwritten (data contract, D05). `created_at` is stamped under the case row lock, at least 1 ms after the finding's latest event, so "latest" follows commit order even when two instances' clocks disagree.
 
 | Column | Type | Notes |
 |---|---|---|

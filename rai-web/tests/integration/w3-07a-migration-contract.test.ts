@@ -33,6 +33,7 @@ test(
       const journal = JSON.parse(
         await readFile(path.join(MIGRATIONS_FOLDER, 'meta/_journal.json'), 'utf8'),
       ) as { entries: { idx: number; tag: string }[] };
+      const laterMigrations = journal.entries.filter((e) => e.idx >= 7).length;
       journal.entries = journal.entries.filter((e) => e.idx < 7);
       await writeFile(path.join(scratch, 'meta/_journal.json'), JSON.stringify(journal));
       for (const entry of journal.entries)
@@ -64,7 +65,7 @@ test(
         `INSERT INTO notification (id,event,lane,recipient,deep_link_path,template_key,template_params,correlation_id) VALUES ($1,'sla_breach_digest','-','historical@rai-desk.example','/queue','mail.digest','{}',$2)`,
         [historicalDigest, correlation],
       );
-      assert.equal((await runMigrations(ownerUrl.href)).applied.length, 1);
+      assert.equal((await runMigrations(ownerUrl.href)).applied.length, laterMigrations);
       assert.equal(
         (await owner.query('SELECT id FROM notification WHERE id=$1', [historicalDigest])).rows.length,
         1,
