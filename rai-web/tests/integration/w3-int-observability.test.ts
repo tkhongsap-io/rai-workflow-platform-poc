@@ -88,7 +88,7 @@ async function stopClean(server: TestServerProcess) {
 }
 
 test(
-  'OBS-03: reachable unmigrated database returns HTTP 503 migrations.pending',
+  'OBS-03: reachable unmigrated database returns HTTP 503 migrations.pending and closes business routes',
   { timeout: 60_000 },
   async () => {
     await withObservabilityDatabase(false, async (env) => {
@@ -111,6 +111,7 @@ test(
         await client.end();
       }
       const server = await startTestServer({ env });
+      let casesId: string | null = null;
       try {
         const body = await readiness(server, 503);
         assert.equal(body.status, 'not_ready');
@@ -120,9 +121,14 @@ test(
         const health = await fetch(`${server.baseUrl}/healthz`);
         assert.equal(health.status, 200);
         await health.arrayBuffer();
+        const cases = await fetch(`${server.baseUrl}/api/cases`);
+        assert.equal(cases.status, 503);
+        assert.equal(((await cases.json()) as { error: { code: string } }).error.code, 'internal_error');
+        casesId = cases.headers.get('x-correlation-id');
       } finally {
         await stopClean(server);
       }
+      assertRequest(server, casesId, '/api/cases', 503);
     });
   },
 );
