@@ -511,6 +511,27 @@ describe('W2-10 substitute: W2 shapes (approve, send-back, qc-run, disposition)'
       assert.deepEqual(substitute.store.findings.get(findingId), frozen);
     });
 
+    it('an unknown finding is 404 for every lane reviewer and 403 role for Admin', async () => {
+      const version = await submit(vendor);
+      const body = {
+        expectedVersion: { versionId: version.versionId, revision: 1 },
+        kind: 'waived',
+        reason: 'synthetic',
+      };
+      const denials = () => substitute.store.logLines.filter((l) => l.event === 'authz.denied');
+      for (const reviewer of ['fx-user-dpo', 'fx-user-it-security', 'fx-user-ai-coe']) {
+        const response = await disposition(reviewer, vendor.caseId, randomUUID(), body);
+        assert.equal(response.status, 404, `${reviewer}: ${response.text()}`);
+        assert.equal(response.json<Envelope>().error.code, 'not_found');
+        assert.deepEqual(response.json<Envelope>().error.details, { resource: 'finding' });
+      }
+      assert.equal(denials().length, 0, 'no authz.denied line');
+
+      const admin = await disposition('fx-user-admin', vendor.caseId, randomUUID(), body);
+      assert.equal(admin.status, 403, admin.text());
+      assert.equal(denials().at(-1)?.fields.reason, 'role');
+    });
+
     it('stale expected version is 409 version_superseded and appends nothing', async () => {
       const { findingId } = await findingOnVendor();
       const before = (substitute.store.dispositions.get(findingId) ?? []).length;
