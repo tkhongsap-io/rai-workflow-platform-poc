@@ -34,6 +34,7 @@ import { loadFixtures } from '@rai/fixtures/load';
 import { fixtureSetLabel, readManifest } from '@rai/fixtures/manifest';
 import { ScriptedQcRunner } from '@rai/fixtures/substitutes/qc/index';
 import type { QcRunner, VersionRef } from '@rai/shared/qc/types';
+import { findingKeyOf } from '@rai/shared/qc/validate';
 import { runAndPersistLaneQc, runAndPersistSubmitQc } from '@rai/server/qc/orchestrator';
 import { computeReadiness } from '@rai/server/observability/health';
 import { createStoreProbes } from '@rai/server/observability/probes';
@@ -960,6 +961,123 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
       (runs.rows as Array<{ status: string }>).map((r) => r.status),
       ['unavailable', 'completed'],
     );
+  });
+
+  it('only an unbound runner replays an unbound unavailable run; a completed run replays for any runner', async () => {
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, VENDOR.caseId);
+    const input = {
+      caseId: VENDOR.caseId,
+      versionId: version.versionId,
+      lane: 'ai_coe' as const,
+      correlationId: randomUUID(),
+    };
+    const unbound = { db: db.app, now };
+    const timingOut: QcRunner = {
+      identity: { runner: 'timeout-probe', runnerVersion: '1' },
+      run: () =>
+        Promise.resolve({
+          status: 'unavailable',
+          reason: 'timeout',
+          detail: null,
+          startedAt: now().toISOString(),
+          finishedAt: now().toISOString(),
+        }),
+    };
+
+    const first = await runAndPersistLaneQc(unbound, input);
+    assert.equal(first.status === 'unavailable' && first.reason, 'not_configured');
+    assert.deepEqual(await runAndPersistLaneQc(unbound, input), first);
+    const timedOut = await runAndPersistLaneQc({ ...unbound, runner: timingOut }, input);
+    assert.equal(timedOut.status === 'unavailable' && timedOut.reason, 'timeout');
+    const again = await runAndPersistLaneQc(unbound, input);
+    assert.equal(again.status === 'unavailable' && again.reason, 'not_configured');
+    assert.notEqual(again.runId, first.runId);
+    const completed = await runAndPersistLaneQc({ ...unbound, runner }, input);
+    assert.equal(completed.status, 'completed');
+    const replayed = await runAndPersistLaneQc(unbound, input);
+    assert.deepEqual([replayed.status, replayed.runId], ['completed', completed.runId]);
+
+    const runs = await db.owner.execute(sql`
+      SELECT id, engine_id, unavailable_reason FROM qc_run
+      WHERE version_id = ${version.versionId} ORDER BY completed_at ASC, id ASC
+    `);
+    assert.deepEqual(runs.rows, [
+      { id: first.runId, engine_id: 'unbound', unavailable_reason: 'not_configured' },
+      { id: timedOut.runId, engine_id: 'timeout-probe', unavailable_reason: 'timeout' },
+      { id: again.runId, engine_id: 'unbound', unavailable_reason: 'not_configured' },
+      { id: completed.runId, engine_id: runner.identity.runner, unavailable_reason: null },
+    ]);
+  });
+
+  it('a slot-5 or lane-mismatched runner finding records the run unavailable runner_error with no findings', async () => {
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, VENDOR.caseId);
+    const cases = [
+      { lane: 'ai_coe', slot: 5, owningLane: 'ai_coe', stored: false }, // slot 5: owning lane pending (#35)
+      { lane: 'ai_coe', slot: 1, owningLane: 'dpo', stored: false }, // slot 1 belongs to ai_coe
+      { lane: 'dpo', slot: 2, owningLane: 'dpo', stored: true }, // control: the same finding shape is valid
+    ] as const;
+    for (const { lane, slot, owningLane, stored } of cases) {
+      const scope = { kind: 'slot', slot } as const;
+      const probe: QcRunner = {
+        identity: { runner: 'finding-probe', runnerVersion: '1' },
+        run: (request) =>
+          Promise.resolve({
+            status: 'completed',
+            rulesEvaluated: ['PACK-SLOT-MISSING'],
+            findings: [
+              {
+                findingKey: findingKeyOf('PACK-SLOT-MISSING', scope),
+                ruleId: 'PACK-SLOT-MISSING',
+                ruleRevision: request.qcRulesRevision,
+                trigger: request.trigger,
+                scope,
+                severity: 'medium',
+                owningLane,
+                evidence: [{ artifactId: null, contentHash: null, slot, locator: { kind: 'absent' } }],
+                measure: null,
+                message: { key: 'qc.finding.slot_missing', params: { slot } },
+                provenance: { runner: 'finding-probe', runnerVersion: '1' },
+              },
+            ],
+            startedAt: now().toISOString(),
+            finishedAt: now().toISOString(),
+          }),
+      };
+      const outcome = await runAndPersistLaneQc(
+        { db: db.app, runner: probe, now, ...diagnostics },
+        { caseId: VENDOR.caseId, versionId: version.versionId, lane, correlationId: randomUUID() },
+      );
+      const run = await db.owner.execute(
+        sql`SELECT status, unavailable_reason FROM qc_run WHERE id = ${outcome.runId}`,
+      );
+      const findings = await db.owner.execute(sql`SELECT id FROM qc_finding WHERE run_id = ${outcome.runId}`);
+      if (stored) {
+        assert.equal(outcome.status, 'completed');
+        assert.equal(findings.rows.length, 1);
+        continue;
+      }
+      assert.deepEqual(outcome, {
+        status: 'unavailable',
+        reason: 'runner_error',
+        runId: outcome.runId,
+        findings: [],
+      });
+      assert.deepEqual(run.rows, [{ status: 'unavailable', unavailable_reason: 'runner_error' }]);
+      assert.equal(findings.rows.length, 0);
+      const settled = capture
+        .lines()
+        .filter(
+          (line) =>
+            line.fields?.qcRunId === outcome.runId &&
+            (line.event === 'qc.run.unavailable' || line.event === 'qc.run.completed'),
+        );
+      assert.deepEqual(
+        settled.map((line) => [line.event, line.fields?.reason]),
+        [['qc.run.unavailable', 'runner_error']],
+      );
+    }
   });
 
   it('lane QC is forbidden for owner, BU SPOC, Admin, and a different lane; no rows written', async () => {

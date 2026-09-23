@@ -16,7 +16,7 @@ export interface InsertRunInput {
   engineId: string;
   ruleRevision: string;
   status: 'completed' | 'unavailable';
-  unavailableReason?: QcUnavailableReason;
+  unavailableReason: QcUnavailableReason | null;
   requestedAt: Date;
   completedAt: Date;
   correlationId: string;
@@ -51,7 +51,7 @@ export async function insertQcRun(tx: Tx, input: InsertRunInput): Promise<void> 
     engineId: input.engineId,
     ruleRevision: input.ruleRevision,
     status: input.status,
-    unavailableReason: input.unavailableReason ?? null,
+    unavailableReason: input.unavailableReason,
     requestedAt: input.requestedAt,
     completedAt: input.completedAt,
     correlationId: input.correlationId,
