@@ -205,6 +205,50 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
     assert.ok(logs.every((line) => line.correlationId === correlationId));
   });
 
+  it('lane QC coalesces concurrent calls for one version and lane into one unavailable run', async () => {
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, VENDOR.caseId);
+    let calls = 0;
+    const unavailable: QcRunner = {
+      identity: { runner: 'lane-probe', runnerVersion: '1' },
+      run() {
+        calls++;
+        return Promise.resolve({
+          status: 'unavailable',
+          reason: 'runner_error',
+          detail: null,
+          startedAt: now().toISOString(),
+          finishedAt: now().toISOString(),
+        });
+      },
+    };
+    const deps = { db: db.app, runner: unavailable, now, ...diagnostics };
+    const input = (lane: 'ai_coe' | 'dpo') => ({
+      caseId: VENDOR.caseId,
+      versionId: version.versionId,
+      lane,
+      correlationId: randomUUID(),
+    });
+    const [first, concurrent, otherLane] = await Promise.all([
+      runAndPersistLaneQc(deps, input('ai_coe')),
+      runAndPersistLaneQc(deps, input('ai_coe')),
+      runAndPersistLaneQc(deps, input('dpo')),
+    ]);
+    assert.deepEqual(concurrent, first);
+    assert.equal(first.status, 'unavailable');
+    assert.notEqual(otherLane.runId, first.runId);
+    assert.equal(calls, 2);
+    const runs = await db.owner.execute(
+      sql`SELECT lane FROM qc_run WHERE version_id = ${version.versionId} ORDER BY lane`,
+    );
+    assert.deepEqual(runs.rows, [{ lane: 'ai_coe' }, { lane: 'dpo' }]);
+
+    // Once settled, an unavailable approve_attempt run is retried (W0-07 3.7).
+    const retried = await runAndPersistLaneQc(deps, input('ai_coe'));
+    assert.notEqual(retried.runId, first.runId);
+    assert.equal(calls, 3);
+  });
+
   it('submit API refuses a result that arrives after Ready without a QC run, finding or audit', async () => {
     const owner = await signIn(OWNER_A);
     const version = await submitOk(owner, VENDOR.caseId);

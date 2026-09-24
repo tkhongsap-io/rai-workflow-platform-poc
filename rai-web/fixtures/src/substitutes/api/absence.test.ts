@@ -49,7 +49,7 @@ describe('W1-13 substitute: absent from non-test configuration', () => {
     };
     assert.equal(pkg.dependencies?.['@rai/fixtures'], undefined);
     assert.equal(pkg.devDependencies?.['@rai/fixtures'], '0.0.0');
-    assert.equal(pkg.scripts.build, 'tsc -b && vite build');
+    assert.equal(pkg.scripts.build, 'tsc -b && NODE_ENV=production vite build');
     for (const file of [
       'web/vite.config.ts',
       '.env.example',

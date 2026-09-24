@@ -168,7 +168,7 @@ describe('W1-INT: the evidence configuration cannot load the substitute', () => 
     const webPackage = JSON.parse(readFileSync(path.join(RAI_WEB_ROOT, 'web', 'package.json'), 'utf8')) as {
       scripts: { build: string };
     };
-    assert.equal(webPackage.scripts.build, 'tsc -b && vite build');
+    assert.equal(webPackage.scripts.build, 'tsc -b && NODE_ENV=production vite build');
   });
 
   it('the product source reads no substitute variable and imports no substitute module', () => {

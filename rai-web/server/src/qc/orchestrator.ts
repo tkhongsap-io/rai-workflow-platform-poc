@@ -507,48 +507,53 @@ function emitUnavailable(
   deps.errors?.job({ category: 'qc_unavailable', ...fields });
 }
 
-/** Preserve the originating correlation even for callers outside an HTTP handler. */
+/**
+ * W0-07 3.4 step 2: concurrent calls for one version and trigger (and lane) share one in-flight run, whatever it
+ * settles to; the locked recheck protects separate app instances. The run keeps the originating correlation even
+ * for callers outside an HTTP handler.
+ */
+function shareFlight<T>(
+  table: WeakMap<Db, Map<string, Promise<T>>>,
+  deps: QcOrchestratorDeps,
+  input: RunQcInput,
+  run: () => Promise<T>,
+): Promise<T> {
+  let flights = table.get(deps.db);
+  if (flights === undefined) {
+    flights = new Map();
+    table.set(deps.db, flights);
+  }
+  const key = `${input.caseId}:${input.versionId}:${input.lane ?? input.trigger}`;
+  const current = flights.get(key);
+  if (current !== undefined) return current;
+  const context = {
+    ...maybeContext(),
+    correlationId: input.correlationId,
+    startedAt: maybeContext()?.startedAt ?? performance.now(),
+  };
+  const tracked = runWithContext(context, run).finally(() => {
+    flights.delete(key);
+  });
+  flights.set(key, tracked);
+  return tracked;
+}
+
+const laneFlights = new WeakMap<Db, Map<string, Promise<PersistQcOutcome>>>();
 export function runAndPersistLaneQc(
   deps: QcOrchestratorDeps,
   input: RunLaneQcInput,
 ): Promise<PersistQcOutcome> {
-  return runWithContext(
-    {
-      ...maybeContext(),
-      correlationId: input.correlationId,
-      startedAt: maybeContext()?.startedAt ?? performance.now(),
-    },
-    () => runQc(deps, { ...input, trigger: 'approve_attempt' }),
-  );
+  const lane = { ...input, trigger: 'approve_attempt' as const };
+  return shareFlight(laneFlights, deps, lane, () => runQc(deps, lane));
 }
 
-/** Coalesce same-process adapter retries; the locked recheck also protects separate app instances. */
 const submitFlights = new WeakMap<Db, Map<string, Promise<SubmitQcOutcome>>>();
 export function runAndPersistSubmitQc(
   deps: QcOrchestratorDeps,
   input: RunSubmitQcInput,
 ): Promise<SubmitQcOutcome> {
-  let flights = submitFlights.get(deps.db);
-  if (flights === undefined) {
-    flights = new Map();
-    submitFlights.set(deps.db, flights);
-  }
-  const key = `${input.caseId}:${input.versionId}`;
-  const current = flights.get(key);
-  if (current !== undefined) return current;
-  const flight = runWithContext(
-    {
-      ...maybeContext(),
-      correlationId: input.correlationId,
-      startedAt: maybeContext()?.startedAt ?? performance.now(),
-    },
-    () => runQc(deps, { ...input, trigger: 'submit', lane: null }),
-  );
-  const tracked = flight.finally(() => {
-    flights.delete(key);
-  });
-  flights.set(key, tracked);
-  return tracked;
+  const submit = { ...input, trigger: 'submit' as const, lane: null };
+  return shareFlight(submitFlights, deps, submit, () => runQc(deps, submit));
 }
 
 /** Test/helper: case row type re-export so callers need not dig into cases/. */
