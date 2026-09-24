@@ -684,6 +684,8 @@ Defaults when a draft is created (W1-02 create, W2-03 send-back): every slot `mi
 | `GET /api/cases/{caseId}/draft` | — | `200 PackDraft` | `401`; `403`; `404` case or no open draft |
 | `PUT /api/cases/{caseId}/draft` | `PackDraftUpdateRequest` | `200 PackDraft`, `draftRevision + 1`; writes audit `draft.saved`; a slot newly `attached` fires the W0-07 `upload` QC trigger after commit | `401`; `403` role not owner/bu_spoc of this case; `404` case; `409 stale_version` `revision_changed` (someone else saved) or `version_superseded` (`expectedVersion.versionId` is not the open draft: the draft was submitted meanwhile, or no draft is open; W0-06 4.2); `422 invalid_input`: `not_applicable` with an empty `text` reason (`validation.reason_required`), `attached` with an `artifactId` that belongs to another case or is unknown (`error.artifact_case_mismatch`, W0-04), template version not configured, unknown slot number; `422 unsafe_upload` `pack_total_exceeded` when attaching would take the version over `UPLOAD_MAX_PACK_BYTES` (W0-08 check 10) |
 
+The case screen offers the editor's Change, Save and Submit controls only to a writer of the case (an owner grant on the case's business owner, or the SPOC of its BU: the `case.edit_draft` rows). Anyone else in scope reads the draft's settings and slots with no editing control. This is presentation only; the `PUT` and submit still answer `403` to them.
+
 ### 7.6 Submit and version navigation (W1-05; consumed by W1-06, W2-07)
 
 ```ts

@@ -18,7 +18,7 @@ import {
   dispositionReasonIsValid,
   expectedVersionOf,
   findingMessageParams,
-  canProposeFixedOnCase,
+  isCaseWriter,
   isSelfExcludedOnCase,
   laneIsDecidable,
   laneKey,
@@ -261,6 +261,21 @@ test('reviewer lanes, self-exclusion and the decidable lane mirror the server de
   );
 });
 
+test('the case writers are its owner and the SPOC of its BU; no reviewer, Admin or other-BU SPOC writes', () => {
+  const spocHr: RoleScope = { role: 'bu_spoc', scope: { kind: 'business_unit', businessUnit: 'HR' } };
+  const writes = (roles: RoleScope[], subjectId: string) => isCaseWriter(roles, subjectId, baseView());
+  assert.equal(writes([owner], 'fixture:fx-user-owner-cm'), true);
+  assert.equal(writes([spocCm], 'fixture:fx-user-spoc-cm'), true);
+  assert.equal(writes([owner], 'fixture:fx-user-owner-cm-2'), false, 'another owner');
+  assert.equal(
+    writes([aiCoe], 'fixture:fx-user-owner-cm'),
+    false,
+    'the owner subject without an owner grant',
+  );
+  assert.equal(writes([dpo, spocHr], 'fixture:fx-user-dpo-spoc-hr'), false, 'SPOC of another BU');
+  for (const reviewer of [aiCoe, dpo, itSec, admin]) assert.equal(writes([reviewer], 'fixture:x'), false);
+});
+
 test('a principal with the dpo and it_security grants reviews and dispositions in both lanes', () => {
   const both: RoleScope[] = [dpo, itSec];
   const subjectId = 'fixture:fx-user-dpo-it';
@@ -401,9 +416,9 @@ test('dispositionKindsForActor: lane kinds, confirm after propose, owner propose
     [],
   );
   // Owner with grant + matching subjectId → propose-fixed when findings are visible (GET …/findings).
-  assert.equal(canProposeFixedOnCase([owner], 'fixture:fx-user-owner-cm', view), true);
-  assert.equal(canProposeFixedOnCase([aiCoe], 'fixture:fx-user-owner-cm', view), false);
-  assert.equal(canProposeFixedOnCase([spocCm], 'fixture:fx-user-spoc-cm', view), true);
+  assert.equal(isCaseWriter([owner], 'fixture:fx-user-owner-cm', view), true);
+  assert.equal(isCaseWriter([aiCoe], 'fixture:fx-user-owner-cm', view), false);
+  assert.equal(isCaseWriter([spocCm], 'fixture:fx-user-spoc-cm', view), true);
   assert.deepEqual(
     dispositionKindsForActor({
       roles: [owner],

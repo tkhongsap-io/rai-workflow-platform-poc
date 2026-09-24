@@ -25,8 +25,10 @@ export const SLOT_STATE_ORDER: readonly SlotStateName[] = Object.freeze([
 
 export const REASON_MAX_LENGTH = 500;
 
-/** The success line of the case screen; one at a time. */
+/** The success line of the case screen; one at a time, shown only on the view it belongs to. */
 export interface Notice {
+  /** The version route the notice belongs to; undefined for the draft. */
+  versionId: string | undefined;
   key:
     | 'pack.saved'
     | 'pack.submitted'
@@ -174,10 +176,10 @@ export function isSelfExcludedOnCase(
 }
 
 /**
- * Owner/BU-SPOC who may propose fixed on findings (W2-09). Requires an owner grant whose subject is the
- * case business owner, or a bu_spoc grant for the case's BU — not subjectId alone.
+ * The W0-05 write rows (edit and submit the draft, resubmit, propose fixed): an owner grant whose subject is the
+ * case's business owner, or a bu_spoc grant for the case's BU — not subjectId alone. The API still decides.
  */
-export function canProposeFixedOnCase(
+export function isCaseWriter(
   roles: readonly RoleScope[],
   subjectId: string,
   view: Pick<CaseView, 'businessOwner' | 'businessUnitId'>,
@@ -222,7 +224,7 @@ export function reviewerWorkspaceLanes(args: {
     ? []
     : reviewerLanesOf(args.roles);
   if (lanes.length > 0) return lanes;
-  return canProposeFixedOnCase(args.roles, args.subjectId, args.view) ? [null] : [];
+  return isCaseWriter(args.roles, args.subjectId, args.view) ? [null] : [];
 }
 
 /**
@@ -255,7 +257,7 @@ export function reviewerFindingsLoadMode({
 
 /**
  * Disposition kinds this actor may offer on a finding the UI already shows.
- * Owner/BU SPOC (canProposeFixedOnCase) → fixed_proposed only. Owning-lane reviewer who is not that
+ * Owner/BU SPOC (isCaseWriter) → fixed_proposed only. Owning-lane reviewer who is not that
  * proposer → fixed, waived, not_applicable, plus fixed_confirmed when latestDisposition is fixed_proposed.
  * Admin and the wrong lane → none.
  */
@@ -267,7 +269,7 @@ export function dispositionKindsForActor(args: {
   latestKind: DispositionKind | null;
 }): DispositionKind[] {
   if (args.view.aiReadinessStatus === 'ready') return [];
-  if (canProposeFixedOnCase(args.roles, args.subjectId, args.view)) {
+  if (isCaseWriter(args.roles, args.subjectId, args.view)) {
     return ['fixed_proposed'];
   }
   if (!reviewerLanesOf(args.roles).includes(args.findingOwningLane)) return [];
