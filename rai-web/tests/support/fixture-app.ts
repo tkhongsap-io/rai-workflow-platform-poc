@@ -1,7 +1,7 @@
 // The in-process app of the integration suites: the production composition (composeAppDeps) over the fixture
 // identities, the test database and a private blob directory, reset to the loaded fixture set and rebuilt before
-// every test. A suite passes only what differs (its clock, its QC runner) and reads the live `app`, `db`,
-// `capture` and `diagnostics` bindings. Each test file runs in its own process, so one app per module is enough.
+// every test. A suite passes only what differs (its clock, its QC runner, its mail sink) and reads the live `app`,
+// `db`, `capture` and `diagnostics` bindings. Each test file runs in its own process, so one app per module is enough.
 
 import { after, before, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,8 +20,10 @@ import { migrationFileCount } from '@rai/server/db/migrate';
 import { createIdentityAdapter } from '@rai/server/identity/adapter';
 import { computeReadiness, createReadinessReader } from '@rai/server/observability/health';
 import { createStoreProbes } from '@rai/server/observability/probes';
+import type { LaneOpenRecipients } from '@rai/server/versions/open-lanes';
 import { FIXTURE_USERS } from '@rai/fixtures/data/users';
 import { loadFixtures } from '@rai/fixtures/load';
+import type { MailSink } from '@rai/shared/mail/types';
 import type { QcRunner } from '@rai/shared/qc/types';
 import type { PackDraft } from '@rai/shared/schemas/pack';
 import type { SubmitRequest, SubmittedVersion } from '@rai/shared/schemas/versions';
@@ -37,6 +39,16 @@ export interface FixtureAppOptions {
   now: () => Date;
   /** Called on every rebuild, so scripted runner state never outlives a test. Absent: no runner is bound. */
   qcRunner?: () => FixtureQcRunner;
+  /** Called on every rebuild. Absent: no case mail and no digest. */
+  mailSink?: () => MailSink;
+}
+
+/** One rebuild's departures from the suite's options; `null` binds no runner or no sink. */
+export interface RebuildOverrides {
+  qcRunner?: FixtureQcRunner | null;
+  mailSink?: MailSink | null;
+  /** Replaces the recipients composeAppDeps derives from the fixture identities. */
+  laneOpenRecipients?: LaneOpenRecipients;
 }
 
 const publicBaseUrl = new URL('http://127.0.0.1:8787');
@@ -56,7 +68,7 @@ export let db: TestDatabase;
 export let app: FastifyInstance;
 /** The current app's emitter and error capture, for suites that call a service directly. */
 export let diagnostics: Pick<App, 'emitter' | 'errors'>;
-/** Every log line the current app wrote. */
+/** Every log line the current test's apps wrote. */
 export let capture: LogCapture;
 
 let options: FixtureAppOptions;
@@ -74,6 +86,9 @@ export function openFixtureApp(suiteOptions: FixtureAppOptions): void {
     store = createFilesystemBlobStore(blobDir);
   });
   beforeEach(async () => {
+    // Close first: the previous test's app may still be delivering mail against the rows the reset removes.
+    if (app !== undefined) await app.close();
+    capture = createLogCapture();
     await db.reset();
     await db.owner.execute(sql.raw('TRUNCATE TABLE "session", "registry_counter"'));
     await rm(path.join(blobDir, 'sha256'), { recursive: true, force: true });
@@ -97,8 +112,12 @@ export function openFixtureApp(suiteOptions: FixtureAppOptions): void {
   });
 }
 
-/** Replaces the app on the same database; `null` binds no QC runner (production without an engine). */
-export async function rebuildApp(qcRunner: FixtureQcRunner | null = options.qcRunner?.() ?? null) {
+/** Replaces the app on the same database. */
+export async function rebuildApp({
+  qcRunner = options.qcRunner?.() ?? null,
+  mailSink = options.mailSink?.() ?? null,
+  laneOpenRecipients,
+}: RebuildOverrides = {}) {
   if (app !== undefined) await app.close();
   const { now } = options;
   const adapter = createIdentityAdapter({
@@ -121,7 +140,7 @@ export async function rebuildApp(qcRunner: FixtureQcRunner | null = options.qcRu
       },
       {
         ...createStoreProbes(db.urls.app, blobDir),
-        // No mail sink is bound in-process: the suites assert mail rows, not delivery, so mail is not "down".
+        // The suites assert mail rows and sink contents, never mail readiness, so the sink always reports up.
         mailSink: () => Promise.resolve('ok'),
         qc: () => qcRunner?.probe?.() ?? Promise.resolve('disabled'),
       },
@@ -137,14 +156,18 @@ export async function rebuildApp(qcRunner: FixtureQcRunner | null = options.qcRu
     ),
     store,
     qcRunner: qcRunner ?? undefined,
+    mailSink: mailSink ?? undefined,
     readiness,
     now,
   });
   // Suites run submit QC by hand (runAndPersistSubmitQc) to control its timing; the background run start.ts binds
   // would race their qc_run assertions. Every other group is exactly the production composition.
   const { qc: _submitQc, ...versionRoutes } = versions!;
-  capture = createLogCapture();
-  const built = buildApp({ ...deps, versions: versionRoutes, logStream: capture.stream });
+  const built = buildApp({
+    ...deps,
+    versions: laneOpenRecipients === undefined ? versionRoutes : { ...versionRoutes, laneOpenRecipients },
+    logStream: capture.stream,
+  });
   diagnostics = built;
   app = built.fastify;
   await app.ready();

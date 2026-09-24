@@ -1,35 +1,19 @@
 import { setTimeout as delay } from 'node:timers/promises';
-import type { ErrorCapture } from '@rai/server/observability/errors';
-import { computeReadiness } from '@rai/server/observability/health';
-import { createStoreProbes } from '@rai/server/observability/probes';
 import type { DeskHealthReport } from '@rai/shared/schemas/observability';
-import { after, before, beforeEach, test } from 'node:test';
+import { beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { Writable } from 'node:stream';
 import { sql, eq } from 'drizzle-orm';
 import { notification } from '@rai/server/db/schema/notification';
 import { operatorJobRun, operatorJobNotification } from '@rai/server/db/schema/operator-job-run';
-import type { FastifyInstance } from 'fastify';
 import type { PackDraft } from '@rai/shared/schemas/pack';
 import type { LaneQcRunResponse } from '@rai/shared/schemas/review';
 import type { SubmittedVersion } from '@rai/shared/schemas/versions';
-import { buildApp } from '../support/observed-app.js';
-import { createScopeFactsSource } from '@rai/server/authz/facts';
-import { createIdentityAdapter } from '@rai/server/identity/adapter';
-import { createFixtureIdentityProvider } from '@rai/server/identity/fixture';
-import { createPgSessionStore } from '@rai/server/identity/session';
 import { laneOpenRecipientsFromIdentities } from '@rai/server/versions/open-lanes';
-import { sendBackRecipientsFromIdentities } from '@rai/server/workflow/send-back-notice';
-import type { Emitter } from '@rai/server/observability/log';
-import {
-  createNotifications,
-  loadCommittedCaseRequest,
-  type Notifications,
-} from '@rai/server/notifications/service';
+import { createNotifications, loadCommittedCaseRequest } from '@rai/server/notifications/service';
 import { laneDueDates } from '@rai/server/sla/due-dates';
 import { createDb } from '@rai/server/db/client';
 import type { QueryConfig, QueryResult } from 'pg';
@@ -38,121 +22,37 @@ import { FileMailSink, MemoryMailSink } from '@rai/fixtures/substitutes/mail-sin
 import { ScriptedQcRunner } from '@rai/fixtures/substitutes/qc/index';
 import { FIXTURE_USERS } from '@rai/fixtures/data/users';
 import { findFixtureCase } from '@rai/fixtures/data/cases/index';
-import { loadFixtures } from '@rai/fixtures/load';
 import { fixtureSetLabel, readManifest } from '@rai/fixtures/manifest';
-import { openTestDatabase, type TestDatabase } from '../support/db.js';
-import { asUser, signInAsFixture, type FixtureSession } from '../support/sign-in.js';
+import { app, capture, db, diagnostics, openFixtureApp, rebuildApp, signIn } from '../support/fixture-app.js';
+import { asUser, type FixtureSession } from '../support/sign-in.js';
 
 const base = new URL('http://127.0.0.1:8787');
 const caseId = findFixtureCase('fx-case-nonvendor')!.caseId;
 const now = () => new Date('2026-09-22T04:00:00Z');
 const ownerId = 'fx-user-owner-cm';
 const emailOf = (id: string) => FIXTURE_USERS.find((u) => u.fixtureUserId === id)!.email;
-let db: TestDatabase;
-let app: FastifyInstance;
+const laneOpenRecipients = laneOpenRecipientsFromIdentities(FIXTURE_USERS);
+// A repeated address violates notification_event_version_lane_recipient_key after the first insert.
+const REPEATED_DPO = { ...laneOpenRecipients, dpo: [laneOpenRecipients.dpo[0]!, laneOpenRecipients.dpo[0]!] };
 let sink: MemoryMailSink;
-let notifications: Notifications;
-let emitter: Emitter;
-let errors: ErrorCapture;
-let scratch: string;
-const logs: string[] = [];
-
-async function build(options: { auto?: boolean; rollback?: boolean } = {}) {
-  const laneOpenRecipients = laneOpenRecipientsFromIdentities(FIXTURE_USERS);
-  if (app) await app.close();
-  const adapter = createIdentityAdapter({
-    env: { RAI_IDENTITY_MODE: 'fixture' },
-    nodeEnv: 'test',
-    discovery: () => Promise.reject(new Error('no network')),
-    groupMappingSource: () => Promise.resolve(null),
-    fixtureUsers: FIXTURE_USERS,
-    now,
-  });
-  await adapter.start({ host: '127.0.0.1', port: 8787, publicBaseUrl: base, trustProxy: false });
-  const deps = { sink, identities: FIXTURE_USERS, publicBaseUrl: base };
-  const built = buildApp({
-    db: db.app,
-    now,
-    observability: {
-      readiness: () =>
-        computeReadiness(
-          {
-            identity: () => adapter.health(),
-            loopbackBind: true,
-            mailKind: 'memory',
-            qcKind: 'substitute',
-            build: { commit: 'dev', schemaVersion: 'unknown' },
-          },
-          {
-            ...createStoreProbes(db.urls.app, path.join(scratch, 'blobs')),
-            mailSink: () => sink.health(),
-            qc: () => Promise.resolve('disabled'),
-          },
-        ),
-    },
-    config: {
-      nodeEnv: 'test',
-      log: { level: 'info', pretty: false },
-      trustProxy: false,
-      publicBaseUrl: base,
-    },
-    logStream: new Writable({
-      write(chunk: Buffer, _enc, cb) {
-        logs.push(chunk.toString());
-        cb();
-      },
-    }),
-    identity: {
-      adapter,
-      sessionStore: createPgSessionStore(db.app),
-      facts: createScopeFactsSource(db.app),
-      fixtureProvider: createFixtureIdentityProvider(FIXTURE_USERS),
-    },
-    pack: { limits: { maxPackBytes: 157286400 } },
-    versions: {
-      // A repeated address violates notification_event_version_lane_recipient_key after the first insert.
-      laneOpenRecipients: options.rollback
-        ? { ...laneOpenRecipients, dpo: [laneOpenRecipients.dpo[0]!, laneOpenRecipients.dpo[0]!] }
-        : laneOpenRecipients,
-    },
-    decide: {
-      sendBackRecipientsForOwner: (subject) => sendBackRecipientsFromIdentities(FIXTURE_USERS, subject),
-    },
-    // Unscripted substitute QC: every lane-QC run completes clean.
-    findings: { qc: { runner: new ScriptedQcRunner({ now }) } },
-    ...(options.auto === false ? {} : { notifications: deps }),
-  });
-  emitter = built.emitter;
-  errors = built.errors;
-  notifications = createNotifications({ ...deps, db: db.app, now, emitter, errors });
-  app = built.fastify;
-  await app.ready();
-}
-before(async () => {
-  db = await openTestDatabase();
-  scratch = await mkdtemp(path.join(tmpdir(), 'rai-w3-03a-'));
-});
-beforeEach(async () => {
-  if (app) await app.close();
-  await db.reset();
-  await db.owner.execute(sql.raw('TRUNCATE TABLE session, registry_counter'));
-  await loadFixtures(db.operator, {
-    nodeEnv: 'test',
-    identityMode: 'fixture',
-    blobDir: path.join(scratch, 'blobs'),
-    outputDir: path.join(scratch, 'fixtures'),
-    now: now(),
-  });
+beforeEach(() => {
   sink = new MemoryMailSink({ publicBaseUrl: base });
-  logs.length = 0;
-  await build();
 });
-after(async () => {
-  if (app) await app.close();
-  await db.close();
-  await rm(scratch, { recursive: true, force: true });
-});
-const signIn = (id: string) => signInAsFixture(app, id);
+// Unscripted substitute QC: every lane-QC run completes clean. The app's automatic worker delivers to `sink`
+// unless a test rebuilds with `mailSink: null`.
+openFixtureApp({ now, qcRunner: () => new ScriptedQcRunner({ now }), mailSink: () => sink });
+
+/** A dispatcher beside the app's automatic worker, logging and capturing errors through the current app. */
+const dispatcher = (mail: MailSink = sink, clock = now, database = db.app) =>
+  createNotifications({
+    db: database,
+    sink: mail,
+    now: clock,
+    identities: FIXTURE_USERS,
+    publicBaseUrl: base,
+    ...diagnostics,
+  });
+
 async function submit() {
   const owner = await signIn(ownerId);
   const draft = (
@@ -185,17 +85,7 @@ async function settledDeliveries(versionId: string, expected: Record<string, num
       last_error_code: unknown;
     }[];
     const sent = sink.sent.filter((r) => r.event.caseId === caseId && r.event.versionId === versionId);
-    const emitted = logs
-      .join('')
-      .split('\n')
-      .filter(Boolean)
-      .map(
-        (line) =>
-          JSON.parse(line) as {
-            event: string;
-            fields?: { notificationId?: string };
-          },
-      );
+    const emitted = capture.lines();
     const count = Object.values(expected).reduce((a, b) => a + b, 0);
     const settled =
       rows.length === count &&
@@ -263,7 +153,7 @@ test(`W3-03a committed lane opens: contents, locale, auth, idempotency — ${fix
   );
   const { response, version, headers, body } = await submit();
   assert.equal(response.statusCode, 201, response.body);
-  await notifications.deliverPending();
+  await dispatcher().deliverPending();
   await settledDeliveries(version.versionId, { lane_open: 4 });
   assert.equal(sink.sent.length, 4);
   const due = await laneDueDates(db.app, version.versionId);
@@ -290,16 +180,12 @@ test(`W3-03a committed lane opens: contents, locale, auth, idempotency — ${fix
       .statusCode,
     201,
   );
-  await notifications.deliverPending();
+  await dispatcher().deliverPending();
   await settledDeliveries(version.versionId, { lane_open: 4 });
   assert.equal(sink.sent.length, 4);
-  const allLogs = logs.join('');
+  const allLogs = capture.text();
   assert.ok(allLogs.includes('mail.sent'));
-  const enqueued = allLogs
-    .trim()
-    .split('\n')
-    .map((line) => JSON.parse(line) as { event: string; correlationId: string })
-    .filter((line) => line.event === 'mail.enqueued');
+  const enqueued = capture.lines().filter((line) => line.event === 'mail.enqueued');
   assert.equal(enqueued.length, 4);
   assert.ok(enqueued.every((line) => line.correlationId === response.headers['x-correlation-id']));
   assert.ok(!allLogs.includes('@rai-desk.example'));
@@ -337,7 +223,7 @@ test('manual sweep skips the automatic worker held sink row; settlement requires
     await bounded(entered.promise);
     const { response, version } = await bounded(submitted);
     assert.equal(response.statusCode, 201);
-    await bounded(notifications.deliverPending());
+    await bounded(dispatcher().deliverPending());
     const rows = await db.owner.execute(sql`
       SELECT status, attempts FROM notification
       WHERE case_id = ${caseId} AND version_id = ${version.versionId}`);
@@ -365,7 +251,7 @@ test('send-back mail goes only to owner, with deciding lane and bounded reviewer
     summary: 'ก'.repeat(700),
   });
   assert.equal(res.statusCode, 201, res.body);
-  await notifications.deliverPending();
+  await dispatcher().deliverPending();
   await settledDeliveries(version.versionId, { lane_open: 4, send_back: 1 });
   const messages = sink.sent.filter((r) => r.event.kind === 'sent_back');
   assert.equal(messages.length, 1);
@@ -388,7 +274,7 @@ for (const fail of [false, true])
     }
     // SKIP LOCKED is not a completion barrier for another post-response worker.
     await app.close();
-    await notifications.deliverPending();
+    await dispatcher().deliverPending();
     const result = await db.owner.execute(
       sql`SELECT n.status, n.attempts, n.last_error_code, n.next_attempt_at IS NOT NULL AS has_deadline, c.ai_readiness_status FROM notification n JOIN "case" c ON c.id = n.case_id WHERE n.event = 'ready'`,
     );
@@ -406,40 +292,40 @@ for (const fail of [false, true])
   });
 
 test('rollback after first outbox insert produces no mail or committed notification', async () => {
-  await build({ rollback: true });
+  await rebuildApp({ laneOpenRecipients: REPEATED_DPO });
   const { response } = await submit();
   assert.equal(response.statusCode, 500);
-  await notifications.deliverPending();
+  await dispatcher().deliverPending();
   assert.equal(sink.sent.length, 0);
   assert.equal((await db.owner.execute(sql`SELECT id FROM notification`)).rows.length, 0);
 });
 
 test('concurrent initial consumers and startup recovery send each committed row once', async () => {
-  await build({ auto: false });
+  await rebuildApp({ mailSink: null });
   assert.equal((await submit()).response.statusCode, 201);
   assert.equal(sink.sent.length, 0);
   const rows = (await db.owner.execute(sql`SELECT id FROM notification`)).rows as { id: string }[];
   await Promise.all(
-    rows.flatMap((r) => [notifications.deliverInitial(r.id), notifications.deliverInitial(r.id)]),
+    rows.flatMap((r) => [dispatcher().deliverInitial(r.id), dispatcher().deliverInitial(r.id)]),
   );
   assert.equal(sink.sent.length, 4);
   assert.equal(sink.receipts.length, 4);
-  await build();
+  await rebuildApp();
   assert.equal(sink.sent.length, 4);
 });
 
 test('startup consumes unattempted committed backlog', async () => {
-  await build({ auto: false });
+  await rebuildApp({ mailSink: null });
   assert.equal((await submit()).response.statusCode, 201);
   assert.equal(sink.sent.length, 0);
-  await build();
+  await rebuildApp();
   assert.equal(sink.sent.length, 4);
 });
 
 test('a row visible only inside an uncommitted transaction cannot reach the sink', async () => {
-  await build({ auto: false });
+  await rebuildApp({ mailSink: null });
   await submit();
-  await notifications.deliverPending();
+  await dispatcher().deliverPending();
   const [original] = await db.owner.select().from(notification);
   const inserted = Promise.withResolvers<void>();
   const release = Promise.withResolvers<void>();
@@ -455,18 +341,18 @@ test('a row visible only inside an uncommitted transaction cannot reach the sink
   const rolledBack = assert.rejects(transaction, /rollback/);
   await inserted.promise;
   try {
-    assert.equal(await notifications.deliverInitial(id), undefined);
+    assert.equal(await dispatcher().deliverInitial(id), undefined);
     assert.equal(sink.sent.length, 4);
   } finally {
     release.resolve();
   }
   await rolledBack;
-  assert.equal(await notifications.deliverInitial(id), undefined);
+  assert.equal(await dispatcher().deliverInitial(id), undefined);
 });
 
 for (const invalid of ['missing_audit', 'unauthorized', 'external', 'unsafe_link'] as const)
   test(`committed outbox rejected safely: ${invalid}`, async () => {
-    await build({ auto: false });
+    await rebuildApp({ mailSink: null });
     await submit();
     const [original] = await db.owner.select().from(notification).where(eq(notification.lane, 'dpo'));
     const id = randomUUID();
@@ -493,7 +379,7 @@ for (const invalid of ['missing_audit', 'unauthorized', 'external', 'unsafe_link
       sink,
       identities,
       publicBaseUrl: base,
-      emitter,
+      emitter: diagnostics.emitter,
     });
     const receipt = await isolated.deliverInitial(id);
     assert.equal(receipt?.status, 'failed');
@@ -558,7 +444,7 @@ test('the post-response hook delivers without an explicit consumer call', async 
 });
 
 test('exported committed loader is reusable without a delivery or status write', async () => {
-  await build({ auto: false });
+  await rebuildApp({ mailSink: null });
   await submit();
   const [row] = await db.owner.select().from(notification);
   const request = await db.app.transaction((tx) =>
@@ -573,20 +459,8 @@ test('exported committed loader is reusable without a delivery or status write',
   assert.equal(unchanged!.status, 'queued');
 });
 
-// W3-04 reuses the committed workflow harness; no duplicate composer/fixture setup.
-const retryWorker = (mail: MailSink, clock: () => Date, database = db.app) =>
-  createNotifications({
-    db: database,
-    sink: mail,
-    now: clock,
-    errors,
-    identities: FIXTURE_USERS,
-    publicBaseUrl: base,
-    emitter,
-  });
-
 test('W3-04 four failed results persist deadlines and leave Ready decisions unchanged', async () => {
-  await build({ auto: false });
+  await rebuildApp({ mailSink: null });
   const { version } = await submit();
   for (const [id, lane] of [
     ['fx-user-dpo', 'dpo'],
@@ -604,25 +478,18 @@ test('W3-04 four failed results persist deadlines and leave Ready decisions unch
   let time = now().getTime();
   for (const [i, delta] of [0, 1000, 5000, 25000].entries()) {
     time += delta;
-    const worker = retryWorker(sink, () => new Date(time));
+    const worker = dispatcher(sink, () => new Date(time));
     if (i > 0)
-      assert.equal(await retryWorker(sink, () => new Date(time - 1)).deliverInitial(row!.id), undefined);
+      assert.equal(await dispatcher(sink, () => new Date(time - 1)).deliverInitial(row!.id), undefined);
     assert.equal((await worker.deliverInitial(row!.id))?.attempt, i + 1);
   }
-  assert.equal(await retryWorker(sink, () => new Date(time + 99999)).deliverInitial(row!.id), undefined);
+  assert.equal(await dispatcher(sink, () => new Date(time + 99999)).deliverInitial(row!.id), undefined);
   const [stored] = await db.owner.select().from(notification).where(eq(notification.id, row!.id));
   assert.equal(stored!.status, 'failed');
   assert.equal(stored!.attempts, 4);
   assert.equal(stored!.nextAttemptAt, null);
   assert.deepEqual((await snapshot()).rows, before);
-  const events = logs
-    .join('')
-    .trim()
-    .split('\n')
-    .map(
-      (s) => JSON.parse(s) as { event: string; correlationId: string; fields?: { notificationId?: string } },
-    )
-    .filter((e) => e.fields?.notificationId === row!.id);
+  const events = capture.lines().filter((e) => e.fields?.notificationId === row!.id);
   assert.equal(events.filter((e) => e.event === 'mail.attempt_failed').length, 3);
   assert.equal(events.filter((e) => e.event === 'mail.failed').length, 1);
   const failures = events.filter((e) => e.event === 'error.captured');
@@ -644,15 +511,15 @@ test('W3-04 four failed results persist deadlines and leave Ready decisions unch
     report.errorCounters.some((counter) => counter.code === 'mail_delivery_failed' && counter.count === 1),
   );
   for (const user of FIXTURE_USERS) {
-    assert.equal(logs.join('').includes(user.email), false);
-    assert.equal(logs.join('').includes(user.displayName), false);
+    assert.equal(capture.text().includes(user.email), false);
+    assert.equal(capture.text().includes(user.displayName), false);
   }
 
   assert.ok(events.every((e) => e.correlationId === row!.correlationId));
 });
 
 test('W3-04 adopts legacy deadline once; reconnect preserves it and successful retry stops', async () => {
-  await build({ auto: false });
+  await rebuildApp({ mailSink: null });
   await submit();
   const [row] = await db.owner.select().from(notification);
   await db.owner
@@ -660,18 +527,18 @@ test('W3-04 adopts legacy deadline once; reconnect preserves it and successful r
     .set({ attempts: 1, lastErrorCode: 'sink_failure' })
     .where(eq(notification.id, row!.id));
   const time = now().getTime();
-  await retryWorker(sink, now).deliverInitial(row!.id);
+  await dispatcher(sink, now).deliverInitial(row!.id);
   const connection = createDb(db.urls.app);
   try {
     assert.equal(
-      await retryWorker(sink, () => new Date(time + 999), connection.db).deliverInitial(row!.id),
+      await dispatcher(sink, () => new Date(time + 999), connection.db).deliverInitial(row!.id),
       undefined,
     );
     assert.equal(
-      (await retryWorker(sink, () => new Date(time + 1000), connection.db).deliverInitial(row!.id))?.status,
+      (await dispatcher(sink, () => new Date(time + 1000), connection.db).deliverInitial(row!.id))?.status,
       'delivered',
     );
-    assert.equal(await retryWorker(sink, () => new Date(time + 99999)).deliverInitial(row!.id), undefined);
+    assert.equal(await dispatcher(sink, () => new Date(time + 99999)).deliverInitial(row!.id), undefined);
     assert.equal(sink.receipts.length, 1);
     assert.equal(sink.receipts[0]!.attempt, 2);
   } finally {
@@ -680,7 +547,7 @@ test('W3-04 adopts legacy deadline once; reconnect preserves it and successful r
 });
 
 test('W3-04 independent workers skip a held row while another notification progresses', async () => {
-  await build({ auto: false });
+  await rebuildApp({ mailSink: null });
   await submit();
   const rows = await db.owner.select().from(notification);
   const entered = Promise.withResolvers<void>(),
@@ -695,10 +562,10 @@ test('W3-04 independent workers skip a held row while another notification progr
   };
   const connection = createDb(db.urls.app);
   const otherSink = new MemoryMailSink({ publicBaseUrl: base });
-  const first = retryWorker(gated, now).deliverInitial(rows[0]!.id);
+  const first = dispatcher(gated, now).deliverInitial(rows[0]!.id);
   try {
     await entered.promise;
-    const other = retryWorker(otherSink, now, connection.db);
+    const other = dispatcher(otherSink, now, connection.db);
     assert.equal(await other.deliverInitial(rows[0]!.id), undefined);
     assert.equal((await other.deliverInitial(rows[1]!.id))?.status, 'delivered');
   } finally {
@@ -711,10 +578,10 @@ test('W3-04 independent workers skip a held row while another notification progr
 });
 
 test('W3-04 accepted file then DB rollback: fresh sink deduplicates replay; no precommit success log', async (t) => {
-  await build({ auto: false });
+  await rebuildApp({ mailSink: null });
   await submit();
   const [row] = await db.owner.select().from(notification);
-  const dir = await mkdtemp(path.join(scratch, 'replay-'));
+  const dir = await mkdtemp(path.join(tmpdir(), 'rai-w3-03a-replay-'));
   const connection = createDb(db.urls.app, { max: 1 });
   connection.pool.on('connect', (client) => {
     const original = client.query.bind(client) as unknown as (
@@ -732,24 +599,25 @@ test('W3-04 accepted file then DB rollback: fresh sink deduplicates replay; no p
   });
   try {
     const first = new FileMailSink({ publicBaseUrl: base, dir });
-    await assert.rejects(retryWorker(first, now, connection.db).deliverInitial(row!.id));
+    await assert.rejects(dispatcher(first, now, connection.db).deliverInitial(row!.id));
     assert.equal(first.sent.length, 1);
     const [pending] = await db.owner.select().from(notification).where(eq(notification.id, row!.id));
     assert.equal(pending!.attempts, 0);
-    assert.ok(!logs.join('').includes('mail.sent'));
+    assert.ok(!capture.text().includes('mail.sent'));
     const restarted = new FileMailSink({ publicBaseUrl: base, dir });
-    assert.equal((await retryWorker(restarted, now).deliverInitial(row!.id))?.status, 'duplicate');
+    assert.equal((await dispatcher(restarted, now).deliverInitial(row!.id))?.status, 'duplicate');
     assert.equal(restarted.sent.length, 0);
     const [sent] = await db.owner.select().from(notification).where(eq(notification.id, row!.id));
     assert.equal(sent!.status, 'sent');
     assert.equal(sent!.attempts, 1); // two sink invocations, one committed result
   } finally {
     await connection.close();
+    await rm(dir, { recursive: true, force: true });
   }
 });
 
 test('W3-04 selects at most 25 due rows per scan and leaves future retries alone', async () => {
-  await build({ auto: false });
+  await rebuildApp({ mailSink: null });
   await submit();
   const [row] = await db.owner.select().from(notification).where(eq(notification.lane, 'dpo'));
   const reviewer = FIXTURE_USERS.find((u) => u.fixtureUserId === 'fx-user-dpo')!;
@@ -766,7 +634,7 @@ test('W3-04 selects at most 25 due rows per scan and leaves future retries alone
     now,
     identities: [...FIXTURE_USERS, ...extra],
     publicBaseUrl: base,
-    emitter,
+    emitter: diagnostics.emitter,
   });
   sink.failAlways(true);
   await worker.deliverPending();
@@ -778,7 +646,7 @@ test('W3-04 selects at most 25 due rows per scan and leaves future retries alone
 });
 
 test('shutdown cancellation keeps the notification lock until the sink settles, then commits the settled result', async () => {
-  await build({ auto: false });
+  await rebuildApp({ mailSink: null });
   await submit();
   const [row] = await db.owner.select().from(notification);
   const entered = Promise.withResolvers<void>();
@@ -788,7 +656,7 @@ test('shutdown cancellation keeps the notification lock until the sink settles, 
     db: db.app,
     identities: FIXTURE_USERS,
     publicBaseUrl: base,
-    emitter,
+    emitter: diagnostics.emitter,
     sink: {
       identity: sink.identity,
       deliver: async (request) => {
@@ -832,23 +700,14 @@ test('request completion and response latency do not wait for a stalled notifica
   try {
     await entered.promise;
     const completion = () =>
-      logs
-        .join('')
-        .split('\n')
-        .filter(Boolean)
-        .map(
-          (raw) =>
-            JSON.parse(raw) as {
-              event: string;
-              fields: { route?: string; durationMs?: number; status?: number };
-            },
-        )
+      capture
+        .lines()
         .filter(
           (line) =>
-            line.event === 'request.completed' && line.fields.route === '/api/cases/:caseId/draft/submit',
+            line.event === 'request.completed' && line.fields?.route === '/api/cases/:caseId/draft/submit',
         );
     assert.equal(completion().length, 1, 'completion must be logged before delivery settles');
-    assert.equal(completion()[0]!.fields.status, 201);
+    assert.equal(completion()[0]!.fields?.status, 201);
     // A deadline is only a hang guard; the correctness assertions precede releasing the sink.
     const response = await Promise.race([
       submitted,
