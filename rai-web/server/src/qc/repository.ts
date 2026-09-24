@@ -2,10 +2,13 @@
 import { and, asc, desc, eq, isNull } from 'drizzle-orm';
 import type { Lane } from '@rai/shared/constants';
 import type { QcTrigger, QcUnavailableReason } from '@rai/shared/qc/types';
+import type { StoredFindingSummary } from '@rai/shared/schemas/review';
 import type { PackVersionRow } from '../cases/repository.js';
 import type { Executor, Tx } from '../db/client.js';
 import { qcFinding } from '../db/schema/qc-finding.js';
 import { qcRun } from '../db/schema/qc-run.js';
+
+export type QcFindingRow = typeof qcFinding.$inferSelect;
 
 export interface InsertRunInput {
   id: string;
@@ -126,61 +129,34 @@ async function findLatestQcRun(
   return row;
 }
 
-export async function listFindingsForRun(
-  exec: Executor,
-  runId: string,
-): Promise<
-  Array<{
-    findingId: string;
-    ruleId: string;
-    slot: number | null;
-    severity: string;
-    owningLane: Lane;
-    messageKey: string;
-    messageParams?: Record<string, string | number>;
-  }>
-> {
+export async function listFindingsForRun(exec: Executor, runId: string): Promise<StoredFindingSummary[]> {
   const rows = await exec
-    .select({
-      findingId: qcFinding.id,
-      ruleId: qcFinding.ruleId,
-      slot: qcFinding.slot,
-      severity: qcFinding.severity,
-      owningLane: qcFinding.owningLane,
-      messageKey: qcFinding.messageKey,
-      messageParams: qcFinding.messageParams,
-    })
+    .select()
     .from(qcFinding)
     .where(eq(qcFinding.runId, runId))
     .orderBy(asc(qcFinding.createdAt), asc(qcFinding.id));
-  return rows.map((r) => {
-    const out: {
-      findingId: string;
-      ruleId: string;
-      slot: number | null;
-      severity: string;
-      owningLane: Lane;
-      messageKey: string;
-      messageParams?: Record<string, string | number>;
-    } = {
-      findingId: r.findingId,
-      ruleId: r.ruleId,
-      slot: r.slot,
-      severity: r.severity,
-      owningLane: r.owningLane as Lane,
-      messageKey: r.messageKey,
-    };
-    const params = asMessageParams(r.messageParams);
-    if (params !== undefined) out.messageParams = params;
-    return out;
-  });
+  return rows.map(storedFindingSummary);
 }
 
-function asMessageParams(value: unknown): Record<string, string | number> | undefined {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
-  const out: Record<string, string | number> = {};
-  for (const [key, entry] of Object.entries(value)) {
-    if (typeof entry === 'string' || typeof entry === 'number') out[key] = entry;
+/** A stored finding as every findings response shows it; params keep the string / number entries t() interpolates. */
+export function storedFindingSummary(row: QcFindingRow): StoredFindingSummary {
+  const messageParams: Record<string, string | number> = {};
+  if (
+    typeof row.messageParams === 'object' &&
+    row.messageParams !== null &&
+    !Array.isArray(row.messageParams)
+  ) {
+    for (const [key, entry] of Object.entries(row.messageParams)) {
+      if (typeof entry === 'string' || typeof entry === 'number') messageParams[key] = entry;
+    }
   }
-  return out;
+  return {
+    findingId: row.id,
+    ruleId: row.ruleId,
+    slot: row.slot as StoredFindingSummary['slot'],
+    severity: row.severity as StoredFindingSummary['severity'],
+    owningLane: row.owningLane as Lane,
+    messageKey: row.messageKey,
+    messageParams,
+  };
 }

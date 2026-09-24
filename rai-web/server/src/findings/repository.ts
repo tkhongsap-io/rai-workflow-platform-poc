@@ -1,18 +1,13 @@
-// W2-05: qc_finding / disposition_event reads and appends.
-import { and, asc, desc, eq, isNotNull } from 'drizzle-orm';
+// W2-05: qc_finding / disposition_event reads and appends, and the one definition of a finding's latest disposition.
+import { and, asc, desc, eq, isNotNull, sql } from 'drizzle-orm';
+import { QueryBuilder } from 'drizzle-orm/pg-core';
 import type { Lane } from '@rai/shared/constants';
-import type { DispositionKind } from '@rai/shared/schemas/review';
+import type { DispositionKind, FindingWithDisposition } from '@rai/shared/schemas/review';
 import type { Executor, Tx } from '../db/client.js';
 import { dispositionEvent } from '../db/schema/disposition-event.js';
 import { qcFinding } from '../db/schema/qc-finding.js';
 import { packVersion } from '../db/schema/pack-version.js';
-
-export type QcFindingRow = typeof qcFinding.$inferSelect;
-
-export async function readFinding(exec: Executor, findingId: string): Promise<QcFindingRow | undefined> {
-  const [row] = await exec.select().from(qcFinding).where(eq(qcFinding.id, findingId)).limit(1);
-  return row;
-}
+import { storedFindingSummary, type QcFindingRow } from '../qc/repository.js';
 
 export async function readFindingForCase(
   exec: Executor,
@@ -28,26 +23,31 @@ export async function readFindingForCase(
   return row?.finding;
 }
 
-export async function latestDisposition(
+/**
+ * Each qc_finding's latest disposition event, joined LATERAL ... ON true. Stamps are minted after the previous
+ * event under the case lock (service.ts), so created_at DESC is commit order; id DESC settles an equal stamp.
+ */
+export const latestDisposition = new QueryBuilder()
+  .select({ kind: dispositionEvent.kind, createdAt: dispositionEvent.createdAt })
+  .from(dispositionEvent)
+  .where(eq(dispositionEvent.findingId, qcFinding.id))
+  .orderBy(desc(dispositionEvent.createdAt), desc(dispositionEvent.id))
+  .limit(1)
+  .as('latest_disposition');
+
+/** The Ready rule's open finding: never dispositioned, or only proposed fixed and not yet confirmed. */
+export const undispositioned = sql<boolean>`(${latestDisposition.kind} IS NULL OR ${latestDisposition.kind} = 'fixed_proposed')`;
+
+export async function readLatestDisposition(
   exec: Executor,
   findingId: string,
 ): Promise<{ kind: DispositionKind; createdAt: Date } | undefined> {
   const [row] = await exec
-    .select({ kind: dispositionEvent.kind, createdAt: dispositionEvent.createdAt })
-    .from(dispositionEvent)
-    .where(eq(dispositionEvent.findingId, findingId))
-    .orderBy(desc(dispositionEvent.createdAt), desc(dispositionEvent.id))
-    .limit(1);
+    .select({ kind: latestDisposition.kind, createdAt: latestDisposition.createdAt })
+    .from(qcFinding)
+    .innerJoinLateral(latestDisposition, sql`true`)
+    .where(eq(qcFinding.id, findingId));
   return row === undefined ? undefined : { kind: row.kind as DispositionKind, createdAt: row.createdAt };
-}
-
-function asMessageParams(value: unknown): Record<string, string | number> | undefined {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
-  const out: Record<string, string | number> = {};
-  for (const [key, entry] of Object.entries(value)) {
-    if (typeof entry === 'string' || typeof entry === 'number') out[key] = entry;
-  }
-  return Object.keys(out).length === 0 ? undefined : out;
 }
 
 /** Stored findings for a version plus each finding's latest disposition kind (GET …/findings; no qc_run write). */
@@ -55,75 +55,18 @@ export async function listFindingsForVersion(
   exec: Executor,
   caseId: string,
   versionId: string,
-): Promise<
-  Array<{
-    findingId: string;
-    ruleId: string;
-    slot: number | null;
-    severity: string;
-    owningLane: Lane;
-    messageKey: string;
-    messageParams?: Record<string, string | number>;
-    latestDisposition: DispositionKind | null;
-  }>
-> {
+): Promise<FindingWithDisposition[]> {
   const rows = await exec
-    .select({
-      findingId: qcFinding.id,
-      ruleId: qcFinding.ruleId,
-      slot: qcFinding.slot,
-      severity: qcFinding.severity,
-      owningLane: qcFinding.owningLane,
-      messageKey: qcFinding.messageKey,
-      messageParams: qcFinding.messageParams,
-    })
+    .select({ finding: qcFinding, latestDisposition: latestDisposition.kind })
     .from(qcFinding)
     .innerJoin(packVersion, eq(qcFinding.versionId, packVersion.id))
+    .leftJoinLateral(latestDisposition, sql`true`)
     .where(and(eq(qcFinding.versionId, versionId), eq(packVersion.caseId, caseId)))
     .orderBy(asc(qcFinding.createdAt), asc(qcFinding.id));
-
-  const out: Array<{
-    findingId: string;
-    ruleId: string;
-    slot: number | null;
-    severity: string;
-    owningLane: Lane;
-    messageKey: string;
-    messageParams?: Record<string, string | number>;
-    latestDisposition: DispositionKind | null;
-  }> = [];
-  for (const r of rows) {
-    const latest = await latestDisposition(exec, r.findingId);
-    const entry: (typeof out)[number] = {
-      findingId: r.findingId,
-      ruleId: r.ruleId,
-      slot: r.slot,
-      severity: r.severity,
-      owningLane: r.owningLane as Lane,
-      messageKey: r.messageKey,
-      latestDisposition: latest?.kind ?? null,
-    };
-    const params = asMessageParams(r.messageParams);
-    if (params !== undefined) entry.messageParams = params;
-    out.push(entry);
-  }
-  return out;
-}
-
-export async function listDispositions(
-  exec: Executor,
-  findingId: string,
-): Promise<Array<{ id: string; kind: string; reason: string | null; createdAt: Date }>> {
-  return exec
-    .select({
-      id: dispositionEvent.id,
-      kind: dispositionEvent.kind,
-      reason: dispositionEvent.reason,
-      createdAt: dispositionEvent.createdAt,
-    })
-    .from(dispositionEvent)
-    .where(eq(dispositionEvent.findingId, findingId))
-    .orderBy(asc(dispositionEvent.createdAt), asc(dispositionEvent.id));
+  return rows.map((row) => ({
+    ...storedFindingSummary(row.finding),
+    latestDisposition: row.latestDisposition as DispositionKind | null,
+  }));
 }
 
 /** Latest submitted version id for a case (max version_number among submitted rows). */
