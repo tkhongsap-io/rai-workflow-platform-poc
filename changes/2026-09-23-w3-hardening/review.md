@@ -11,7 +11,7 @@ Most W2/W3 PRs, #90 to #126, merged without an independent review verdict. A dyn
 | Findings confirmed | 71 (5 high, 20 medium, 46 low) |
 | Findings refuted by the skeptic | 17 |
 | Fix batches | 23 planned (H1-H23), then H24 from the final verification and H25-H29 from the two walkthrough re-checks |
-| Deferred to the owner, with a reason (section 5) | 3 whole findings, issue #35, 5 leftover parts of closed findings, and 3 questions from the walkthrough re-checks (12 items) |
+| Deferred to the owner, with a reason (section 5) | 3 whole findings, issue #35, 3 leftover parts of closed findings, 2 spec questions raised by closed findings, and 3 questions from the walkthrough re-checks (12 items) |
 
 The five high findings:
 
@@ -92,17 +92,17 @@ A separate workflow checked `origin/main` at `4522074` (after H23), each part in
 
 | Outcome | Count |
 |---|---|
-| Closed, with the code on `main` and the proving test or measurable change cited (one of them, finding 57, closed in part) | 67 |
+| Closed, with the code on `main` cited. Most have a proving test or a measurable change; behaviour-preserving refactors and docs-only fixes rely on the existing suites, as the auditors list. Three of them (findings 17, 46 and 57) have a leftover part deferred: section 5 items 5, 8 and 9. | 67 |
 | Deferred whole, with a reason (section 5) | 3 |
 | Withdrawn: the H15 perf-harness guard, kept on purpose (section 4) | 1 |
 | Open | 0 |
 
-How these counts were reached. The three closure auditors reported per slice:
-- workflow-core and queue-SLA: 19 closed;
-- notifications, runtime-ops and security: 21 closed, 1 deferred;
-- web-UI, architecture and tests-evidence: 26 closed, 3 deferred, 1 withdrawn.
+How these counts were reached. The three closure auditors reported:
+- **Workflow-core and queue-SLA:** 18 closed, plus one gap: the queue-SLA N+1 fix has no counting test. The skeptic refuted the gap, so this slice counts 19 closed.
+- **Notifications, runtime-ops and security:** 21 closed and 1 deferred (finding 39).
+- **Web-UI, architecture and tests-evidence:** a headline of 26 closed, 3 deferred and 1 withdrawn (68). Its itemised list has 27 closed, including finding 46's owner-filter part and finding 57's `app.ts`/`start.ts` headers, and 2 deferred whole (53, 61). The remainders of 46 and 57 are deferred.
 
-That totals 66, 4 and 1. The auditors counted finding 57 (comments that narrate ticket history) as deferred, but H19 fixed its `app.ts`/`start.ts` part, and the ticket-ID line count below reflects that; only optional trimming remains. Counting only findings deferred whole gives 67, 3 and 1. The lead's first draft of this record said 65 and 5, a summing error, and round 1 of the review of #157 caught it.
+Counting whole findings gives 67, 3 and 1. The lead's first draft said 65 and 5, from the headline sums; round 1 of the review of #157 caught the mismatch.
 
 - Pool resilience: `server/src/db/client.ts` and `start.ts` (idle-error handler, 5 s connect timeout), tested by `w3-h4-pool-idle-error.test.ts`.
 - Process handlers: `main.ts`, tested by `w3-h4-fatal-handler.test.ts`.
@@ -179,12 +179,12 @@ Only wording fixes to the script followed. The agent also noted that the send-ba
 
 ## 5. Deferred for Ta (none decided here)
 
-Three of the 71 findings were deferred whole: items 2, 3 and 4 (retro findings 61, 53 and 39, numbered by their position in the retro's confirmed list, not GitHub numbers). Item 1 is the existing GitHub issue #35; the closed findings around it fail closed. Items 5-9 are parts left over from findings that were otherwise closed:
+Three of the 71 findings were deferred whole: items 2, 3 and 4 (retro findings 61, 53 and 39, numbered by their position in the retro's confirmed list, not GitHub numbers). Item 1 is the existing GitHub issue #35; the closed findings around it fail closed. Items 5, 8 and 9 are parts left over from findings that were otherwise closed:
 - item 5, `scopedCases`, from retro finding 17;
-- item 6, the local-google readiness state, from H10;
-- item 7, the `BLOB_TMP_MAX_AGE_HOURS` minimum, from H11;
 - item 8, display names, from retro finding 46;
 - item 9, the optional parts of retro finding 57 (H19 fixed its `app.ts`/`start.ts` part) and of other findings.
+
+Items 6 and 7 are open spec questions that the H10 and H11 findings raised. Those fixes left them out on purpose: the local-google readiness state needs a W0-10 addition, and the `BLOB_TMP_MAX_AGE_HOURS` minimum is an open W0-04 question.
 
 Items 10-12 are questions from the walkthrough re-checks.
 
