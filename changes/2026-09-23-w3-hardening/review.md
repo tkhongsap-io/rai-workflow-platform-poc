@@ -13,13 +13,14 @@ Most W2/W3 PRs, #90 to #126, merged without an independent review verdict. A dyn
 | Fix batches | 23 planned (H1-H23), then H24 from the final verification and H25-H29 from the two walkthrough re-checks |
 | Deferred to the owner, with a reason (section 5) | 3 whole findings, issue #35, 3 leftover parts of closed findings, 2 spec questions raised by closed findings, and 3 questions from the walkthrough re-checks (12 items) |
 
-The five high findings:
+The five high findings are four distinct bugs; two lenses reported the approve bug separately:
 
-1. Approve accepted any UUID as `qcRunId` (H2).
-2. The QC orchestrator silently dropped findings it could not map to a lane (H7).
-3. The reviewer workspace showed only its own run's findings (H5).
-4. The Ready self-approval check used the approver's current grants, not the ones held when deciding (H8).
-5. An idle Postgres client error crashed the server (H4).
+1. Approve accepted any `qcRunId`: it did no lane-QC lookup and never enforced `qc_run_superseded` (H2; reported by the workflow-core and architecture lenses).
+2. `awaiting_disposition` appeared only in the queue; `/api/cases` and `/api/cases/:id` reported the same case as `in_review` (H3).
+3. The reviewer workspace hid the lane's stored findings that did not come from its own lane-QC run (H5).
+4. An idle Postgres client error crashed the server, and pool connects had no timeout (H4).
+
+Two medium findings were of similar weight. The QC orchestrator silently dropped findings it could not map to a lane (H7). The Ready self-approval check used the approver's current grants, not the ones held when deciding (H8).
 
 ## 2. Batches
 
