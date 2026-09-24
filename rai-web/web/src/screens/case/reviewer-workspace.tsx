@@ -51,7 +51,6 @@ export interface ReviewerWorkspaceProps {
   lane: Lane | null;
   onDecided: (response: LaneDecisionResponse) => void;
   onDispositionRecorded: (response: DispositionResponse) => void;
-  onUnauthenticated: (err: unknown) => boolean;
 }
 
 export function ReviewerWorkspace({
@@ -63,7 +62,6 @@ export function ReviewerWorkspace({
   lane,
   onDecided,
   onDispositionRecorded,
-  onUnauthenticated,
 }: ReviewerWorkspaceProps): JSX.Element | null {
   const { t } = useLocale();
   const loadMode = reviewerFindingsLoadMode(view, lane);
@@ -92,13 +90,12 @@ export function ReviewerWorkspace({
         if (!cancelled) setStored({ key, result });
       })
       .catch((err: unknown) => {
-        if (cancelled || onUnauthenticated(err)) return;
-        setStored({ key, result: { kind: 'error', error: err } });
+        if (!cancelled) setStored({ key, result: { kind: 'error', error: err } });
       });
     return () => {
       cancelled = true;
     };
-  }, [caseId, version, lane, loadMode, loadKey, reloadToken, onUnauthenticated]);
+  }, [caseId, version, lane, loadMode, loadKey, reloadToken]);
 
   const onDisposition = useCallback(
     (response: DispositionResponse): void => {
@@ -119,11 +116,9 @@ export function ReviewerWorkspace({
         .then((listed) => {
           update(() => laneFindings(listed, lane));
         })
-        .catch((err: unknown) => {
-          void onUnauthenticated(err);
-        });
+        .catch(() => undefined); // the recorded kind stays; the next load brings the server's view
     },
-    [onDispositionRecorded, caseId, version.versionId, lane, onUnauthenticated],
+    [onDispositionRecorded, caseId, version.versionId, lane],
   );
 
   const errorNotice = (error: unknown): JSX.Element => (
@@ -186,7 +181,6 @@ export function ReviewerWorkspace({
               session={session}
               view={view}
               onDisposition={onDisposition}
-              onUnauthenticated={onUnauthenticated}
             />
           )}
           {lane !== null && state.run !== null && laneIsDecidable({ lane, view, hasOpenDraft }) ? (
@@ -197,7 +191,6 @@ export function ReviewerWorkspace({
               expectedVersion={expectedVersion}
               qcRunId={state.run.runId}
               onDecided={onDecided}
-              onUnauthenticated={onUnauthenticated}
             />
           ) : null}
         </>

@@ -38,7 +38,6 @@ export interface FindingsListProps {
   session: SessionInfo;
   view: CaseView;
   onDisposition: (response: DispositionResponse) => void;
-  onUnauthenticated: (err: unknown) => boolean;
 }
 
 /** Render stored findings (from qc-run or GET …/findings) with disposition controls. */
@@ -50,7 +49,6 @@ export function FindingsList({
   session,
   view,
   onDisposition,
-  onUnauthenticated,
 }: FindingsListProps): JSX.Element {
   const { t } = useLocale();
   if (findings.length === 0) {
@@ -72,7 +70,6 @@ export function FindingsList({
           session={session}
           view={view}
           onDisposition={onDisposition}
-          onUnauthenticated={onUnauthenticated}
         />
       ))}
     </ul>
@@ -104,7 +101,6 @@ function FindingRow({
   session,
   view,
   onDisposition,
-  onUnauthenticated,
 }: {
   finding: StoredFindingSummary;
   latestKind: DispositionKind | null;
@@ -113,7 +109,6 @@ function FindingRow({
   session: SessionInfo;
   view: CaseView;
   onDisposition: (response: DispositionResponse) => void;
-  onUnauthenticated: (err: unknown) => boolean;
 }): JSX.Element {
   const { t } = useLocale();
   const message = isLocaleKey(finding.messageKey)
@@ -146,7 +141,6 @@ function FindingRow({
           view={view}
           latestKind={latestKind}
           onRecorded={onDisposition}
-          onUnauthenticated={onUnauthenticated}
         />
       </div>
     </li>

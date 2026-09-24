@@ -10,7 +10,7 @@ import type { LocaleKey } from '@rai/shared/locales/keys';
 import { ApiError, api } from '../../api/client.js';
 import { ErrorNotice } from '../../components/error-notice.js';
 import { useLocale } from '../../i18n/locale-provider.js';
-import { useSession, useSignedInSession } from '../../session/session-provider.js';
+import { useSignedInSession } from '../../session/session-provider.js';
 import { ROUTES } from '../../routes.js';
 import {
   blankFields,
@@ -103,7 +103,6 @@ function TextField({
 export function NewCaseScreen(): JSX.Element {
   const { t } = useLocale();
   const session = useSignedInSession();
-  const { signedOut } = useSession();
   const navigate = useNavigate();
   const [config, setConfig] = useState<ConfigState>({ kind: 'loading' });
   const [form, setForm] = useState<NewCaseForm>(() => initialForm(session.principal));
@@ -122,14 +121,12 @@ export function NewCaseScreen(): JSX.Element {
         if (!cancelled) setConfig({ kind: 'loaded', configuration });
       })
       .catch((err: unknown) => {
-        if (cancelled) return;
-        if (err instanceof ApiError && err.status === 401) signedOut('revoked');
-        else setConfig({ kind: 'failed', error: err });
+        if (!cancelled) setConfig({ kind: 'failed', error: err });
       });
     return () => {
       cancelled = true;
     };
-  }, [signedOut]);
+  }, []);
 
   const set = <K extends NewCaseField>(key: K, value: NewCaseForm[K]): void =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -149,10 +146,6 @@ export function NewCaseScreen(): JSX.Element {
       const created = await api.createCase(toCreateRequest(form), crypto.randomUUID());
       void navigate(ROUTES.cases, { state: { createdRegistryId: created.registryId } });
     } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
-        signedOut('revoked');
-        return;
-      }
       if (err instanceof ApiError && err.code === 'invalid_input') {
         const { fields, other } = fieldMessagesFrom(err.fieldErrors, blankFields(form));
         setFieldErrors(fields);

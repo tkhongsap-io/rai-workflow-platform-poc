@@ -3,12 +3,12 @@ import { useEffect, useMemo, useState, type FormEvent, type JSX } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import type { CaseStatus, LaneProjectionStatus } from '@rai/shared/schemas/cases';
 import type { QueueItem, QueueQuery, QueueResponse } from '@rai/shared/schemas/queue';
-import { ApiError, api } from '../../api/client.js';
+import { api } from '../../api/client.js';
 import { ErrorNotice } from '../../components/error-notice.js';
 import { Badge, StatusBadge, STATUS_LABEL_KEY, type BadgeTone } from '../../components/status-badge.js';
 import { formatDate, formatDateTime } from '../../i18n/format.js';
 import { useLocale } from '../../i18n/locale-provider.js';
-import { useSession, useSignedInSession } from '../../session/session-provider.js';
+import { useSignedInSession } from '../../session/session-provider.js';
 import { ROUTES } from '../../routes.js';
 import { pageCount } from '../cases/case-list.view-model.js';
 import { canCreateCase } from '../operator/desk-health.view-model.js';
@@ -261,7 +261,6 @@ type Result =
 export function QueueScreen(): JSX.Element {
   const { t } = useLocale();
   const session = useSignedInSession();
-  const { signedOut } = useSession();
   const [params, setParams] = useSearchParams();
   const search = params.toString();
   const parsed = useMemo(() => parseQueueQuery(search), [search]);
@@ -280,14 +279,12 @@ export function QueueScreen(): JSX.Element {
         if (!cancelled) setResult({ key: requestKey, kind: 'loaded', response });
       })
       .catch((error: unknown) => {
-        if (cancelled) return;
-        if (error instanceof ApiError && error.status === 401) signedOut('revoked');
-        else setResult({ key: requestKey, kind: 'failed', error });
+        if (!cancelled) setResult({ key: requestKey, kind: 'failed', error });
       });
     return () => {
       cancelled = true;
     };
-  }, [parsed, requestKey, signedOut]);
+  }, [parsed, requestKey]);
   const reset = () => {
     setParams({});
     setResetCount((count) => count + 1);

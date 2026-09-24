@@ -1,5 +1,5 @@
 import { useEffect, useState, type JSX } from 'react';
-import { api, ApiError, InvalidResponseError } from '../../api/client.js';
+import { api, InvalidResponseError } from '../../api/client.js';
 import { ErrorNotice } from '../../components/error-notice.js';
 import { useLocale } from '../../i18n/locale-provider.js';
 import { useSession } from '../../session/session-provider.js';
@@ -8,7 +8,7 @@ import { isOperatorAdmin, visibleOperatorResult, type OperatorResult } from './d
 import './desk-health.css';
 
 export function DeskHealthScreen(): JSX.Element {
-  const { state, signedOut } = useSession();
+  const { state } = useSession();
   const { t } = useLocale();
   const session = state.status === 'signed_in' ? state.session : undefined;
   const admin = isOperatorAdmin(session);
@@ -24,15 +24,13 @@ export function DeskHealthScreen(): JSX.Element {
         if (!obsolete) setResult({ session, generation, kind: 'loaded', report });
       },
       (error: unknown) => {
-        if (obsolete) return;
-        if (error instanceof ApiError && error.status === 401) signedOut('revoked');
-        else setResult({ session, generation, kind: 'failed', error });
+        if (!obsolete) setResult({ session, generation, kind: 'failed', error });
       },
     );
     return () => {
       obsolete = true;
     };
-  }, [admin, session, generation, signedOut]);
+  }, [admin, session, generation]);
 
   return (
     <div className={'operator-health'}>

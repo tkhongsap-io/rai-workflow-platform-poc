@@ -144,6 +144,8 @@ test.describe(`W1-INT (W1-07) sign-in and scoped list on the real server (fx-use
     expect(probe.status()).toBe(200);
     expect(probe.headers()['x-rai-substitute']).toBeUndefined();
     await expect(page.getByLabel(th['auth.fixture_user_select'])).toBeVisible();
+    // The session probe's 401 means "not signed in yet", never an expired session.
+    await expect(page.getByText(th['auth.session_expired'])).toHaveCount(0);
     // The Google button is the 404 branch of GET /auth/fixture/users and must not show in fixture mode.
     await expect(page.getByRole('button', { name: th['auth.sign_in_with_google'] })).toHaveCount(0);
     await expect(page).toHaveTitle(th['app.title']);
@@ -231,6 +233,26 @@ test.describe(`W1-INT (W1-07) sign-in and scoped list on the real server (fx-use
     // the case (its name) is rendered.
     await expect(page.getByRole('alert')).toContainText(th['error.forbidden']);
     await expect(page.getByRole('button', { name: th['pack.action.change'] })).toHaveCount(0);
+    await signOut(page);
+  });
+
+  test('a session revoked during use returns to sign-in once with returnTo and the expired notice', async ({
+    page,
+  }) => {
+    await signInThroughPicker(page, 'fx-user-owner-cm');
+    const open = page.getByRole('link', {
+      name: th['cases.open_named'].replace('{registryId}', 'RAI-2000-0001'),
+    });
+    const target = (await open.getAttribute('href')) ?? '';
+    expect(target).toMatch(/^\/cases\//);
+    await signOut(page); // revoked on the server; the SPA still holds its copy of the session
+    await open.click(); // the case screen's first call answers 401
+    await expect(page).toHaveURL(`/sign-in?returnTo=${encodeURIComponent(target)}`);
+    await expect(page.getByText(th['auth.session_expired'])).toBeVisible();
+    await page.getByLabel(th['auth.fixture_user_select']).selectOption('fx-user-owner-cm');
+    await page.getByRole('button', { name: th['auth.sign_in'], exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`${target}(/versions/[^/]+)?$`)); // the case, or its latest version
+    await expect(page.getByText(th['auth.session_expired'])).toHaveCount(0);
     await signOut(page);
   });
 
