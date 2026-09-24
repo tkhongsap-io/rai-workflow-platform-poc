@@ -225,14 +225,6 @@ export function reviewerWorkspaceLanes(args: {
   return canProposeFixedOnCase(args.roles, args.subjectId, args.view) ? [null] : [];
 }
 
-/** Ready is a persisted read: lane QC remains available only before completion. */
-export function reviewerFindingsLoadMode(
-  view: Pick<CaseView, 'aiReadinessStatus'>,
-  lane: Lane | null,
-): 'persisted' | 'lane_qc' {
-  return view.aiReadinessStatus === 'ready' || lane === null ? 'persisted' : 'lane_qc';
-}
-
 /**
  * Whether a lane's workspace offers approve and send-back: not once the case is Ready, while a successor draft is
  * open, or after the lane has decided. A convenience only; the API answers every decision.
@@ -243,6 +235,22 @@ export function laneIsDecidable(args: { lane: Lane; view: CaseView; hasOpenDraft
     !args.hasOpenDraft &&
     laneProjectionStatus(args.view, args.lane) === 'pending'
   );
+}
+
+/**
+ * Lane QC runs only for a lane that can still decide, because approve must name the run the reviewer saw. Otherwise
+ * the workspace reads the stored findings: once a successor draft is open or the case is Ready, qc-run answers 409.
+ */
+export function reviewerFindingsLoadMode({
+  lane,
+  view,
+  hasOpenDraft,
+}: {
+  lane: Lane | null;
+  view: CaseView;
+  hasOpenDraft: boolean;
+}): 'persisted' | 'lane_qc' {
+  return lane !== null && laneIsDecidable({ lane, view, hasOpenDraft }) ? 'lane_qc' : 'persisted';
 }
 
 /**

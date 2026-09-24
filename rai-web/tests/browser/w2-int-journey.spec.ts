@@ -4,7 +4,8 @@
 // document slot → version N stays readable and a successor draft exists → owner edits that draft and resubmits v2
 // (all three lanes open again) → disposition so an undispositioned finding does not block Ready (owner proposes
 // fixed, owning lane confirms) → three current-version approvals → Ready is the desk completion state on the
-// approve response. No Deploy control. No new ready route.
+// approve response. No Deploy control. No new ready route. After each decision the workspace reads the stored
+// findings with no error notice.
 //
 // Sign-in through POST /auth/fixture/sign-in (support/sign-in.ts); keyboard on send-back, disposition, approve and
 // submit; axe (th) on the states reached; three widths from playwright.config.ts. Fixture set slice1-synthetic@1
@@ -73,17 +74,40 @@ async function openAsReviewer(page: Page, user: string, caseId: string, versionI
   await expect(page.locator('[data-review-qc="loading"]')).toHaveCount(0);
 }
 
-async function keyboardApprove(page: Page, lane: string): Promise<LaneDecisionResponse> {
+/**
+ * Runs a lane decision, then proves the refreshed workspace reads the stored findings with no error notice instead of
+ * re-running lane QC: after a send-back the version is closed and qc-run answers 409 under a successful decision.
+ */
+async function decideThenReadStoredFindings<T>(
+  page: Page,
+  versionId: string,
+  decide: () => Promise<T>,
+): Promise<T> {
+  const nextLoad = page.waitForResponse(
+    (r) => new RegExp(`/versions/${versionId}/(findings|lanes/[a-z_]+/qc-run)$`).test(r.url()),
+    { timeout: 15_000 },
+  );
+  const decided = await decide();
+  const load = await nextLoad;
+  expect(`${load.request().method()} ${new URL(load.url()).pathname}`).toMatch(/^GET \/.*\/findings$/);
+  await expect(page.locator('[data-review-qc="loading"]')).toHaveCount(0);
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  return decided;
+}
+
+async function keyboardApprove(page: Page, lane: string, versionId: string): Promise<LaneDecisionResponse> {
   const approveLabel = t('th', 'review.action.approve');
   const approvePromise = page.waitForResponse(
     (r) => r.request().method() === 'POST' && new RegExp(`/lanes/${lane}/approve$`).test(r.url()),
   );
   await tabUntil(page, (info) => info.tag === 'button' && info.text === approveLabel, 80);
   await expectVisibleFocus(page);
-  await page.keyboard.press('Enter');
-  const response = await approvePromise;
-  expect(response.status()).toBe(201);
-  return (await response.json()) as LaneDecisionResponse;
+  return decideThenReadStoredFindings(page, versionId, async () => {
+    await page.keyboard.press('Enter');
+    const response = await approvePromise;
+    expect(response.status()).toBe(201);
+    return (await response.json()) as LaneDecisionResponse;
+  });
 }
 
 test.describe(`W2-INT journey on the real server: v1 → send-back → v2 → dispositions → three approvals → Ready (${FIXTURE_SET}; fx-case-nonvendor)`, () => {
@@ -139,8 +163,10 @@ test.describe(`W2-INT journey on the real server: v1 → send-back → v2 → di
       (info) => info.tag === 'button' && info.text === t('th', 'review.send_back.submit'),
       8,
     );
-    await page.keyboard.press('Enter');
-    await expect(sendBackDialog).toBeHidden();
+    await decideThenReadStoredFindings(page, v1Id, async () => {
+      await page.keyboard.press('Enter');
+      await expect(sendBackDialog).toBeHidden();
+    });
     await expect(
       page.getByRole('status').filter({ hasText: t('th', 'review.decided.send_back') }),
     ).toBeVisible();
@@ -248,7 +274,7 @@ test.describe(`W2-INT journey on the real server: v1 → send-back → v2 → di
     // 5. Three current-version approvals → Ready on the last approve response. No Deploy control.
     await signOut(page);
     await openAsReviewer(page, DPO, caseId, v2Id);
-    const dpoBody = await keyboardApprove(page, 'dpo');
+    const dpoBody = await keyboardApprove(page, 'dpo', v2Id);
     expect(dpoBody.ready).toBe(false);
     await expect(
       page.getByRole('status').filter({ hasText: t('th', 'review.decided.approve') }),
@@ -256,12 +282,12 @@ test.describe(`W2-INT journey on the real server: v1 → send-back → v2 → di
 
     await signOut(page);
     await openAsReviewer(page, AI_COE, caseId, v2Id);
-    const aiBody = await keyboardApprove(page, 'ai_coe');
+    const aiBody = await keyboardApprove(page, 'ai_coe', v2Id);
     expect(aiBody.ready).toBe(false);
 
     await signOut(page);
     await openAsReviewer(page, IT_SEC, caseId, v2Id);
-    const itBody = await keyboardApprove(page, 'it_security');
+    const itBody = await keyboardApprove(page, 'it_security', v2Id);
     expect(itBody.ready).toBe(true);
     await expect(page.getByRole('status').filter({ hasText: t('th', 'review.decided.ready') })).toBeVisible();
     await expect(page.locator('[data-status="ready_for_launch"]').first()).toContainText(
