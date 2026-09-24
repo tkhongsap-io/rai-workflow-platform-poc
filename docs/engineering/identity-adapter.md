@@ -305,7 +305,7 @@ W0-09 confirmed this mechanism (section 14 b): the cookie is an opaque random va
 
 ### 6.4 Error contract
 
-Codes and statuses are the ADR-0003 table that W0-06 confirms. Every response carries `code`, `messageKey` (always `error.<code>`, the W0-06 envelope) and the correlation ID (W0-10). The section 12 keys `auth.session_required`, `auth.sign_in_failed` and `auth.not_permitted` are what the sign-in screen displays; no response carries them as its `messageKey`.
+Codes and statuses are the ADR-0003 table that W0-06 confirms. Every response carries `code`, `messageKey` (always `error.<code>`, the W0-06 envelope) and the correlation ID (W0-10). The section 12 keys `auth.session_required`, `auth.sign_in_failed` and `auth.not_permitted` are display keys for the sign-in screen; no response carries them as its `messageKey`.
 
 | Situation | HTTP / `code` | `messageKey` | Session | Audit / log |
 |---|---|---|---|---|
@@ -440,7 +440,7 @@ Resolution: for each `groups` entry in the token, every matching rule contribute
 | ID-08 | No cookie → 401; wrong role on a route → 403 from the W0-05 middleware, not from the adapter | integration (Fastify inject, Postgres) | W1-01 |
 | ID-09 | Session: absolute expiry, idle expiry, sign-out revokes, replaced on re-sign-in, `lastSeenAt` throttled | integration (Postgres) | W1-01 |
 | ID-10 | Fixture routes are 404 in every non-fixture mode; `fixture` outside `NODE_ENV=test` exits 78 | integration | W1-01 |
-| ID-11 | Callback error branches (state, nonce, transaction cookie missing, email not verified) return 401 with `auth.sign_in_failed` and no session; uses a synthetic claims object, not Google | unit | W1-01 |
+| ID-11 | Callback error branches (state, nonce, transaction cookie missing, email not verified) return 401 unauthenticated (`error.unauthenticated`) and no session; uses a synthetic claims object, not Google | unit | W1-01 |
 | ID-12 | Sign-in through the fixture provider lands each user on that user's scoped list; an out-of-scope case is absent; no client-side check decides access | browser, Playwright | W1-07 (on W1-13), W1-INT (real server) |
 | ID-13 | The dual-role identity `fx-user-dpo-spoc-hr` is refused approve of the DPO lane on the `HR` case `fx-case-hr-dualrole` and permitted approve of the DPO lane on a `CM` case (D05; ids from W0-02 section 8.3) | integration | W2-02, W2-08 |
 | ID-14 | Manual: Google sign-in on a loopback bind with a locally held OAuth client, recorded as "Google sign-in on loopback: pass" without the account address; unknown-mode and non-loopback refusals recorded with exit code | manual, outside CI | W1-08 |
