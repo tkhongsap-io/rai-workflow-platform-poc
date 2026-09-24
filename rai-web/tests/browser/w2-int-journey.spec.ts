@@ -1,7 +1,8 @@
 // W2-INT: the automated W2 journey against the real server (W0-02 section 8.1 browser layer). Proves A04, A07, A09.
 //
 // Journey (one test, through the UI): owner submits v1 of fx-case-nonvendor → one lane send-back that names a
-// document slot → version N stays readable and a successor draft exists → owner edits that draft and resubmits v2
+// document slot → version N stays readable, lists the decision with its feedback, and a successor draft exists that
+// shows the same feedback → owner edits that draft and resubmits v2
 // (all three lanes open again) → disposition so an undispositioned finding does not block Ready (owner proposes
 // fixed, owning lane confirms) → three current-version approvals → Ready is the desk completion state on the
 // approve response. No Deploy control. No new ready route. After each decision the workspace reads the stored
@@ -28,6 +29,27 @@ const IT_SEC = 'fx-user-it-security';
 const NONVENDOR_CASE = 'RAI-2000-0001';
 
 type Row = Record<string, unknown>;
+
+const DEFICIENCY = 'Privacy notice must name the retention period';
+const SUMMARY = 'Resubmit once the notice is updated';
+
+/** The DPO send-back of v1 under `heading`: lane, decision, the slot it names, its deficiency and summary. */
+async function expectSendBackFeedback(page: Page, heading: string): Promise<void> {
+  const region = page.getByRole('region', { name: heading, exact: true });
+  await expect(region.getByRole('heading', { name: heading, exact: true })).toBeVisible();
+  const decision = region.getByRole('listitem').filter({ hasText: t('th', 'lane.dpo') });
+  await expect(decision).toContainText(t('th', 'projection.sent_back'));
+  await expect(decision).toContainText(
+    t('th', 'version.decisions.decided_by', { subject: `fixture:${DPO}` }),
+  );
+  const item = decision.getByRole('listitem');
+  await expect(item).toHaveCount(1);
+  await expect(item).toContainText(
+    t('th', 'review.send_back.slot_option', { number: 2, name: t('th', 'slot.s2.name') }),
+  );
+  await expect(item).toContainText(DEFICIENCY);
+  await expect(decision).toContainText(SUMMARY);
+}
 
 async function caseIdOf(page: Page, registryId: string): Promise<string> {
   const response = await page.request.get('/api/cases?pageSize=100');
@@ -113,7 +135,7 @@ async function keyboardApprove(page: Page, lane: string, versionId: string): Pro
 }
 
 test.describe(`W2-INT journey on the real server: v1 → send-back → v2 → dispositions → three approvals → Ready (${FIXTURE_SET}; fx-case-nonvendor)`, () => {
-  test('owner submits; AI/COE send-back names a slot; owner resubmits v2; dispose then three approvals reach Ready', async ({
+  test('owner submits; DPO send-back names a slot; owner sees the feedback and resubmits v2; dispose then three approvals reach Ready', async ({
     page,
   }, testInfo) => {
     test.setTimeout(240_000);
@@ -145,10 +167,10 @@ test.describe(`W2-INT journey on the real server: v1 → send-back → v2 → di
       .filter({ hasText: t('th', 'version.frozen_note') })
       .innerText();
 
-    // 2. One lane send-back that names a document slot (slot 1 — single-lane).
+    // 2. One lane send-back that names a document slot (slot 2 — DPO only) with a summary.
     await signOut(page);
-    await openAsReviewer(page, AI_COE, caseId, v1Id);
-    await expect(page.locator('[data-review-qc="findings"]')).toBeVisible();
+    await openAsReviewer(page, DPO, caseId, v1Id);
+    await expect(page.locator('[data-review-qc="empty"]')).toHaveText(t('th', 'review.findings.empty'));
     await expectAccessible(page, testInfo, { name: 'w2-int-journey-reviewer-v1-th', lang: 'th' });
 
     const sendBackLabel = t('th', 'review.action.send_back');
@@ -157,9 +179,11 @@ test.describe(`W2-INT journey on the real server: v1 → send-back → v2 → di
     await page.keyboard.press('Enter');
     const sendBackDialog = page.getByRole('dialog', { name: t('th', 'review.send_back.title') });
     await expect(sendBackDialog).toBeVisible();
-    await sendBackDialog.locator('select').selectOption('1');
+    await sendBackDialog.locator('select').selectOption('2');
     await pressTab(page);
-    await page.keyboard.type('Use-case brief needs a risk note before AI/COE can approve');
+    await page.keyboard.type(DEFICIENCY);
+    await pressTab(page);
+    await page.keyboard.type(SUMMARY);
     await tabUntil(
       page,
       (info) => info.tag === 'button' && info.text === t('th', 'review.send_back.submit'),
@@ -172,6 +196,7 @@ test.describe(`W2-INT journey on the real server: v1 → send-back → v2 → di
     await expect(
       page.getByRole('status').filter({ hasText: t('th', 'review.decided.send_back') }),
     ).toBeVisible();
+    await expectSendBackFeedback(page, t('th', 'version.decisions.heading'));
 
     const nav = page.getByRole('navigation', { name: t('th', 'version.nav_heading') });
     await expect(nav).toContainText(t('th', 'version.nav_draft', { number: 2 }));
@@ -187,6 +212,7 @@ test.describe(`W2-INT journey on the real server: v1 → send-back → v2 → di
       .filter({ hasText: t('th', 'version.frozen_note') })
       .innerText();
     expect(frozenTextAfter).toBe(frozenTextBefore);
+    await expectSendBackFeedback(page, t('th', 'version.decisions.heading'));
     const v1After = (await (
       await page.request.get(`/api/cases/${caseId}/versions/${v1Id}`)
     ).json()) as SubmittedVersion;
@@ -204,11 +230,16 @@ test.describe(`W2-INT journey on the real server: v1 → send-back → v2 → di
     expect(drafts[0]?.is_draft).toBe(true);
     expect(drafts[0]?.version_number).toBe(2);
 
-    // 3. Owner edits the successor draft and resubmits v2; all three lanes open again.
+    // 3. Owner sees the feedback on v1 and on the successor draft, edits the draft and resubmits v2; all three lanes
+    // open again.
     await signOut(page);
     await signInAsFixture(page, OWNER);
+    await page.goto(`/cases/${caseId}/versions/${v1Id}`);
+    await expectSendBackFeedback(page, t('th', 'version.decisions.heading'));
+    await expectAccessible(page, testInfo, { name: 'w2-int-journey-owner-v1-decisions-th', lang: 'th' });
     await page.goto(`/cases/${caseId}`);
     await expect(page.getByRole('button', { name: t('th', 'pack.action.submit') })).toBeEnabled();
+    await expectSendBackFeedback(page, t('th', 'pack.feedback_heading', { number: 1 }));
     await setSlotNotYet(page, 7, 'slot.s7.name');
     await expect(page.getByText(t('th', 'pack.pending_changes', { count: 1 }))).toBeVisible();
     await page.getByRole('button', { name: t('th', 'pack.action.save') }).click();

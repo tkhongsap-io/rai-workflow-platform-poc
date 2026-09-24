@@ -1,6 +1,6 @@
-// The case screen: overview, version navigation, and the pack editor or a frozen version with its review
-// workspaces. Every API answer is rendered as received: a 403 or 404 shows the envelope's message key (a 401 drops
-// the session in the API client). No client rule decides access.
+// The case screen: overview, version navigation, and the pack editor (under its parent's send-back feedback) or a
+// frozen version with its review workspaces and lane decisions. Every API answer is rendered as received: a 403 or
+// 404 shows the envelope's message key (a 401 drops the session in the API client). No client rule decides access.
 
 import { useEffect, useRef, useState, type JSX } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
@@ -17,6 +17,7 @@ import { ROUTES } from '../../routes.js';
 import { useSignedInSession } from '../../session/session-provider.js';
 import './case.css';
 import { CaseOverview } from './case-overview.js';
+import { LaneDecisions } from './lane-decisions.js';
 import { PackEditor, type PendingSettings } from './pack-editor.js';
 import { PackFrozen } from './pack-frozen.js';
 import { ReviewerWorkspace } from './reviewer-workspace.js';
@@ -34,6 +35,8 @@ interface Loaded {
   configuration: ConfigurationView;
   view: CaseView;
   draft: PackDraft | null;
+  /** The version a successor draft was sent back from; its decisions carry the feedback to fix. */
+  draftParent: SubmittedVersion | null;
   versions: VersionSummary[];
 }
 
@@ -50,7 +53,11 @@ async function loadAll(caseId: string): Promise<Loaded> {
     api.listVersions(caseId),
   ]);
   const draft = view.draft === null ? null : await api.getDraft(caseId);
-  return { configuration, view, draft, versions: versions.items };
+  const draftParent =
+    draft === null || draft.parentVersionId === null
+      ? null
+      : await api.getVersion(caseId, draft.parentVersionId);
+  return { configuration, view, draft, draftParent, versions: versions.items };
 }
 
 export function CaseScreen(): JSX.Element {
@@ -347,24 +354,32 @@ function CaseScreenBody(props: BodyProps): JSX.Element {
         <div className={'case-content'}>
           {versionId === undefined ? (
             state.draft !== null ? (
-              <PackEditor
-                caseId={caseId}
-                draft={state.draft}
-                configuration={state.configuration}
-                artifacts={props.artifacts}
-                pendingSlots={props.pendingSlots}
-                pendingSettings={props.pendingSettings}
-                busy={props.busy}
-                error={props.editorError}
-                notice={props.notice?.key.startsWith('pack.') === true ? props.notice : null}
-                onSlotChange={props.onSlotChange}
-                onSettingsChange={props.onSettingsChange}
-                onSave={props.onSave}
-                onDiscard={props.onDiscard}
-                onSubmit={props.onSubmit}
-                onReload={props.onReload}
-                onDismissError={props.onDismissError}
-              />
+              <>
+                {state.draftParent !== null ? (
+                  <LaneDecisions
+                    heading={t('pack.feedback_heading', { number: state.draftParent.versionNumber })}
+                    decisions={state.draftParent.decisions.filter((d) => d.decision === 'send_back')}
+                  />
+                ) : null}
+                <PackEditor
+                  caseId={caseId}
+                  draft={state.draft}
+                  configuration={state.configuration}
+                  artifacts={props.artifacts}
+                  pendingSlots={props.pendingSlots}
+                  pendingSettings={props.pendingSettings}
+                  busy={props.busy}
+                  error={props.editorError}
+                  notice={props.notice?.key.startsWith('pack.') === true ? props.notice : null}
+                  onSlotChange={props.onSlotChange}
+                  onSettingsChange={props.onSettingsChange}
+                  onSave={props.onSave}
+                  onDiscard={props.onDiscard}
+                  onSubmit={props.onSubmit}
+                  onReload={props.onReload}
+                  onDismissError={props.onDismissError}
+                />
+              </>
             ) : (
               <p className={'muted'} role={'status'}>
                 {t('pack.no_draft')}
@@ -400,6 +415,10 @@ function CaseScreenBody(props: BodyProps): JSX.Element {
                   onDispositionRecorded={props.onDispositionRecorded}
                 />
               ))}
+              <LaneDecisions
+                heading={t('version.decisions.heading')}
+                decisions={versionState.version.decisions}
+              />
               <PackFrozen version={versionState.version} versions={state.versions} />
             </>
           ) : versionState.kind === 'error' ? (

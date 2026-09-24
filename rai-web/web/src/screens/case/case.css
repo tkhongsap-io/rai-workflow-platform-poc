@@ -1,7 +1,7 @@
 /* W1-06 case flow layout on the W1-07 tokens and primitives of styles.css (cards, buttons, badges, notices,
    fields, dialog). Only what the case screens add: the overview header, the facts grid, the lane projections,
-   the version navigation beside the content on wide screens, the nine slot rows, the pack settings and the
-   slot-state choices. Reflows at 1440 / 834 / 390 without horizontal scroll (W0-02 section 9, item 7); no
+   the version navigation beside the content on wide screens, the nine slot rows, the pack settings, the
+   slot-state choices and the lane decisions with their send-back feedback. Reflows at 1440 / 834 / 390 without horizontal scroll (W0-02 section 9, item 7); no
    outline is removed outside :focus-visible (item 4; scripts/check-css.mjs). */
 
 .case-screen > .btn-ghost {
@@ -366,4 +366,34 @@
 
 .review-qc-unavailable p {
   margin: 0;
+}
+
+.decision-list,
+.feedback-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.decision-list {
+  margin-top: 12px;
+}
+
+.decision-row p,
+.feedback-text {
+  margin: 0;
+}
+
+.feedback-list {
+  margin-top: 8px;
+  padding-left: 12px;
+  border-left: 3px solid var(--border);
+  gap: 8px;
+}
+
+.feedback-text {
+  white-space: pre-wrap;
 }
