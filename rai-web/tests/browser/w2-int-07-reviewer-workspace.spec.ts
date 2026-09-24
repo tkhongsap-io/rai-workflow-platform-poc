@@ -5,6 +5,7 @@
 import { test, expect, type Page } from './support/real-test.js';
 import type { CaseListResponse } from '@rai/shared/schemas/cases';
 import type { PackDraft } from '@rai/shared/schemas/pack';
+import type { LaneQcRunResponse } from '@rai/shared/schemas/review';
 import { t } from '@rai/shared/locales/keys';
 import { expectAccessible, expectStatusElementsHaveText } from './support/axe.js';
 import { expectVisibleFocus, pressTab, tabTo, tabUntil } from './support/keyboard.js';
@@ -15,6 +16,7 @@ const OWNER = 'fx-user-owner-cm';
 const AI_COE = 'fx-user-ai-coe';
 const ADMIN = 'fx-user-admin';
 const NONVENDOR_CASE = 'RAI-2000-0001';
+const NA_REASONS_CASE = 'RAI-2000-0004';
 
 async function caseIdOf(page: Page, registryId: string): Promise<string> {
   const response = await page.request.get('/api/cases?pageSize=100');
@@ -231,5 +233,49 @@ test.describe(`W2-INT reviewer workspace on the real server (${FIXTURE_SET}; fx-
     ).toBeFocused();
     await expect(page.locator('[data-review-controls="ready"]')).toHaveCount(0);
     await expectAccessible(page, testInfo, { name: 'w2-int-reviewer-after-approve-th', lang: 'th' });
+  });
+
+  test('one opening runs lane QC once; approve names the unavailable run shown', async ({ page }) => {
+    // Slot 1 set to "not yet" no longer matches fx-case-na-reasons' QC script, so the substitute's run is unavailable.
+    await signInAsFixture(page, OWNER);
+    const caseId = await caseIdOf(page, NA_REASONS_CASE);
+    const draft = (await (await page.request.get(`/api/cases/${caseId}/draft`)).json()) as PackDraft;
+    const saved = await page.request.put(`/api/cases/${caseId}/draft`, {
+      data: {
+        expectedVersion: { versionId: draft.draftId, revision: draft.draftRevision },
+        slots: { 1: { state: 'not_yet' } },
+      },
+    });
+    expect(saved.status()).toBe(200);
+    const { draftRevision } = (await saved.json()) as PackDraft;
+    const submit = await page.request.post(`/api/cases/${caseId}/draft/submit`, {
+      data: { expectedVersion: { versionId: draft.draftId, revision: draftRevision } },
+      headers: { 'idempotency-key': crypto.randomUUID() },
+    });
+    expect(submit.status()).toBe(201);
+    const { versionId } = (await submit.json()) as { versionId: string };
+    await signOut(page);
+
+    const qcRuns: Promise<LaneQcRunResponse>[] = [];
+    page.on('response', (response) => {
+      if (/\/lanes\/ai_coe\/qc-run$/.test(response.url()))
+        qcRuns.push(response.json() as Promise<LaneQcRunResponse>);
+    });
+    await openAsReviewer(page, caseId, versionId);
+    await expect(page.locator('[data-review-qc="unavailable"]')).toBeVisible();
+    await page.waitForLoadState('networkidle');
+    expect(qcRuns, 'one opening issues one lane-QC request').toHaveLength(1);
+    const shown = await qcRuns[0]!;
+    expect(shown.status).toBe('unavailable');
+
+    const approvePromise = page.waitForRequest(
+      (req) => req.method() === 'POST' && /\/lanes\/ai_coe\/approve$/.test(req.url()),
+    );
+    await page.getByRole('button', { name: t('th', 'review.action.approve') }).click();
+    const body = (await approvePromise).postDataJSON() as { qcRunId?: string };
+    expect(body.qcRunId).toBe(shown.runId);
+    await expect(
+      page.getByRole('status').filter({ hasText: t('th', 'review.decided.approve') }),
+    ).toBeFocused();
   });
 });
