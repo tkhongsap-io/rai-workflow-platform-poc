@@ -264,6 +264,8 @@ test.describe(`W1-INT (W1-06) case flow on the real server (fx-case-missing-slot
     const discard = page.getByRole('button', { name: t('th', 'pack.action.discard') });
     const submit = page.getByRole('button', { name: t('th', 'pack.action.submit') });
     const readOnly = page.getByText(t('th', 'pack.read_only'));
+    const templateVersion = page.getByLabel(t('th', 'pack.template_version'));
+    const stageContext = page.getByLabel(t('th', 'pack.stage_context'));
 
     // The dual-role DPO + HR SPOC edits the HR case as its SPOC.
     const editors: [string, string][] = [
@@ -279,6 +281,8 @@ test.describe(`W1-INT (W1-06) case flow on the real server (fx-case-missing-slot
       await expect(discard, user).toBeVisible();
       await expect(submit, user).toBeVisible();
       await expect(readOnly, user).toHaveCount(0);
+      await expect(templateVersion, user).toBeEnabled();
+      await expect(stageContext, user).toBeEnabled();
     }
 
     // Reviewers, Admin, and the dual-role user on a CM case (DPO there, not SPOC) read the same draft, unchanged.
@@ -302,6 +306,8 @@ test.describe(`W1-INT (W1-06) case flow on the real server (fx-case-missing-slot
       await expect(save, user).toHaveCount(0);
       await expect(discard, user).toHaveCount(0);
       await expect(submit, user).toHaveCount(0);
+      await expect(templateVersion, user).toBeDisabled();
+      await expect(stageContext, user).toBeDisabled();
       // Hiding the controls is presentation: the server still refuses the save.
       const draft = await readDraft(page, caseId);
       const refused = await page.request.put(`/api/cases/${caseId}/draft`, {
