@@ -130,6 +130,8 @@ before(async () => {
     },
   });
   const built = buildApp({
+    db: db.app,
+    now,
     config: { nodeEnv: 'test', log: { level: 'info', pretty: false }, trustProxy: false, publicBaseUrl },
     logStream,
     identity: {
@@ -137,25 +139,20 @@ before(async () => {
       sessionStore: createPgSessionStore(db.app),
       facts: createScopeFactsSource(db.app),
       fixtureProvider: createFixtureIdentityProvider(FIXTURE_USERS),
-      now,
     },
     cases: {
-      db: db.app,
       businessUnits: createBusinessUnitDirectory(
         businessUnitsFromGrants(FIXTURE_USERS.flatMap((u) => [...u.roles])),
       ),
       subjects: createSubjectDirectory(db.app, { known: FIXTURE_USERS }),
-      now,
     },
-    artifacts: { store, db: db.app, limits: LIMITS },
+    artifacts: { store, limits: LIMITS },
     pack: {
-      db: db.app,
       limits: { maxPackBytes: PACK_LIMIT_BYTES },
       uploadTrigger: (event) => {
         if (triggerBehaviour === 'throw') throw new Error('substitute exploded');
         fired.push(event);
       },
-      now,
     },
   });
   app = built.fastify;

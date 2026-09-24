@@ -69,10 +69,11 @@ async function build(options: { auto?: boolean; rollback?: boolean } = {}) {
     now,
   });
   await adapter.start({ host: '127.0.0.1', port: 8787, publicBaseUrl: base, trustProxy: false });
-  const deps = { db: db.app, sink, identities: FIXTURE_USERS, publicBaseUrl: base };
+  const deps = { sink, identities: FIXTURE_USERS, publicBaseUrl: base };
   const built = buildApp({
+    db: db.app,
+    now,
     observability: {
-      db: db.app,
       readiness: () =>
         computeReadiness(
           {
@@ -106,29 +107,24 @@ async function build(options: { auto?: boolean; rollback?: boolean } = {}) {
       sessionStore: createPgSessionStore(db.app),
       facts: createScopeFactsSource(db.app),
       fixtureProvider: createFixtureIdentityProvider(FIXTURE_USERS),
-      now,
     },
-    pack: { db: db.app, limits: { maxPackBytes: 157286400 }, now },
+    pack: { limits: { maxPackBytes: 157286400 } },
     versions: {
-      db: db.app,
-      now,
       // A repeated address violates notification_event_version_lane_recipient_key after the first insert.
       laneOpenRecipients: options.rollback
         ? { ...laneOpenRecipients, dpo: [laneOpenRecipients.dpo[0]!, laneOpenRecipients.dpo[0]!] }
         : laneOpenRecipients,
     },
     decide: {
-      db: db.app,
-      now,
       sendBackRecipientsForOwner: (subject) => sendBackRecipientsFromIdentities(FIXTURE_USERS, subject),
     },
     // Unscripted substitute QC: every lane-QC run completes clean.
-    findings: { db: db.app, now, qc: { runner: new ScriptedQcRunner({ now }) } },
+    findings: { qc: { runner: new ScriptedQcRunner({ now }) } },
     ...(options.auto === false ? {} : { notifications: deps }),
   });
   emitter = built.emitter;
   errors = built.errors;
-  notifications = createNotifications({ ...deps, emitter, errors });
+  notifications = createNotifications({ ...deps, db: db.app, now, emitter, errors });
   app = built.fastify;
   await app.ready();
 }

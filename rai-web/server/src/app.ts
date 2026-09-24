@@ -14,6 +14,7 @@ import { createDrain, type Drain } from './shutdown.js';
 import { InvalidInputError, isContractError, internalErrorResponse } from '@rai/shared/errors';
 import type { CorrelationId } from '@rai/shared/ids';
 import type { AppConfig } from './config.js';
+import type { Db } from './db/client.js';
 import { registerArtifactRoutes, type ArtifactRouteDeps } from './artifacts/routes.js';
 import { registerAuthorization, type ScopeFactsSource } from './authz/middleware.js';
 import { registerCaseRoutes, type CaseRouteDeps } from './cases/routes.js';
@@ -44,32 +45,37 @@ export interface IdentityDeps {
   sessionStore: SessionStore;
   facts: ScopeFactsSource;
   fixtureProvider?: FixtureIdentityProvider; // fixture mode only
-  now?: () => Date;
 }
 
+/** What buildApp injects into every route group, so no group can hold a different database or clock. */
+type Injected = 'db' | 'now' | 'emitter' | 'errors';
+type QcBinding = Pick<QcOrchestratorDeps, 'runner' | 'timeoutMs'>;
+
 export interface AppDeps {
-  observability?: ObservabilityDeps;
+  /** The database every route group reads. Absent only in substrate tests that register no such group. */
+  db?: Db;
+  /** The one application clock; defaults to the wall clock. */
+  now?: () => Date;
+  observability?: Omit<ObservabilityDeps, 'db'>;
   /** Local daily producer; uses the same drain and single notification dispatcher. */
-  digest?: Omit<DigestDeps, 'emitter'>;
+  digest?: Omit<DigestDeps, Injected>;
   /** The single post-commit mail dispatcher for case mail, digest mail and retries. */
-  notifications?: Omit<NotificationDeps, 'emitter' | 'errors'>;
+  notifications?: Omit<NotificationDeps, Injected>;
   config: Pick<AppConfig, 'nodeEnv' | 'log' | 'trustProxy' | 'publicBaseUrl'>;
   /** Absent only in substrate-level tests that register no route; main.ts always passes it. */
   identity?: IdentityDeps;
-  /** The case routes' dependencies (database, configured BUs, subject directory). Needs `identity`. */
-  cases?: Omit<CaseRouteDeps, 'emitter'>;
-  /** The blob store, database and W0-08 limits for the artifact routes. Needs `identity`. */
-  artifacts?: Omit<ArtifactRouteDeps, 'emitter'>;
-  /** The pack draft routes' dependencies (database, pack limit, the W0-07 upload hook). Needs `identity`. */
-  pack?: Omit<PackRouteDeps, 'emitter'>;
-  /** The submit and version-navigation routes' dependencies (database). Needs `identity`. */
-  versions?: Omit<VersionRouteDeps, 'afterSubmit'> & {
-    qc?: Pick<QcOrchestratorDeps, 'runner' | 'timeoutMs'>;
-  };
+  /** The case routes' dependencies (configured BUs, subject directory). Needs `identity`. */
+  cases?: Omit<CaseRouteDeps, Injected>;
+  /** The blob store and W0-08 limits for the artifact routes. Needs `identity`. */
+  artifacts?: Omit<ArtifactRouteDeps, Injected>;
+  /** The pack draft routes' dependencies (pack limit, the W0-07 upload hook). Needs `identity`. */
+  pack?: Omit<PackRouteDeps, Injected>;
+  /** The submit and version-navigation routes; `qc` binds the submit-triggered QC run. Needs `identity`. */
+  versions?: Omit<VersionRouteDeps, 'afterSubmit' | Injected> & { qc?: QcBinding };
   /** Lane approve / send-back. Needs `identity`. */
-  decide?: DecideRouteDeps;
+  decide?: Omit<DecideRouteDeps, Injected>;
   /** Findings disposition and the lane QC run. Needs `identity`. */
-  findings?: Omit<FindingsRouteDeps, 'emitter'>;
+  findings?: Omit<FindingsRouteDeps, 'qc' | Injected> & { qc?: QcBinding };
   /** The built SPA to serve from web/dist (static.ts); absent when there is no web build (API only). */
   static?: StaticOptions;
   /** Test seam: where the pino lines go instead of stdout, so a suite can assert on emitted events. */
@@ -124,6 +130,11 @@ export function buildApp(deps: AppDeps): App {
   const errors = createErrorCapture(emitter);
   const requestErrors = new WeakMap<object, ErrorCategory>();
   const drain = createDrain(fastify); // first hook: every accepted request is counted (shutdown.ts)
+  const now = deps.now ?? (() => new Date());
+  const dbAndClock = (): { db: Db; now: () => Date } => {
+    if (deps.db === undefined) throw new Error('buildApp: a route group needs deps.db');
+    return { db: deps.db, now };
+  };
   fastify.addHook('onRequest', (request, reply, done) => {
     void reply.header('X-Correlation-Id', request.id);
     void reply.header('Cache-Control', 'no-store');
@@ -177,13 +188,13 @@ export function buildApp(deps: AppDeps): App {
 
   // Completion logging must precede hooks that await background delivery.
   if (deps.digest !== undefined)
-    registerDailyDigest(fastify, { ...deps.digest, emitter }, drain, (error) => {
+    registerDailyDigest(fastify, { ...deps.digest, ...dbAndClock(), emitter }, drain, (error) => {
       errors.internal(error);
     });
   if (deps.notifications !== undefined)
     registerNotifications(
       fastify,
-      createNotifications({ ...deps.notifications, emitter, errors }),
+      createNotifications({ ...deps.notifications, ...dbAndClock(), emitter, errors }),
       emitter,
       drain,
       errors,
@@ -248,7 +259,7 @@ export function buildApp(deps: AppDeps): App {
       sessionCookieName: cookieNames(deps.config.publicBaseUrl).session,
       facts: identity.facts,
       emitter,
-      ...(identity.now === undefined ? {} : { now: identity.now }),
+      now,
     });
     void fastify.register((instance, _opts, done) => {
       registerAuthRoutes(instance, {
@@ -257,46 +268,39 @@ export function buildApp(deps: AppDeps): App {
         publicBaseUrl: deps.config.publicBaseUrl,
         emitter,
         ...(identity.fixtureProvider === undefined ? {} : { fixtureProvider: identity.fixtureProvider }),
-        ...(identity.now === undefined ? {} : { now: identity.now }),
+        now,
       });
       done();
     });
-    if (deps.observability !== undefined) registerOperatorRoutes(fastify, deps.observability, errors);
+    if (deps.observability !== undefined)
+      registerOperatorRoutes(fastify, { ...deps.observability, db: dbAndClock().db }, errors);
     const caseDeps = deps.cases;
     if (caseDeps !== undefined) {
       void fastify.register((instance, _opts, done) => {
-        registerCaseRoutes(instance, { ...caseDeps, emitter });
-        registerQueueRoutes(instance, { db: caseDeps.db });
+        registerCaseRoutes(instance, { ...caseDeps, ...dbAndClock(), emitter });
+        registerQueueRoutes(instance, dbAndClock());
         done();
       });
     }
-    if (deps.artifacts !== undefined) registerArtifactRoutes(fastify, { ...deps.artifacts, emitter });
+    if (deps.artifacts !== undefined)
+      registerArtifactRoutes(fastify, { ...deps.artifacts, ...dbAndClock(), emitter });
     const packDeps = deps.pack;
     if (packDeps !== undefined) {
       void fastify.register((instance, _opts, done) => {
-        registerPackRoutes(instance, { ...packDeps, emitter, errors });
+        registerPackRoutes(instance, { ...packDeps, ...dbAndClock(), emitter, errors });
         done();
       });
     }
     const versionDeps = deps.versions;
     if (versionDeps !== undefined) {
       void fastify.register((instance, _opts, done) => {
+        const { qc, ...routeDeps } = versionDeps;
         registerVersionRoutes(instance, {
-          ...versionDeps,
-          ...(versionDeps.qc === undefined
+          ...routeDeps,
+          ...dbAndClock(),
+          ...(qc === undefined
             ? {}
-            : {
-                afterSubmit: createSubmitTrigger(
-                  {
-                    ...versionDeps.qc,
-                    db: versionDeps.db,
-                    emitter,
-                    errors,
-                    ...(versionDeps.now === undefined ? {} : { now: versionDeps.now }),
-                  },
-                  drain,
-                ),
-              }),
+            : { afterSubmit: createSubmitTrigger({ ...qc, ...dbAndClock(), emitter, errors }, drain) }),
         });
         done();
       });
@@ -304,14 +308,14 @@ export function buildApp(deps: AppDeps): App {
     const decideDeps = deps.decide;
     if (decideDeps !== undefined) {
       void fastify.register((instance, _opts, done) => {
-        registerDecideRoutes(instance, decideDeps);
+        registerDecideRoutes(instance, { ...decideDeps, ...dbAndClock() });
         done();
       });
     }
     const findingsDeps = deps.findings;
     if (findingsDeps !== undefined) {
       void fastify.register((instance, _opts, done) => {
-        registerFindingsRoutes(instance, { ...findingsDeps, emitter, errors });
+        registerFindingsRoutes(instance, { ...findingsDeps, ...dbAndClock(), emitter, errors });
         done();
       });
     }

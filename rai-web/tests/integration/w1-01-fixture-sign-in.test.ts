@@ -49,13 +49,14 @@ before(async () => {
   });
   await adapter.start({ host: '127.0.0.1', port: 8787, publicBaseUrl, trustProxy: false });
   const built = buildApp({
+    db: db.app,
+    now,
     config,
     identity: {
       adapter,
       sessionStore: createPgSessionStore(db.app),
       facts: createScopeFactsSource(db.app),
       fixtureProvider: createFixtureIdentityProvider(FIXTURE_USERS),
-      now,
     },
   });
   app = built.fastify;

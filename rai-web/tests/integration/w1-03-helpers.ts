@@ -90,6 +90,7 @@ export async function openHarness(): Promise<Harness> {
   });
   await adapter.start({ host: '127.0.0.1', port: 8787, publicBaseUrl: PUBLIC_BASE_URL, trustProxy: false });
   const built = buildApp({
+    db: db.app,
     config: {
       nodeEnv: 'test',
       log: { level: 'info', pretty: false },
@@ -97,7 +98,7 @@ export async function openHarness(): Promise<Harness> {
       publicBaseUrl: PUBLIC_BASE_URL,
     },
     logStream,
-    artifacts: { store, db: db.app, limits: LIMITS },
+    artifacts: { store, limits: LIMITS },
     identity: {
       adapter,
       sessionStore: createPgSessionStore(db.app),

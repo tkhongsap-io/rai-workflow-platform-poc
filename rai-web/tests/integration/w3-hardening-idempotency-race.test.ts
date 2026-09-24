@@ -78,6 +78,8 @@ before(async () => {
     now,
   });
   app = buildApp({
+    db: db.app,
+    now,
     config: { nodeEnv: 'test', log: { level: 'info', pretty: false }, trustProxy: false, publicBaseUrl },
     logStream: capture.stream,
     identity: {
@@ -85,33 +87,27 @@ before(async () => {
       sessionStore: createPgSessionStore(db.app),
       facts: createScopeFactsSource(db.app),
       fixtureProvider: createFixtureIdentityProvider(FIXTURE_USERS),
-      now,
     },
     cases: {
-      db: db.app,
       businessUnits: createBusinessUnitDirectory(
         businessUnitsFromGrants(FIXTURE_USERS.flatMap((u) => [...u.roles])),
       ),
       subjects: createSubjectDirectory(db.app, { known: FIXTURE_USERS }),
-      now,
     },
     artifacts: {
       store,
-      db: db.app,
       limits: {
         maxFileBytes: UPLOAD_LIMIT_DEFAULTS.UPLOAD_MAX_FILE_BYTES,
         maxPackBytes: UPLOAD_LIMIT_DEFAULTS.UPLOAD_MAX_PACK_BYTES,
         maxImagePixels: UPLOAD_LIMIT_DEFAULTS.UPLOAD_MAX_IMAGE_PIXELS,
       },
     },
-    pack: { db: db.app, limits: { maxPackBytes: UPLOAD_LIMIT_DEFAULTS.UPLOAD_MAX_PACK_BYTES }, now },
-    versions: { db: db.app, now, laneOpenRecipients: laneOpenRecipientsFromIdentities(FIXTURE_USERS) },
+    pack: { limits: { maxPackBytes: UPLOAD_LIMIT_DEFAULTS.UPLOAD_MAX_PACK_BYTES } },
+    versions: { laneOpenRecipients: laneOpenRecipientsFromIdentities(FIXTURE_USERS) },
     decide: {
-      db: db.app,
-      now,
       sendBackRecipientsForOwner: (owner) => sendBackRecipientsFromIdentities(FIXTURE_USERS, owner),
     },
-    findings: { db: db.app, now, qc: { runner, now } },
+    findings: { qc: { runner } },
   }).fastify;
   await app.ready();
 });

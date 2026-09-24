@@ -78,9 +78,9 @@ function setup(
       publicBaseUrl: new URL('http://127.0.0.1:18788'),
     },
     logStream,
+    db: {} as Db,
     ...(identity === undefined ? {} : { identity }),
     observability: {
-      db: {} as Db,
       readiness:
         readiness ??
         (() =>
@@ -367,4 +367,21 @@ test('request.completed names the signed-in actor and a sole role', async () => 
   } finally {
     await app.fastify.close();
   }
+});
+
+test('a route group without deps.db refuses to build instead of wiring routes to no database', () => {
+  assert.throws(
+    () =>
+      buildApp({
+        config: {
+          nodeEnv: 'test',
+          log: { level: 'info', pretty: false },
+          trustProxy: false,
+          publicBaseUrl: new URL('http://127.0.0.1:18788'),
+        },
+        identity: identityResolving(() => Promise.resolve(undefined)),
+        observability: { readiness: () => readinessOf(storeProbes) },
+      }),
+    /a route group needs deps\.db/,
+  );
 });

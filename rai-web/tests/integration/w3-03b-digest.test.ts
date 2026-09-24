@@ -65,6 +65,8 @@ beforeEach(async () => {
   });
   await adapter.start({ host: '127.0.0.1', port: 8787, publicBaseUrl: base, trustProxy: false });
   appDeps = {
+    db: db.app,
+    now: () => opened,
     config: {
       nodeEnv: 'test',
       log: { level: 'info', pretty: false },
@@ -82,12 +84,9 @@ beforeEach(async () => {
       sessionStore: createPgSessionStore(db.app),
       facts: createScopeFactsSource(db.app),
       fixtureProvider: createFixtureIdentityProvider(FIXTURE_USERS),
-      now: () => opened,
     },
-    pack: { db: db.app, limits: { maxPackBytes: 157286400 }, now: () => opened },
+    pack: { limits: { maxPackBytes: 157286400 } },
     versions: {
-      db: db.app,
-      now: () => opened,
       laneOpenRecipients: laneOpenRecipientsFromIdentities(FIXTURE_USERS),
     },
   };
@@ -422,8 +421,9 @@ test('bound app startup produces then uses the single dispatcher; restart does n
     await app.fastify.close();
     app = buildApp({
       ...appDeps,
-      digest: { db: db.app, publicBaseUrl: base, now: () => clock },
-      notifications: { db: db.app, publicBaseUrl: base, identities: FIXTURE_USERS, sink, now: () => clock },
+      now: () => clock,
+      digest: { publicBaseUrl: base },
+      notifications: { publicBaseUrl: base, identities: FIXTURE_USERS, sink },
     });
     await app.fastify.ready();
   };
