@@ -1,10 +1,9 @@
-// The start sequence main.ts runs, as a function so ID-02 (S16) can drive it with an injected address resolver and
-// exit function: config → identity adapter start() (never listens on a refusal, exit 78) → app → listen → post-listen
-// loopback check (S16: close and exit 78 when the bound address is not loopback). main.ts never migrates (W0-04).
+// The start sequence main.ts runs, as a function so tests can inject the address resolver and exit: config →
+// fixture inputs → identity adapter start() (never listens on a refusal, exit 78) → app → listen → post-listen
+// loopback check (W0-03 S16: close and exit 78 when the bound address is not loopback). main.ts never migrates (W0-04).
 
 import { createReadinessReader, computeReadiness } from './observability/health.js';
 import { createStoreProbes } from './observability/probes.js';
-import { isLoopbackHost } from './config.js';
 import { loadMailSink } from './notifications/runtime.js';
 import type { AddressInfo } from 'node:net';
 import path from 'node:path';
@@ -18,7 +17,7 @@ import {
   type BusinessUnitDirectory,
 } from './cases/business-units.js';
 import { createSubjectDirectory } from './cases/subject-directory.js';
-import { ConfigError, EXIT_CONFIG, parseConfig, type Env } from './config.js';
+import { ConfigError, EXIT_CONFIG, isLoopbackHost, parseConfig, type Env } from './config.js';
 import { createDb, type DbHandle } from './db/client.js';
 import { currentRevision } from './configuration/store.js';
 import { createIdentityAdapter, type Discovery, type GroupMappingSource } from './identity/adapter.js';
@@ -30,26 +29,32 @@ import type { Emitter } from './observability/log.js';
 import { noopUploadTrigger } from './pack/qc-trigger.js';
 import { startedFields } from './observability/started.js';
 import { WEB_DIST_DIR, webDistPresent } from './static.js';
+import { migrationFileCount } from './db/migrate.js';
 import type { QcRunner, VersionRef } from '@rai/shared/qc/types';
 import { laneOpenRecipientsFromIdentities } from './versions/open-lanes.js';
 import { sendBackRecipientsFromIdentities } from './workflow/send-back-notice.js';
 
+type ConfiguredQcRunner = QcRunner & { probe(): Promise<'ok' | 'unavailable' | 'disabled'> };
+type ImportFixture = (specifier: string) => Promise<unknown>;
+
 export interface StartOverrides {
   /** Synthetic journey only; shared runner instance, never a runtime configuration option. */
-  qcRunner?: QcRunner & { probe(): Promise<'ok' | 'disabled' | 'unavailable'> };
+  qcRunner?: ConfiguredQcRunner;
   /** S16 seam: what the adapter reads after listen; defaults to fastify.server.address(). */
   addressOf?: (fastify: FastifyInstance) => AddressInfo | string | null;
   /** Exit seam for tests; defaults to process.exit. Must not return. */
   exit?: (code: number) => never;
-  /** The fixture table (fixture mode only); defaults to a dynamic import of @rai/fixtures/data/users. */
+  /** The fixture table (fixture mode only); defaults to FIXTURE_USERS from @rai/fixtures/data/users. */
   fixtureUsers?: readonly FixtureIdentity[];
-  /** The slice-1 BU key list (every mode); defaults to FIXTURE_BUSINESS_UNITS from the same dynamic import. */
+  /** The slice-1 BU key list (every mode); defaults to FIXTURE_BUSINESS_UNITS from the same module. */
   fixtureBusinessUnits?: readonly string[];
+  /** Test seam for the run-time `@rai/fixtures` import. */
+  importFixture?: ImportFixture;
   discovery?: Discovery;
   now?: () => Date;
-  /** The built SPA directory to serve (W1-INT static.ts); defaults to rai-web/web/dist. */
+  /** The built SPA directory to serve; defaults to rai-web/web/dist. */
   webDistDir?: string;
-  /** W0-04 graceful shutdown: how long in-flight requests get after close() before their sockets are destroyed. */
+  /** How long in-flight requests get after close() before their sockets are destroyed (W0-04). */
   drainMs?: number;
 }
 
@@ -58,79 +63,52 @@ export interface StartedServer {
   emitter: Emitter;
   /** The configured BU keys the case routes accept (W0-04 `case.business_unit_id`), observable by tests. */
   businessUnits: BusinessUnitDirectory;
-  /**
-   * W0-04 graceful shutdown (shutdown.ts): no new connections, in-flight requests answered within `drainMs`
-   * (SHUTDOWN_DRAIN_MS, 10 s), every remaining socket destroyed, then the database pool closed. Bounded: a socket
-   * that never sent a byte (a browser's speculative pre-connect) cannot hold the process open.
-   */
+  /** The bounded W0-04 drain (shutdown.ts), then the database pool closes. */
   close(): Promise<void>;
 }
 
-/** @rai/fixtures/data/users resolved at run time, so the server never imports fixtures statically (absent in a production install). */
-async function loadFixtureUsersModule(): Promise<Record<string, unknown> | undefined> {
-  const specifier = '@rai/fixtures/data/users'; // a variable, so tsc does not resolve it (fixtures depends on server; no cycle)
-  try {
-    return (await import(specifier)) as Record<string, unknown>;
-  } catch {
-    return undefined;
-  }
-}
-
-/** Fixture mode only: the eight W0-03 identities from @rai/fixtures. */
-export async function loadFixtureUsers(): Promise<readonly FixtureIdentity[] | undefined> {
-  const users = (await loadFixtureUsersModule())?.FIXTURE_USERS;
-  if (!Array.isArray(users)) return undefined;
-  return users as readonly FixtureIdentity[]; // createFixtureIdentityProvider re-validates every invariant
+/** Only an absent package degrades; a present but broken fixtures build must refuse to start, not start empty. */
+function isMissingFixtures(err: unknown): boolean {
+  const e = err as { code?: unknown; message?: unknown } | null;
+  return e?.code === 'ERR_MODULE_NOT_FOUND' && String(e.message).includes("'@rai/fixtures'");
 }
 
 /**
- * W1-10 / W2-INT: the slice-1 QC substitute (`QC_MODE=substitute`) bound on the real server so W2 findings and
- * dispositions work against the deployable. Dynamic import only — never a static `@rai/fixtures` import — so
- * `check:substitute-absent` still passes and a production install without the fixtures package starts unbound.
+ * `@rai/fixtures/<path>` resolved at run time: the server never imports fixtures statically, so the production
+ * build cannot contain them (`check:substitute-absent`). Undefined when the package is not installed.
  */
-type ConfiguredQcRunner = QcRunner & { probe(): Promise<'ok' | 'unavailable' | 'disabled'> };
-export async function loadQcSubstituteRunner(now?: () => Date): Promise<ConfiguredQcRunner | undefined> {
-  const qcSpecifier = '@rai/fixtures/substitutes/qc/index';
-  const casesSpecifier = '@rai/fixtures/data/cases/index';
+async function importFixtureModule<T>(importFixture: ImportFixture, path: string): Promise<T | undefined> {
   try {
-    const qcMod = (await import(qcSpecifier)) as {
-      ScriptedQcRunner: new (options?: {
-        fixtureCaseIdOf?: (version: VersionRef) => string | undefined;
-        now?: () => Date;
-      }) => ConfiguredQcRunner;
-    };
-    const casesMod = (await import(casesSpecifier)) as Record<string, unknown>;
-    const rawCases = casesMod.FIXTURE_CASES;
-    if (!Array.isArray(rawCases)) return undefined;
-    const byCaseId = new Map<string, string>();
-    for (const entry of rawCases as unknown[]) {
-      const row = entry as { caseId?: unknown; fixtureCaseId?: unknown } | null;
-      if (typeof row?.caseId === 'string' && typeof row.fixtureCaseId === 'string')
-        byCaseId.set(row.caseId, row.fixtureCaseId);
-    }
-    return new qcMod.ScriptedQcRunner({
-      fixtureCaseIdOf: (version) => byCaseId.get(version.caseId),
-      ...(now === undefined ? {} : { now }),
-    });
-  } catch {
-    return undefined;
+    return (await importFixture(`@rai/fixtures/${path}`)) as T;
+  } catch (err) {
+    if (isMissingFixtures(err)) return undefined;
+    throw err;
   }
 }
 
-/**
- * Every mode: the slice-1 BU key list (`CM`, `HR`; W0-03 section 7) that W0-04 `case.business_unit_id` names, read
- * from `FIXTURE_BUSINESS_UNITS`. Only the keys are taken; the identities stay fixture-mode only. Undefined when the
- * fixtures package is absent (a production install), where the W6/W8 group mapping will supply the keys.
- */
-export async function loadFixtureBusinessUnits(): Promise<readonly string[] | undefined> {
-  const units = (await loadFixtureUsersModule())?.FIXTURE_BUSINESS_UNITS;
-  if (!Array.isArray(units)) return undefined;
-  const keys: string[] = [];
-  for (const unit of units as unknown[]) {
-    const id = (unit as { businessUnitId?: unknown } | null)?.businessUnitId;
-    if (typeof id === 'string') keys.push(id);
-  }
-  return keys;
+/** The eight W0-03 identities (fixture mode) and the slice-1 BU list (`CM`, `HR`; W0-03 section 7, every mode). */
+interface FixtureUsersModule {
+  FIXTURE_USERS: readonly FixtureIdentity[];
+  FIXTURE_BUSINESS_UNITS: readonly { businessUnitId: string }[];
+}
+
+/** The slice-1 QC substitute (`QC_MODE=substitute`), so findings and dispositions work against the deployable. */
+async function loadQcSubstituteRunner(
+  importFixture: ImportFixture,
+  clock: { now?: () => Date },
+): Promise<ConfiguredQcRunner | undefined> {
+  const qc = await importFixtureModule<{
+    ScriptedQcRunner: new (options: {
+      fixtureCaseIdOf: (version: VersionRef) => string | undefined;
+      now?: () => Date;
+    }) => ConfiguredQcRunner;
+  }>(importFixture, 'substitutes/qc/index');
+  const cases = await importFixtureModule<{
+    FIXTURE_CASES: readonly { caseId: string; fixtureCaseId: string }[];
+  }>(importFixture, 'data/cases/index');
+  if (qc === undefined || cases === undefined) return undefined;
+  const byCaseId = new Map(cases.FIXTURE_CASES.map((c) => [c.caseId, c.fixtureCaseId]));
+  return new qc.ScriptedQcRunner({ fixtureCaseIdOf: (version) => byCaseId.get(version.caseId), ...clock });
 }
 
 /** process.refused (W0-10 3.3): the reason code only, never a value; written before any logger exists. */
@@ -154,59 +132,61 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
     throw err;
   }
 
-  // W1-INT: the one deployable serves web/dist (W0-02 section 1, static.ts). Without a web build the process
-  // serves the API alone (the integration suites spawn main.ts through tsx); in production a missing bundle is
-  // a misconfiguration and the process refuses to start rather than answer 404 on every page.
+  // Without a web build the process serves the API alone (the integration suites spawn main.ts through tsx); in
+  // production a missing bundle is a misconfiguration, not a reason to answer 404 on every page.
   const webDistDir = overrides.webDistDir ?? WEB_DIST_DIR;
   const serveWeb = webDistPresent(webDistDir);
   if (!serveWeb && config.nodeEnv === 'production') return refuse('missing:web/dist', exit);
 
+  const clock = overrides.now === undefined ? {} : { now: overrides.now };
+  const importFixture = overrides.importFixture ?? ((specifier: string) => import(specifier));
+  const fixtures = await Promise.all([
+    importFixtureModule<FixtureUsersModule>(importFixture, 'data/users'),
+    // A production process stays unbound even if fixtures can import.
+    config.qc.mode === 'substitute' && config.nodeEnv !== 'production'
+      ? (overrides.qcRunner ?? loadQcSubstituteRunner(importFixture, clock))
+      : undefined,
+  ]).catch(() => undefined);
+  if (fixtures === undefined) return refuse('fixtures_import_failed', exit);
+  const [usersModule, qcRunner] = fixtures;
+  const fixtureUsers =
+    config.identity.mode === 'fixture' ? (overrides.fixtureUsers ?? usersModule?.FIXTURE_USERS) : undefined;
+
   const db: DbHandle = createDb(config.database.url);
   const groupMappingSource: GroupMappingSource = async () =>
     (await currentRevision(db.db, 'group_role_mapping'))?.body ?? null;
-  const fixtureUsers =
-    config.identity.mode === 'fixture' ? (overrides.fixtureUsers ?? (await loadFixtureUsers())) : undefined;
   const adapter = createIdentityAdapter({
     env: config.identity.env,
     nodeEnv: config.nodeEnv,
     discovery: overrides.discovery ?? openidClientDiscovery,
     groupMappingSource,
     ...(fixtureUsers === undefined ? {} : { fixtureUsers }),
-    ...(overrides.now === undefined ? {} : { now: overrides.now }),
+    ...clock,
   });
-  const bind = {
-    host: config.host,
-    port: config.port,
-    publicBaseUrl: config.publicBaseUrl,
-    trustProxy: config.trustProxy,
-  };
   try {
-    await adapter.start(bind); // level 1 of the fail-closed rule: refused means never listening
+    // Level 1 of the fail-closed rule: refused means never listening.
+    const { host, port, publicBaseUrl, trustProxy } = config;
+    await adapter.start({ host, port, publicBaseUrl, trustProxy });
   } catch (err) {
     await db.close();
     if (err instanceof IdentityStartupError) return refuse(err.reason, exit);
     throw err;
   }
 
-  // W1-02: the configured BU keys are the slice-1 fixture BU list (W0-04 `case.business_unit_id`: "a key from the
-  // fixture BU list (CM, HR; W0-03 section 7) in slice 1; the AD-group mapping arrives at W6/W8") in every identity
-  // mode, so a local-google account (W0-03 4.1: an unmapped account is owner and "sees nothing until it creates a
-  // case") can file a case; the `business_unit` grants of an injected fixture table are added. The subject
-  // directory knows the fixture identities plus every subject that has signed in.
+  // The fixture BU keys apply in every identity mode, so a local-google owner (W0-03 4.1) can file a case; the W6/W8
+  // group mapping replaces them.
   const knownIdentities = fixtureUsers ?? [];
   const businessUnits = createBusinessUnitDirectory([
-    ...(overrides.fixtureBusinessUnits ?? (await loadFixtureBusinessUnits()) ?? []),
+    ...(overrides.fixtureBusinessUnits ??
+      usersModule?.FIXTURE_BUSINESS_UNITS.map((u) => u.businessUnitId) ??
+      []),
     ...businessUnitsFromGrants(knownIdentities.flatMap((u) => [...u.roles])),
   ]);
   const store = createFilesystemBlobStore(path.resolve(config.blobDir));
   await store.init(); // root 0700, tmp/ emptied at process start (W0-08 section 6)
-  // Bind the QC substitute only outside production: a production process stays unbound even if fixtures can import.
-  const qcRunner =
-    config.qc.mode === 'substitute' && config.nodeEnv !== 'production'
-      ? (overrides.qcRunner ?? (await loadQcSubstituteRunner(overrides.now)))
-      : undefined;
   // Only fixture identities can be synthetic mail recipients in this slice. No live directory or transport.
   const mailSink = config.identity.mode === 'fixture' ? await loadMailSink(config) : undefined;
+  const schemaVersion = String(migrationFileCount());
   // Readiness observes the exact runner and sink injected into the existing consumers.
   const readiness = createReadinessReader(() =>
     computeReadiness(
@@ -215,7 +195,7 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
         loopbackBind: isLoopbackHost(config.host),
         mailKind: config.mail.mode === 'sink-memory' ? 'memory' : 'file',
         qcKind: 'substitute',
-        build: { commit: config.buildCommit, schemaVersion: 'unknown' },
+        build: { commit: config.buildCommit, schemaVersion },
       },
       {
         ...createStoreProbes(config.database.url, path.resolve(config.blobDir)),
@@ -224,22 +204,21 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
       },
     ),
   );
+  // Mail recipients are the fixture identities in slice 1; AD resolution is W8.
+  const ownerRecipients = (ownerSubjectId: string) =>
+    sendBackRecipientsFromIdentities(knownIdentities, ownerSubjectId);
   const { fastify, emitter, errors, drain } = buildApp({
     observability: { db: db.db, readiness },
     ...(mailSink === undefined
       ? {}
       : {
-          digest: {
-            db: db.db,
-            publicBaseUrl: config.publicBaseUrl,
-            ...(overrides.now === undefined ? {} : { now: overrides.now }),
-          },
+          digest: { db: db.db, publicBaseUrl: config.publicBaseUrl, ...clock },
           notifications: {
             db: db.db,
             sink: mailSink,
             identities: knownIdentities,
             publicBaseUrl: config.publicBaseUrl,
-            ...(overrides.now === undefined ? {} : { now: overrides.now }),
+            ...clock,
           },
         }),
     config,
@@ -249,43 +228,27 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
       sessionStore: createPgSessionStore(db.db),
       facts: createScopeFactsSource(db.db),
       ...(fixtureUsers === undefined ? {} : { fixtureProvider: createFixtureIdentityProvider(fixtureUsers) }),
-      ...(overrides.now === undefined ? {} : { now: overrides.now }),
+      ...clock,
     },
     cases: {
       db: db.db,
       businessUnits,
       subjects: createSubjectDirectory(db.db, { known: knownIdentities }),
-      ...(overrides.now === undefined ? {} : { now: overrides.now }),
+      ...clock,
     },
-    // W1-04: the W0-07 `upload` hook point stays the no-op until the QC orchestrator is bound (W2-05 / W4).
-    pack: {
-      db: db.db,
-      limits: config.upload,
-      uploadTrigger: noopUploadTrigger,
-      ...(overrides.now === undefined ? {} : { now: overrides.now }),
-    },
-    // W1-05 / W2-01: submit/freeze, lane open, and version navigation (W0-02 7.6). Recipients are the fixture
-    // identities that hold each lane (slice 1); AD resolution is W8.
+    // Upload-triggered QC is not implemented (W4), so the W0-07 upload hook stays a no-op.
+    pack: { db: db.db, limits: config.upload, uploadTrigger: noopUploadTrigger, ...clock },
     versions: {
       db: db.db,
       laneOpenRecipients: laneOpenRecipientsFromIdentities(knownIdentities),
       qc: qcRunner === undefined ? {} : { runner: qcRunner },
-      ...(overrides.now === undefined ? {} : { now: overrides.now }),
+      ...clock,
     },
-    // W2-02: lane approve / send-back; owner email for send_back notices from identity data.
-    decide: {
-      db: db.db,
-      sendBackRecipientsForOwner: (ownerSubjectId) =>
-        sendBackRecipientsFromIdentities(knownIdentities, ownerSubjectId),
-      ...(overrides.now === undefined ? {} : { now: overrides.now }),
-    },
-    // W2-05 / W2-06 / W2-INT: disposition + lane QC. QC_MODE=substitute binds ScriptedQcRunner outside
-    // production when fixtures are installed (slice-1 evidence path); production stays unbound.
+    decide: { db: db.db, sendBackRecipientsForOwner: ownerRecipients, ...clock },
     findings: {
       db: db.db,
-      readyRecipientsForOwner: (ownerSubjectId) =>
-        sendBackRecipientsFromIdentities(knownIdentities, ownerSubjectId),
-      ...(overrides.now === undefined ? {} : { now: overrides.now }),
+      readyRecipientsForOwner: ownerRecipients,
+      ...clock,
       ...(qcRunner === undefined ? {} : { qc: { runner: qcRunner } }),
     },
     ...(serveWeb ? { static: { root: webDistDir } } : {}),
@@ -303,6 +266,6 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
     if (err instanceof IdentityStartupError) return refuse(err.reason, exit);
     throw err;
   }
-  emitter.log('process.started', startedFields(config));
+  emitter.log('process.started', startedFields(config, schemaVersion));
   return { fastify, emitter, businessUnits, close };
 }

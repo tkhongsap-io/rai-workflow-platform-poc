@@ -70,7 +70,7 @@ export async function runMigrations(
   }
 }
 
-/** The number of migration files in the folder; readiness (W3-07) compares it with the applied count. */
+/** The number of migration files in the folder: the schema version this build expects. */
 export function migrationFileCount(folder: string = MIGRATIONS_FOLDER): number {
   return readMigrationFiles({ migrationsFolder: folder }).length;
 }

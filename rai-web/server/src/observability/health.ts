@@ -52,6 +52,12 @@ export async function computeReadiness(
   options: { now?: () => Date; timeoutMs?: number } = {},
 ): Promise<ReadinessReport> {
   const timeout = options.timeoutMs ?? PROBE_TIMEOUT_MS;
+  const unsetIdentity = {
+    mode: 'unset',
+    loopbackBind: config.loopbackBind,
+    status: 'misconfigured',
+    reason: 'mode_unknown',
+  } as const;
   let identity: ReadinessReport['identity'];
   try {
     const health = config.identity();
@@ -61,16 +67,9 @@ export async function computeReadiness(
       status: health.ready ? ('ok' as const) : ('misconfigured' as const),
       ...(health.reason === undefined ? {} : { reason: health.reason }),
     };
-    identity = Value.Check(ReadinessReportSchema.properties.identity, candidate)
-      ? candidate
-      : { mode: 'unset', loopbackBind: config.loopbackBind, status: 'misconfigured', reason: 'mode_unknown' };
+    identity = Value.Check(ReadinessReportSchema.properties.identity, candidate) ? candidate : unsetIdentity;
   } catch {
-    identity = {
-      mode: 'unset',
-      loopbackBind: config.loopbackBind,
-      status: 'misconfigured',
-      reason: 'mode_unknown',
-    };
+    identity = unsetIdentity;
   }
   const [db, migrations, blob, mail, qc] = await Promise.all([
     bounded(() => probes.db(), ['ok', 'unreachable', 'timeout'], 'unreachable', 'timeout', timeout),

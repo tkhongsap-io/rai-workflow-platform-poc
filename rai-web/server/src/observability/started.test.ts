@@ -10,14 +10,14 @@ const withHost = (host: string) => ({
 
 test('process.started reports the configured bind host as loopback only when it is one (W0-10 section 3.3)', () => {
   for (const host of ['127.0.0.1', '::1', 'localhost']) {
-    assert.deepEqual(startedFields(withHost(host)), {
+    assert.deepEqual(startedFields(withHost(host), '9'), {
       identityMode: 'local-google',
       loopback: true,
-      schemaVersion: 'unknown-until-W3-07',
+      schemaVersion: '9',
       commit: 'abc123',
     });
   }
   for (const host of ['0.0.0.0', '::', '172.26.0.2', 'desk.example.test']) {
-    assert.equal(startedFields(withHost(host)).loopback, false, host);
+    assert.equal(startedFields(withHost(host), '9').loopback, false, host);
   }
 });

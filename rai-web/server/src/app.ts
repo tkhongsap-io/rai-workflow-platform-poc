@@ -1,13 +1,8 @@
-// buildApp(deps): the Fastify instance used by main.ts and by tests without listen (W0-02 section 1). W1-00 wired
-// the substrate: the W0-10 correlation id (server-minted request id, X-Correlation-Id response header, request
-// context), the allow-list logger, and the one error handler that maps a ContractError to the W0-06 8.2 envelope
-// and everything else to internal_error. W1-01 adds the cookie parser, the authorization middleware (authz/, the
-// only place scope is enforced) and the sign-in surface (identity/routes.ts); a schema validation failure maps to
-// 422 invalid_input with field paths (W0-06 8.2). Routes arrive with W1-02 onwards and declare `config.auth`;
-// W1-02 registers the case routes (cases/routes.ts) when `cases` deps are given; W1-04 the pack draft routes
-// (pack/routes.ts) when `pack` deps are given; W1-05 the submit and version routes (versions/routes.ts) when
-// `versions` deps are given. W1-INT registers the SPA (static.ts: web/dist, helmet headers, history fallback)
-// when `static` is given; the API routes and the JSON not-found handler are unchanged by it.
+// buildApp(deps): the Fastify instance main.ts runs and tests inject into without listening (W0-02 section 1).
+// Every request gets a server-minted correlation id (W0-10), the allow-list logger and one error handler that maps
+// a ContractError to the W0-06 8.2 envelope and everything else to internal_error. The authorization middleware
+// (authz/) is the only place scope is enforced, and every route must declare `config.auth`. Each route group is
+// registered only when its deps are given; the SPA (static.ts) leaves the API routes and the JSON 404 unchanged.
 
 import { registerDailyDigest } from './notifications/digest-runtime.js';
 import type { DigestDeps } from './notifications/digest.js';
@@ -61,21 +56,21 @@ export interface AppDeps {
   config: Pick<AppConfig, 'nodeEnv' | 'log' | 'trustProxy' | 'publicBaseUrl'>;
   /** Absent only in substrate-level tests that register no route; main.ts always passes it. */
   identity?: IdentityDeps;
-  /** W1-02: the case routes' dependencies (database, configured BUs, subject directory). Needs `identity`. */
+  /** The case routes' dependencies (database, configured BUs, subject directory). Needs `identity`. */
   cases?: Omit<CaseRouteDeps, 'emitter'>;
-  /** The blob store, database and W0-08 limits for the W1-03 artifact routes; needs `identity`. */
+  /** The blob store, database and W0-08 limits for the artifact routes. Needs `identity`. */
   artifacts?: Omit<ArtifactRouteDeps, 'emitter'>;
-  /** W1-04: the pack draft routes' dependencies (database, pack limit, the W0-07 upload hook). Needs `identity`. */
+  /** The pack draft routes' dependencies (database, pack limit, the W0-07 upload hook). Needs `identity`. */
   pack?: Omit<PackRouteDeps, 'emitter'>;
-  /** W1-05: the submit and version-navigation routes' dependencies (database). Needs `identity`. */
+  /** The submit and version-navigation routes' dependencies (database). Needs `identity`. */
   versions?: Omit<VersionRouteDeps, 'afterSubmit'> & {
     qc?: Pick<QcOrchestratorDeps, 'runner' | 'timeoutMs'>;
   };
-  /** W2-02: lane approve / send-back. Needs `identity`. */
+  /** Lane approve / send-back. Needs `identity`. */
   decide?: DecideRouteDeps;
-  /** W2-05: findings disposition + lane QC run. Needs `identity`. */
+  /** Findings disposition and the lane QC run. Needs `identity`. */
   findings?: Omit<FindingsRouteDeps, 'emitter'>;
-  /** W1-INT: the built SPA to serve from web/dist (static.ts); absent when there is no web build (API only). */
+  /** The built SPA to serve from web/dist (static.ts); absent when there is no web build (API only). */
   static?: StaticOptions;
   /** Test seam: where the pino lines go instead of stdout, so a suite can assert on emitted events. */
   logStream?: NodeJS.WritableStream;
