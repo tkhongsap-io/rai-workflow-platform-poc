@@ -5,14 +5,8 @@
 // scope step). Neither action sets `rai.workflow_write`: nothing here may touch a projection, so W1-00's
 // `case_projection_gate` trigger stays armed as the third layer of the W0-04 fields rule.
 
-import {
-  InvalidInputError,
-  NotFoundError,
-  StaleVersionError,
-  type ErrorDetails,
-  type FieldError,
-} from '@rai/shared/errors';
-import type { Principal, Role } from '@rai/shared/schemas/auth';
+import { InvalidInputError, NotFoundError, StaleVersionError, type FieldError } from '@rai/shared/errors';
+import type { Principal } from '@rai/shared/schemas/auth';
 import type {
   CaseCreateRequest,
   CaseUpdateRequest,
@@ -25,6 +19,8 @@ import { currentBody } from '../configuration/store.js';
 import type { Db, Executor, Tx } from '../db/client.js';
 import { lockCase, withTransaction } from '../db/transaction.js';
 import { revertVendorDefaults } from '../pack/repository.js';
+import type { ActionContext } from '../versions/transaction.js';
+import { staleDetails } from '../workflow/refs.js';
 import type { BusinessUnitDirectory } from './business-units.js';
 import { findReplay, lockIdempotencyKey, requestDigest, storeIdempotencyKey } from './idempotency.js';
 import {
@@ -43,13 +39,6 @@ export interface CaseServiceDeps {
   businessUnits: BusinessUnitDirectory;
   subjects: SubjectDirectory;
   now?: () => Date;
-}
-
-/** Who acts, as which role (the policy row that allowed), under which correlation id (W0-10). */
-export interface ActionContext {
-  actor: Principal;
-  role: Role;
-  correlationId: string;
 }
 
 /** Draft v1 values the create transaction records; W1-04's PUT /draft changes them (W0-02 7.5). */
@@ -323,26 +312,4 @@ async function assertDraftOpen(
       ),
     );
   }
-}
-
-/** The W0-06 8.2 `stale_version` details from a version row; shared with the pack draft save (W1-04). */
-export function staleDetails(
-  reason: ErrorDetails['stale_version']['reason'],
-  guidanceKey: ErrorDetails['stale_version']['guidanceKey'],
-  version: { id: string; versionNumber: number; submittedAt: Date | null; readyAt: Date | null },
-  revision: number,
-  refreshPath: string,
-): ErrorDetails['stale_version'] {
-  return {
-    reason,
-    guidanceKey,
-    current: {
-      versionId: version.id,
-      versionNumber: version.versionNumber,
-      revision,
-      state: version.submittedAt === null ? 'draft' : 'submitted',
-      ready: version.readyAt != null,
-    },
-    refreshPath,
-  };
 }

@@ -11,9 +11,7 @@ import type { ArtifactRef } from '@rai/shared/schemas/artifacts';
 import { CONFIGURATION_KINDS, type ConfigurationKind } from '@rai/shared/schemas/cases';
 import type { SlotNumber, StageContext } from '@rai/shared/schemas/pack';
 import type { FrozenSlot, SubmittedVersion, VersionSummary } from '@rai/shared/schemas/versions';
-import { SLOT_NUMBERS, reasonFromColumn } from '../pack/slots.js';
-
-export const REASON_REQUIRED = 'validation.reason_required' as const;
+import { REASON_REQUIRED, SLOT_NUMBERS, reasonFromColumn } from '../pack/slots.js';
 
 /** The three columns of a slot row the precondition and the view read. */
 export interface SlotColumnsIn {

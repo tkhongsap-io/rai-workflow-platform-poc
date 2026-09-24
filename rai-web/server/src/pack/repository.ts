@@ -11,6 +11,7 @@ import type { Executor, Tx } from '../db/client.js';
 import { artifact } from '../db/schema/artifact.js';
 import { artifactSlot } from '../db/schema/artifact-slot.js';
 import { packVersion } from '../db/schema/pack-version.js';
+import { isUuid } from '../workflow/refs.js';
 import {
   SLOT_NUMBERS,
   carriesVendorDefault,
@@ -76,8 +77,6 @@ export async function packDraftView(
   };
 }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /** Loads the artifact an attach names, inside the transaction, and applies the W0-04 case binding. */
 export async function loadArtifactForSlot(
   exec: Executor,
@@ -85,7 +84,7 @@ export async function loadArtifactForSlot(
   slot: SlotNumber,
   artifactId: string,
 ): Promise<ArtifactRow> {
-  if (!UUID.test(artifactId)) throw new ArtifactCaseMismatch(slot, artifactId); // unknown: never a uuid cast error
+  if (!isUuid(artifactId)) throw new ArtifactCaseMismatch(slot, artifactId); // unknown: never a uuid cast error
   const [row] = await exec.select().from(artifact).where(eq(artifact.id, artifactId)).limit(1);
   if (row === undefined || row.caseId !== caseId) throw new ArtifactCaseMismatch(slot, artifactId);
   return row;

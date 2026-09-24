@@ -1,6 +1,6 @@
-// Transaction helpers (W0-04 "Transactions and idempotency"). W1-00 provides the base: a plain transaction, the
-// workflow-write setting the case projection gate requires, and the case row lock. The full withWorkflowTransaction
-// recipe (idempotency replay, expected version, audit-before-commit) arrives with W1-05 in versions/.
+// Transaction primitives (W0-04 "Transactions and idempotency"): a plain transaction, the workflow-write setting the
+// case projection gate requires, and the case row lock. Keyed actions compose them in `withWorkflowTransaction`
+// (versions/transaction.ts), which adds idempotency replay and audit-before-commit.
 import { sql } from 'drizzle-orm';
 import type { Db, Tx } from './client.js';
 

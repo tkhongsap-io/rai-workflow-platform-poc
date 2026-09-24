@@ -16,11 +16,15 @@ import { readCaseRow, type CaseRow } from '../cases/repository.js';
 import type { Db, Tx } from '../db/client.js';
 import { lockCase, setWorkflowWrite, withTransaction } from '../db/transaction.js';
 
-/** Who acts, as which role (the policy row that allowed), under which correlation id (W0-10), with which key. */
-export interface WorkflowActionContext {
+/** Who acts, as which role (the policy row that allowed), under which correlation id (W0-10). */
+export interface ActionContext {
   actor: Principal;
   role: Role;
   correlationId: string;
+}
+
+/** The action context with the keyed action it runs. */
+export interface WorkflowActionContext extends ActionContext {
   action: string; // the W0-04 `idempotency_key.action` name, e.g. 'case.submit'
   idempotencyKey: string;
   requestDigest: string; // SHA-256 over the action and the canonical body (cases/idempotency.ts)

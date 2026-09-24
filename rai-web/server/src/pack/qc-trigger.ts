@@ -1,9 +1,9 @@
 // The W0-07 3.2 `upload` trigger hook point: fired by the save-draft that attaches a stored artifact to a slot,
-// after that save's transaction has committed, and only for a slot whose artifact reference actually changed. The
-// orchestrator that turns this into a `QcRunRequest` (W0-07 3.4, `server/src/qc/`) and the W1-10 substitute it
-// binds are not part of this ticket; the server registers `noopUploadTrigger` until they land (W2-05 / W4). A
+// after that save's transaction has committed, and only for a slot whose artifact reference actually changed. A
 // bound trigger can never hold up, fail or roll back the save: the service calls it after commit and reports a
-// failure as an `error.captured` line only.
+// failure as an `error.captured` line only. The server binds `noopUploadTrigger` because the QC orchestrator runs
+// only the `submit` and `approve_attempt` triggers; per-upload QC on a draft is W4 (version-aware soft QC), which
+// is not authorized.
 
 export interface UploadTriggerEvent {
   caseId: string;
@@ -17,5 +17,5 @@ export interface UploadTriggerEvent {
 
 export type UploadTrigger = (event: UploadTriggerEvent) => void | Promise<void>;
 
-/** Slice 1 without an orchestrator: the hook exists, nothing runs. QC is not implemented (W4). */
+/** The hook with nothing bound: no upload-time QC run is recorded. */
 export const noopUploadTrigger: UploadTrigger = () => undefined;
