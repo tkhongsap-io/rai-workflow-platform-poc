@@ -21,6 +21,7 @@ import type {
   SlotState,
 } from '@rai/shared/qc/types';
 import { checkOwningLane, validateQcFinding } from '@rai/shared/qc/validate';
+import type { StoredFindingSummary } from '@rai/shared/schemas/review';
 import type { CaseRow, PackVersionRow } from '../cases/repository.js';
 import { readCaseRow, readVersionRow } from '../cases/repository.js';
 import { staleDetails } from '../cases/service.js';
@@ -65,18 +66,8 @@ export type RunSubmitQcInput = Omit<RunLaneQcInput, 'lane'>;
 type RunQcInput = RunSubmitQcInput &
   ({ trigger: 'submit'; lane: null } | { trigger: 'approve_attempt'; lane: Lane });
 
-export interface StoredFindingView {
-  findingId: string;
-  ruleId: string;
-  slot: number | null;
-  severity: string;
-  owningLane: Lane;
-  messageKey: string;
-  messageParams?: Record<string, string | number>;
-}
-
 export type PersistQcOutcome =
-  | { status: 'completed'; runId: string; findings: StoredFindingView[] }
+  | { status: 'completed'; runId: string; findings: StoredFindingSummary[] }
   | { status: 'unavailable'; reason: QcUnavailableReason; runId: string; findings: [] };
 
 export type SubmitQcOutcome =
@@ -257,7 +248,7 @@ async function persistResult(
     return { status: 'unavailable', reason: result.reason, runId: run.id, findings: [] };
   }
   await recordRun(tx, version, request, run, null, result.findings.length);
-  const findings: StoredFindingView[] = [];
+  const findings: StoredFindingSummary[] = [];
   for (const finding of result.findings) {
     const findingId = uuidv7(run.stamp.getTime());
     const slot = slotOfFinding(finding);

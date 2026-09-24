@@ -13,6 +13,8 @@ import type { Tx } from '../db/client.js';
 import { cases } from '../db/schema/case.js';
 import { laneDecision } from '../db/schema/lane-decision.js';
 import { packVersion } from '../db/schema/pack-version.js';
+import { qcFinding } from '../db/schema/qc-finding.js';
+import { latestDisposition, undispositioned } from '../findings/repository.js';
 import { CaseRowChanged } from '../versions/repository.js';
 import { insertReadyNotifications } from './ready-notice.js';
 
@@ -123,20 +125,12 @@ export async function evaluateReadyPredicate(
   const byLane = new Map(approvals.map((row) => [row.lane as Lane, row]));
   const missingApprovals = requiredLanes.filter((lane) => !byLane.has(lane));
 
-  const undispositioned = await tx.execute(sql`
-    SELECT f.id::text AS id
-    FROM qc_finding f
-    LEFT JOIN LATERAL (
-      SELECT kind
-      FROM disposition_event d
-      WHERE d.finding_id = f.id
-      ORDER BY d.created_at DESC, d.id DESC
-      LIMIT 1
-    ) latest ON true
-    WHERE f.version_id = ${versionId}::uuid
-      AND (latest.kind IS NULL OR latest.kind = 'fixed_proposed')
-  `);
-  const undispositionedFindingIds = (undispositioned.rows as Array<{ id: string }>).map((r) => r.id);
+  const findings = await tx
+    .select({ id: qcFinding.id, open: undispositioned })
+    .from(qcFinding)
+    .leftJoinLateral(latestDisposition, sql`true`)
+    .where(eq(qcFinding.versionId, versionId));
+  const undispositionedFindingIds = findings.filter((f) => f.open).map((f) => f.id);
 
   // §6 condition 4: each approving actor must be neither owner nor BU SPOC of the case.
   const facts: CaseScopeFacts = {
@@ -152,25 +146,11 @@ export async function evaluateReadyPredicate(
     return { ready: false, missingApprovals, undispositionedFindingIds, selfApprovedLanes };
   }
 
-  const dispositioned = await tx.execute(sql`
-    SELECT count(*)::int AS n
-    FROM qc_finding f
-    INNER JOIN LATERAL (
-      SELECT kind
-      FROM disposition_event d
-      WHERE d.finding_id = f.id
-      ORDER BY d.created_at DESC, d.id DESC
-      LIMIT 1
-    ) latest ON true
-    WHERE f.version_id = ${versionId}::uuid
-      AND latest.kind IN ('fixed', 'fixed_confirmed', 'waived', 'not_applicable')
-  `);
-  const dispositionedFindingCount = Number((dispositioned.rows[0] as { n: number } | undefined)?.n ?? 0);
-
   return {
     ready: true,
     approvalDecisionIds: requiredLanes.map((lane) => byLane.get(lane)!.id),
-    dispositionedFindingCount,
+    // Ready means no finding is open, so every finding on the version is dispositioned.
+    dispositionedFindingCount: findings.length,
   };
 }
 

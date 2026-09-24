@@ -10,9 +10,10 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Writable } from 'node:stream';
 import { sql } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/node-postgres';
 import type { FastifyInstance } from 'fastify';
 import type { ErrorResponse } from '@rai/shared/errors';
-import type { LaneQcRunResponse, VersionFindingsResponse } from '@rai/shared/schemas/review';
+import type { DispositionKind, LaneQcRunResponse, VersionFindingsResponse } from '@rai/shared/schemas/review';
 import type { PackDraft } from '@rai/shared/schemas/pack';
 import type { SubmitRequest, SubmittedVersion } from '@rai/shared/schemas/versions';
 import { buildApp } from '../support/observed-app.js';
@@ -21,6 +22,10 @@ import { createScopeFactsSource } from '@rai/server/authz/facts';
 import { businessUnitsFromGrants, createBusinessUnitDirectory } from '@rai/server/cases/business-units';
 import { createSubjectDirectory } from '@rai/server/cases/subject-directory';
 import { UPLOAD_LIMIT_DEFAULTS } from '@rai/server/config';
+import { createDb, schema } from '@rai/server/db/client';
+import { dispositionEvent } from '@rai/server/db/schema/disposition-event';
+import { qcFinding } from '@rai/server/db/schema/qc-finding';
+import { listFindingsForVersion } from '@rai/server/findings/repository';
 import { createIdentityAdapter } from '@rai/server/identity/adapter';
 import { createFixtureIdentityProvider } from '@rai/server/identity/fixture';
 import { createPgSessionStore } from '@rai/server/identity/session';
@@ -256,5 +261,78 @@ describe(`W2-09 version findings read — ${SET}`, () => {
     });
     assert.equal(notUuid.statusCode, 404);
     assert.equal(notUuid.json<ErrorResponse>().error.code, 'not_found');
+  });
+
+  it('lists every finding with its latest disposition (created_at DESC, id DESC) in one query', async () => {
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, VENDOR.caseId);
+    const ai = await signIn(AI_COE);
+    const qc = await app.inject({
+      method: 'POST',
+      url: `/api/cases/${VENDOR.caseId}/versions/${version.versionId}/lanes/ai_coe/qc-run`,
+      headers: { 'content-type': 'application/json', ...asUser(ai) },
+      payload: {
+        expectedVersion: { versionId: version.versionId, revision: await caseRevision(VENDOR.caseId) },
+      },
+    });
+    assert.equal(qc.statusCode, 200, qc.body);
+    const qcBody = qc.json<LaneQcRunResponse>();
+    const disposed = qcBody.findings[0]!.findingId;
+    const bare = randomUUID();
+    await db.owner.insert(qcFinding).values({
+      id: bare,
+      runId: qcBody.runId!,
+      versionId: version.versionId,
+      kind: 'defect',
+      ruleId: 'synthetic',
+      ruleRevision: '1',
+      severity: 'low',
+      owningLane: 'ai_coe',
+      evidence: [],
+      messageKey: 'synthetic',
+      messageParams: {},
+      createdAt: now(),
+    });
+    const event = (id: string, kind: DispositionKind, at: number) => ({
+      id,
+      findingId: disposed,
+      kind,
+      reason: 'synthetic',
+      actorSubjectId: OWNER_A,
+      actorRole: 'owner',
+      createdAt: new Date(at),
+      correlationId: randomUUID(),
+    });
+    // The later stamp outranks a larger id; on equal stamps the larger id wins.
+    await db.owner
+      .insert(dispositionEvent)
+      .values([
+        event('ffffffff-ffff-7fff-bfff-ffffffffffff', 'waived', clock + 1),
+        event('00000000-0000-7000-8000-000000000001', 'not_applicable', clock + 2),
+        event('00000000-0000-7000-8000-000000000002', 'fixed', clock + 2),
+      ]);
+
+    const handle = createDb(db.urls.app, { max: 1 });
+    let queries = 0;
+    const counted = drizzle(handle.pool, { schema, logger: { logQuery: () => void (queries += 1) } });
+    try {
+      const findings = await listFindingsForVersion(counted, VENDOR.caseId, version.versionId);
+      assert.equal(findings.length, qcBody.findings.length + 1);
+      assert.equal(queries, 1, 'one query regardless of finding count');
+      assert.equal(findings.find((f) => f.findingId === disposed)?.latestDisposition, 'fixed');
+      assert.equal(findings.find((f) => f.findingId === bare)?.latestDisposition, null);
+    } finally {
+      await handle.close();
+    }
+
+    const listed = await app.inject({
+      method: 'GET',
+      url: `/api/cases/${VENDOR.caseId}/versions/${version.versionId}/findings`,
+      headers: asUser(owner),
+    });
+    assert.equal(listed.statusCode, 200, listed.body);
+    // Same shape as the qc-run response: messageParams is present even when the finding stored none.
+    const bareRow = listed.json<VersionFindingsResponse>().findings.find((f) => f.findingId === bare);
+    assert.deepEqual(bareRow?.messageParams, {});
   });
 });

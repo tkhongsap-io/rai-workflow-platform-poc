@@ -18,8 +18,8 @@ import { isUuid } from '../versions/repository.js';
 import {
   findLatestSubmittedVersionId,
   insertDisposition,
-  latestDisposition,
   readFindingForCase,
+  readLatestDisposition,
 } from './repository.js';
 
 export interface DispositionServiceDeps {
@@ -155,7 +155,7 @@ export async function recordDisposition(
           );
         }
 
-        const latest = await latestDisposition(tx, finding.id);
+        const latest = await readLatestDisposition(tx, finding.id);
         if (request.kind === 'fixed_confirmed' && latest?.kind !== 'fixed_proposed') {
           throw new InvalidInputError([
             { path: 'body.kind', messageKey: 'error.invalid_input.fixed_confirmed_without_proposal' },

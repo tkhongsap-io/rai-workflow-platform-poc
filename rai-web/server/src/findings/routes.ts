@@ -80,18 +80,8 @@ export function registerFindingsRoutes(fastify: FastifyInstance, deps: FindingsR
       if (version === undefined || version.caseId !== request.params.caseId) {
         throw new NotFoundError('version');
       }
-      const findings = await listFindingsForVersion(deps.db, request.params.caseId, request.params.versionId);
       return {
-        findings: findings.map((f) => ({
-          findingId: f.findingId,
-          ruleId: f.ruleId,
-          slot: f.slot as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | null,
-          severity: f.severity as 'high' | 'medium' | 'low' | 'info',
-          owningLane: f.owningLane,
-          messageKey: f.messageKey,
-          latestDisposition: f.latestDisposition,
-          ...(f.messageParams === undefined ? {} : { messageParams: f.messageParams }),
-        })),
+        findings: await listFindingsForVersion(deps.db, request.params.caseId, request.params.versionId),
       };
     },
   );
@@ -197,15 +187,7 @@ export function registerFindingsRoutes(fastify: FastifyInstance, deps: FindingsR
       return {
         runId: outcome.runId,
         status: 'completed' as const,
-        findings: outcome.findings.map((f) => ({
-          findingId: f.findingId,
-          ruleId: f.ruleId,
-          slot: f.slot as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | null,
-          severity: f.severity as 'high' | 'medium' | 'low' | 'info',
-          owningLane: f.owningLane,
-          messageKey: f.messageKey,
-          ...(f.messageParams === undefined ? {} : { messageParams: f.messageParams }),
-        })),
+        findings: outcome.findings,
       };
     },
   );
