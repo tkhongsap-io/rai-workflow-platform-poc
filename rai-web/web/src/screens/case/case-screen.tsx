@@ -306,9 +306,12 @@ interface BodyProps {
   onDispositionRecorded: (response: DispositionResponse) => void;
 }
 
-/** A decision reloads the screen; focus moves to its outcome instead of dropping to <body>. */
-function focusOnMount(element: HTMLElement | null): void {
-  element?.focus();
+/**
+ * A decision reloads the screen and its controls unmount, dropping focus to <body>; the outcome notice picks it up.
+ * A keyboard user who has moved on while the reload ran keeps focus where they put it.
+ */
+function focusIfDropped(element: HTMLElement | null): void {
+  if (document.activeElement === document.body) element?.focus();
 }
 
 function BackToList(): JSX.Element {
@@ -409,7 +412,7 @@ function CaseScreenBody(props: BodyProps): JSX.Element {
                   className={'notice notice-success'}
                   role={'status'}
                   tabIndex={-1}
-                  ref={props.notice.key.startsWith('review.decided.') ? focusOnMount : undefined}
+                  ref={props.notice.key.startsWith('review.decided.') ? focusIfDropped : undefined}
                 >
                   {t(props.notice.key, props.notice.params)}
                 </p>
