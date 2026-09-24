@@ -1,5 +1,25 @@
 # Development log
 
+## W3 hardening H1-H29 — 2026-09-25
+
+Most W2/W3 PRs (#90-#126) had merged without an independent review verdict. On Ta's instruction a retro-review of `main` at `d815a8e` confirmed 71 findings (5 high) and refuted 17. Batches H1-H23 (#128-#150) fixed them. H24 (#151) fixed what the final verification found. H25-H29 (#152-#156) fixed defects found by running the Nakhun walkthrough for real. They include a false "Action failed" after a successful send-back, and send-back feedback that reached the owner only by mail. The feedback is now on the version read (a contract PR) and shown on the owner's successor draft. Also fixed: a duplicate lane-QC request that could make an approve 409, the draft editor being offered to users who cannot edit, and a focus race after lane decisions that was already on `main`. Each batch went through the full suite, two independent reviewer verdicts on the PR and green CI on the reviewed head. #136 had one reviewer before merge and a second after; see the review record.
+
+- **Behaviour changes:**
+  - approve must name the latest lane-QC run (H2);
+  - QC fails closed, recording the run unavailable, when a finding has no mappable lane (H7), so #35 stays undecided;
+  - Ready checks self-approval against the approver's grants at decision time (H8, migration 0008);
+  - a `Sec-Fetch-Site` guard on every signed-in write (H6);
+  - pool idle-error handling and fatal process handlers (H4);
+  - readiness returns 503 while migrations are pending (H10);
+  - an idempotency-key race returns 422 instead of 500 (H17);
+  - the reviewer workspace shows every stored finding of its lane (H5).
+- **Simplification** (`d815a8e` to `4522074`): non-test source −609 lines, tests −889. Each helper the retro named as duplicated now has one definition. `runQc` went from 227 lines to 58.
+- **Final verification** on a clean checkout of `4522074` passed 580 unit, 316 integration, 181 real-server browser, 48 substitute browser and 40 repository tests, with no skips.
+- **Deferred for Ta:** #35 and the QC-after-send-back spec conflict, among others. H15's guard-removal finding was withdrawn: the performance harness guard stays.
+- **Hand-off:** a [walkthrough script](changes/2026-09-23-w3-hardening/walkthrough-script.md) for Nakhun and a [#35 decision brief](changes/2026-09-23-w3-hardening/issue-35-decision-brief.md).
+
+Details: [review](changes/2026-09-23-w3-hardening/review.md). W3 acceptance remains Ta's; W4-W8 are not authorized.
+
 ## W3 synthetic engineering exit — 2026-09-23
 
 All nine W3 engineering tickets, including W3-INT and W3-06, are merged. PR #125 delivered main `e62b669ab2aa36a3e4343a095b5bedcd9e159c19`; [actual-main CI](https://github.com/tkhongsap-io/rai-workflow-platform-poc/actions/runs/35781574925) passed all 12 checks. The final run passed 565 unit, 293 integration, 174 real-server browser, 171 separate UI rehearsal and 40 repository tests. The [exit review](changes/2026-09-23-w3-exit/review.md) records the independently reviewed delivery, supplementary keyboard recording and 3,760-sample advisory performance baseline.

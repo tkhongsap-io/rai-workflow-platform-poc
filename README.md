@@ -1,6 +1,6 @@
 # RAI Workflow Platform PoC
 
-**Working product name: RAI web. Status: W3 synthetic implementation and engineering exit recorded 2026-09-23; Ta’s package review remains pending. Production release and W4–W8 remain gated.**
+**Working product name: RAI web. Status: W3 synthetic implementation and engineering exit recorded 2026-09-23 and hardened 2026-09-23 to 2026-09-25; Ta’s package review remains pending. Production release and W4–W8 remain gated.**
 
 A review desk for one submitted AI-use-case pack, with parallel AI/COE, DPO and IT/Security review, versioned send-back and soft document QC. This is not True's official AI register and does not operate the eight-stage AI lifecycle.
 
@@ -89,6 +89,6 @@ Run the local design with `python3 demo/serve.py`, then open http://127.0.0.1:51
 
 ## Build status
 
-G0, W0, W1 and W2 exits are recorded. W3 delivers the scoped queue, working-day SLA, committed notifications, daily digest, bounded retries, Admin diagnostics and the real-server keyboard journey. The [W3 engineering exit](changes/2026-09-23-w3-exit/review.md) records exact test, performance and walkthrough evidence and remaining limitations. The application uses a real local API/database with explicit synthetic identity, QC and file-mail adapters; the historical API substitute is confined to its separate test harness. Ta’s package review, workload/target confirmation and manual Google loopback sign-in remain pending. Issue #35 and epic #53 remain open for unresolved finding ownership. W4–W8 are not authorized; Ready means desk completion, not deployment permission.
+G0, W0, W1 and W2 exits are recorded. W3 delivers the scoped queue, working-day SLA, committed notifications, daily digest, bounded retries, Admin diagnostics and the real-server keyboard journey. The [W3 engineering exit](changes/2026-09-23-w3-exit/review.md) records exact test, performance and walkthrough evidence and remaining limitations. The application uses a real local API/database with explicit synthetic identity, QC and file-mail adapters; the historical API substitute is confined to its separate test harness. After the exit, the [W3 hardening](changes/2026-09-23-w3-hardening/review.md) retro-reviewed the unreviewed W2/W3 PRs and fixed or deferred every confirmed finding. It also covered resilience, cross-site write protection, fail-closed QC and simplification. Its [walkthrough script](changes/2026-09-23-w3-hardening/walkthrough-script.md) starts the desk locally in fixture mode for a synthetic session. Ta’s package review, workload/target confirmation and manual Google loopback sign-in remain pending. Issue #35 and epic #53 remain open for unresolved finding ownership. W4–W8 are not authorized; Ready means desk completion, not deployment permission.
 
 Production identity is True AD/Entra on True's network; any Google account is allowed only on localhost. A networked test deployment needs an allow-list or AD. Ready for launch means review-desk completion only; it is not Council approval or an ITSM deployment authorization.
