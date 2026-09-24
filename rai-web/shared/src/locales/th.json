@@ -381,6 +381,7 @@
   "review.findings.intro": "ผลตรวจ QC ของช่องทางนี้แสดงก่อนการตัดสินใจ อนุมัติได้เฉพาะหลังเห็นผลนี้แล้ว",
   "review.findings.list_label": "รายการข้อค้นพบ",
   "review.findings.loading": "กำลังเรียกผลตรวจ QC ของช่องทาง…",
+  "review.findings.none_stored": "ไม่มีข้อค้นพบที่บันทึกไว้สำหรับช่องทางนี้ในเวอร์ชันนี้",
   "review.findings.slot": "ช่อง {number}: {name}",
   "review.findings.slot_none": "ระดับชุดเอกสาร",
   "review.qc.reason.artifact_unreadable": "อ่านเอกสารไม่ได้",

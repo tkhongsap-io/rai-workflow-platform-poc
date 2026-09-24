@@ -77,6 +77,7 @@ async function openAsReviewer(page: Page, user: string, caseId: string, versionI
 /**
  * Runs a lane decision, then proves the refreshed workspace reads the stored findings with no error notice instead of
  * re-running lane QC: after a send-back the version is closed and qc-run answers 409 under a successful decision.
+ * Without a run in view, an empty lane must not read as a clean QC result: the decision may have seen QC unavailable.
  */
 async function decideThenReadStoredFindings<T>(
   page: Page,
@@ -92,6 +93,7 @@ async function decideThenReadStoredFindings<T>(
   expect(`${load.request().method()} ${new URL(load.url()).pathname}`).toMatch(/^GET \/.*\/findings$/);
   await expect(page.locator('[data-review-qc="loading"]')).toHaveCount(0);
   await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect(page.locator('[data-review-qc="empty"]')).toHaveCount(0);
   return decided;
 }
 
@@ -279,6 +281,9 @@ test.describe(`W2-INT journey on the real server: v1 → send-back → v2 → di
     await expect(
       page.getByRole('status').filter({ hasText: t('th', 'review.decided.approve') }),
     ).toBeVisible();
+    await expect(page.locator('[data-review-qc="none_stored"]')).toHaveText(
+      t('th', 'review.findings.none_stored'),
+    );
 
     await signOut(page);
     await openAsReviewer(page, AI_COE, caseId, v2Id);

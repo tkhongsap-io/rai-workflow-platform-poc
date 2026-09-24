@@ -381,6 +381,7 @@
   "review.findings.intro": "This lane's QC result appears before any decision. Approve only after you have seen it.",
   "review.findings.list_label": "Findings",
   "review.findings.loading": "Running lane QC…",
+  "review.findings.none_stored": "No findings are stored for this lane on this version",
   "review.findings.slot": "Slot {number}: {name}",
   "review.findings.slot_none": "Pack level",
   "review.qc.reason.artifact_unreadable": "artifact unreadable",

@@ -181,6 +181,7 @@ export function ReviewerWorkspace({
               expectedVersion={expectedVersion}
               session={session}
               view={view}
+              laneQcRan={state.run !== null}
               onDisposition={onDisposition}
             />
           )}
