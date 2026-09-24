@@ -60,13 +60,24 @@ export type SendBackLaneRequest = Static<typeof SendBackLaneRequestSchema>;
 
 export const LANE_DECISIONS = ['approve', 'send_back'] as const;
 export type LaneDecisionKind = (typeof LANE_DECISIONS)[number];
+const LaneDecisionKindSchema = Type.Union([Type.Literal('approve'), Type.Literal('send_back')]);
+
+/** One decided lane of a submitted version, as the version read serves it (W0-02 7.6 `decisions`). */
+export const LaneDecisionSchema = Type.Object({
+  lane: LaneSchema,
+  decision: LaneDecisionKindSchema,
+  decidedBy: Type.String(), // subject id, as `SubmittedVersion.submittedBy`
+  decidedAt: Type.String(),
+  feedback: Type.Union([SendBackFeedbackSchema, Type.Null()]), // null on approve
+});
+export type LaneDecision = Static<typeof LaneDecisionSchema>;
 
 /** Success body for both decide routes (201). */
 export const LaneDecisionResponseSchema = Type.Object({
   decisionId: Type.String(),
   versionId: Type.String(),
   lane: LaneSchema,
-  decision: Type.Union([Type.Literal('approve'), Type.Literal('send_back')]),
+  decision: LaneDecisionKindSchema,
   decidedAt: Type.String(),
   /** Successor draft id when this send-back created or reused N+1; null on approve. */
   successorDraftVersionId: Type.Union([Type.String(), Type.Null()]),

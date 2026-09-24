@@ -100,6 +100,7 @@ export function versionRoutes(): RouteDefinition[] {
           laneMappingVersion: CURRENT_LANE_MAPPING.version,
           slots,
           isLatest: true,
+          decisions: [], // stays empty on every read: see the README's drift list
         };
         stored.versions.push(version);
         ctx.store.laneDueByVersion.set(

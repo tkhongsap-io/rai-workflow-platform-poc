@@ -3,6 +3,7 @@
 import { Type, type Static } from 'typebox';
 import type { ConfigurationRevisionId } from '../ids.js';
 import { ArtifactRefSchema } from './artifacts.js';
+import type { LaneDecision } from './review.js';
 import { NotApplicableReasonSchema, type StageContextSchema, type SlotNumber } from './slots.js';
 
 /** W0-06 section 5.1, verbatim; versionId = draftId for draft actions. */
@@ -42,7 +43,7 @@ export interface SubmittedVersion {
   laneMappingVersion: string; // the D02 constant's version, e.g. 'lane-mapping/v1'
   slots: Record<SlotNumber, FrozenSlot>;
   isLatest: boolean;
-  // W2 contract PRs add: lanes, decisions, findings, dispositions
+  decisions: LaneDecision[]; // the version's decided lanes as of the read, ascending by decidedAt then lane
 }
 
 export const SubmitRequestSchema = Type.Object({ expectedVersion: ExpectedVersionSchema });

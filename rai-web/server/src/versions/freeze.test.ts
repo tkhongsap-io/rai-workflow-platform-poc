@@ -153,6 +153,7 @@ describe('W1-05 lane mapping content and the SubmittedVersion view', () => {
           },
           frozenSlotsOf(rows(), new Map()),
           true,
+          [],
         ),
       (e: unknown) => e instanceof VersionNotSubmitted,
     );

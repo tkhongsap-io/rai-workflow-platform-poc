@@ -188,7 +188,16 @@ describe(`W2-03 successor draft concurrency and stale actions — ${SET}`, () =>
       headers: asUser(owner),
     });
     assert.equal(frozen.statusCode, 200, frozen.body);
-    assert.equal(frozen.json<SubmittedVersion>().versionId, version.versionId);
+    const frozenBody = frozen.json<SubmittedVersion>();
+    assert.equal(frozenBody.versionId, version.versionId);
+    // Both decisions share the clock instant, so the read orders them by lane.
+    assert.deepEqual(
+      frozenBody.decisions.map((d) => [d.lane, d.decision, d.feedback?.items[0]?.slot]),
+      [
+        ['ai_coe', 'send_back', 1],
+        ['dpo', 'send_back', 2],
+      ],
+    );
 
     const sent = (await auditStore.read(db.owner)).filter((e) => e.action === 'lane.sent_back');
     assert.equal(sent.length, 2);

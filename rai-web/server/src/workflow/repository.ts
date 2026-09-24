@@ -1,10 +1,10 @@
-// W2-02 / W2-03: lane decision store helpers — insert decision, write lane projection, create or reuse
+// W2-02 / W2-03: lane decision store helpers — insert and read decisions, write lane projection, create or reuse
 // successor draft on send-back (D05 / W0-06 4.5: concurrent send-backs share one N+1 under the case lock).
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { uuidv7 } from '@rai/shared/ids';
 import type { Lane } from '@rai/shared/constants';
 import type { RoleScope } from '@rai/shared/schemas/auth';
-import type { SendBackFeedback } from '@rai/shared/schemas/review';
+import type { LaneDecision, LaneDecisionKind, SendBackFeedback } from '@rai/shared/schemas/review';
 import type { CaseRow, PackVersionRow } from '../cases/repository.js';
 import { deskStatusFor } from '../cases/status.js';
 import type { Executor, Tx } from '../db/client.js';
@@ -70,6 +70,28 @@ export async function findLaneDecision(
     .where(and(eq(laneDecision.versionId, versionId), eq(laneDecision.lane, lane)))
     .limit(1);
   return row;
+}
+
+/** The version's decisions in the W0-02 7.6 read shape, ascending by `decided_at` then lane. */
+export async function listLaneDecisions(exec: Executor, versionId: string): Promise<LaneDecision[]> {
+  const rows = await exec
+    .select({
+      lane: laneDecision.lane,
+      decision: laneDecision.decision,
+      decidedBy: laneDecision.actorSubjectId,
+      decidedAt: laneDecision.decidedAt,
+      feedback: laneDecision.feedback,
+    })
+    .from(laneDecision)
+    .where(eq(laneDecision.versionId, versionId))
+    .orderBy(asc(laneDecision.decidedAt), asc(laneDecision.lane));
+  return rows.map((row) => ({
+    lane: row.lane as Lane,
+    decision: row.decision as LaneDecisionKind,
+    decidedBy: row.decidedBy,
+    decidedAt: row.decidedAt.toISOString(),
+    feedback: row.feedback as SendBackFeedback | null, // validated against SendBackFeedbackSchema on insert
+  }));
 }
 
 /**
