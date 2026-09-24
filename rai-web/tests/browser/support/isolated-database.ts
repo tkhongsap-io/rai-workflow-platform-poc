@@ -9,6 +9,7 @@ import { readEnv, parseDatabaseConfig } from '@rai/server/config';
 import { createDb } from '@rai/server/db/client';
 import { runMigrations } from '@rai/server/db/migrate';
 import { loadFixtures } from '@rai/fixtures/load';
+import { operatorUrlForTests } from '../../support/db.js';
 
 export async function withIsolatedFixtureDatabase<T>(
   run: (env: Record<string, string>) => Promise<T>,
@@ -16,7 +17,7 @@ export async function withIsolatedFixtureDatabase<T>(
   const env = readEnv();
   assert.equal(env.NODE_ENV, 'test');
   assert.equal(env.RAI_IDENTITY_MODE, 'fixture');
-  const config = parseDatabaseConfig(env);
+  const config = { ...parseDatabaseConfig(env), operatorUrl: operatorUrlForTests(env) };
   const source = new URL(config.url);
   assert(['127.0.0.1', 'localhost', '[::1]'].includes(source.hostname));
   const adminUrl = new URL(env.OBS_MIGRATION_ADMIN_URL ?? config.url);

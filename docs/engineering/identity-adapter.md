@@ -305,15 +305,15 @@ W0-09 confirmed this mechanism (section 14 b): the cookie is an opaque random va
 
 ### 6.4 Error contract
 
-Codes and statuses are the ADR-0003 table that W0-06 confirms. Every response carries `code`, `messageKey` (D12 locale key, section 12) and the correlation ID (W0-10).
+Codes and statuses are the ADR-0003 table that W0-06 confirms. Every response carries `code`, `messageKey` (always `error.<code>`, the W0-06 envelope) and the correlation ID (W0-10). The section 12 keys `auth.session_required`, `auth.sign_in_failed` and `auth.not_permitted` are what the sign-in screen displays; no response carries them as its `messageKey`.
 
 | Situation | HTTP / `code` | `messageKey` | Session | Audit / log |
 |---|---|---|---|---|
-| No cookie, unknown hash, expired, idle-expired or revoked session | 401 `unauthenticated` | `auth.session_required` | none | log only, reason code |
-| Callback with missing or mismatched `state`, `nonce` or transaction cookie; code exchange failed; `iss`/`aud` mismatch; email not verified | 401 `unauthenticated` | `auth.sign_in_failed` | none created | log reason code; audit `identity.sign_in_refused` with subject hash, no email |
-| Verified login with no (role, scope) pair: unlisted (allow-list), no mapped group or groups overage (AD), unmapped in production | 403 `forbidden` | `auth.not_permitted` | none created | audit `identity.sign_in_refused` (reason code, issuer key, sha256 of subject; never the email) |
-| Sign-out without matching `Sec-Fetch-Site` | 403 `forbidden` | `auth.not_permitted` | unchanged | log only |
-| Any other non-`public` write (not `GET`, `HEAD` or `OPTIONS`) with `Sec-Fetch-Site` present and neither `same-origin` nor `none` (section 6.1) | 403 `forbidden` | `error.forbidden` | unchanged | `authz.denied` reason `cross_site`; no audit row |
+| No cookie, unknown hash, expired, idle-expired or revoked session | 401 `unauthenticated` | `error.unauthenticated` | none | log only, reason code |
+| Callback with missing or mismatched `state`, `nonce` or transaction cookie; code exchange failed; `iss`/`aud` mismatch; email not verified | 401 `unauthenticated` | `error.unauthenticated` | none created | log reason code; audit `identity.sign_in_refused` with subject hash, no email |
+| Verified login with no (role, scope) pair: unlisted (allow-list), no mapped group or groups overage (AD), unmapped in production | 403 `forbidden` | `error.forbidden` | none created | audit `identity.sign_in_refused` (reason code, issuer key, sha256 of subject; never the email) |
+| Sign-out without `Sec-Fetch-Site` (a cross-site value is refused first, by the next row) | 403 `forbidden` | `error.forbidden` | unchanged | log only |
+| Any non-`public` write, sign-out included (not `GET`, `HEAD` or `OPTIONS`), with `Sec-Fetch-Site` present and neither `same-origin` nor `none` (section 6.1) | 403 `forbidden` | `error.forbidden` | unchanged | `authz.denied` reason `cross_site`; no audit row |
 | Fixture route in a non-fixture mode | 404 `not_found` | `error.not_found` | — | — |
 | `POST /auth/fixture/sign-in` with an unknown `fixtureUserId` | 404 `not_found` (W0-02 7.2) | `error.not_found`; the picker never offers an unknown id, so `auth.fixture_user_unknown` (section 12) is the SPA's message when a stale picker entry is refused | none | — |
 | Start-up misconfiguration (section 5) | process exits 78 before listening | — | — | log reason code; readiness `identity.ready=false` |

@@ -35,6 +35,13 @@ Every request runs the [W0-06 section 4](../../../../../docs/engineering/workflo
 
 Uploads run W0-08 section 4 checks 1-8 and 10 (session, scope, open draft, filename rule incl. the non-empty stem and the 200-code-point limit, per-file limit, empty file, magic sniff, sniffed kind versus extension, per-pack total) with the section 5 reason keys. The structural checks of W0-08 2.1, 2.2 and the PNG/JPEG rules (check 9) are the product sniffer's (W1-03, `server/src/artifacts/`) and are **not** reproduced: a file the substitute accepts may still be refused by the server.
 
+## Known drift from the server (rehearsal only, never evidence)
+
+- Approve checks only that `qcRunId` is a well-formed UUID. The server also refuses an approve when the version and lane have no lane-QC run (422 `lane_qc_not_run`) or when a newer run exists (409 `qc_run_superseded`). The substitute does neither.
+- The substitute keeps its own UUID check (`requireQcRunId` in `workflow.ts`) and its own undispositioned-finding predicate for Ready (`applyReadyIfHeld`). Neither is the server's code.
+
+Deleting the substitute is Ta's decision and is on the W3 hardening deferred list. Until then this drift is documented here and is not fixed.
+
 ## Files
 
 | File                                                                                               | Holds                                                                                                        |

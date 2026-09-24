@@ -22,6 +22,7 @@ import {
   type TestServerProcess,
 } from '../support/process.js';
 import { assertNoLeak } from '../support/log-capture.js';
+import { operatorUrlForTests } from '../support/db.js';
 
 const safe = { NODE_ENV: 'test', RAI_IDENTITY_MODE: 'fixture' };
 const origin = 'http://127.0.0.1:58819';
@@ -208,9 +209,7 @@ test(
     const baseURL = `http://127.0.0.1:${port}`;
     const options = realServerOptions(baseURL, env);
     const blocker = new pg.Client({ connectionString: env.DATABASE_MIGRATE_URL });
-    const observer = new pg.Client({ connectionString: env.DATABASE_OPERATOR_URL });
-    await blocker.connect();
-    await observer.connect();
+    const observer = new pg.Client({ connectionString: operatorUrlForTests(env) });
     const stopped = deferred();
     const events: string[] = [];
     const children: TestServerProcess[] = [];
@@ -238,6 +237,8 @@ test(
     let posting: Promise<Response> | undefined;
     let resetting: Promise<void> | undefined;
     try {
+      await blocker.connect();
+      await observer.connect();
       await lifecycle.reset();
       const caseId = findFixtureCase('fx-case-nonvendor')!.caseId;
       const login = await fetch(`${baseURL}/auth/fixture/sign-in`, {
@@ -297,11 +298,11 @@ test(
       assert.equal(restored.rows[0]?.submitted_at, null, 'original fixture draft restored after real submit');
       for (const child of children) assertNoLeak({ text: () => JSON.stringify(child.lines) });
     } finally {
-      await blocker.query('ROLLBACK');
+      // Ending the connection releases any row lock it holds; an open client would keep the test process alive.
+      await blocker.end();
       await posting?.catch(() => undefined);
       await resetting?.catch(() => undefined);
       await lifecycle.stop();
-      await blocker.end();
       await observer.end();
     }
   },
