@@ -180,7 +180,7 @@ None on authorization: W0–W3 remain the synthetic-data scope of D03; W4–W8 s
 
 The [delivery pack](docs/delivery/README.md) breaks G0, W0 and W1-W3 into decision briefs and assignable tickets; it does not change these packages.
 
-After the W3 engineering exit, most W2/W3 PRs (#90-#126) turned out to have merged without an independent review verdict. On Ta's instruction the [W3 hardening change](changes/2026-09-23-w3-hardening/review.md) reviewed them retroactively, fixed or deferred every confirmed finding, and simplified the code in reviewed batches. It changed no scope and no recorded decision.
+After the W3 engineering exit, most W2/W3 PRs (#90-#126) turned out to have merged without an independent review verdict. On Ta's instruction the [W3 hardening change](changes/2026-09-23-w3-hardening/review.md) reviewed them retroactively, fixed, deferred or (in one case, removing the performance harness guard) withdrawn every confirmed finding, and simplified the code in reviewed batches. It changed no scope and no recorded decision.
 
 ### W3 detail
 
@@ -193,4 +193,4 @@ After the W3 engineering exit, most W2/W3 PRs (#90-#126) turned out to have merg
 | Local identity | Automated fixture boundary verified | Manual Google loopback sign-in remains pending Ta |
 | W4–W8 | Not authorized | Separate package gates and D07–D10; operator rehearsal and production release remain future work |
 
-The W3 exit record retains failed/repaired checks, source identities and the PR120 premature-merge exception with subsequent verification. Every hardening PR merged only after two independent reviewer verdicts and green CI on the reviewed head, with one exception recorded in the hardening review. There is no scope change or authorization to continue into W4 here.
+The W3 exit record retains failed/repaired checks, source identities and the PR120 premature-merge exception with subsequent verification. Every hardening batch PR (H1-H29, #128-#156) merged only after two independent reviewer verdicts and green CI on the reviewed head, except #136, which got its second verdict after merge. The docs-only frame PR #127 merged with no reviewer verdict and before its CI finished (CI passed afterwards). Both exceptions are recorded in the hardening review. There is no scope change or authorization to continue into W4 here.

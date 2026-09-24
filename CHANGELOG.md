@@ -2,7 +2,7 @@
 
 ## 2026-09-25
 
-- W3 hardening (#127-#156): retro-review of the unreviewed W2/W3 PRs, with 71 confirmed findings fixed or deferred.
+- W3 hardening (#127-#156): retro-review of the unreviewed W2/W3 PRs, with 71 confirmed findings: 66 fixed, 4 deferred to Ta and 1 withdrawn.
   - Approve requires the latest lane-QC run.
   - QC fails closed on findings with no owning lane.
   - Ready uses decision-time scopes (migration 0008).

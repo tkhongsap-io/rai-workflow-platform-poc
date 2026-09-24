@@ -11,7 +11,7 @@ Most W2/W3 PRs, #90 to #126, merged without an independent review verdict. A dyn
 | Findings confirmed | 71 (5 high, 20 medium, 46 low) |
 | Findings refuted by the skeptic | 17 |
 | Fix batches | 23 planned (H1-H23), then H24 from the final verification and H25-H29 from the two walkthrough re-checks |
-| Deferred to the owner, with a reason (section 5) | 9 items from the retro-review, plus 3 questions from the walkthrough re-checks |
+| Deferred to the owner, with a reason (section 5) | 4 whole findings, issue #35, 4 leftover parts of closed findings, and 3 questions from the walkthrough re-checks (12 items) |
 
 The five high findings:
 
@@ -36,7 +36,7 @@ Each batch has its own record, `h<n>.md`, in this folder.
 
 | PR | Batch | Merge | Lines | Reviewer verdicts (in order posted) |
 |---|---|---|---|---|
-| #127 | Frame the change (docs) | `d815a8e` | +24/−0 | docs frame |
+| #127 | Frame the change (docs) | `d815a8e` | +24/−0 | none (section 4) |
 | #128 | H1 Retire the five promoted substitute twin specs | `d63adbb` | +74/−1777 | contract PASS, correctness PASS |
 | #134 | H2 Approve requires the latest lane-QC run; owed W0-06 §10 tests | `d10578d` | +498/−61 | contract PASS, correctness PASS |
 | #137 | H3 One derived case status; queue and SLA correctness | `1b4d49e` | +298/−189 | correctness PASS, contract PASS |
@@ -92,8 +92,8 @@ A separate workflow checked `origin/main` at `4522074` (after H23), each part in
 
 | Outcome | Count |
 |---|---|
-| Closed, with the code on `main` and the proving test or measurable change cited | 65 |
-| Deferred with a reason (section 5) | 5 |
+| Closed, with the code on `main` and the proving test or measurable change cited | 66 |
+| Deferred with a reason (section 5) | 4 |
 | Withdrawn: the H15 perf-harness guard, kept on purpose (section 4) | 1 |
 | Open | 0 |
 
@@ -159,6 +159,7 @@ Only wording fixes to the script followed. The agent also noted that the send-ba
 
 ## 4. Exceptions and incidents
 
+- **#127, the change frame, merged with no reviewer verdict and before its CI finished.** It is docs only: intent, spec and plan, written before any code as AGENTS.md requires. The lead merged it at 13:03:37Z, one second after its CI run started (run 35864480688). The run passed at 13:23:28Z. No independent reviewer read it before merge; the reviewers of every later batch read it as context.
 - **#136 (H14) merged with one reviewer.** The implementing agent stopped before opening its PR. The lead committed the work, rebased, reran the suite (172 real-server and 48 substitute browser tests at the time) and opened #136. One independent reviewer covered both lenses and passed it. A second, independent post-merge review (contract, simplicity and test integrity) on 2026-09-24 passed it, with 181 real-server and 48 substitute browser tests on `main` `4522074`, and is posted on #136. The gap is closed after the fact; it does not change the rule that two verdicts come before merge.
 - **H15's PR title overclaims.** #135 is titled "no machine-specific guards", but its second finding, removing the performance harness's port-54370 and `authorization` guard, was withdrawn by the lead. The guard is a safety control and stays. The title was not changed after merge; this record is the correction.
 - **H8 reviewer touched a foreign container.** A port collision on 54368 sent one H8 reviewer's DDL to `rai-w3-obs-api-postgres-1`, a stale synthetic database left by an earlier W3 session. No harm resulted: synthetic data only, and it was left consistent. Afterwards the lead stopped (did not remove) 13 stale containers, moved batch ports to 553xx with a free-port check, and made "never connect to, migrate or modify a Postgres container you did not start" a rule in every agent prompt.
@@ -170,6 +171,14 @@ Only wording fixes to the script followed. The agent also noted that the send-ba
 - **Merges by the lead.** Reviewer agents post comments, not GitHub approvals, and cannot merge their own flow's PRs. The lead merged each PR with `gh pr merge --squash --delete-branch` after checking both verdicts and CI on the exact head. GitHub kept the remote branches; the lead deleted the merged `codex/harden-h*` branches (23 on 2026-09-24, the rest on 2026-09-25).
 
 ## 5. Deferred for Ta (none decided here)
+
+Four of the 71 findings were deferred whole: items 2, 3, 4 and 9 (retro findings 61, 53, 39 and 57, numbered by their position in the retro's confirmed list, not GitHub numbers). Item 1 is the existing GitHub issue #35; the closed findings around it fail closed. Items 5-8 are parts left over from findings that were otherwise closed:
+- item 5, `scopedCases`, from retro finding 17;
+- item 6, the local-google readiness state, from H10;
+- item 7, the `BLOB_TMP_MAX_AGE_HOURS` minimum, from H11;
+- item 8, display names, from retro finding 46.
+
+Items 10-12 are questions from the walkthrough re-checks.
 
 1. **Issue #35: owning lane** for slot-5, slot-9, pack-level and QC-unavailable findings. Until it is decided, QC fails closed: such a run is recorded unavailable and no findings are stored (H7), and no lane is hard-coded (H9). See the [decision brief](issue-35-decision-brief.md).
 2. **QC evidence arriving after a send-back.** W0-06 ("without modifying the closed version") and W0-07 §3.4 ("closed but not Ready is not late; append proceeds") conflict. `main` follows the refusing reading: `loadOpenSubmittedTarget` throws `version_closed` once a successor draft exists, and no `qc_run` is written. Choosing a reading means either a code change or a W0-07 amendment.
