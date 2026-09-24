@@ -1,6 +1,7 @@
 // W1-07 (Lane B): holds the SessionInfo the API returned (W0-02 7.2) and nothing else. There is no role or scope
 // logic here: the shell shows the principal the server described, the list shows the rows the server returned,
-// and a 401 on any call clears the session so the router sends the viewer to the sign-in screen with `returnTo`.
+// and a 401 on any call outside the sign-in flow clears the session through the one handler registered on the API
+// client, so the router sends the viewer to the sign-in screen with `returnTo`.
 
 import {
   createContext,
@@ -13,7 +14,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { SessionInfo } from '@rai/shared/schemas/auth';
-import { ApiError, api } from '../api/client.js';
+import { api } from '../api/client.js';
 import { useLocale } from '../i18n/locale-provider.js';
 
 /** Why there is no session: first visit, the viewer signed out, or the server answered 401 during use. */
@@ -30,8 +31,6 @@ export interface SessionContextValue {
   signedIn: (session: SessionInfo) => void;
   /** Drops the local copy; the caller has already revoked the server session (`user`) or received a 401 (`revoked`). */
   signedOut: (reason: SignedOutReason) => void;
-  /** Re-reads GET /api/session. */
-  refresh: () => Promise<void>;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -50,14 +49,9 @@ export function SessionProvider({ children }: { children: ReactNode }): JSX.Elem
 
   const signedOut = useCallback((reason: SignedOutReason) => setState({ status: 'signed_out', reason }), []);
 
-  const refresh = useCallback(async () => {
-    try {
-      signedIn(await api.getSession());
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 401) signedOut('revoked');
-      else throw err;
-    }
-  }, [signedIn, signedOut]);
+  useEffect(() => {
+    api.setUnauthenticatedHandler(() => signedOut('revoked'));
+  }, [signedOut]);
 
   useEffect(() => {
     let cancelled = false;
@@ -76,8 +70,8 @@ export function SessionProvider({ children }: { children: ReactNode }): JSX.Elem
   }, [signedIn, signedOut]);
 
   const value = useMemo<SessionContextValue>(
-    () => ({ state, signedIn, signedOut, refresh }),
-    [state, signedIn, signedOut, refresh],
+    () => ({ state, signedIn, signedOut }),
+    [state, signedIn, signedOut],
   );
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

@@ -118,6 +118,41 @@ test('createCase sends the caller-minted Idempotency-Key and the JSON body; list
   assert.equal(calls[1]?.init?.method, 'POST');
 });
 
+test('a 401 during use calls the registered handler once; the session probe and the auth routes never do', async () => {
+  const unauthenticated = {
+    error: { code: 'unauthenticated', messageKey: 'error.unauthenticated', correlationId: 'c' },
+  };
+  const client = createApiClient(fetchAnswering(401, unauthenticated));
+  let calls = 0;
+  client.setUnauthenticatedHandler(() => {
+    calls += 1;
+  });
+  // A 401 here means "not signed in" to the sign-in flow itself; revoking on it would loop the sign-in page.
+  await assert.rejects(client.getSession(), ApiError);
+  await assert.rejects(client.getFixtureUsers(), ApiError);
+  await assert.rejects(client.fixtureSignIn({ fixtureUserId: 'fx-user-owner-cm' }), ApiError);
+  await assert.rejects(client.startSignIn({ returnTo: '/cases' }), ApiError);
+  await assert.rejects(client.signOut(), ApiError);
+  assert.equal(calls, 0);
+  // The caller still receives the error after the handler has run.
+  await assert.rejects(client.listCases(), (err: unknown) => err instanceof ApiError && err.status === 401);
+  assert.equal(calls, 1);
+  await assert.rejects(client.setSessionLocale({ locale: 'en' }), ApiError);
+  assert.equal(calls, 2);
+});
+
+test('a 403 does not call the unauthenticated handler', async () => {
+  const client = createApiClient(
+    fetchAnswering(403, { error: { code: 'forbidden', messageKey: 'error.forbidden', correlationId: 'c' } }),
+  );
+  let calls = 0;
+  client.setUnauthenticatedHandler(() => {
+    calls += 1;
+  });
+  await assert.rejects(client.getQueue(), ApiError);
+  assert.equal(calls, 0);
+});
+
 test('a 204 resolves to undefined', async () => {
   const client = createApiClient(fetchAnswering(204, null));
   assert.equal(await client.signOut(), undefined);

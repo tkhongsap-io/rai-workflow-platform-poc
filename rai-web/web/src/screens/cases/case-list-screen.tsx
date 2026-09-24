@@ -7,12 +7,12 @@
 import { useEffect, useState, type JSX } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { CASE_LIST_DEFAULTS, type CaseListResponse } from '@rai/shared/schemas/cases';
-import { ApiError, api } from '../../api/client.js';
+import { api } from '../../api/client.js';
 import { ErrorNotice } from '../../components/error-notice.js';
 import { StatusBadge } from '../../components/status-badge.js';
 import { formatDateTime } from '../../i18n/format.js';
 import { useLocale } from '../../i18n/locale-provider.js';
-import { useSession, useSignedInSession } from '../../session/session-provider.js';
+import { useSignedInSession } from '../../session/session-provider.js';
 import { ROUTES } from '../../routes.js';
 import { canCreateCase } from '../operator/desk-health.view-model.js';
 import { pageCount, scopeLineFor, toRowModel, type CaseRowModel } from './case-list.view-model.js';
@@ -82,7 +82,6 @@ function CaseCard({ row }: { row: CaseRowModel }): JSX.Element {
 export function CaseListScreen(): JSX.Element {
   const { t } = useLocale();
   const session = useSignedInSession();
-  const { signedOut } = useSession();
   const location = useLocation();
   const [params, setParams] = useSearchParams();
   const page = Math.max(1, Number(params.get('page') ?? CASE_LIST_DEFAULTS.page) || 1);
@@ -101,15 +100,12 @@ export function CaseListScreen(): JSX.Element {
         if (!cancelled) setResult({ key: requestKey, kind: 'loaded', response });
       })
       .catch((err: unknown) => {
-        if (cancelled) return;
-        if (err instanceof ApiError && err.status === 401)
-          signedOut('revoked'); // the router shows sign-in with returnTo
-        else setResult({ key: requestKey, kind: 'failed', error: err });
+        if (!cancelled) setResult({ key: requestKey, kind: 'failed', error: err });
       });
     return () => {
       cancelled = true;
     };
-  }, [page, requestKey, signedOut]);
+  }, [page, requestKey]);
 
   const scope = scopeLineFor(session.principal);
   const newCaseLink = canCreateCase(session) ? (

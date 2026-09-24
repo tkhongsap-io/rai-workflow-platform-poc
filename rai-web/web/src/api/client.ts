@@ -2,6 +2,7 @@
 // the section 7 shapes to whatever answers /api and /auth on the same origin: the real server (W1-INT) or, behind
 // the Vite proxy, the W1-13 substitute. It never decides access: every 401/403 arrives here as an ApiError carrying
 // the W0-06 8.2 envelope and the screens render what they were told (section 1.1 "the SPA never decides access").
+// A 401 outside the sign-in flow also calls the one handler the session provider registers.
 // W1-06 adds the case-flow calls: the pack draft (7.5), artifact upload as multipart with one `file` part and
 // artifact metadata (7.4), submit and version navigation (7.6).
 
@@ -161,7 +162,18 @@ export async function toApiError(response: Response): Promise<ApiError> {
   );
 }
 
+/** A 401 from these routes is the sign-in flow's own answer, not a session lost during use. */
+const SIGN_IN_FLOW_PATHS: ReadonlySet<string> = new Set([
+  API_PATHS.session,
+  API_PATHS.signIn,
+  API_PATHS.signOut,
+  API_PATHS.fixtureUsers,
+  API_PATHS.fixtureSignIn,
+]);
+
 export function createApiClient(fetchImpl: FetchLike = (input, init) => fetch(input, init)) {
+  let onUnauthenticated = (): void => undefined;
+
   async function request<T>(method: string, path: string, options: RequestOptions = {}): Promise<T> {
     const headers: Record<string, string> = { accept: 'application/json' };
     let body: BodyInit | undefined;
@@ -189,7 +201,11 @@ export function createApiClient(fetchImpl: FetchLike = (input, init) => fetch(in
     } catch (err) {
       throw new NetworkError(err);
     }
-    if (!response.ok) throw await toApiError(response);
+    if (!response.ok) {
+      const error = await toApiError(response);
+      if (error.status === 401 && !SIGN_IN_FLOW_PATHS.has(path)) onUnauthenticated();
+      throw error;
+    }
     if (response.status === 204) return undefined as T;
     try {
       return (await response.json()) as T;
@@ -199,6 +215,10 @@ export function createApiClient(fetchImpl: FetchLike = (input, init) => fetch(in
   }
 
   return {
+    /** Runs on every 401 outside the sign-in flow, before the caller receives the ApiError. */
+    setUnauthenticatedHandler: (handler: () => void): void => {
+      onUnauthenticated = handler;
+    },
     /** 200 SessionInfo, or throws ApiError 401 when there is no valid session (W0-02 7.2). */
     getSession: () => request<SessionInfo>('GET', API_PATHS.session),
     setSessionLocale: (body: SessionLocaleRequest) =>

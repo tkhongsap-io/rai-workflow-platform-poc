@@ -16,7 +16,6 @@ export interface LaneDecisionActionsProps {
   expectedVersion: ExpectedVersion;
   qcRunId: string | null;
   onDecided: (response: LaneDecisionResponse) => void;
-  onUnauthenticated: (err: unknown) => boolean;
 }
 
 export function LaneDecisionActions({
@@ -26,7 +25,6 @@ export function LaneDecisionActions({
   expectedVersion,
   qcRunId,
   onDecided,
-  onUnauthenticated,
 }: LaneDecisionActionsProps): JSX.Element {
   const { t } = useLocale();
   const [busy, setBusy] = useState<'idle' | 'approving' | 'sending'>('idle');
@@ -43,12 +41,12 @@ export function LaneDecisionActions({
         onDecided(response);
       })
       .catch((err: unknown) => {
-        if (!onUnauthenticated(err)) setDecisionError(err);
+        setDecisionError(err);
       })
       .finally(() => {
         setBusy('idle');
       });
-  }, [qcRunId, caseId, versionId, lane, expectedVersion, onDecided, onUnauthenticated]);
+  }, [qcRunId, caseId, versionId, lane, expectedVersion, onDecided]);
 
   const sendBack = useCallback(
     (feedback: SendBackFeedback): void => {
@@ -61,13 +59,13 @@ export function LaneDecisionActions({
           onDecided(response);
         })
         .catch((err: unknown) => {
-          if (!onUnauthenticated(err)) setDecisionError(err);
+          setDecisionError(err);
         })
         .finally(() => {
           setBusy('idle');
         });
     },
-    [caseId, versionId, lane, expectedVersion, onDecided, onUnauthenticated],
+    [caseId, versionId, lane, expectedVersion, onDecided],
   );
 
   return (

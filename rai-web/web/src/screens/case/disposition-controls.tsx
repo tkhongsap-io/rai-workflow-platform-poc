@@ -20,7 +20,6 @@ export interface DispositionControlsProps {
   view: CaseView;
   latestKind: DispositionKind | null;
   onRecorded: (response: DispositionResponse) => void;
-  onUnauthenticated: (err: unknown) => boolean;
 }
 
 export function DispositionControls({
@@ -31,7 +30,6 @@ export function DispositionControls({
   view,
   latestKind,
   onRecorded,
-  onUnauthenticated,
 }: DispositionControlsProps): JSX.Element | null {
   const { t } = useLocale();
   const kinds = dispositionKindsForActor({
@@ -64,7 +62,7 @@ export function DispositionControls({
         onRecorded(response);
       })
       .catch((err: unknown) => {
-        if (!onUnauthenticated(err)) setError(err);
+        setError(err);
       })
       .finally(() => {
         setBusy(false);

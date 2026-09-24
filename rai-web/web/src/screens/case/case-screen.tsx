@@ -1,8 +1,8 @@
 // The case screen: overview, version navigation, and the pack editor or a frozen version with its review
-// workspaces. Every API answer is rendered as received: a 401 drops the session, a 403 or 404 shows the envelope's
-// message key. No client rule decides access.
+// workspaces. Every API answer is rendered as received: a 403 or 404 shows the envelope's message key (a 401 drops
+// the session in the API client). No client rule decides access.
 
-import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
+import { useEffect, useRef, useState, type JSX } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import type { SessionInfo } from '@rai/shared/schemas/auth';
 import type { ArtifactRef } from '@rai/shared/schemas/artifacts';
@@ -10,11 +10,11 @@ import type { CaseView, ConfigurationView } from '@rai/shared/schemas/cases';
 import type { PackDraft, PackDraftUpdateRequest, SlotNumber, SlotState } from '@rai/shared/schemas/pack';
 import type { LaneDecisionResponse, DispositionResponse } from '@rai/shared/schemas/review';
 import type { SubmittedVersion, VersionSummary } from '@rai/shared/schemas/versions';
-import { ApiError, api } from '../../api/client.js';
+import { api } from '../../api/client.js';
 import { ErrorNotice } from '../../components/error-notice.js';
 import { useLocale } from '../../i18n/locale-provider.js';
 import { ROUTES } from '../../routes.js';
-import { useSession, useSignedInSession } from '../../session/session-provider.js';
+import { useSignedInSession } from '../../session/session-provider.js';
 import './case.css';
 import { CaseOverview } from './case-overview.js';
 import { PackEditor, type PendingSettings } from './pack-editor.js';
@@ -58,7 +58,6 @@ export function CaseScreen(): JSX.Element {
   const caseId = params.caseId ?? '';
   const versionId = params.versionId;
   const navigate = useNavigate();
-  const { signedOut } = useSession();
   const session = useSignedInSession();
 
   // Loading is derived: a result is current only when it was produced for the key of the current request, so
@@ -85,18 +84,6 @@ export function CaseScreen(): JSX.Element {
         ? versionResult.result
         : { kind: 'loading' };
 
-  /** A 401 during use: the session is gone; RequireSession then shows sign-in with `returnTo` (W0-02 7.2). */
-  const unauthenticated = useCallback(
-    (err: unknown): boolean => {
-      if (err instanceof ApiError && err.status === 401) {
-        signedOut('revoked');
-        return true;
-      }
-      return false;
-    },
-    [signedOut],
-  );
-
   // Load everything for the case; re-run on reload.
   useEffect(() => {
     let cancelled = false;
@@ -108,13 +95,12 @@ export function CaseScreen(): JSX.Element {
         setPendingSettings({});
       })
       .catch((err: unknown) => {
-        if (cancelled || unauthenticated(err)) return;
-        setLoadResult({ key: loadKey, result: { kind: 'error', error: err } });
+        if (!cancelled) setLoadResult({ key: loadKey, result: { kind: 'error', error: err } });
       });
     return () => {
       cancelled = true;
     };
-  }, [caseId, loadKey, unauthenticated]);
+  }, [caseId, loadKey]);
 
   // The selected frozen version, when the route names one.
   useEffect(() => {
@@ -126,13 +112,12 @@ export function CaseScreen(): JSX.Element {
         if (!cancelled) setVersionResult({ key: versionKey, result: { kind: 'ready', version } });
       })
       .catch((err: unknown) => {
-        if (cancelled || unauthenticated(err)) return;
-        setVersionResult({ key: versionKey, result: { kind: 'error', error: err } });
+        if (!cancelled) setVersionResult({ key: versionKey, result: { kind: 'error', error: err } });
       });
     return () => {
       cancelled = true;
     };
-  }, [caseId, versionId, versionKey, unauthenticated]);
+  }, [caseId, versionId, versionKey]);
 
   // Artifact metadata for every attached slot of the draft (frozen versions embed their references). An id
   // absent from the map renders as loading; the in-flight set keeps one request per id.
@@ -197,7 +182,7 @@ export function CaseScreen(): JSX.Element {
         setNotice({ key: 'pack.saved', params: { revision: saved.draftRevision } });
       })
       .catch((err: unknown) => {
-        if (!unauthenticated(err)) setEditorError(err);
+        setEditorError(err);
       })
       .finally(() => {
         setBusy('idle');
@@ -222,7 +207,7 @@ export function CaseScreen(): JSX.Element {
         void navigate(ROUTES.caseVersion(caseId, version.versionId));
       })
       .catch((err: unknown) => {
-        if (!unauthenticated(err)) setEditorError(err);
+        setEditorError(err);
       })
       .finally(() => {
         setBusy('idle');
@@ -275,7 +260,6 @@ export function CaseScreen(): JSX.Element {
       }}
       onLaneDecided={onLaneDecided}
       onDispositionRecorded={onDispositionRecorded}
-      onUnauthenticated={unauthenticated}
     />
   );
 }
@@ -301,7 +285,6 @@ interface BodyProps {
   onDismissError: () => void;
   onLaneDecided: (response: LaneDecisionResponse) => void;
   onDispositionRecorded: (response: DispositionResponse) => void;
-  onUnauthenticated: (err: unknown) => boolean;
 }
 
 /** A decision reloads the screen; focus moves to its outcome instead of dropping to <body>. */
@@ -415,7 +398,6 @@ function CaseScreenBody(props: BodyProps): JSX.Element {
                   session={props.session}
                   onDecided={props.onLaneDecided}
                   onDispositionRecorded={props.onDispositionRecorded}
-                  onUnauthenticated={props.onUnauthenticated}
                 />
               ))}
               <PackFrozen version={versionState.version} versions={state.versions} />
