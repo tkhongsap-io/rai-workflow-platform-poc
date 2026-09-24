@@ -11,7 +11,9 @@ import {
   uuid,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
+import type { RoleScope } from '@rai/shared/schemas/auth';
 import { packVersion } from './pack-version.js';
+import { qcRun } from './qc-run.js';
 
 export const LANE_DECISION_KINDS = ['approve', 'send_back'] as const;
 export const LANE_DECISION_LANES = ['ai_coe', 'dpo', 'it_security'] as const;
@@ -27,10 +29,12 @@ export const laneDecision = pgTable(
     decision: text('decision').notNull(),
     actorSubjectId: text('actor_subject_id').notNull(),
     actorRole: text('actor_role').notNull(),
+    /** The actor's RoleScope grants when deciding; Ready judges self-approval on these, not on later grants. */
+    actorScopes: jsonb('actor_scopes').$type<RoleScope[]>(),
     /** Send-back feedback JSON; NULL on approve. Shape: { items: [...], summary? }. */
     feedback: jsonb('feedback'),
     /** Approve: the latest lane-QC run the reviewer saw (W0-06 4.4), checked by approveLane. NULL on send_back. */
-    observedQcRunId: uuid('observed_qc_run_id'),
+    observedQcRunId: uuid('observed_qc_run_id').references((): AnyPgColumn => qcRun.id),
     decidedAt: timestamp('decided_at', { withTimezone: true }).notNull(),
     correlationId: text('correlation_id').notNull(),
     idempotencyKeyId: uuid('idempotency_key_id'),

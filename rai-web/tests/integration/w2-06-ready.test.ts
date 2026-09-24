@@ -31,7 +31,8 @@ import { createFixtureIdentityProvider } from '@rai/server/identity/fixture';
 import { createPgSessionStore } from '@rai/server/identity/session';
 import { laneOpenRecipientsFromIdentities } from '@rai/server/versions/open-lanes';
 import { sendBackRecipientsFromIdentities } from '@rai/server/workflow/send-back-notice';
-import type { ReadyKnownIdentity } from '@rai/server/workflow/ready';
+import { evaluateReadyPredicate } from '@rai/server/workflow/ready';
+import { readCaseRow } from '@rai/server/cases/repository';
 import { FIXTURE_USERS, findFixtureUser } from '@rai/fixtures/data/users';
 import { findFixtureCase } from '@rai/fixtures/data/cases/index';
 import { loadFixtures } from '@rai/fixtures/load';
@@ -76,9 +77,8 @@ let runner: ScriptedQcRunner;
 let clock = Date.parse('2026-09-22T07:00:00Z');
 const now = () => new Date(clock);
 
-async function rebuildApp(opts: { knownIdentities?: readonly ReadyKnownIdentity[] } = {}): Promise<void> {
+async function rebuildApp(): Promise<void> {
   if (app !== undefined) await app.close();
-  const knownForReady = opts.knownIdentities ?? FIXTURE_USERS;
   // Only the vendor case carries scripted defects; lane QC on every other case is clean.
   runner = new ScriptedQcRunner({
     fixtureCaseIdOf: (version) => (version.caseId === VENDOR.caseId ? VENDOR.fixtureCaseId : undefined),
@@ -123,13 +123,11 @@ async function rebuildApp(opts: { knownIdentities?: readonly ReadyKnownIdentity[
       db: db.app,
       now,
       sendBackRecipientsForOwner: ownerRecipients,
-      knownIdentities: knownForReady,
     },
     findings: {
       db: db.app,
       now,
       readyRecipientsForOwner: ownerRecipients,
-      knownIdentities: knownForReady,
       qc: { runner, now },
     },
   });
@@ -625,59 +623,96 @@ describe(`W2-06 Ready predicate — ${SET}`, () => {
     assert.equal(state.readyAudits.length, 0);
   });
 
-  it('a BU SPOC approval inserted by SQL (simulated policy bug) blocks Ready even with two real lane approvals', async () => {
+  for (const variant of [
+    {
+      name: 'with the SPOC grants it was decided under',
+      role: 'dpo',
+      scopes: findFixtureUser(SPOC_CM)!.roles,
+    },
+    { name: 'without a scopes snapshot, recording a bu_spoc role', role: 'bu_spoc', scopes: null },
+  ]) {
+    it(`a BU SPOC approval inserted by SQL (simulated policy bug) ${variant.name} blocks Ready`, async () => {
+      const owner = await signIn(OWNER_A);
+      const version = await submitOk(owner, NONVENDOR.caseId);
+      const revision = await caseRevision(NONVENDOR.caseId);
+      const dpoRunId = await laneQcRunId(
+        await signIn(DPO),
+        NONVENDOR.caseId,
+        version.versionId,
+        'dpo',
+        revision,
+      );
+
+      // Simulated policy bug: CM BU SPOC recorded as the DPO lane approver.
+      await db.owner.execute(sql`
+        INSERT INTO lane_decision (
+          id, version_id, lane, decision, actor_subject_id, actor_role, actor_scopes,
+          feedback, observed_qc_run_id, decided_at, correlation_id
+        ) VALUES (
+          ${randomUUID()}::uuid, ${version.versionId}::uuid, 'dpo', 'approve',
+          ${subjectOf(SPOC_CM)}, ${variant.role},
+          ${variant.scopes === null ? null : JSON.stringify(variant.scopes)}::jsonb,
+          NULL, ${dpoRunId}::uuid, ${now()}, ${randomUUID()}
+        )
+      `);
+
+      const ai = await signIn(AI_COE);
+      const it = await signIn(IT_SEC);
+      const a1 = await approve(ai, NONVENDOR.caseId, version.versionId, 'ai_coe', revision);
+      assert.equal(a1.statusCode, 201, a1.body);
+      assert.equal(a1.json<LaneDecisionResponse>().ready, false);
+      const a2 = await approve(it, NONVENDOR.caseId, version.versionId, 'it_security', revision);
+      assert.equal(a2.statusCode, 201, a2.body);
+      assert.equal(a2.json<LaneDecisionResponse>().ready, false);
+
+      const state = await readyState(NONVENDOR.caseId, version.versionId);
+      assert.equal(state.version.ready_at, null);
+      assert.equal(state.caseRow.desk_status, 'in_review');
+      assert.equal(state.readyAudits.length, 0);
+      const evaluation = await db.app.transaction(async (tx) =>
+        evaluateReadyPredicate(tx, (await readCaseRow(tx, NONVENDOR.caseId))!, version.versionId),
+      );
+      assert.deepEqual(evaluation, {
+        ready: false,
+        missingApprovals: [],
+        undispositionedFindingIds: [],
+        selfApprovedLanes: ['dpo'],
+      });
+    });
+  }
+
+  it("an approver's later grant change does not strand Ready: the decision-time scopes count", async () => {
     const owner = await signIn(OWNER_A);
     const version = await submitOk(owner, NONVENDOR.caseId);
     const revision = await caseRevision(NONVENDOR.caseId);
-    const dpoRunId = await laneQcRunId(
-      await signIn(DPO),
-      NONVENDOR.caseId,
-      version.versionId,
-      'dpo',
-      revision,
+    const dpo = await approve(await signIn(DPO), NONVENDOR.caseId, version.versionId, 'dpo', revision);
+    assert.equal(dpo.statusCode, 201, dpo.body);
+    const stored = await db.owner.execute(
+      sql`SELECT actor_scopes FROM lane_decision WHERE version_id = ${version.versionId} AND lane = 'dpo'`,
     );
+    assert.deepEqual(stored.rows, [{ actor_scopes: findFixtureUser(DPO)!.roles }]);
 
-    // Simulated policy bug: CM BU SPOC recorded as the DPO lane approver.
+    // After approving, the DPO reviewer also becomes BU SPOC of the case's BU (a routine grant sync).
     await db.owner.execute(sql`
-      INSERT INTO lane_decision (
-        id, version_id, lane, decision, actor_subject_id, actor_role,
-        feedback, observed_qc_run_id, decided_at, correlation_id
-      ) VALUES (
-        ${randomUUID()}::uuid, ${version.versionId}::uuid, 'dpo', 'approve',
-        ${subjectOf(SPOC_CM)}, 'dpo', NULL, ${dpoRunId}::uuid,
-        ${now()}, ${randomUUID()}
-      )
+      UPDATE session
+      SET principal = jsonb_set(principal, '{roles}', principal->'roles' || ${JSON.stringify(
+        findFixtureUser(SPOC_CM)!.roles,
+      )}::jsonb)
+      WHERE subject_id = ${subjectOf(DPO)}
     `);
 
-    const ai = await signIn(AI_COE);
-    const it = await signIn(IT_SEC);
-    const a1 = await approve(ai, NONVENDOR.caseId, version.versionId, 'ai_coe', revision);
-    assert.equal(a1.statusCode, 201, a1.body);
-    assert.equal(a1.json<LaneDecisionResponse>().ready, false);
-    const a2 = await approve(it, NONVENDOR.caseId, version.versionId, 'it_security', revision);
-    assert.equal(a2.statusCode, 201, a2.body);
-    assert.equal(a2.json<LaneDecisionResponse>().ready, false);
-
-    const state = await readyState(NONVENDOR.caseId, version.versionId);
-    assert.equal(state.version.ready_at, null);
-    assert.equal(state.caseRow.desk_status, 'in_review');
-    assert.equal(state.readyAudits.length, 0);
-  });
-
-  it('empty knownIdentities (local-google shape) still sets Ready when lane reviewers have sessions', async () => {
-    await rebuildApp({ knownIdentities: [] });
-
-    const owner = await signIn(OWNER_A);
-    const version = await submitOk(owner, NONVENDOR.caseId);
-    const revision = await caseRevision(NONVENDOR.caseId);
-    // Sign-ins create session.principal rows used when the known list is empty.
-    const last = await approveAllThree(NONVENDOR.caseId, version.versionId, revision);
-    assert.equal(last.ready, true);
-
-    const state = await readyState(NONVENDOR.caseId, version.versionId);
-    assert.ok(state.version.ready_at != null);
-    assert.equal(state.caseRow.desk_status, 'ready');
-    assert.equal(state.readyAudits.length, 1);
+    const ai = await approve(await signIn(AI_COE), NONVENDOR.caseId, version.versionId, 'ai_coe', revision);
+    assert.equal(ai.statusCode, 201, ai.body);
+    const it = await approve(
+      await signIn(IT_SEC),
+      NONVENDOR.caseId,
+      version.versionId,
+      'it_security',
+      revision,
+    );
+    assert.equal(it.statusCode, 201, it.body);
+    assert.equal(it.json<LaneDecisionResponse>().ready, true);
+    assert.ok((await readyState(NONVENDOR.caseId, version.versionId)).version.ready_at != null);
   });
 
   it('upload on a Ready case is 409 version_closed, not no_open_draft', async () => {

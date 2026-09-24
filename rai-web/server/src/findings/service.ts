@@ -13,13 +13,12 @@ import { readVersionRow, type CaseRow, type PackVersionRow } from '../cases/repo
 import { staleDetails } from '../cases/service.js';
 import type { Db } from '../db/client.js';
 import { withWorkflowTransaction, type WorkflowResult } from '../versions/transaction.js';
-import { nextMonotonicStamp } from '../workflow/monotonic-stamp.js';
-import { applyReadyIfHeld, type ReadyKnownIdentity, type ReadyTrigger } from '../workflow/ready.js';
+import { applyReadyIfHeld, type ReadyTrigger } from '../workflow/ready.js';
 import { isUuid } from '../versions/repository.js';
 import {
   findLatestSubmittedVersionId,
   insertDisposition,
-  latestDispositionKind,
+  latestDisposition,
   readFindingForCase,
 } from './repository.js';
 
@@ -28,8 +27,6 @@ export interface DispositionServiceDeps {
   now?: () => Date;
   /** Owner email(s) for ready notices; resolved from identity data in start.ts / tests. */
   readyRecipientsForOwner?: (ownerSubjectId: string) => readonly string[];
-  /** Known identities for Ready §6 condition 4 (same list as decide notices). */
-  knownIdentities?: readonly ReadyKnownIdentity[];
 }
 
 export interface ActionContext {
@@ -89,7 +86,7 @@ export async function recordDisposition(
   request: DispositionRequest,
   idempotencyKey: string,
 ): Promise<WorkflowResult<DispositionResponse>> {
-  const stamp = nextMonotonicStamp(deps.now ?? (() => new Date()));
+  const clock = deps.now ?? (() => new Date());
   if (request.expectedVersion.versionId !== undefined && !isUuid(request.expectedVersion.versionId)) {
     throw new NotFoundError('version');
   }
@@ -106,7 +103,7 @@ export async function recordDisposition(
       action: DISPOSITION_ACTION,
       idempotencyKey,
       requestDigest: requestDigest(DISPOSITION_ACTION, { ...request, findingId }),
-      now: stamp,
+      now: clock(),
     },
     {
       async apply({ tx, caseRow: before, audit }) {
@@ -158,15 +155,16 @@ export async function recordDisposition(
           );
         }
 
-        if (request.kind === 'fixed_confirmed') {
-          const latest = await latestDispositionKind(tx, finding.id);
-          if (latest !== 'fixed_proposed') {
-            throw new InvalidInputError([
-              { path: 'body.kind', messageKey: 'error.invalid_input.fixed_confirmed_without_proposal' },
-            ]);
-          }
+        const latest = await latestDisposition(tx, finding.id);
+        if (request.kind === 'fixed_confirmed' && latest?.kind !== 'fixed_proposed') {
+          throw new InvalidInputError([
+            { path: 'body.kind', messageKey: 'error.invalid_input.fixed_confirmed_without_proposal' },
+          ]);
         }
 
+        // Minted under the case lock and after the finding's latest event, so "latest" follows commit order
+        // even with a frozen clock or a second instance whose clock lags.
+        const stamp = new Date(Math.max(clock().getTime(), (latest?.createdAt.getTime() ?? -Infinity) + 1));
         const dispositionId = uuidv7(stamp.getTime());
         const evidenceRef =
           request.evidence === undefined
@@ -214,7 +212,6 @@ export async function recordDisposition(
           correlationId: ctx.correlationId,
           occurredAt: stamp,
           recipients,
-          knownIdentities: deps.knownIdentities ?? [],
         });
 
         const body: DispositionResponse = {

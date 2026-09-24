@@ -3,6 +3,7 @@
 import { and, eq } from 'drizzle-orm';
 import { uuidv7 } from '@rai/shared/ids';
 import type { Lane } from '@rai/shared/constants';
+import type { RoleScope } from '@rai/shared/schemas/auth';
 import type { SendBackFeedback } from '@rai/shared/schemas/review';
 import type { CaseRow, PackVersionRow } from '../cases/repository.js';
 import { deskStatusFor } from '../cases/status.js';
@@ -34,6 +35,7 @@ export interface InsertDecisionInput {
   decision: 'approve' | 'send_back';
   actorSubjectId: string;
   actorRole: string;
+  actorScopes: RoleScope[];
   feedback: SendBackFeedback | null;
   observedQcRunId: string | null;
   decidedAt: Date;
@@ -48,6 +50,7 @@ export async function insertLaneDecision(tx: Tx, input: InsertDecisionInput): Pr
     decision: input.decision,
     actorSubjectId: input.actorSubjectId,
     actorRole: input.actorRole,
+    actorScopes: input.actorScopes,
     feedback: input.feedback,
     observedQcRunId: input.observedQcRunId,
     decidedAt: input.decidedAt,

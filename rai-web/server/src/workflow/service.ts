@@ -29,7 +29,7 @@ import {
   writeLaneProjection,
 } from './repository.js';
 import { insertSendBackNotifications } from './send-back-notice.js';
-import { applyReadyIfHeld, type ReadyKnownIdentity } from './ready.js';
+import { applyReadyIfHeld } from './ready.js';
 import { withWorkflowTransaction, type WorkflowResult } from '../versions/transaction.js';
 import { isUuid } from '../versions/repository.js';
 
@@ -38,11 +38,6 @@ export interface DecideServiceDeps {
   now?: () => Date;
   /** Owner email(s) for send_back and ready notices; resolved from identity data in start.ts / tests. */
   sendBackRecipientsForOwner?: (ownerSubjectId: string) => readonly string[];
-  /**
-   * Known identities (fixture list in slice 1) for Ready §6 condition 4: resolve each approver's grants.
-   * Same list start.ts already injects for notices; do not build a separate directory.
-   */
-  knownIdentities?: readonly ReadyKnownIdentity[];
 }
 
 export interface ActionContext {
@@ -288,6 +283,7 @@ export async function approveLane(
           decision: 'approve',
           actorSubjectId: ctx.actor.subjectId,
           actorRole: ctx.role,
+          actorScopes: ctx.actor.roles,
           feedback: null,
           observedQcRunId: qcRunId,
           decidedAt: now,
@@ -316,7 +312,6 @@ export async function approveLane(
           correlationId: ctx.correlationId,
           occurredAt: now,
           recipients,
-          knownIdentities: deps.knownIdentities ?? [],
         });
         const body = responseOf(
           decisionId,
@@ -378,6 +373,7 @@ export async function sendBackLane(
           decision: 'send_back',
           actorSubjectId: ctx.actor.subjectId,
           actorRole: ctx.role,
+          actorScopes: ctx.actor.roles,
           feedback,
           observedQcRunId: null,
           decidedAt: now,

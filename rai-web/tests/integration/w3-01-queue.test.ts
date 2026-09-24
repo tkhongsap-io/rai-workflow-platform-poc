@@ -112,9 +112,8 @@ async function rebuildApp(): Promise<void> {
       now,
       sendBackRecipientsForOwner: (ownerSubjectId) =>
         sendBackRecipientsFromIdentities(FIXTURE_USERS, ownerSubjectId),
-      knownIdentities: FIXTURE_USERS,
     },
-    findings: { db: db.app, now, knownIdentities: FIXTURE_USERS },
+    findings: { db: db.app, now },
   });
   app = built.fastify;
   await app.ready();
