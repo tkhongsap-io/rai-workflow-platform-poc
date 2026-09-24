@@ -33,7 +33,8 @@ import { FIXTURE_CASES, findFixtureCase } from '@rai/fixtures/data/cases/index';
 import { loadFixtures } from '@rai/fixtures/load';
 import { fixtureSetLabel, readManifest } from '@rai/fixtures/manifest';
 import { ScriptedQcRunner } from '@rai/fixtures/substitutes/qc/index';
-import type { QcRunner, VersionRef } from '@rai/shared/qc/types';
+import type { QcRunRequest, QcRunResult, QcRunner, VersionRef } from '@rai/shared/qc/types';
+import { findingKeyOf } from '@rai/shared/qc/validate';
 import { runAndPersistLaneQc, runAndPersistSubmitQc } from '@rai/server/qc/orchestrator';
 import { computeReadiness } from '@rai/server/observability/health';
 import { createStoreProbes } from '@rai/server/observability/probes';
@@ -263,6 +264,36 @@ function dispose(
     },
     payload: body as object,
   });
+}
+
+/** A completed run with one PACK-SLOT-MISSING finding; the slot/lane pair decides whether it validates. */
+function slotMissingResult(
+  request: QcRunRequest,
+  slot: 1 | 2 | 5,
+  owningLane: 'ai_coe' | 'dpo',
+): QcRunResult {
+  const scope = { kind: 'slot', slot } as const;
+  return {
+    status: 'completed',
+    rulesEvaluated: ['PACK-SLOT-MISSING'],
+    findings: [
+      {
+        findingKey: findingKeyOf('PACK-SLOT-MISSING', scope),
+        ruleId: 'PACK-SLOT-MISSING',
+        ruleRevision: request.qcRulesRevision,
+        trigger: request.trigger,
+        scope,
+        severity: 'medium',
+        owningLane,
+        evidence: [{ artifactId: null, contentHash: null, slot, locator: { kind: 'absent' } }],
+        measure: null,
+        message: { key: 'qc.finding.slot_missing', params: { slot } },
+        provenance: { runner: 'finding-probe', runnerVersion: '1' },
+      },
+    ],
+    startedAt: now().toISOString(),
+    finishedAt: now().toISOString(),
+  };
 }
 
 describe(`W2-05 findings and dispositions — ${SET}`, () => {
@@ -959,6 +990,150 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
     assert.deepEqual(
       (runs.rows as Array<{ status: string }>).map((r) => r.status),
       ['unavailable', 'completed'],
+    );
+  });
+
+  it('only an unbound runner replays an unbound unavailable run; a completed run replays for any runner', async () => {
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, VENDOR.caseId);
+    const input = {
+      caseId: VENDOR.caseId,
+      versionId: version.versionId,
+      lane: 'ai_coe' as const,
+      correlationId: randomUUID(),
+    };
+    const unbound = { db: db.app, now };
+    const timingOut: QcRunner = {
+      identity: { runner: 'timeout-probe', runnerVersion: '1' },
+      run: () =>
+        Promise.resolve({
+          status: 'unavailable',
+          reason: 'timeout',
+          detail: null,
+          startedAt: now().toISOString(),
+          finishedAt: now().toISOString(),
+        }),
+    };
+
+    const first = await runAndPersistLaneQc(unbound, input);
+    assert.equal(first.status === 'unavailable' && first.reason, 'not_configured');
+    assert.deepEqual(await runAndPersistLaneQc(unbound, input), first);
+    const timedOut = await runAndPersistLaneQc({ ...unbound, runner: timingOut }, input);
+    assert.equal(timedOut.status === 'unavailable' && timedOut.reason, 'timeout');
+    const again = await runAndPersistLaneQc(unbound, input);
+    assert.equal(again.status === 'unavailable' && again.reason, 'not_configured');
+    assert.notEqual(again.runId, first.runId);
+    const completed = await runAndPersistLaneQc({ ...unbound, runner }, input);
+    assert.equal(completed.status, 'completed');
+    const replayed = await runAndPersistLaneQc(unbound, input);
+    assert.deepEqual([replayed.status, replayed.runId], ['completed', completed.runId]);
+
+    const runs = await db.owner.execute(sql`
+      SELECT id, engine_id, unavailable_reason FROM qc_run
+      WHERE version_id = ${version.versionId} ORDER BY completed_at ASC, id ASC
+    `);
+    assert.deepEqual(runs.rows, [
+      { id: first.runId, engine_id: 'unbound', unavailable_reason: 'not_configured' },
+      { id: timedOut.runId, engine_id: 'timeout-probe', unavailable_reason: 'timeout' },
+      { id: again.runId, engine_id: 'unbound', unavailable_reason: 'not_configured' },
+      { id: completed.runId, engine_id: runner.identity.runner, unavailable_reason: null },
+    ]);
+  });
+
+  it('a slot-5 or lane-mismatched runner finding records the run unavailable runner_error with no findings', async () => {
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, VENDOR.caseId);
+    const cases = [
+      { lane: 'ai_coe', slot: 5, owningLane: 'ai_coe', stored: false }, // slot 5: owning lane pending (#35)
+      { lane: 'ai_coe', slot: 1, owningLane: 'dpo', stored: false }, // slot 1 belongs to ai_coe
+      { lane: 'dpo', slot: 2, owningLane: 'dpo', stored: true }, // control: the same finding shape is valid
+    ] as const;
+    for (const { lane, slot, owningLane, stored } of cases) {
+      const probe: QcRunner = {
+        identity: { runner: 'finding-probe', runnerVersion: '1' },
+        run: (request) => Promise.resolve(slotMissingResult(request, slot, owningLane)),
+      };
+      const outcome = await runAndPersistLaneQc(
+        { db: db.app, runner: probe, now, ...diagnostics },
+        { caseId: VENDOR.caseId, versionId: version.versionId, lane, correlationId: randomUUID() },
+      );
+      const run = await db.owner.execute(
+        sql`SELECT status, unavailable_reason FROM qc_run WHERE id = ${outcome.runId}`,
+      );
+      const findings = await db.owner.execute(sql`SELECT id FROM qc_finding WHERE run_id = ${outcome.runId}`);
+      if (stored) {
+        assert.equal(outcome.status, 'completed');
+        assert.equal(findings.rows.length, 1);
+        continue;
+      }
+      assert.deepEqual(outcome, {
+        status: 'unavailable',
+        reason: 'runner_error',
+        runId: outcome.runId,
+        findings: [],
+      });
+      assert.deepEqual(run.rows, [{ status: 'unavailable', unavailable_reason: 'runner_error' }]);
+      assert.equal(findings.rows.length, 0);
+      const settled = capture
+        .lines()
+        .filter(
+          (line) =>
+            line.fields?.qcRunId === outcome.runId &&
+            (line.event === 'qc.run.unavailable' || line.event === 'qc.run.completed'),
+        );
+      assert.deepEqual(
+        settled.map((line) => [line.event, line.fields?.reason]),
+        [['qc.run.unavailable', 'runner_error']],
+      );
+    }
+  });
+
+  it('an invalid finding that arrives after Ready is recorded late as unavailable with no refused findings', async () => {
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, VENDOR.caseId);
+    let enter!: () => void;
+    let release!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      enter = resolve;
+    });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const correlationId = randomUUID();
+    const pending = runAndPersistLaneQc(
+      {
+        db: db.app,
+        now,
+        ...diagnostics,
+        runner: {
+          identity: { runner: 'finding-probe', runnerVersion: '1' },
+          async run(request) {
+            enter();
+            await gate;
+            return slotMissingResult(request, 5, 'ai_coe'); // slot 5: owning lane pending (#35)
+          },
+        },
+      },
+      { caseId: VENDOR.caseId, versionId: version.versionId, lane: 'ai_coe', correlationId },
+    );
+    const rejected = assert.rejects(pending, { code: 'stale_version' });
+    await entered;
+    try {
+      await db.owner.execute(sql`UPDATE pack_version SET ready_at=now() WHERE id=${version.versionId}`);
+    } finally {
+      release();
+    }
+    await rejected;
+    const late = await db.owner.execute(
+      sql`SELECT status, refused_finding_count FROM qc_late_result WHERE version_id=${version.versionId}`,
+    );
+    assert.deepEqual(late.rows, [{ status: 'unavailable', refused_finding_count: 0 }]);
+    const logged = capture
+      .lines()
+      .filter((line) => line.event === 'qc.run.late' && line.correlationId === correlationId);
+    assert.deepEqual(
+      logged.map((line) => [line.fields?.status, line.fields?.refusedFindingCount]),
+      [['unavailable', 0]],
     );
   });
 
