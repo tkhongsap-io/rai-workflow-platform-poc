@@ -4,33 +4,17 @@
 // appends; unavailable stores qc_run status=unavailable with zero findings. #35 stays open (slot-5 / pack /
 // unavailable owning lane blocked until §7.3). Ready is W2-06. Fixture set slice1-synthetic@1.
 
-import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import { createLogCapture, assertNoLeak, type LogCapture } from '../support/log-capture.js';
+import { assertNoLeak } from '../support/log-capture.js';
 import { sql } from 'drizzle-orm';
-import type { FastifyInstance } from 'fastify';
 import { StaleVersionError, type ErrorResponse } from '@rai/shared/errors';
 import type { DispositionResponse, LaneQcRunResponse } from '@rai/shared/schemas/review';
 import type { PackDraft } from '@rai/shared/schemas/pack';
-import type { SubmitRequest, SubmittedVersion } from '@rai/shared/schemas/versions';
-import { buildApp } from '../support/observed-app.js';
-import { createFilesystemBlobStore, type FilesystemBlobStore } from '@rai/server/artifacts/blob-store';
-import { createScopeFactsSource } from '@rai/server/authz/facts';
-import { businessUnitsFromGrants, createBusinessUnitDirectory } from '@rai/server/cases/business-units';
-import { createSubjectDirectory } from '@rai/server/cases/subject-directory';
-import { UPLOAD_LIMIT_DEFAULTS } from '@rai/server/config';
-import { createIdentityAdapter } from '@rai/server/identity/adapter';
-import { createFixtureIdentityProvider } from '@rai/server/identity/fixture';
-import { createPgSessionStore } from '@rai/server/identity/session';
-import { laneOpenRecipientsFromIdentities } from '@rai/server/versions/open-lanes';
-import { sendBackRecipientsFromIdentities } from '@rai/server/workflow/send-back-notice';
+import type { SubmittedVersion } from '@rai/shared/schemas/versions';
 import { FIXTURE_USERS, findFixtureUser } from '@rai/fixtures/data/users';
 import { FIXTURE_CASES, findFixtureCase } from '@rai/fixtures/data/cases/index';
-import { loadFixtures } from '@rai/fixtures/load';
 import { fixtureSetLabel, readManifest } from '@rai/fixtures/manifest';
 import { ScriptedQcRunner } from '@rai/fixtures/substitutes/qc/index';
 import type { QcRunRequest, QcRunResult, QcRunner, VersionRef } from '@rai/shared/qc/types';
@@ -38,20 +22,21 @@ import { findingKeyOf } from '@rai/shared/qc/validate';
 import { runAndPersistLaneQc, runAndPersistSubmitQc } from '@rai/server/qc/orchestrator';
 import { createDb } from '@rai/server/db/client';
 import { recordDisposition } from '@rai/server/findings/service';
-import { computeReadiness } from '@rai/server/observability/health';
-import { createStoreProbes } from '@rai/server/observability/probes';
 import type { DeskHealthReport } from '@rai/shared/schemas/observability';
-import { openTestDatabase, type TestDatabase } from '../support/db.js';
-import { asUser, signInAsFixture, type FixtureSession } from '../support/sign-in.js';
+import {
+  app,
+  capture,
+  caseRevision,
+  db,
+  diagnostics,
+  openFixtureApp,
+  rebuildApp,
+  signIn,
+  submit,
+} from '../support/fixture-app.js';
+import { asUser, type FixtureSession } from '../support/sign-in.js';
 
 const SET = fixtureSetLabel(readManifest());
-const publicBaseUrl = new URL('http://127.0.0.1:8787');
-const LIMITS = {
-  maxFileBytes: UPLOAD_LIMIT_DEFAULTS.UPLOAD_MAX_FILE_BYTES,
-  maxPackBytes: UPLOAD_LIMIT_DEFAULTS.UPLOAD_MAX_PACK_BYTES,
-  maxImagePixels: UPLOAD_LIMIT_DEFAULTS.UPLOAD_MAX_IMAGE_PIXELS,
-};
-const LANE_OPEN_RECIPIENTS = laneOpenRecipientsFromIdentities(FIXTURE_USERS);
 
 const OWNER_A = 'fx-user-owner-cm';
 const DPO = 'fx-user-dpo';
@@ -63,169 +48,40 @@ const VENDOR = findFixtureCase('fx-case-vendor')!;
 
 const fixtureCaseIdByRowId = new Map(FIXTURE_CASES.map((c) => [c.caseId, c.fixtureCaseId]));
 
-let db: TestDatabase;
-let app: FastifyInstance;
-let diagnostics: Pick<ReturnType<typeof buildApp>, 'emitter' | 'errors'>;
-let store: FilesystemBlobStore;
-let blobDir: string;
-let outputDir: string;
 let runner: ScriptedQcRunner;
-let capture: LogCapture;
-let clock = Date.parse('2026-09-22T06:00:00Z');
+const START = Date.parse('2026-09-22T06:01:00Z');
+let clock = START;
 const now = () => new Date(clock);
-
-async function rebuildApp(runnerOverride?: QcRunner): Promise<void> {
-  if (app !== undefined) await app.close();
-  runner = new ScriptedQcRunner({
-    fixtureCaseIdOf: (version: VersionRef) => fixtureCaseIdByRowId.get(version.caseId),
-    now,
-  });
-  const adapter = createIdentityAdapter({
-    env: { RAI_IDENTITY_MODE: 'fixture', RAI_SESSION_ABSOLUTE_HOURS: '12', RAI_SESSION_IDLE_MINUTES: '120' },
-    nodeEnv: 'test',
-    discovery: () => Promise.reject(new Error('never called in fixture mode')),
-    groupMappingSource: () => Promise.resolve(null),
-    fixtureUsers: FIXTURE_USERS,
-    now,
-  });
-  await adapter.start({ host: '127.0.0.1', port: 8787, publicBaseUrl, trustProxy: false });
-  capture = createLogCapture();
-  const logStream = capture.stream;
-  const built = buildApp({
-    config: { nodeEnv: 'test', log: { level: 'info', pretty: false }, trustProxy: false, publicBaseUrl },
-    logStream,
-    observability: {
-      db: db.app,
-      readiness: () =>
-        computeReadiness(
-          {
-            identity: () => adapter.health(),
-            loopbackBind: true,
-            mailKind: 'memory',
-            qcKind: 'substitute',
-            build: { commit: 'dev', schemaVersion: '8' },
-          },
-          {
-            ...createStoreProbes(db.urls.app, blobDir),
-            mailSink: () => Promise.resolve('ok'),
-            qc: () => runner.probe(),
-          },
-        ),
-    },
-    identity: {
-      adapter,
-      sessionStore: createPgSessionStore(db.app),
-      facts: createScopeFactsSource(db.app),
-      fixtureProvider: createFixtureIdentityProvider(FIXTURE_USERS),
+beforeEach(() => {
+  clock = START;
+});
+openFixtureApp({
+  now,
+  qcRunner: () =>
+    (runner = new ScriptedQcRunner({
+      fixtureCaseIdOf: (version: VersionRef) => fixtureCaseIdByRowId.get(version.caseId),
       now,
-    },
-    cases: {
-      db: db.app,
-      businessUnits: createBusinessUnitDirectory(
-        businessUnitsFromGrants(FIXTURE_USERS.flatMap((u) => [...u.roles])),
-      ),
-      subjects: createSubjectDirectory(db.app, { known: FIXTURE_USERS }),
-      now,
-    },
-    artifacts: { store, db: db.app, limits: LIMITS },
-    pack: { db: db.app, limits: { maxPackBytes: LIMITS.maxPackBytes }, now },
-    versions: { db: db.app, now, laneOpenRecipients: LANE_OPEN_RECIPIENTS },
-    decide: {
-      db: db.app,
-      now,
-      sendBackRecipientsForOwner: (ownerSubjectId) =>
-        sendBackRecipientsFromIdentities(FIXTURE_USERS, ownerSubjectId),
-    },
-    findings: {
-      db: db.app,
-      now,
-      qc: { runner: runnerOverride ?? runner, now },
-    },
-  });
-  diagnostics = built;
-  app = built.fastify;
-  await app.ready();
-}
+    })),
+});
 
 afterEach(() => {
   assertNoLeak(capture);
 });
 
-before(async () => {
-  db = await openTestDatabase();
-  blobDir = await mkdtemp(path.join(tmpdir(), 'rai-w2-05-blobs-'));
-  outputDir = await mkdtemp(path.join(tmpdir(), 'rai-w2-05-out-'));
-  store = createFilesystemBlobStore(blobDir);
-  await store.init();
-  await rebuildApp();
-});
-beforeEach(async () => {
-  clock = Date.parse('2026-09-22T06:00:00Z');
-  await db.reset();
-  await db.owner.execute(sql.raw('TRUNCATE TABLE "session", "registry_counter"'));
-  await rm(path.join(blobDir, 'sha256'), { recursive: true, force: true });
-  await store.init();
-  await loadFixtures(db.operator, {
-    nodeEnv: 'test',
-    identityMode: 'fixture',
-    blobDir,
-    outputDir,
-    now: now(),
-  });
-  clock += 60_000;
-  await rebuildApp();
-});
-after(async () => {
-  await app.close();
-  await db.close();
-  await rm(blobDir, { recursive: true, force: true });
-  await rm(outputDir, { recursive: true, force: true });
-});
-
-const signIn = (id: string) => signInAsFixture(app, id);
-
+/** Submits, and checks the audit row and the request log carry the response's correlation id. */
 async function submitOk(session: FixtureSession, caseId: string) {
-  const draftRes = await app.inject({
-    method: 'GET',
-    url: `/api/cases/${caseId}/draft`,
-    headers: asUser(session),
-  });
-  assert.equal(draftRes.statusCode, 200, draftRes.body);
-  const draft = draftRes.json<PackDraft>();
-  const body: SubmitRequest = {
-    expectedVersion: { versionId: draft.draftId, revision: draft.draftRevision },
-  };
-  const res = await app.inject({
-    method: 'POST',
-    url: `/api/cases/${caseId}/draft/submit`,
-    headers: {
-      'content-type': 'application/json',
-      'idempotency-key': randomUUID(),
-      ...asUser(session),
-    },
-    payload: body,
-  });
-  assert.equal(res.statusCode, 201, res.body);
-  const version = res.json<SubmittedVersion>();
+  const { version, correlationId } = await submit(session, caseId);
   const audit = await db.owner.execute(
     sql`SELECT id, correlation_id FROM audit_event WHERE action = 'version.submitted' AND target_version_id = ${version.versionId}`,
   );
   assert.equal(audit.rows.length, 1);
-  assert.equal(audit.rows[0]!.correlation_id, res.headers['x-correlation-id']);
+  assert.equal(audit.rows[0]!.correlation_id, correlationId);
   assert.ok(
     capture
       .lines()
-      .some(
-        (line) =>
-          line.event === 'request.completed' && line.correlationId === res.headers['x-correlation-id'],
-      ),
+      .some((line) => line.event === 'request.completed' && line.correlationId === correlationId),
   );
   return version;
-}
-
-async function caseRevision(caseId: string): Promise<number> {
-  const r = await db.owner.execute(sql`SELECT row_version FROM "case" WHERE id = ${caseId}`);
-  return Number((r.rows[0] as { row_version: number }).row_version);
 }
 
 async function runLaneQc(
@@ -836,54 +692,7 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
     const revision = await caseRevision(VENDOR.caseId);
 
     // Rebuild without a QC runner (production posture).
-    if (app !== undefined) await app.close();
-    const adapter = createIdentityAdapter({
-      env: {
-        RAI_IDENTITY_MODE: 'fixture',
-        RAI_SESSION_ABSOLUTE_HOURS: '12',
-        RAI_SESSION_IDLE_MINUTES: '120',
-      },
-      nodeEnv: 'test',
-      discovery: () => Promise.reject(new Error('never called in fixture mode')),
-      groupMappingSource: () => Promise.resolve(null),
-      fixtureUsers: FIXTURE_USERS,
-      now,
-    });
-    await adapter.start({ host: '127.0.0.1', port: 8787, publicBaseUrl, trustProxy: false });
-    capture = createLogCapture();
-    const logStream = capture.stream;
-    const built = buildApp({
-      config: { nodeEnv: 'test', log: { level: 'info', pretty: false }, trustProxy: false, publicBaseUrl },
-      logStream,
-      identity: {
-        adapter,
-        sessionStore: createPgSessionStore(db.app),
-        facts: createScopeFactsSource(db.app),
-        fixtureProvider: createFixtureIdentityProvider(FIXTURE_USERS),
-        now,
-      },
-      cases: {
-        db: db.app,
-        businessUnits: createBusinessUnitDirectory(
-          businessUnitsFromGrants(FIXTURE_USERS.flatMap((u) => [...u.roles])),
-        ),
-        subjects: createSubjectDirectory(db.app, { known: FIXTURE_USERS }),
-        now,
-      },
-      artifacts: { store, db: db.app, limits: LIMITS },
-      pack: { db: db.app, limits: { maxPackBytes: LIMITS.maxPackBytes }, now },
-      versions: { db: db.app, now, laneOpenRecipients: LANE_OPEN_RECIPIENTS },
-      decide: {
-        db: db.app,
-        now,
-        sendBackRecipientsForOwner: (ownerSubjectId) =>
-          sendBackRecipientsFromIdentities(FIXTURE_USERS, ownerSubjectId),
-      },
-      findings: { db: db.app, now },
-    });
-    diagnostics = built;
-    app = built.fastify;
-    await app.ready();
+    await rebuildApp(null);
 
     const ai = await signIn(AI_COE);
     const first = await runLaneQc(ai, VENDOR.caseId, version.versionId, 'ai_coe', revision);

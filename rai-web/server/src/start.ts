@@ -9,30 +9,25 @@ import type { AddressInfo } from 'node:net';
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from './app.js';
+import { composeAppDeps } from './compose-app-deps.js';
 import { createFilesystemBlobStore } from './artifacts/blob-store.js';
-import { createScopeFactsSource } from './authz/facts.js';
 import {
   businessUnitsFromGrants,
   createBusinessUnitDirectory,
   type BusinessUnitDirectory,
 } from './cases/business-units.js';
-import { createSubjectDirectory } from './cases/subject-directory.js';
 import { ConfigError, EXIT_CONFIG, isLoopbackHost, parseConfig, type Env } from './config.js';
 import { createDb, type DbHandle } from './db/client.js';
 import { currentRevision } from './configuration/store.js';
 import { createIdentityAdapter, type Discovery, type GroupMappingSource } from './identity/adapter.js';
-import { createFixtureIdentityProvider, type FixtureIdentity } from './identity/fixture.js';
+import type { FixtureIdentity } from './identity/fixture.js';
 import { openidClientDiscovery } from './identity/oidc.js';
-import { createPgSessionStore } from './identity/session.js';
 import { IdentityStartupError } from './identity/types.js';
 import type { Emitter } from './observability/log.js';
-import { noopUploadTrigger } from './pack/qc-trigger.js';
 import { startedFields } from './observability/started.js';
 import { WEB_DIST_DIR, webDistPresent } from './static.js';
 import { migrationFileCount } from './db/migrate.js';
 import type { QcRunner, VersionRef } from '@rai/shared/qc/types';
-import { laneOpenRecipientsFromIdentities } from './versions/open-lanes.js';
-import { sendBackRecipientsFromIdentities } from './workflow/send-back-notice.js';
 
 type ConfiguredQcRunner = QcRunner & { probe(): Promise<'ok' | 'unavailable' | 'disabled'> };
 type ImportFixture = (specifier: string) => Promise<unknown>;
@@ -204,55 +199,21 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
       },
     ),
   );
-  // Mail recipients are the fixture identities in slice 1; AD resolution is W8.
-  const ownerRecipients = (ownerSubjectId: string) =>
-    sendBackRecipientsFromIdentities(knownIdentities, ownerSubjectId);
-  const { fastify, emitter, errors, drain } = buildApp({
-    observability: { db: db.db, readiness },
-    ...(mailSink === undefined
-      ? {}
-      : {
-          digest: { db: db.db, publicBaseUrl: config.publicBaseUrl, ...clock },
-          notifications: {
-            db: db.db,
-            sink: mailSink,
-            identities: knownIdentities,
-            publicBaseUrl: config.publicBaseUrl,
-            ...clock,
-          },
-        }),
-    config,
-    artifacts: { store, db: db.db, limits: config.upload },
-    identity: {
+  const { fastify, emitter, errors, drain } = buildApp(
+    composeAppDeps({
+      config,
+      db: db.db,
       adapter,
-      sessionStore: createPgSessionStore(db.db),
-      facts: createScopeFactsSource(db.db),
-      ...(fixtureUsers === undefined ? {} : { fixtureProvider: createFixtureIdentityProvider(fixtureUsers) }),
-      ...clock,
-    },
-    cases: {
-      db: db.db,
+      fixtureUsers,
       businessUnits,
-      subjects: createSubjectDirectory(db.db, { known: knownIdentities }),
-      ...clock,
-    },
-    // Upload-triggered QC is not implemented (W4), so the W0-07 upload hook stays a no-op.
-    pack: { db: db.db, limits: config.upload, uploadTrigger: noopUploadTrigger, ...clock },
-    versions: {
-      db: db.db,
-      laneOpenRecipients: laneOpenRecipientsFromIdentities(knownIdentities),
-      qc: qcRunner === undefined ? {} : { runner: qcRunner },
-      ...clock,
-    },
-    decide: { db: db.db, sendBackRecipientsForOwner: ownerRecipients, ...clock },
-    findings: {
-      db: db.db,
-      readyRecipientsForOwner: ownerRecipients,
-      ...clock,
-      ...(qcRunner === undefined ? {} : { qc: { runner: qcRunner } }),
-    },
-    ...(serveWeb ? { static: { root: webDistDir } } : {}),
-  });
+      store,
+      qcRunner,
+      mailSink,
+      readiness,
+      now: overrides.now,
+      webDistDir: serveWeb ? webDistDir : undefined,
+    }),
+  );
   db.pool.on('error', (err) => errors.internal(err));
   const close = async () => {
     await drain.close(overrides.drainMs);

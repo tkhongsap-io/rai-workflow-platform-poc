@@ -77,6 +77,8 @@ async function rebuildApp(): Promise<void> {
     },
   });
   const built = buildApp({
+    db: db.app,
+    now,
     config: { nodeEnv: 'test', log: { level: 'info', pretty: false }, trustProxy: false, publicBaseUrl },
     logStream,
     identity: {
@@ -84,33 +86,24 @@ async function rebuildApp(): Promise<void> {
       sessionStore: createPgSessionStore(db.app),
       facts: createScopeFactsSource(db.app),
       fixtureProvider: createFixtureIdentityProvider(FIXTURE_USERS),
-      now,
     },
     cases: {
-      db: db.app,
       businessUnits: createBusinessUnitDirectory(
         businessUnitsFromGrants(FIXTURE_USERS.flatMap((u) => [...u.roles])),
       ),
       subjects: createSubjectDirectory(db.app, { known: FIXTURE_USERS }),
-      now,
     },
-    artifacts: { store, db: db.app, limits: LIMITS },
-    pack: { db: db.app, limits: { maxPackBytes: LIMITS.maxPackBytes }, now },
+    artifacts: { store, limits: LIMITS },
+    pack: { limits: { maxPackBytes: LIMITS.maxPackBytes } },
     versions: {
-      db: db.app,
-      now,
       laneOpenRecipients: laneOpenRecipientsFromIdentities(FIXTURE_USERS),
     },
     decide: {
-      db: db.app,
-      now,
       sendBackRecipientsForOwner: (ownerSubjectId) =>
         sendBackRecipientsFromIdentities(FIXTURE_USERS, ownerSubjectId),
     },
     findings: {
-      db: db.app,
-      now,
-      qc: { runner: new ScriptedQcRunner({ fixtureCaseIdOf: () => undefined, now }), now }, // clean lane QC
+      qc: { runner: new ScriptedQcRunner({ fixtureCaseIdOf: () => undefined, now }) }, // clean lane QC
     },
   });
   app = built.fastify;
