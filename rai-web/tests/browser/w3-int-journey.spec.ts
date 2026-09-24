@@ -323,9 +323,9 @@ test('one keyboard case: create/upload/submit/restart/queue/mail/send-back/v2/di
           await expect(workspace.getByRole('heading')).toHaveText(
             t('th', 'review.findings.heading', { lane: label('lane.it_security') }),
           );
-          await expect(workspace.locator('[data-review-qc="empty"]')).toBeVisible();
-          await expect(workspace.locator('[data-review-qc="empty"]')).toHaveText(
-            label('review.findings.empty'),
+          await expect(workspace.locator('[data-review-qc="none_stored"]')).toBeVisible();
+          await expect(workspace.locator('[data-review-qc="none_stored"]')).toHaveText(
+            label('review.findings.none_stored'),
           );
           await expect(workspace.locator('[data-finding-id]')).toHaveCount(0);
         } else {

@@ -1,6 +1,7 @@
 // One lane's review of the latest version, or the owner/BU-SPOC panel that proposes fixes. A lane shows every
-// stored finding the server assigned to it, whichever run produced it; the lane-QC run comes first because approve
-// must name the run the reviewer saw. The API decides every action; this only draws the controls.
+// stored finding the server assigned to it, whichever run produced it. While the lane can decide, the lane-QC run
+// comes first because approve must name the run the reviewer saw. The API decides every action; this only draws the
+// controls.
 
 import { useCallback, useEffect, useState, type JSX } from 'react';
 import type { CaseView } from '@rai/shared/schemas/cases';
@@ -20,7 +21,7 @@ import { ErrorNotice } from '../../components/error-notice.js';
 import { useLocale } from '../../i18n/locale-provider.js';
 import { FindingsList, QcUnavailableBlock } from './finding-list.js';
 import { LaneDecisionActions } from './lane-decision-actions.js';
-import { expectedVersionOf, laneIsDecidable, laneKey, reviewerFindingsLoadMode } from './view-model.js';
+import { expectedVersionOf, laneKey, reviewerFindingsLoadMode } from './view-model.js';
 
 interface LaneFindings {
   findings: StoredFindingSummary[];
@@ -64,7 +65,7 @@ export function ReviewerWorkspace({
   onDispositionRecorded,
 }: ReviewerWorkspaceProps): JSX.Element | null {
   const { t } = useLocale();
-  const loadMode = reviewerFindingsLoadMode(view, lane);
+  const loadMode = reviewerFindingsLoadMode({ lane, view, hasOpenDraft });
   const loadKey = `${caseId}/${version.versionId}/${lane ?? 'propose'}/${loadMode}`;
   const [stored, setStored] = useState<{ key: string; result: LoadResult } | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
@@ -180,10 +181,12 @@ export function ReviewerWorkspace({
               expectedVersion={expectedVersion}
               session={session}
               view={view}
+              laneQcRan={state.run !== null}
               onDisposition={onDisposition}
             />
           )}
-          {lane !== null && state.run !== null && laneIsDecidable({ lane, view, hasOpenDraft }) ? (
+          {/* A run is loaded only while the lane is decidable. */}
+          {lane !== null && state.run !== null ? (
             <LaneDecisionActions
               caseId={caseId}
               versionId={version.versionId}

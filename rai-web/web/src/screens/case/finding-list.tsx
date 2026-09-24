@@ -37,6 +37,8 @@ export interface FindingsListProps {
   expectedVersion: ExpectedVersion;
   session: SessionInfo;
   view: CaseView;
+  /** Whether this view loaded a lane-QC run; only then may an empty list read as that run's result. */
+  laneQcRan: boolean;
   onDisposition: (response: DispositionResponse) => void;
 }
 
@@ -48,13 +50,16 @@ export function FindingsList({
   expectedVersion,
   session,
   view,
+  laneQcRan,
   onDisposition,
 }: FindingsListProps): JSX.Element {
   const { t } = useLocale();
   if (findings.length === 0) {
+    // Stored findings alone say nothing about a QC result: the run they came from may have been unavailable.
+    const status = laneQcRan ? 'empty' : 'none_stored';
     return (
-      <p className={'muted'} role={'status'} data-review-qc={'empty'}>
-        {t('review.findings.empty')}
+      <p className={'muted'} role={'status'} data-review-qc={status}>
+        {t(`review.findings.${status}`)}
       </p>
     );
   }

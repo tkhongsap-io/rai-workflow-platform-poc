@@ -440,15 +440,20 @@ test('dispositionKindsForActor: lane kinds, confirm after propose, owner propose
   }
 });
 
-test('Ready loads persisted findings while non-Ready approved lanes still run QC', () => {
+test('lane QC runs only while the lane is decidable; otherwise the stored findings load', () => {
   const ready = baseView({ aiReadinessStatus: 'ready' });
-  for (const lane of ['ai_coe', 'dpo', 'it_security', null] as const) {
-    assert.equal(reviewerFindingsLoadMode(ready, lane), 'persisted');
-    assert.equal(
-      reviewerFindingsLoadMode(baseView({ raiStatus: 'approved' }), lane),
-      lane === null ? 'persisted' : 'lane_qc',
-    );
+  const mode = (lane: 'ai_coe' | 'dpo' | 'it_security' | null, view: CaseView, hasOpenDraft = false) =>
+    reviewerFindingsLoadMode({ lane, view, hasOpenDraft });
+  for (const lane of ['ai_coe', 'dpo', 'it_security'] as const) {
+    assert.equal(mode(lane, baseView()), 'lane_qc', `${lane} pending`);
+    assert.equal(mode(lane, ready), 'persisted', `${lane} Ready`);
+    // After a send-back the version is closed: qc-run would answer 409.
+    assert.equal(mode(lane, baseView(), true), 'persisted', `${lane} open successor draft`);
   }
+  assert.equal(mode('ai_coe', baseView({ raiStatus: 'approved' })), 'persisted', 'decided lane');
+  assert.equal(mode('ai_coe', baseView({ raiStatus: 'sent_back' })), 'persisted', 'sent-back lane');
+  assert.equal(mode('dpo', baseView({ raiStatus: 'approved' })), 'lane_qc', 'another lane decided');
+  assert.equal(mode(null, baseView()), 'persisted', 'proposal panel');
   assert.deepEqual(
     reviewerWorkspaceLanes({ roles: [aiCoe], subjectId: 'reviewer', view: ready, version: baseVersion() }),
     ['ai_coe'],

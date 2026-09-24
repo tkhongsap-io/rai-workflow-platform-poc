@@ -169,8 +169,8 @@ for (const completion of ['approval', 'disposition'] as const) {
             expect((await get).status()).toBe(200);
             await expect(page.locator('[data-status="ready_for_launch"]').first()).toBeVisible();
             if (user === actors.it_security) {
-              await expect(page.locator('[data-review-qc="empty"]')).toContainText(
-                t('th', 'review.findings.empty'),
+              await expect(page.locator('[data-review-qc="none_stored"]')).toContainText(
+                t('th', 'review.findings.none_stored'),
               );
               await expect(page.locator('[data-finding-id]')).toHaveCount(0);
             } else {
