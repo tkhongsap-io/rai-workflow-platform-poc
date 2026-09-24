@@ -1,4 +1,4 @@
-// W3-03b producer/loader only. The W3-04 dispatcher owns all sink calls and retry state.
+// Digest producer and loader only; the dispatcher in service.ts owns every sink call and retry state.
 import { randomUUID } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import { Type, type Static } from 'typebox';
@@ -19,6 +19,7 @@ import { laneDueDates } from '../sla/due-dates.js';
 import { packVersion } from '../db/schema/pack-version.js';
 import { runWithContext } from '../observability/context.js';
 import type { Emitter } from '../observability/log.js';
+import { SAFE_ID, safeBaseUrl, syntheticAddress } from './compose.js';
 
 const SnapshotSchema = Type.Object(
   {
@@ -40,29 +41,15 @@ export class DigestCompositionError extends Error {
 function requireValid(value: unknown): asserts value {
   if (!value) throw new DigestCompositionError();
 }
-function synthetic(address: string): boolean {
-  return (
-    /^[^\s@<>,;:"()[\]\\/]+@(?:[a-z0-9-]+\.)+(?:test|example|invalid)$/i.test(address) ||
-    /^[^\s@<>,;:"()[\]\\/]+@(?:[a-z0-9-]+\.)*example\.(?:com|net|org)$/i.test(address)
-  );
-}
 function render(
   event: CommittedDigestEvent,
   address: string,
   snapshot: Snapshot,
   base: URL,
 ): DeliveryRequest {
-  requireValid(isDigestJobProvenance(event.provenance) && synthetic(address));
-  requireValid(
-    ['http:', 'https:'].includes(base.protocol) &&
-      base.pathname === '/' &&
-      !base.search &&
-      !base.hash &&
-      !base.username &&
-      !base.password,
-  );
+  requireValid(isDigestJobProvenance(event.provenance) && syntheticAddress(address) && safeBaseUrl(base));
   const caseIds = [...new Set(snapshot.breaches.map((b) => b.caseId))];
-  requireValid(caseIds.every((id) => /^[a-zA-Z0-9][a-zA-Z0-9._~-]{0,127}$/.test(id)));
+  requireValid(caseIds.every((id) => SAFE_ID.test(id)));
   const deepLinks = snapshot.breaches.map(({ caseId }) => ({
     url: `${base.origin}/cases/${caseId}`,
     route: 'case' as const,

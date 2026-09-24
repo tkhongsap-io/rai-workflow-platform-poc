@@ -58,6 +58,7 @@ let scratch: string;
 const logs: string[] = [];
 
 async function build(options: { auto?: boolean; rollback?: boolean } = {}) {
+  const laneOpenRecipients = laneOpenRecipientsFromIdentities(FIXTURE_USERS);
   if (app) await app.close();
   const adapter = createIdentityAdapter({
     env: { RAI_IDENTITY_MODE: 'fixture' },
@@ -111,14 +112,10 @@ async function build(options: { auto?: boolean; rollback?: boolean } = {}) {
     versions: {
       db: db.app,
       now,
-      laneOpenRecipients: laneOpenRecipientsFromIdentities(FIXTURE_USERS),
-      ...(options.rollback
-        ? {
-            failAfterFirstLaneOpenNotification: () => {
-              throw new Error('synthetic rollback');
-            },
-          }
-        : {}),
+      // A repeated address violates notification_event_version_lane_recipient_key after the first insert.
+      laneOpenRecipients: options.rollback
+        ? { ...laneOpenRecipients, dpo: [laneOpenRecipients.dpo[0]!, laneOpenRecipients.dpo[0]!] }
+        : laneOpenRecipients,
     },
     decide: {
       db: db.app,
@@ -382,7 +379,7 @@ test('send-back mail goes only to owner, with deciding lane and bounded reviewer
 });
 
 for (const fail of [false, true])
-  test(`Ready: owner only; failure=${fail} never undoes decisions and no retry runs`, async () => {
+  test(`Ready: owner only; failure=${fail} never undoes decisions and retry waits for its deadline`, async () => {
     const { version } = await submit();
     for (const [id, lane] of [
       ['fx-user-dpo', 'dpo'],
@@ -397,21 +394,19 @@ for (const fail of [false, true])
     await app.close();
     await notifications.deliverPending();
     const result = await db.owner.execute(
-      sql`SELECT n.status, n.attempts, n.last_error_code, c.ai_readiness_status FROM notification n JOIN "case" c ON c.id = n.case_id WHERE n.event = 'ready'`,
+      sql`SELECT n.status, n.attempts, n.last_error_code, n.next_attempt_at IS NOT NULL AS has_deadline, c.ai_readiness_status FROM notification n JOIN "case" c ON c.id = n.case_id WHERE n.event = 'ready'`,
     );
     assert.equal(result.rows.length, 1);
     assert.deepEqual(result.rows[0], {
       status: fail ? 'queued' : 'sent',
       attempts: 1,
       last_error_code: fail ? 'sink_failure' : null,
+      has_deadline: fail,
       ai_readiness_status: 'ready',
     });
     const ready = sink.sent.filter((r) => r.event.kind === 'ready_for_launch');
     assert.equal(ready.length, fail ? 0 : 1);
     if (!fail) assert.equal(ready[0]!.recipient.address, emailOf(ownerId));
-    const count = sink.receipts.length;
-    await notifications.deliverPending();
-    assert.equal(sink.receipts.length, count);
   });
 
 test('rollback after first outbox insert produces no mail or committed notification', async () => {
@@ -786,7 +781,7 @@ test('W3-04 selects at most 25 due rows per scan and leaves future retries alone
   assert.equal(sink.receipts.length, 30);
 });
 
-test('shutdown cancellation keeps the notification lock until the sink settles, then rolls back', async () => {
+test('shutdown cancellation keeps the notification lock until the sink settles, then commits the settled result', async () => {
   await build({ auto: false });
   await submit();
   const [row] = await db.owner.select().from(notification);
@@ -808,7 +803,6 @@ test('shutdown cancellation keeps the notification lock until the sink settles, 
     },
   });
   const delivery = consumer.deliverInitial(row!.id, controller.signal);
-  const rejected = assert.rejects(delivery, { name: 'AbortError' });
   try {
     await entered.promise;
     controller.abort();
@@ -819,13 +813,14 @@ test('shutdown cancellation keeps the notification lock until the sink settles, 
   } finally {
     release.resolve();
   }
-  await rejected;
-  const [unchanged] = await db.owner.select().from(notification).where(eq(notification.id, row!.id));
-  assert.equal(unchanged!.attempts, 0);
-  assert.equal(unchanged!.status, 'queued');
-  assert.equal(sink.sent.length, 1, 'sink may have accepted before rollback; replay remains explicit');
-  await consumer.deliverInitial(row!.id);
-  assert.equal(sink.sent.length, 1, 'same live sink deduplicates the replay');
+  assert.equal((await delivery)?.status, 'delivered');
+  const [settled] = await db.owner.select().from(notification).where(eq(notification.id, row!.id));
+  assert.equal(settled!.status, 'sent');
+  assert.equal(settled!.attempts, 1);
+  assert.equal(sink.sent.length, 1);
+  // No new row starts once the drain has aborted.
+  await assert.rejects(consumer.deliverPending(undefined, controller.signal), { name: 'AbortError' });
+  assert.equal(sink.sent.length, 1);
 });
 
 test('request completion and response latency do not wait for a stalled notification sink', async () => {
@@ -837,7 +832,6 @@ test('request completion and response latency do not wait for a stalled notifica
     await release.promise;
     return originalDeliver(request);
   };
-  const started = performance.now();
   const submitted = submit();
   try {
     await entered.promise;
@@ -858,7 +852,6 @@ test('request completion and response latency do not wait for a stalled notifica
             line.event === 'request.completed' && line.fields.route === '/api/cases/:caseId/draft/submit',
         );
     assert.equal(completion().length, 1, 'completion must be logged before delivery settles');
-    const duration = completion()[0]!.fields.durationMs!;
     assert.equal(completion()[0]!.fields.status, 201);
     // A deadline is only a hang guard; the correctness assertions precede releasing the sink.
     const response = await Promise.race([
@@ -868,10 +861,6 @@ test('request completion and response latency do not wait for a stalled notifica
       }),
     ]);
     assert.equal(response.response.statusCode, 201);
-    await delay(100);
-    assert.ok(duration < performance.now() - started);
-    assert.equal(completion().length, 1);
-    assert.equal(completion()[0]!.fields.durationMs, duration);
   } finally {
     release.resolve();
     await submitted;

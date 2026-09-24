@@ -1,4 +1,4 @@
-// W3-04: pure policy only. The dispatcher must lock the row and commit the returned state.
+// Pure retry policy: the dispatcher locks the row and commits the returned state.
 import type { DeliveryReceipt } from '@rai/shared/mail/types';
 
 export const RETRY_BACKOFF_MS = Object.freeze([1000, 5000, 25000] as const);

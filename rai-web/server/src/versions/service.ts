@@ -37,7 +37,6 @@ import { readCaseRow, readVersionRow, type CaseRow, type PackVersionRow } from '
 import { staleDetails } from '../cases/service.js';
 import { revisionInForce } from '../configuration/activation.js';
 import type { Db, Executor, Tx } from '../db/client.js';
-import type { NodeEnv } from '../config.js';
 import { configurationRevision } from '../db/schema/configuration-revision.js';
 import {
   frozenSlotsOf,
@@ -61,16 +60,9 @@ import { withWorkflowTransaction, type WorkflowResult } from './transaction.js';
 
 export interface VersionServiceDeps {
   db: Db;
-  /** From AppConfig (config.ts); used to gate the test-only failure hook. Never read process.env here. */
-  nodeEnv: NodeEnv;
   now?: () => Date;
   /** Slice-1: fixture reviewers who hold each lane (from identity data). Empty until W8 AD resolution otherwise. */
   laneOpenRecipients?: LaneOpenRecipients;
-  /**
-   * Test-only failure injection (W2-01): throws after the first lane_open notification insert inside the
-   * submit transaction. Ignored unless `nodeEnv` is `test`; unset in production wiring.
-   */
-  failAfterFirstLaneOpenNotification?: () => void;
 }
 
 /** Who acts, as which role (the policy row that allowed), under which correlation id (W0-10). */
@@ -261,10 +253,6 @@ export async function submitDraft(
           idempotencyKeyRef: idempotencyKeyReference,
           occurredAt: now,
           recipients: deps.laneOpenRecipients ?? EMPTY_LANE_OPEN_RECIPIENTS,
-          nodeEnv: deps.nodeEnv,
-          ...(deps.failAfterFirstLaneOpenNotification === undefined
-            ? {}
-            : { failAfterFirstLaneOpenNotification: deps.failAfterFirstLaneOpenNotification }),
         });
         return {
           status: 201,

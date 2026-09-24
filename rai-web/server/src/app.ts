@@ -56,7 +56,7 @@ export interface AppDeps {
   observability?: ObservabilityDeps;
   /** Local daily producer; uses the same drain and single notification dispatcher. */
   digest?: Omit<DigestDeps, 'emitter'>;
-  /** W3-03a initial post-commit notifications; retries and digest remain separate. */
+  /** The single post-commit mail dispatcher for case mail, digest mail and retries. */
   notifications?: Omit<NotificationDeps, 'emitter' | 'errors'>;
   config: Pick<AppConfig, 'nodeEnv' | 'log' | 'trustProxy' | 'publicBaseUrl'>;
   /** Absent only in substrate-level tests that register no route; main.ts always passes it. */
@@ -67,9 +67,8 @@ export interface AppDeps {
   artifacts?: Omit<ArtifactRouteDeps, 'emitter'>;
   /** W1-04: the pack draft routes' dependencies (database, pack limit, the W0-07 upload hook). Needs `identity`. */
   pack?: Omit<PackRouteDeps, 'emitter'>;
-  /** W1-05: the submit and version-navigation routes' dependencies (database). Needs `identity`.
-   * `nodeEnv` is taken from `config` when the routes are registered (never from process.env in versions/). */
-  versions?: Omit<VersionRouteDeps, 'nodeEnv' | 'afterSubmit'> & {
+  /** W1-05: the submit and version-navigation routes' dependencies (database). Needs `identity`. */
+  versions?: Omit<VersionRouteDeps, 'afterSubmit'> & {
     qc?: Pick<QcOrchestratorDeps, 'runner' | 'timeoutMs'>;
   };
   /** W2-02: lane approve / send-back. Needs `identity`. */
@@ -289,7 +288,6 @@ export function buildApp(deps: AppDeps): App {
       void fastify.register((instance, _opts, done) => {
         registerVersionRoutes(instance, {
           ...versionDeps,
-          nodeEnv: deps.config.nodeEnv,
           ...(versionDeps.qc === undefined
             ? {}
             : {

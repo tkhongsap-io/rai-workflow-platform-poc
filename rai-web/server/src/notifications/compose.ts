@@ -1,4 +1,4 @@
-// W3-03a: only committed case events. No transport, scheduling or workflow writes.
+// Pure composition of committed case events: no transport, scheduling or workflow writes.
 import { LANES, type Lane } from '@rai/shared/constants';
 import { t, type LocaleKey } from '@rai/shared/locales/keys';
 import { buildDedupKey } from '@rai/shared/mail/dedup';
@@ -65,18 +65,23 @@ export function resolveRecipient(
   };
 }
 
+/** An opaque ID that is safe as one deep-link path segment. */
+export const SAFE_ID = /^[a-zA-Z0-9][a-zA-Z0-9._~-]{0,127}$/;
+
+/** A bare http(s) origin: links carry no path prefix, query, fragment or credentials. */
+export function safeBaseUrl(base: URL): boolean {
+  return (
+    ['http:', 'https:'].includes(base.protocol) &&
+    base.pathname === '/' &&
+    !base.search &&
+    !base.hash &&
+    !base.username &&
+    !base.password
+  );
+}
+
 export function versionLink(baseUrl: URL, caseId: string, versionId: string): SafeDeepLink {
-  const id = /^[a-zA-Z0-9][a-zA-Z0-9._~-]{0,127}$/;
-  if (
-    !['http:', 'https:'].includes(baseUrl.protocol) ||
-    baseUrl.pathname !== '/' ||
-    baseUrl.search ||
-    baseUrl.hash ||
-    baseUrl.username ||
-    baseUrl.password ||
-    !id.test(caseId) ||
-    !id.test(versionId)
-  )
+  if (!safeBaseUrl(baseUrl) || !SAFE_ID.test(caseId) || !SAFE_ID.test(versionId))
     throw new CompositionError('unsafe_link');
   return {
     url: `${baseUrl.origin}/cases/${caseId}/versions/${versionId}`,
