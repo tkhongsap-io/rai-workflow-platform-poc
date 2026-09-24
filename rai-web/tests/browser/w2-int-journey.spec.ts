@@ -276,6 +276,7 @@ test.describe(`W2-INT journey on the real server: v1 → send-back → v2 → di
     // 5. Three current-version approvals → Ready on the last approve response. No Deploy control.
     await signOut(page);
     await openAsReviewer(page, DPO, caseId, v2Id);
+    await expect(page.locator('[data-review-qc="empty"]')).toHaveText(t('th', 'review.findings.empty'));
     const dpoBody = await keyboardApprove(page, 'dpo', v2Id);
     expect(dpoBody.ready).toBe(false);
     await expect(
