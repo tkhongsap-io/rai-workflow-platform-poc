@@ -5,46 +5,22 @@
 // the owner edits the successor draft (row_version may bump) still succeeds and does not create a second draft.
 // Fixture set slice1-synthetic@1; real Postgres harness.
 
-import { after, before, beforeEach, describe, it } from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import { Writable } from 'node:stream';
 import { sql } from 'drizzle-orm';
-import type { FastifyInstance } from 'fastify';
 import type { ErrorDetails, ErrorResponse } from '@rai/shared/errors';
 import type { LaneDecisionResponse, LaneQcRunResponse } from '@rai/shared/schemas/review';
 import type { PackDraft, PackDraftUpdateRequest } from '@rai/shared/schemas/pack';
-import type { SubmitRequest, SubmittedVersion } from '@rai/shared/schemas/versions';
-import { buildApp } from '../support/observed-app.js';
-import { createFilesystemBlobStore, type FilesystemBlobStore } from '@rai/server/artifacts/blob-store';
+import type { SubmittedVersion } from '@rai/shared/schemas/versions';
 import { auditStore } from '@rai/server/audit/store';
-import { createScopeFactsSource } from '@rai/server/authz/facts';
-import { businessUnitsFromGrants, createBusinessUnitDirectory } from '@rai/server/cases/business-units';
-import { createSubjectDirectory } from '@rai/server/cases/subject-directory';
-import { UPLOAD_LIMIT_DEFAULTS } from '@rai/server/config';
-import { createIdentityAdapter } from '@rai/server/identity/adapter';
-import { createFixtureIdentityProvider } from '@rai/server/identity/fixture';
-import { createPgSessionStore } from '@rai/server/identity/session';
-import { laneOpenRecipientsFromIdentities } from '@rai/server/versions/open-lanes';
-import { sendBackRecipientsFromIdentities } from '@rai/server/workflow/send-back-notice';
-import { FIXTURE_USERS, findFixtureUser } from '@rai/fixtures/data/users';
+import { findFixtureUser } from '@rai/fixtures/data/users';
 import { findFixtureCase } from '@rai/fixtures/data/cases/index';
-import { loadFixtures } from '@rai/fixtures/load';
 import { fixtureSetLabel, readManifest } from '@rai/fixtures/manifest';
-import { openTestDatabase, type TestDatabase } from '../support/db.js';
-import { asUser, signInAsFixture, type FixtureSession } from '../support/sign-in.js';
+import { app, caseRevision, db, openFixtureApp, signIn, submitOk } from '../support/fixture-app.js';
+import { asUser, type FixtureSession } from '../support/sign-in.js';
 
 const SET = fixtureSetLabel(readManifest());
-const publicBaseUrl = new URL('http://127.0.0.1:8787');
-const LIMITS = {
-  maxFileBytes: UPLOAD_LIMIT_DEFAULTS.UPLOAD_MAX_FILE_BYTES,
-  maxPackBytes: UPLOAD_LIMIT_DEFAULTS.UPLOAD_MAX_PACK_BYTES,
-  maxImagePixels: UPLOAD_LIMIT_DEFAULTS.UPLOAD_MAX_IMAGE_PIXELS,
-};
-const LANE_OPEN_RECIPIENTS = laneOpenRecipientsFromIdentities(FIXTURE_USERS);
 
 const OWNER_A = 'fx-user-owner-cm';
 const DPO = 'fx-user-dpo';
@@ -52,123 +28,10 @@ const AI_COE = 'fx-user-ai-coe';
 const IT_SEC = 'fx-user-it-security';
 const NONVENDOR = findFixtureCase('fx-case-nonvendor')!;
 
-let db: TestDatabase;
-let app: FastifyInstance;
-let store: FilesystemBlobStore;
-let blobDir: string;
-let outputDir: string;
-let clock = Date.parse('2026-09-22T05:00:00Z');
-const now = () => new Date(clock);
+const now = () => new Date('2026-09-22T05:01:00Z');
+openFixtureApp({ now });
 
-async function rebuildApp(): Promise<void> {
-  if (app !== undefined) await app.close();
-  const adapter = createIdentityAdapter({
-    env: { RAI_IDENTITY_MODE: 'fixture', RAI_SESSION_ABSOLUTE_HOURS: '12', RAI_SESSION_IDLE_MINUTES: '120' },
-    nodeEnv: 'test',
-    discovery: () => Promise.reject(new Error('never called in fixture mode')),
-    groupMappingSource: () => Promise.resolve(null),
-    fixtureUsers: FIXTURE_USERS,
-    now,
-  });
-  await adapter.start({ host: '127.0.0.1', port: 8787, publicBaseUrl, trustProxy: false });
-  const logStream = new Writable({
-    write(_chunk: Buffer, _enc, cb) {
-      cb();
-    },
-  });
-  const built = buildApp({
-    db: db.app,
-    now,
-    config: { nodeEnv: 'test', log: { level: 'info', pretty: false }, trustProxy: false, publicBaseUrl },
-    logStream,
-    identity: {
-      adapter,
-      sessionStore: createPgSessionStore(db.app),
-      facts: createScopeFactsSource(db.app),
-      fixtureProvider: createFixtureIdentityProvider(FIXTURE_USERS),
-    },
-    cases: {
-      businessUnits: createBusinessUnitDirectory(
-        businessUnitsFromGrants(FIXTURE_USERS.flatMap((u) => [...u.roles])),
-      ),
-      subjects: createSubjectDirectory(db.app, { known: FIXTURE_USERS }),
-    },
-    artifacts: { store, limits: LIMITS },
-    pack: { limits: { maxPackBytes: LIMITS.maxPackBytes } },
-    versions: { laneOpenRecipients: LANE_OPEN_RECIPIENTS },
-    decide: {
-      sendBackRecipientsForOwner: (ownerSubjectId) =>
-        sendBackRecipientsFromIdentities(FIXTURE_USERS, ownerSubjectId),
-    },
-    findings: {},
-  });
-  app = built.fastify;
-  await app.ready();
-}
-
-before(async () => {
-  db = await openTestDatabase();
-  blobDir = await mkdtemp(path.join(tmpdir(), 'rai-w2-03-blobs-'));
-  outputDir = await mkdtemp(path.join(tmpdir(), 'rai-w2-03-out-'));
-  store = createFilesystemBlobStore(blobDir);
-  await store.init();
-  await rebuildApp();
-});
-beforeEach(async () => {
-  clock = Date.parse('2026-09-22T05:00:00Z');
-  await db.reset();
-  await db.owner.execute(sql.raw('TRUNCATE TABLE "session", "registry_counter"'));
-  await rm(path.join(blobDir, 'sha256'), { recursive: true, force: true });
-  await store.init();
-  await loadFixtures(db.operator, {
-    nodeEnv: 'test',
-    identityMode: 'fixture',
-    blobDir,
-    outputDir,
-    now: now(),
-  });
-  clock += 60_000;
-  await rebuildApp();
-});
-after(async () => {
-  await app.close();
-  await db.close();
-  await rm(blobDir, { recursive: true, force: true });
-  await rm(outputDir, { recursive: true, force: true });
-});
-
-const signIn = (id: string) => signInAsFixture(app, id);
 type Res = { statusCode: number; body: string; headers: Record<string, unknown>; json<T>(): T };
-
-async function submitOk(session: FixtureSession, caseId: string) {
-  const draftRes = await app.inject({
-    method: 'GET',
-    url: `/api/cases/${caseId}/draft`,
-    headers: asUser(session),
-  });
-  assert.equal(draftRes.statusCode, 200, draftRes.body);
-  const draft = draftRes.json<PackDraft>();
-  const body: SubmitRequest = {
-    expectedVersion: { versionId: draft.draftId, revision: draft.draftRevision },
-  };
-  const res = await app.inject({
-    method: 'POST',
-    url: `/api/cases/${caseId}/draft/submit`,
-    headers: {
-      'content-type': 'application/json',
-      'idempotency-key': randomUUID(),
-      ...asUser(session),
-    },
-    payload: body,
-  });
-  assert.equal(res.statusCode, 201, res.body);
-  return res.json<SubmittedVersion>();
-}
-
-async function caseRevision(caseId: string): Promise<number> {
-  const r = await db.owner.execute(sql`SELECT row_version FROM "case" WHERE id = ${caseId}`);
-  return Number((r.rows[0] as { row_version: number }).row_version);
-}
 
 async function nSnapshot(versionId: string) {
   const version = (

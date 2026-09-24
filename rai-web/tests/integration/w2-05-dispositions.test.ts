@@ -692,7 +692,7 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
     const revision = await caseRevision(VENDOR.caseId);
 
     // Rebuild without a QC runner (production posture).
-    await rebuildApp(null);
+    await rebuildApp({ qcRunner: null });
 
     const ai = await signIn(AI_COE);
     const first = await runLaneQc(ai, VENDOR.caseId, version.versionId, 'ai_coe', revision);
@@ -1159,7 +1159,7 @@ describe('W3-07a durable late-QC diagnostics', () => {
         };
       },
     };
-    await rebuildApp(delayed);
+    await rebuildApp({ qcRunner: delayed });
     const owner = await signIn(OWNER_A);
     const version = await submitOk(owner, VENDOR.caseId);
     const ai = await signIn(AI_COE);
