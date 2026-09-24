@@ -11,7 +11,7 @@ Most W2/W3 PRs, #90 to #126, merged without an independent review verdict. A dyn
 | Findings confirmed | 71 (5 high, 20 medium, 46 low) |
 | Findings refuted by the skeptic | 17 |
 | Fix batches | 23 planned (H1-H23), then H24 from the final verification and H25-H29 from the two walkthrough re-checks |
-| Deferred to the owner, with a reason (section 5) | 4 whole findings, issue #35, 4 leftover parts of closed findings, and 3 questions from the walkthrough re-checks (12 items) |
+| Deferred to the owner, with a reason (section 5) | 3 whole findings, issue #35, 5 leftover parts of closed findings, and 3 questions from the walkthrough re-checks (12 items) |
 
 The five high findings:
 
@@ -92,10 +92,17 @@ A separate workflow checked `origin/main` at `4522074` (after H23), each part in
 
 | Outcome | Count |
 |---|---|
-| Closed, with the code on `main` and the proving test or measurable change cited | 66 |
-| Deferred with a reason (section 5) | 4 |
+| Closed, with the code on `main` and the proving test or measurable change cited (one of them, finding 57, closed in part) | 67 |
+| Deferred whole, with a reason (section 5) | 3 |
 | Withdrawn: the H15 perf-harness guard, kept on purpose (section 4) | 1 |
 | Open | 0 |
+
+How these counts were reached. The three closure auditors reported per slice:
+- workflow-core and queue-SLA: 19 closed;
+- notifications, runtime-ops and security: 21 closed, 1 deferred;
+- web-UI, architecture and tests-evidence: 26 closed, 3 deferred, 1 withdrawn.
+
+That totals 66, 4 and 1. The auditors counted finding 57 (comments that narrate ticket history) as deferred, but H19 fixed its `app.ts`/`start.ts` part, and the ticket-ID line count below reflects that; only optional trimming remains. Counting only findings deferred whole gives 67, 3 and 1. The lead's first draft of this record said 65 and 5, a summing error, and round 1 of the review of #157 caught it.
 
 - Pool resilience: `server/src/db/client.ts` and `start.ts` (idle-error handler, 5 s connect timeout), tested by `w3-h4-pool-idle-error.test.ts`.
 - Process handlers: `main.ts`, tested by `w3-h4-fatal-handler.test.ts`.
@@ -172,11 +179,12 @@ Only wording fixes to the script followed. The agent also noted that the send-ba
 
 ## 5. Deferred for Ta (none decided here)
 
-Four of the 71 findings were deferred whole: items 2, 3, 4 and 9 (retro findings 61, 53, 39 and 57, numbered by their position in the retro's confirmed list, not GitHub numbers). Item 1 is the existing GitHub issue #35; the closed findings around it fail closed. Items 5-8 are parts left over from findings that were otherwise closed:
+Three of the 71 findings were deferred whole: items 2, 3 and 4 (retro findings 61, 53 and 39, numbered by their position in the retro's confirmed list, not GitHub numbers). Item 1 is the existing GitHub issue #35; the closed findings around it fail closed. Items 5-9 are parts left over from findings that were otherwise closed:
 - item 5, `scopedCases`, from retro finding 17;
 - item 6, the local-google readiness state, from H10;
 - item 7, the `BLOB_TMP_MAX_AGE_HOURS` minimum, from H11;
-- item 8, display names, from retro finding 46.
+- item 8, display names, from retro finding 46;
+- item 9, the optional parts of retro finding 57 (H19 fixed its `app.ts`/`start.ts` part) and of other findings.
 
 Items 10-12 are questions from the walkthrough re-checks.
 
