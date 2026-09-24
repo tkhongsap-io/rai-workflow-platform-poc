@@ -1,4 +1,4 @@
-// W1-06 view-model unit tests (W0-02 section 8.1: web unit tests cover view models and formatting only). Dates,
+// Case-flow view-model unit tests (W0-02 section 8.1: web unit tests cover view models and formatting only). Dates,
 // sizes (i18n/format.test.ts), paths (routes.test.ts) and the envelope (api/client.test.ts) are tested where
 // they live.
 
@@ -12,16 +12,15 @@ import {
   SLOT_NUMBERS,
   SLOT_STATE_ORDER,
   applySlotChange,
-  decidableLane,
   dispositionKindKey,
   dispositionKindNeedsReason,
   dispositionKindsForActor,
   dispositionReasonIsValid,
   expectedVersionOf,
   findingMessageParams,
-  findingsLane,
   canProposeFixedOnCase,
   isSelfExcludedOnCase,
+  laneIsDecidable,
   laneKey,
   laneProjectionStatus,
   mergedSlots,
@@ -30,8 +29,9 @@ import {
   qcUnavailableReasonKey,
   reasonDisplay,
   reasonIsValid,
-  reviewerLaneOf,
   reviewerFindingsLoadMode,
+  reviewerLanesOf,
+  reviewerWorkspaceLanes,
   sameSlotState,
   sendBackFeedbackIsValid,
   severityKey,
@@ -169,6 +169,7 @@ test('the slot a field path of an invalid_input answer points at', () => {
 
 const aiCoe: RoleScope = { role: 'ai_coe', scope: { kind: 'all_cases', lane: 'ai_coe' } };
 const dpo: RoleScope = { role: 'dpo', scope: { kind: 'all_cases', lane: 'dpo' } };
+const itSec: RoleScope = { role: 'it_security', scope: { kind: 'all_cases', lane: 'it_security' } };
 const admin: RoleScope = { role: 'admin', scope: { kind: 'all_cases' } };
 const owner: RoleScope = { role: 'owner', scope: { kind: 'own_cases' } };
 const spocCm: RoleScope = { role: 'bu_spoc', scope: { kind: 'business_unit', businessUnit: 'CM' } };
@@ -228,90 +229,71 @@ function baseVersion(overrides: Partial<SubmittedVersion> = {}): SubmittedVersio
   };
 }
 
-test('W2-07: reviewerLaneOf, self-exclusion and decidableLane mirror the server deny cases', () => {
-  assert.equal(reviewerLaneOf([aiCoe]), 'ai_coe');
-  assert.equal(reviewerLaneOf([admin]), null);
-  assert.equal(reviewerLaneOf([owner, dpo]), 'dpo');
+test('reviewer lanes, self-exclusion and the decidable lane mirror the server deny cases', () => {
+  assert.deepEqual(reviewerLanesOf([aiCoe]), ['ai_coe']);
+  assert.deepEqual(reviewerLanesOf([admin]), []);
+  assert.deepEqual(reviewerLanesOf([owner, dpo]), ['dpo']);
   assert.equal(isSelfExcludedOnCase([dpo, spocCm], 'fixture:fx-user-dpo', baseView()), true);
   assert.equal(isSelfExcludedOnCase([dpo], 'fixture:fx-user-dpo', baseView()), false);
   assert.equal(isSelfExcludedOnCase([aiCoe], 'fixture:fx-user-owner-cm', baseView()), true);
   assert.equal(laneProjectionStatus(baseView(), 'ai_coe'), 'pending');
   assert.equal(laneProjectionStatus(baseView({ raiStatus: 'approved' }), 'ai_coe'), 'approved');
 
-  const version = baseVersion();
+  const lanesOf = (roles: RoleScope[], subjectId: string, version = baseVersion()) =>
+    reviewerWorkspaceLanes({ roles, subjectId, view: baseView(), version });
+  assert.deepEqual(lanesOf([aiCoe], 'fixture:fx-user-ai-coe'), ['ai_coe']);
+  assert.deepEqual(lanesOf([admin], 'fixture:fx-user-admin'), []);
+  assert.deepEqual(lanesOf([owner], 'fixture:fx-user-owner-cm'), [null]);
+  assert.deepEqual(lanesOf([spocCm], 'fixture:fx-user-spoc-cm'), [null]);
+  assert.deepEqual(lanesOf([dpo, spocCm], 'fixture:fx-user-dpo'), [null], 'self-excluded reviewer proposes');
+  assert.deepEqual(lanesOf([aiCoe], 'fixture:fx-user-ai-coe', baseVersion({ isLatest: false })), []);
+  assert.deepEqual(lanesOf([owner], 'fixture:fx-user-owner-cm', baseVersion({ isLatest: false })), []);
+
+  const decidable = (overrides: Partial<CaseView>, hasOpenDraft = false) =>
+    laneIsDecidable({ lane: 'ai_coe', view: baseView(overrides), hasOpenDraft });
+  assert.equal(decidable({}), true);
+  assert.equal(decidable({}, true), false);
+  assert.equal(decidable({ raiStatus: 'approved' }), false);
   assert.equal(
-    decidableLane({
-      roles: [aiCoe],
-      subjectId: 'fixture:fx-user-ai-coe',
-      view: baseView(),
-      version,
-      hasOpenDraft: false,
-    }),
-    'ai_coe',
-  );
-  assert.equal(
-    decidableLane({
-      roles: [admin],
-      subjectId: 'fixture:fx-user-admin',
-      view: baseView(),
-      version,
-      hasOpenDraft: false,
-    }),
-    null,
-  );
-  assert.equal(
-    decidableLane({
-      roles: [owner],
-      subjectId: 'fixture:fx-user-owner-cm',
-      view: baseView(),
-      version,
-      hasOpenDraft: false,
-    }),
-    null,
-  );
-  assert.equal(
-    decidableLane({
-      roles: [dpo],
-      subjectId: 'fixture:fx-user-dpo',
-      view: baseView(),
-      version,
-      hasOpenDraft: false,
-    }),
-    'dpo',
-  );
-  assert.equal(
-    decidableLane({
-      roles: [aiCoe],
-      subjectId: 'fixture:fx-user-ai-coe',
-      view: baseView(),
-      version: baseVersion({ isLatest: false }),
-      hasOpenDraft: false,
-    }),
-    null,
-  );
-  assert.equal(
-    decidableLane({
-      roles: [aiCoe],
-      subjectId: 'fixture:fx-user-ai-coe',
-      view: baseView(),
-      version,
-      hasOpenDraft: true,
-    }),
-    null,
-  );
-  assert.equal(
-    decidableLane({
-      roles: [aiCoe],
-      subjectId: 'fixture:fx-user-ai-coe',
-      view: baseView({ raiStatus: 'approved' }),
-      version,
-      hasOpenDraft: false,
-    }),
-    null,
+    laneIsDecidable({ lane: 'dpo', view: baseView({ raiStatus: 'approved' }), hasOpenDraft: false }),
+    true,
   );
 });
 
-test('W2-07: send-back feedback requires a named slot; severity and qc reason keys exist', () => {
+test('a principal with the dpo and it_security grants reviews and dispositions in both lanes', () => {
+  const both: RoleScope[] = [dpo, itSec];
+  const subjectId = 'fixture:fx-user-dpo-it';
+  assert.deepEqual(reviewerLanesOf(both), ['dpo', 'it_security']);
+  assert.deepEqual(
+    reviewerWorkspaceLanes({ roles: both, subjectId, view: baseView(), version: baseVersion() }),
+    ['dpo', 'it_security'],
+  );
+  for (const findingOwningLane of ['dpo', 'it_security'] as const) {
+    assert.deepEqual(
+      dispositionKindsForActor({
+        roles: both,
+        subjectId,
+        view: baseView(),
+        findingOwningLane,
+        latestKind: null,
+      }),
+      ['fixed', 'waived', 'not_applicable'],
+      findingOwningLane,
+    );
+  }
+  assert.deepEqual(
+    dispositionKindsForActor({
+      roles: both,
+      subjectId,
+      view: baseView(),
+      findingOwningLane: 'ai_coe',
+      latestKind: null,
+    }),
+    [],
+  );
+});
+
+test('send-back feedback requires a named slot; severity and qc reason keys exist', () => {
   assert.equal(sendBackFeedbackIsValid([]), false);
   assert.equal(sendBackFeedbackIsValid([{ slot: 5 as const, deficiency: '' }]), false);
   assert.equal(sendBackFeedbackIsValid([{ slot: 5 as const, deficiency: '   ' }]), false);
@@ -329,9 +311,10 @@ test('W2-07: send-back feedback requires a named slot; severity and qc reason ke
   ] as const) {
     assert.ok(isLocaleKey(qcUnavailableReasonKey(reason)), String(reason));
   }
+  assert.equal(qcUnavailableReasonKey(undefined), 'review.qc.reason.unreported', 'no reason is not a cause');
 });
 
-test('W2-07: findingMessageParams fills {threshold_source} so t() never leaves braces', () => {
+test('findingMessageParams fills {threshold_source} so t() never leaves braces', () => {
   const finding: StoredFindingSummary = {
     findingId: 'f1',
     ruleId: 'ACC-CLASSIC-ML-METRIC',
@@ -352,47 +335,19 @@ test('W2-07: findingMessageParams fills {threshold_source} so t() never leaves b
   assert.ok(en.includes('v1.0 Sheet3'), en);
 });
 
-test('W2-09: findingsLane keeps the owning lane after decide; owner/Admin get none', () => {
-  const version = baseVersion();
-  assert.equal(
-    findingsLane({
+test('a decided lane keeps its workspace so its findings stay open to disposition', () => {
+  assert.deepEqual(
+    reviewerWorkspaceLanes({
       roles: [aiCoe],
       subjectId: 'fixture:fx-user-ai-coe',
       view: baseView({ raiStatus: 'approved' }),
-      version,
+      version: baseVersion(),
     }),
-    'ai_coe',
-  );
-  assert.equal(
-    findingsLane({
-      roles: [owner],
-      subjectId: 'fixture:fx-user-owner-cm',
-      view: baseView(),
-      version,
-    }),
-    null,
-  );
-  assert.equal(
-    findingsLane({
-      roles: [admin],
-      subjectId: 'fixture:fx-user-admin',
-      view: baseView(),
-      version,
-    }),
-    null,
-  );
-  assert.equal(
-    findingsLane({
-      roles: [aiCoe],
-      subjectId: 'fixture:fx-user-ai-coe',
-      view: baseView(),
-      version: baseVersion({ isLatest: false }),
-    }),
-    null,
+    ['ai_coe'],
   );
 });
 
-test('W2-09: dispositionKindsForActor — lane kinds, confirm after propose, owner propose-fixed only', () => {
+test('dispositionKindsForActor: lane kinds, confirm after propose, owner propose-fixed only', () => {
   const view = baseView();
   assert.deepEqual(
     dispositionKindsForActor({
@@ -401,7 +356,6 @@ test('W2-09: dispositionKindsForActor — lane kinds, confirm after propose, own
       view,
       findingOwningLane: 'ai_coe',
       latestKind: null,
-      canSeeFindings: true,
     }),
     ['fixed', 'waived', 'not_applicable'],
   );
@@ -412,7 +366,6 @@ test('W2-09: dispositionKindsForActor — lane kinds, confirm after propose, own
       view,
       findingOwningLane: 'ai_coe',
       latestKind: 'fixed_proposed',
-      canSeeFindings: true,
     }),
     ['fixed', 'waived', 'not_applicable', 'fixed_confirmed'],
   );
@@ -423,7 +376,6 @@ test('W2-09: dispositionKindsForActor — lane kinds, confirm after propose, own
       view,
       findingOwningLane: 'ai_coe',
       latestKind: 'waived',
-      canSeeFindings: true,
     }),
     ['fixed', 'waived', 'not_applicable'],
   );
@@ -434,7 +386,6 @@ test('W2-09: dispositionKindsForActor — lane kinds, confirm after propose, own
       view,
       findingOwningLane: 'ai_coe',
       latestKind: null,
-      canSeeFindings: true,
     }),
     [],
   );
@@ -445,7 +396,6 @@ test('W2-09: dispositionKindsForActor — lane kinds, confirm after propose, own
       view,
       findingOwningLane: 'ai_coe',
       latestKind: null,
-      canSeeFindings: true,
     }),
     [],
   );
@@ -460,18 +410,6 @@ test('W2-09: dispositionKindsForActor — lane kinds, confirm after propose, own
       view,
       findingOwningLane: 'ai_coe',
       latestKind: null,
-      canSeeFindings: false,
-    }),
-    [],
-  );
-  assert.deepEqual(
-    dispositionKindsForActor({
-      roles: [owner],
-      subjectId: 'fixture:fx-user-owner-cm',
-      view,
-      findingOwningLane: 'ai_coe',
-      latestKind: null,
-      canSeeFindings: true,
     }),
     ['fixed_proposed'],
   );
@@ -482,7 +420,6 @@ test('W2-09: dispositionKindsForActor — lane kinds, confirm after propose, own
       view,
       findingOwningLane: 'ai_coe',
       latestKind: 'fixed_proposed',
-      canSeeFindings: true,
     }),
     ['fixed_proposed'],
   );
@@ -512,34 +449,28 @@ test('Ready loads persisted findings while non-Ready approved lanes still run QC
       lane === null ? 'persisted' : 'lane_qc',
     );
   }
-  assert.equal(
-    findingsLane({ roles: [aiCoe], subjectId: 'reviewer', view: ready, version: baseVersion() }),
-    'ai_coe',
+  assert.deepEqual(
+    reviewerWorkspaceLanes({ roles: [aiCoe], subjectId: 'reviewer', view: ready, version: baseVersion() }),
+    ['ai_coe'],
   );
-  assert.equal(
-    findingsLane({ roles: [aiCoe], subjectId: ready.businessOwner, view: ready, version: baseVersion() }),
-    null,
-  );
-  assert.equal(
-    findingsLane({
+  assert.deepEqual(
+    reviewerWorkspaceLanes({
       roles: [aiCoe],
       subjectId: 'reviewer',
       view: ready,
       version: baseVersion({ isLatest: false }),
     }),
-    null,
+    [],
   );
 });
 
 test('Ready denies every offered mutation even when lane projections still say pending', () => {
   const view = baseView({ aiReadinessStatus: 'ready' });
-  const it: RoleScope = { role: 'it_security', scope: { kind: 'all_cases', lane: 'it_security' } };
-  for (const grant of [aiCoe, dpo, it, owner, spocCm, admin]) {
+  for (const lane of ['ai_coe', 'dpo', 'it_security'] as const) {
+    assert.equal(laneIsDecidable({ lane, view, hasOpenDraft: false }), false, lane);
+  }
+  for (const grant of [aiCoe, dpo, itSec, owner, spocCm, admin]) {
     const subjectId: string = grant === owner ? view.businessOwner : 'reviewer';
-    assert.equal(
-      decidableLane({ roles: [grant], subjectId, view, version: baseVersion(), hasOpenDraft: false }),
-      null,
-    );
     for (const findingOwningLane of ['ai_coe', 'dpo', 'it_security'] as const) {
       assert.deepEqual(
         dispositionKindsForActor({
@@ -548,7 +479,6 @@ test('Ready denies every offered mutation even when lane projections still say p
           view,
           findingOwningLane,
           latestKind: 'fixed_proposed',
-          canSeeFindings: true,
         }),
         [],
       );
@@ -561,7 +491,6 @@ test('Ready denies every offered mutation even when lane projections still say p
       view: baseView({ raiStatus: 'approved' }),
       findingOwningLane: 'ai_coe',
       latestKind: 'fixed_proposed',
-      canSeeFindings: true,
     }),
     ['fixed', 'waived', 'not_applicable', 'fixed_confirmed'],
   );

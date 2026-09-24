@@ -1,5 +1,5 @@
-// Findings list for the reviewer workspace (W2-07 / W2-09): unavailable / empty / finding rows with
-// disposition controls. latestKind comes from GET …/findings (and optional in-session overlay).
+// Finding rows with their disposition controls, the empty status, and the QC-unavailable block. The latest
+// disposition of each finding comes from GET …/findings.
 
 import type { JSX } from 'react';
 import { isLocaleKey } from '@rai/shared/locales/keys';
@@ -145,7 +145,6 @@ function FindingRow({
           session={session}
           view={view}
           latestKind={latestKind}
-          canSeeFindings={true}
           onRecorded={onDisposition}
           onUnauthenticated={onUnauthenticated}
         />

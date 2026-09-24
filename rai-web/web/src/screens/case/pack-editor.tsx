@@ -27,6 +27,7 @@ import {
   slotNameKey,
   slotOfFieldPath,
   stageKey,
+  type Notice,
   type PendingSlots,
 } from './view-model.js';
 
@@ -44,7 +45,7 @@ export interface PackEditorProps {
   pendingSettings: PendingSettings;
   busy: 'idle' | 'saving' | 'submitting';
   error: unknown;
-  notice: { key: 'pack.saved' | 'pack.submitted'; params: Record<string, string | number> } | null;
+  notice: Notice | null;
   onSlotChange: (slot: SlotNumber, next: SlotState, artifact: ArtifactRef | undefined) => void;
   onSettingsChange: (next: PendingSettings) => void;
   onSave: () => void;

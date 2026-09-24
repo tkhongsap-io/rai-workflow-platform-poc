@@ -1,4 +1,4 @@
-// Pure view-model functions for the case flow (W1-06). No DOM, no fetch: unit-tested under `npm run test:unit`
+// Pure view-model functions for the case flow. No DOM, no fetch: unit-tested under `npm run test:unit`
 // (W0-02 section 8.1: web unit tests cover view models and formatting only). Every label is a locale key
 // rendered by the screen through t() (D12). Dates and sizes render through web/src/i18n/format.ts; paths come
 // from web/src/routes.ts; the envelope is described by components/error-notice.ts. Nothing here decides access
@@ -24,6 +24,17 @@ export const SLOT_STATE_ORDER: readonly SlotStateName[] = Object.freeze([
 ]);
 
 export const REASON_MAX_LENGTH = 500;
+
+/** The success line of the case screen; one at a time. */
+export interface Notice {
+  key:
+    | 'pack.saved'
+    | 'pack.submitted'
+    | 'review.decided.approve'
+    | 'review.decided.send_back'
+    | 'review.decided.ready';
+  params: Record<string, string | number>;
+}
 
 export function slotNameKey(slot: SlotNumber): LocaleKey {
   return `slot.s${slot}.name` as LocaleKey;
@@ -142,18 +153,9 @@ export function slotOfFieldPath(path: string): SlotNumber | null {
   return (SLOT_NUMBERS as readonly number[]).includes(n) ? (n as SlotNumber) : null;
 }
 
-/** The reviewer's own lane from the session grants, or null when the principal has no lane role. */
-export function reviewerLaneOf(roles: readonly RoleScope[]): Lane | null {
-  for (const grant of roles) {
-    if (
-      (grant.role === 'ai_coe' || grant.role === 'dpo' || grant.role === 'it_security') &&
-      grant.scope.kind === 'all_cases' &&
-      'lane' in grant.scope
-    ) {
-      return grant.scope.lane;
-    }
-  }
-  return null;
+/** Every lane the principal reviews; a principal may hold several lane grants. */
+export function reviewerLanesOf(roles: readonly RoleScope[]): Lane[] {
+  return roles.flatMap((grant) => ('lane' in grant.scope ? [grant.scope.lane] : []));
 }
 
 /** D05: owner of the case, or BU SPOC of the case's business unit, must not decide that lane. */
@@ -204,21 +206,23 @@ export function laneProjectionStatus(view: CaseView, lane: Lane): LaneProjection
 }
 
 /**
- * The lane whose QC findings this actor may load on this version (qc-run is authorized as lane.approve).
- * Null for Admin, owner/SPOC self-exclusion (403 on qc-run), or a non-current submitted version.
- * Remains after the lane is decided so disposition controls can still appear (W2-09 / A09).
+ * The workspaces to show on this version: one per lane the actor reviews, or `null` for the owner/BU-SPOC panel
+ * that proposes fixes. Only the latest version has any. The case's owner or BU SPOC never reviews it (D05; qc-run
+ * answers 403), so their lane grants give way to the proposal panel. A decided lane keeps its workspace so its
+ * findings stay open to disposition.
  */
-export function findingsLane(args: {
+export function reviewerWorkspaceLanes(args: {
   roles: readonly RoleScope[];
   subjectId: string;
   view: CaseView;
   version: SubmittedVersion;
-}): Lane | null {
-  const lane = reviewerLaneOf(args.roles);
-  if (lane === null) return null;
-  if (isSelfExcludedOnCase(args.roles, args.subjectId, args.view)) return null;
-  if (!args.version.isLatest) return null;
-  return lane;
+}): (Lane | null)[] {
+  if (!args.version.isLatest) return [];
+  const lanes = isSelfExcludedOnCase(args.roles, args.subjectId, args.view)
+    ? []
+    : reviewerLanesOf(args.roles);
+  if (lanes.length > 0) return lanes;
+  return canProposeFixedOnCase(args.roles, args.subjectId, args.view) ? [null] : [];
 }
 
 /** Ready is a persisted read: lane QC remains available only before completion. */
@@ -230,22 +234,15 @@ export function reviewerFindingsLoadMode(
 }
 
 /**
- * The lane the signed-in reviewer may decide on this version, or null when the UI must not draw controls
- * (wrong role, Admin, owner/SPOC self-exclusion, stale/superseded version, or lane already decided).
- * Mirrors the server deny cases so the SPA does not offer a button the API would 403 (W0-05 UI convenience).
+ * Whether a lane's workspace offers approve and send-back: not once the case is Ready, while a successor draft is
+ * open, or after the lane has decided. A convenience only; the API answers every decision.
  */
-export function decidableLane(args: {
-  roles: readonly RoleScope[];
-  subjectId: string;
-  view: CaseView;
-  version: SubmittedVersion;
-  hasOpenDraft: boolean;
-}): Lane | null {
-  const lane = findingsLane(args);
-  if (lane === null) return null;
-  if (args.view.aiReadinessStatus === 'ready' || args.hasOpenDraft) return null;
-  if (laneProjectionStatus(args.view, lane) !== 'pending') return null;
-  return lane;
+export function laneIsDecidable(args: { lane: Lane; view: CaseView; hasOpenDraft: boolean }): boolean {
+  return (
+    args.view.aiReadinessStatus !== 'ready' &&
+    !args.hasOpenDraft &&
+    laneProjectionStatus(args.view, args.lane) === 'pending'
+  );
 }
 
 /**
@@ -260,14 +257,12 @@ export function dispositionKindsForActor(args: {
   view: Pick<CaseView, 'businessOwner' | 'businessUnitId' | 'aiReadinessStatus'>;
   findingOwningLane: Lane;
   latestKind: DispositionKind | null;
-  canSeeFindings: boolean;
 }): DispositionKind[] {
-  if (!args.canSeeFindings || args.view.aiReadinessStatus === 'ready') return [];
+  if (args.view.aiReadinessStatus === 'ready') return [];
   if (canProposeFixedOnCase(args.roles, args.subjectId, args.view)) {
     return ['fixed_proposed'];
   }
-  const lane = reviewerLaneOf(args.roles);
-  if (lane === null || lane !== args.findingOwningLane) return [];
+  if (!reviewerLanesOf(args.roles).includes(args.findingOwningLane)) return [];
   if (isSelfExcludedOnCase(args.roles, args.subjectId, args.view)) return [];
   const kinds: DispositionKind[] = ['fixed', 'waived', 'not_applicable'];
   if (args.latestKind === 'fixed_proposed') kinds.push('fixed_confirmed');
@@ -330,7 +325,8 @@ export function qcUnavailableReasonKey(
     case 'artifact_unreadable':
       return 'review.qc.reason.artifact_unreadable';
     case 'not_configured':
-    case undefined:
       return 'review.qc.reason.not_configured';
+    case undefined:
+      return 'review.qc.reason.unreported';
   }
 }

@@ -1,9 +1,6 @@
-// The case flow (W1-06, Lane B): overview, version navigation and the nine-slot pack editor or a frozen version,
-// as one screen over the W0-02 section 7 contract behind W1-07's RequireSession. Loads the case and configuration
-// (7.3), the open draft (7.5) when the case has one, the version list and the selected version (7.6), and the
-// metadata of every attached artifact (7.4) through the typed client. Every answer is rendered as received: a
-// 401 drops the session so the router sends the viewer to sign-in with `returnTo`; a 403 or 404 is shown as the
-// envelope's message key. No client-side rule decides access (W0-05 "UI convenience"; W0-02 section 1.1).
+// The case screen: overview, version navigation, and the pack editor or a frozen version with its review
+// workspaces. Every API answer is rendered as received: a 401 drops the session, a 403 or 404 shows the envelope's
+// message key. No client rule decides access.
 
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
@@ -17,7 +14,7 @@ import { ApiError, api } from '../../api/client.js';
 import { ErrorNotice } from '../../components/error-notice.js';
 import { useLocale } from '../../i18n/locale-provider.js';
 import { ROUTES } from '../../routes.js';
-import { useSession } from '../../session/session-provider.js';
+import { useSession, useSignedInSession } from '../../session/session-provider.js';
 import './case.css';
 import { CaseOverview } from './case-overview.js';
 import { PackEditor, type PendingSettings } from './pack-editor.js';
@@ -25,7 +22,13 @@ import { PackFrozen } from './pack-frozen.js';
 import { ReviewerWorkspace } from './reviewer-workspace.js';
 import type { ArtifactLookup } from './slot-rows.js';
 import { VersionNav } from './version-nav.js';
-import { SLOT_NUMBERS, applySlotChange, type PendingSlots } from './view-model.js';
+import {
+  SLOT_NUMBERS,
+  applySlotChange,
+  reviewerWorkspaceLanes,
+  type Notice,
+  type PendingSlots,
+} from './view-model.js';
 
 interface Loaded {
   configuration: ConfigurationView;
@@ -39,11 +42,6 @@ type LoadState = { kind: 'loading' } | LoadResult;
 
 type VersionResult = { kind: 'error'; error: unknown } | { kind: 'ready'; version: SubmittedVersion };
 type VersionState = { kind: 'idle' } | { kind: 'loading' } | VersionResult;
-
-export type Notice =
-  | { key: 'pack.saved' | 'pack.submitted'; params: Record<string, string | number> }
-  | { key: 'review.decided.approve' | 'review.decided.send_back'; params: Record<string, string | number> }
-  | { key: 'review.decided.ready'; params: Record<string, string | number> };
 
 async function loadAll(caseId: string): Promise<Loaded> {
   const [configuration, view, versions] = await Promise.all([
@@ -60,7 +58,8 @@ export function CaseScreen(): JSX.Element {
   const caseId = params.caseId ?? '';
   const versionId = params.versionId;
   const navigate = useNavigate();
-  const { signedOut, state: sessionState } = useSession();
+  const { signedOut } = useSession();
+  const session = useSignedInSession();
 
   // Loading is derived: a result is current only when it was produced for the key of the current request, so
   // no effect sets state synchronously (react-hooks/set-state-in-effect); the async callbacks set it.
@@ -260,7 +259,7 @@ export function CaseScreen(): JSX.Element {
       busy={busy}
       editorError={editorError}
       notice={notice}
-      session={sessionState.status === 'signed_in' ? sessionState.session : null}
+      session={session}
       onSlotChange={onSlotChange}
       onSettingsChange={setPendingSettings}
       onSave={onSave}
@@ -292,7 +291,7 @@ interface BodyProps {
   busy: 'idle' | 'saving' | 'submitting';
   editorError: unknown;
   notice: Notice | null;
-  session: SessionInfo | null;
+  session: SessionInfo;
   onSlotChange: (slot: SlotNumber, next: SlotState, artifact: ArtifactRef | undefined) => void;
   onSettingsChange: (next: PendingSettings) => void;
   onSave: () => void;
@@ -303,6 +302,11 @@ interface BodyProps {
   onLaneDecided: (response: LaneDecisionResponse) => void;
   onDispositionRecorded: (response: DispositionResponse) => void;
   onUnauthenticated: (err: unknown) => boolean;
+}
+
+/** A decision reloads the screen; focus moves to its outcome instead of dropping to <body>. */
+function focusOnMount(element: HTMLElement | null): void {
+  element?.focus();
 }
 
 function BackToList(): JSX.Element {
@@ -369,12 +373,7 @@ function CaseScreenBody(props: BodyProps): JSX.Element {
                 pendingSettings={props.pendingSettings}
                 busy={props.busy}
                 error={props.editorError}
-                notice={
-                  props.notice !== null &&
-                  (props.notice.key === 'pack.saved' || props.notice.key === 'pack.submitted')
-                    ? props.notice
-                    : null
-                }
+                notice={props.notice?.key.startsWith('pack.') === true ? props.notice : null}
                 onSlotChange={props.onSlotChange}
                 onSettingsChange={props.onSettingsChange}
                 onSave={props.onSave}
@@ -391,12 +390,24 @@ function CaseScreenBody(props: BodyProps): JSX.Element {
           ) : versionState.kind === 'ready' ? (
             <>
               {props.notice !== null ? (
-                <p className={'notice notice-success'} role={'status'}>
+                <p
+                  className={'notice notice-success'}
+                  role={'status'}
+                  tabIndex={-1}
+                  ref={props.notice.key.startsWith('review.decided.') ? focusOnMount : undefined}
+                >
                   {t(props.notice.key, props.notice.params)}
                 </p>
               ) : null}
-              {props.session !== null ? (
+              {reviewerWorkspaceLanes({
+                roles: props.session.principal.roles,
+                subjectId: props.session.principal.subjectId,
+                view: state.view,
+                version: versionState.version,
+              }).map((lane) => (
                 <ReviewerWorkspace
+                  key={lane ?? 'owner'}
+                  lane={lane}
                   caseId={caseId}
                   version={versionState.version}
                   view={state.view}
@@ -406,7 +417,7 @@ function CaseScreenBody(props: BodyProps): JSX.Element {
                   onDispositionRecorded={props.onDispositionRecorded}
                   onUnauthenticated={props.onUnauthenticated}
                 />
-              ) : null}
+              ))}
               <PackFrozen version={versionState.version} versions={state.versions} />
             </>
           ) : versionState.kind === 'error' ? (
