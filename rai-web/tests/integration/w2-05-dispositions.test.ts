@@ -54,6 +54,7 @@ const LANE_OPEN_RECIPIENTS = laneOpenRecipientsFromIdentities(FIXTURE_USERS);
 const OWNER_A = 'fx-user-owner-cm';
 const DPO = 'fx-user-dpo';
 const AI_COE = 'fx-user-ai-coe';
+const IT_SECURITY = 'fx-user-it-security';
 const ADMIN = 'fx-user-admin';
 const SPOC_CM = 'fx-user-spoc-cm';
 const VENDOR = findFixtureCase('fx-case-vendor')!;
@@ -1198,6 +1199,76 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
 
     const runs = await db.owner.execute(sql`SELECT id FROM qc_run WHERE version_id = ${version.versionId}`);
     assert.equal(runs.rows.length, 0);
+  });
+});
+
+describe('W3 hardening: disposition and lane QC answer malformed or unknown ids like the middleware', () => {
+  const linesFor = (res: { headers: Record<string, unknown> }, event: string) =>
+    capture.lines().filter((l) => l.event === event && l.correlationId === res.headers['x-correlation-id']);
+
+  function assertNotFound(
+    res: { statusCode: number; body: string; headers: Record<string, unknown> },
+    resource: string,
+  ) {
+    assert.equal(res.statusCode, 404, res.body);
+    const error = JSON.parse(res.body) as ErrorResponse;
+    assert.equal(error.error.code, 'not_found');
+    assert.deepEqual(error.error.details, { resource });
+    assert.deepEqual(
+      linesFor(res, 'error.captured').map((l) => l.fields?.code),
+      ['not_found'],
+    );
+    assert.equal(linesFor(res, 'authz.denied').length, 0, 'no authz.denied line');
+  }
+
+  it("caseId 'not-a-uuid', findingId 'x' and qc-run versionId 'x' are 404, never 500", async () => {
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, VENDOR.caseId);
+    const revision = await caseRevision(VENDOR.caseId);
+    const ai = await signIn(AI_COE);
+    const body = {
+      expectedVersion: { versionId: version.versionId, revision },
+      kind: 'waived',
+      reason: 'synthetic',
+    };
+
+    assertNotFound(await dispose(ai, 'not-a-uuid', randomUUID(), body), 'case');
+    assertNotFound(await dispose(ai, VENDOR.caseId, 'x', body), 'finding');
+    assertNotFound(
+      await app.inject({
+        method: 'POST',
+        url: `/api/cases/${VENDOR.caseId}/versions/x/lanes/ai_coe/qc-run`,
+        headers: { 'content-type': 'application/json', ...asUser(ai) },
+        payload: { expectedVersion: { versionId: 'x', revision } },
+      }),
+      'version',
+    );
+
+    // Without all_cases the unresolved case is 403 scope, as the middleware answers it.
+    const denied = await dispose(owner, 'not-a-uuid', randomUUID(), { ...body, kind: 'fixed_proposed' });
+    assert.equal(denied.statusCode, 403, denied.body);
+    assert.deepEqual(
+      linesFor(denied, 'error.captured').map((l) => l.fields?.code),
+      ['forbidden'],
+    );
+    assert.equal(linesFor(denied, 'authz.denied')[0]?.fields?.reason, 'scope');
+  });
+
+  it('an unknown finding is 404 for every lane reviewer and 403 role for Admin', async () => {
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, VENDOR.caseId);
+    const revision = await caseRevision(VENDOR.caseId);
+    const body = {
+      expectedVersion: { versionId: version.versionId, revision },
+      kind: 'waived',
+      reason: 'synthetic',
+    };
+    for (const reviewer of [DPO, IT_SECURITY, AI_COE]) {
+      assertNotFound(await dispose(await signIn(reviewer), VENDOR.caseId, randomUUID(), body), 'finding');
+    }
+    const admin = await dispose(await signIn(ADMIN), VENDOR.caseId, randomUUID(), body);
+    assert.equal(admin.statusCode, 403, admin.body);
+    assert.equal(linesFor(admin, 'authz.denied')[0]?.fields?.reason, 'role');
   });
 });
 

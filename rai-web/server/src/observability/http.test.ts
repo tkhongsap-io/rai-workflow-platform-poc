@@ -256,6 +256,29 @@ test('health probes bypass a failing cookie session lookup while protected route
   }
 });
 
+test('a public route with a cookie serves without touching a failing session store', async () => {
+  let calls = 0;
+  const app = setup(
+    identityResolving(async () => {
+      calls++;
+      return unavailable();
+    }),
+    () => readinessOf(storeProbes),
+  );
+  app.fastify.get('/test/public', { config: { auth: { kind: 'public' } } }, () => 'served');
+  try {
+    const response = await app.fastify.inject({
+      url: '/test/public',
+      headers: { cookie: `rai_session=${canary}` },
+    });
+    assert.equal(response.statusCode, 200);
+    assert.equal(calls, 0);
+    assert.equal(app.lines().filter((line) => line.event === 'error.captured').length, 0);
+  } finally {
+    await app.fastify.close();
+  }
+});
+
 test('readiness emits its first status and transitions, not repeated polls', async () => {
   let db: 'ok' | 'unreachable' = 'ok';
   const app = setup(undefined, () => readinessOf({ ...storeProbes, db: () => Promise.resolve(db) }));
@@ -331,7 +354,7 @@ test('request.completed names the signed-in actor and a sole role', async () => 
     ),
     () => readinessOf(storeProbes),
   );
-  app.fastify.get('/test/actor', { config: { auth: { kind: 'public' } } }, () => 'served');
+  app.fastify.get('/test/actor', { config: { auth: { kind: 'session' } } }, () => 'served');
   try {
     const response = await app.fastify.inject({
       url: '/test/actor',

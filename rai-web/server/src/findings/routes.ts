@@ -3,11 +3,11 @@
 // (W0-05: "resolves the body's kind to its action before authorize runs").
 // Lane QC uses lane.approve + target:lane (owning-lane reviewer only), same ownership gate as lane.approve.
 
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import { Type } from 'typebox';
-import { ForbiddenError, NotFoundError, UnauthenticatedError } from '@rai/shared/errors';
-import { LANES, type Lane } from '@rai/shared/constants';
+import { NotFoundError } from '@rai/shared/errors';
+import { LANES } from '@rai/shared/constants';
 import {
   DispositionRequestSchema,
   DispositionResponseSchema,
@@ -17,8 +17,8 @@ import {
   VersionFindingsResponseSchema,
   type DispositionKind,
 } from '@rai/shared/schemas/review';
-import { actorOf } from '../authz/middleware.js';
-import { authorize, type Action, type CaseScopeFacts } from '../authz/policy.js';
+import { actorOf, denyUnlessAllowed } from '../authz/middleware.js';
+import { authorize, type Action } from '../authz/policy.js';
 import type { ErrorCapture } from '../observability/errors.js';
 import type { Emitter } from '../observability/log.js';
 import { IDEMPOTENCY_HEADER, requireIdempotencyKey } from '../cases/idempotency.js';
@@ -64,34 +64,6 @@ export function registerFindingsRoutes(fastify: FastifyInstance, deps: FindingsR
   const app = fastify.withTypeProvider<TypeBoxTypeProvider>();
   const facts = createScopeFactsSource(deps.db);
 
-  function authorizeFinding(
-    request: FastifyRequest,
-    action: Action,
-    caseFacts: CaseScopeFacts,
-    owningLane: Lane,
-  ) {
-    const principal = request.principal;
-    if (principal === undefined) throw new UnauthenticatedError();
-    const actor = actorOf(principal);
-    const decision = authorize(actor, action, {
-      kind: 'finding',
-      facts: caseFacts,
-      owningLane,
-    });
-    if (!decision.allow) {
-      deps.emitter.log('authz.denied', {
-        action,
-        targetType: 'finding',
-        targetId: caseFacts.caseId,
-        actorSubjectId: actor.subjectId,
-        actorRole: actor.roles.map((r) => r.role).join(','),
-        reason: decision.reason,
-      });
-      throw new ForbiddenError();
-    }
-    return decision;
-  }
-
   // GET …/versions/:versionId/findings — version.view; returns stored findings + latestDisposition (no qc_run write).
   app.get(
     '/api/cases/:caseId/versions/:versionId/findings',
@@ -136,58 +108,43 @@ export function registerFindingsRoutes(fastify: FastifyInstance, deps: FindingsR
       },
     },
     async (request, reply) => {
-      const principal = request.principal;
-      if (principal === undefined) throw new UnauthenticatedError();
+      const principal = request.principal!;
       const key = requireIdempotencyKey(request.headers[IDEMPOTENCY_HEADER]);
-
+      const { caseId, findingId } = request.params;
+      const actor = actorOf(principal);
       // Body schema already validated kind; map to action before authorize (W0-05).
       const action = KIND_TO_ACTION[request.body.kind];
+      const log = { targetType: 'finding', targetId: caseId };
 
-      const caseFacts = await facts.byCaseId(request.params.caseId);
+      // A malformed id is a missing row: the same 403-before-404 answers the middleware gives.
+      const caseFacts = isUuid(caseId) ? await facts.byCaseId(caseId) : undefined;
       if (caseFacts === undefined) {
-        // Unresolved: authorize with unresolved using propose_fixed as role probe then 404/403.
-        const probe = authorize(actorOf(principal), action, { kind: 'unresolved' });
-        if (!probe.allow) {
-          deps.emitter.log('authz.denied', {
-            action,
-            targetType: 'finding',
-            targetId: request.params.caseId,
-            actorSubjectId: principal.subjectId,
-            actorRole: principal.roles.map((r) => r.role).join(','),
-            reason: probe.reason,
-          });
-          throw new ForbiddenError();
-        }
+        denyUnlessAllowed(deps.emitter, actor, action, { kind: 'unresolved' }, log);
         throw new NotFoundError('case');
       }
+      const finding = isUuid(findingId) ? await readFindingForCase(deps.db, caseId, findingId) : undefined;
+      // An unknown finding has no owning lane (issue #35 assigns none), so any lane that would allow means 404.
+      const owningLane =
+        finding === undefined
+          ? (LANES.find(
+              (lane) =>
+                authorize(actor, action, { kind: 'finding', facts: caseFacts, owningLane: lane }).allow,
+            ) ?? LANES[0]!)
+          : owningLaneOf(finding);
+      const decision = denyUnlessAllowed(
+        deps.emitter,
+        actor,
+        action,
+        { kind: 'finding', facts: caseFacts, owningLane },
+        log,
+      );
+      if (finding === undefined) throw new NotFoundError('finding');
 
-      const finding = await readFindingForCase(deps.db, request.params.caseId, request.params.findingId);
-      if (finding === undefined) {
-        const probe = authorize(actorOf(principal), action, {
-          kind: 'finding',
-          facts: caseFacts,
-          owningLane: 'ai_coe',
-        });
-        if (!probe.allow) {
-          deps.emitter.log('authz.denied', {
-            action,
-            targetType: 'finding',
-            targetId: request.params.caseId,
-            actorSubjectId: principal.subjectId,
-            actorRole: principal.roles.map((r) => r.role).join(','),
-            reason: probe.reason,
-          });
-          throw new ForbiddenError();
-        }
-        throw new NotFoundError('finding');
-      }
-
-      const decision = authorizeFinding(request, action, caseFacts, owningLaneOf(finding));
       const result = await recordDisposition(
         deps,
         { actor: principal, role: decision.via.role, correlationId: request.id },
-        request.params.caseId,
-        request.params.findingId,
+        caseId,
+        findingId,
         request.body,
         key,
       );
@@ -208,7 +165,10 @@ export function registerFindingsRoutes(fastify: FastifyInstance, deps: FindingsR
       },
     },
     async (request) => {
-      if (request.body.expectedVersion.versionId !== request.params.versionId) {
+      if (
+        !isUuid(request.params.versionId) ||
+        request.body.expectedVersion.versionId !== request.params.versionId
+      ) {
         throw new NotFoundError('version');
       }
       const outcome = await runAndPersistLaneQc(
@@ -249,6 +209,4 @@ export function registerFindingsRoutes(fastify: FastifyInstance, deps: FindingsR
       };
     },
   );
-
-  void LANES;
 }

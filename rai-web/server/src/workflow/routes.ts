@@ -4,14 +4,13 @@
 import type { FastifyInstance } from 'fastify';
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import { Type } from 'typebox';
-import { LANES } from '@rai/shared/constants';
-import { NotFoundError } from '@rai/shared/errors';
 import {
   ApproveLaneRequestSchema,
   LaneDecisionResponseSchema,
   LaneSchema,
   SendBackLaneRequestSchema,
 } from '@rai/shared/schemas/review';
+import { authorizedActor } from '../authz/middleware.js';
 import { IDEMPOTENCY_HEADER, requireIdempotencyKey } from '../cases/idempotency.js';
 import { approveLane, sendBackLane, type DecideServiceDeps } from './service.js';
 
@@ -37,13 +36,11 @@ export function registerDecideRoutes(fastify: FastifyInstance, deps: DecideRoute
       },
     },
     async (request, reply) => {
-      const principal = request.principal;
-      const decision = request.authz?.decision;
-      if (principal === undefined || decision === undefined) throw new NotFoundError('case');
+      const { principal, role } = authorizedActor(request);
       const key = requireIdempotencyKey(request.headers[IDEMPOTENCY_HEADER]);
       const result = await approveLane(
         deps,
-        { actor: principal, role: decision.via.role, correlationId: request.id },
+        { actor: principal, role, correlationId: request.id },
         request.params.caseId,
         request.params.versionId,
         request.params.lane,
@@ -65,13 +62,11 @@ export function registerDecideRoutes(fastify: FastifyInstance, deps: DecideRoute
       },
     },
     async (request, reply) => {
-      const principal = request.principal;
-      const decision = request.authz?.decision;
-      if (principal === undefined || decision === undefined) throw new NotFoundError('case');
+      const { principal, role } = authorizedActor(request);
       const key = requireIdempotencyKey(request.headers[IDEMPOTENCY_HEADER]);
       const result = await sendBackLane(
         deps,
-        { actor: principal, role: decision.via.role, correlationId: request.id },
+        { actor: principal, role, correlationId: request.id },
         request.params.caseId,
         request.params.versionId,
         request.params.lane,
@@ -81,7 +76,4 @@ export function registerDecideRoutes(fastify: FastifyInstance, deps: DecideRoute
       return reply.status(201).send(result.body);
     },
   );
-
-  // Exhaustiveness: every Lane is a valid :lane param value (keeps the constant wired into the route module).
-  void LANES;
 }

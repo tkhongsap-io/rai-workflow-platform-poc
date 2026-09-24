@@ -8,9 +8,9 @@
 import type { FastifyInstance } from 'fastify';
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import { Type } from 'typebox';
-import { NotFoundError } from '@rai/shared/errors';
 import { StageContextSchema } from '@rai/shared/schemas/slots';
 import { FrozenSlotSchema, SubmitRequestSchema, VersionSummarySchema } from '@rai/shared/schemas/versions';
+import { authorizedActor } from '../authz/middleware.js';
 import { IDEMPOTENCY_HEADER, requireIdempotencyKey } from '../cases/idempotency.js';
 import { latestVersion, listVersions, readVersion, submitDraft, type VersionServiceDeps } from './service.js';
 import type { RunSubmitQcInput } from '../qc/orchestrator.js';
@@ -61,13 +61,11 @@ export function registerVersionRoutes(fastify: FastifyInstance, deps: VersionRou
       },
     },
     async (request, reply) => {
-      const principal = request.principal;
-      const decision = request.authz?.decision;
-      if (principal === undefined || decision === undefined) throw new NotFoundError('case'); // unreachable after the middleware
+      const { principal, role } = authorizedActor(request);
       const key = requireIdempotencyKey(request.headers[IDEMPOTENCY_HEADER]);
       const result = await submitDraft(
         deps,
-        { actor: principal, role: decision.via.role, correlationId: request.id },
+        { actor: principal, role, correlationId: request.id },
         request.params.caseId,
         request.body,
         key,

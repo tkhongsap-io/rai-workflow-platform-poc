@@ -8,8 +8,9 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import { Type } from 'typebox';
-import { InvalidInputError, NotFoundError } from '@rai/shared/errors';
+import { InvalidInputError } from '@rai/shared/errors';
 import { PackDraftSchema, PackDraftUpdateRequestSchema } from '@rai/shared/schemas/pack';
+import { authorizedActor } from '../authz/middleware.js';
 import { rejectProjectedFields } from '../cases/projected-fields.js';
 import { readDraft, saveDraft, type PackServiceDeps } from './service.js';
 import { reasonRequiredErrors } from './slots.js';
@@ -55,12 +56,10 @@ export function registerPackRoutes(fastify: FastifyInstance, deps: PackRouteDeps
       preValidation: saveDraftBodyHook,
     },
     (request) => {
-      const principal = request.principal;
-      const decision = request.authz?.decision;
-      if (principal === undefined || decision === undefined) throw new NotFoundError('case'); // unreachable after the middleware
+      const { principal, role } = authorizedActor(request);
       return saveDraft(
         deps,
-        { actor: principal, role: decision.via.role, correlationId: request.id },
+        { actor: principal, role, correlationId: request.id },
         request.params.caseId,
         request.body,
       );

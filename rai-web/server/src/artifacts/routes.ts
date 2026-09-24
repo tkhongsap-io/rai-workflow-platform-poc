@@ -14,6 +14,7 @@ import { Type } from 'typebox';
 import { InvalidInputError, NotFoundError, UnsafeUploadError } from '@rai/shared/errors';
 import { ArtifactRefSchema } from '@rai/shared/schemas/artifacts';
 import { auditStore } from '../audit/store.js';
+import { authorizedActor } from '../authz/middleware.js';
 import type { Db } from '../db/client.js';
 import { artifact } from '../db/schema/artifact.js';
 import { withTransaction } from '../db/transaction.js';
@@ -63,14 +64,6 @@ async function firstPart(request: FastifyRequest): Promise<MultipartFile | undef
   return part;
 }
 
-function actorOf(request: FastifyRequest): { subjectId: string; role: string } {
-  const principal = request.principal;
-  const decision = request.authz?.decision;
-  if (principal === undefined || decision === undefined)
-    throw new Error('artifact route reached without authorization');
-  return { subjectId: principal.subjectId, role: decision.via.role };
-}
-
 export function registerArtifactRoutes(fastify: FastifyInstance, deps: ArtifactRouteDeps): void {
   const now = deps.now ?? (() => new Date());
 
@@ -104,11 +97,12 @@ export function registerArtifactRoutes(fastify: FastifyInstance, deps: ArtifactR
         if (!request.isMultipart())
           throw new InvalidInputError([{ path: 'file', messageKey: 'validation.required' }]);
         const file = await firstPart(request);
+        const { principal, role } = authorizedActor(request);
         const ref = await storeUpload(
           { db: deps.db, store: deps.store, limits: deps.limits, emitter: deps.emitter, now },
           {
             caseId: request.params.caseId,
-            actor: actorOf(request),
+            actor: { subjectId: principal.subjectId, role },
             correlationId: request.id,
             part:
               file === undefined
@@ -144,13 +138,13 @@ export function registerArtifactRoutes(fastify: FastifyInstance, deps: ArtifactR
       async (request, reply) => {
         const row = await loadArtifact(request.params.artifactId);
         if (row.bytesState !== 'present') throw new NotFoundError('artifact');
-        const actor = actorOf(request);
+        const { principal, role } = authorizedActor(request);
         const stream = await deps.store.open(row.contentHash);
         // The one audit event written outside a state change: its own transaction, before the bytes flow (W0-04).
         await withTransaction(deps.db, (tx) =>
           auditStore.append(tx, {
-            actorSubjectId: actor.subjectId,
-            actorRole: actor.role,
+            actorSubjectId: principal.subjectId,
+            actorRole: role,
             action: 'artifact.downloaded',
             targetCaseId: row.caseId,
             targetRef: { artifact_id: row.id },
