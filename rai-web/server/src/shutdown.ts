@@ -4,8 +4,7 @@
 // Why this exists: `fastify.close()` calls `http.Server.close()`, whose idle sweep closes only the sockets Node's
 // HTTP parser has seen a request on. A socket that connected and sent nothing — Chromium's speculative
 // pre-connect, which every open tab holds — is never swept, so `close()` waits for it forever and the deployable
-// hangs after SIGTERM whenever a browser tab is open (found by the W1-INT review on the CI runner; reproduced with
-// a plain `net.connect` that writes nothing). The drain here: initiate the close (no new connections are
+// hangs after SIGTERM whenever a browser tab is open (a plain `net.connect` that writes nothing reproduces it). The drain here: initiate the close (no new connections are
 // accepted, Node's sweep runs), wait until every request the app has accepted has answered — bounded by
 // `drainMs` — then destroy every remaining socket (0-byte pre-connects, keep-alive sockets that went idle after
 // the sweep, and any request past the deadline, whose transaction Postgres rolls back) so the close completes.
@@ -18,7 +17,7 @@ import type { FastifyInstance } from 'fastify';
 export const SHUTDOWN_DRAIN_MS = 10_000;
 
 export interface Drain {
-  /** Requests accepted and not yet answered (or abandoned by the client). */
+  /** Requests accepted and not yet answered (or abandoned by the client); the test seam for the counter. */
   inFlight(): number;
   /** Abort new/background work when shutdown begins; active sinks must settle before rollback. */
   readonly signal: AbortSignal;
@@ -33,18 +32,22 @@ export function createDrain(fastify: FastifyInstance): Drain {
   const controller = new AbortController();
   const background = new Set<Promise<void>>();
   const idleWaiters = new Set<() => void>();
+  const idle = () => inFlight === 0 && background.size === 0;
+  const wakeIfIdle = () => {
+    if (idle()) for (const wake of idleWaiters) wake();
+  };
   fastify.addHook('onRequest', (_request, reply, done) => {
     inFlight += 1;
     reply.raw.once('close', () => {
       inFlight -= 1;
-      if (inFlight === 0 && background.size === 0) for (const wake of idleWaiters) wake();
+      wakeIfIdle();
     });
     done();
   });
 
   const untilIdle = (deadlineMs: number) =>
     new Promise<void>((resolve) => {
-      if (inFlight === 0 && background.size === 0) {
+      if (idle()) {
         resolve();
         return;
       }
@@ -64,7 +67,7 @@ export function createDrain(fastify: FastifyInstance): Drain {
       background.add(task);
       const finished = () => {
         background.delete(task);
-        if (inFlight === 0 && background.size === 0) for (const wake of idleWaiters) wake();
+        wakeIfIdle();
       };
       void task.then(finished, finished);
     },

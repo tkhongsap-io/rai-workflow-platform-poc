@@ -6,6 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer, type AddressInfo } from 'node:net';
+import { migrationFileCount } from './db/migrate.js';
 import { startServer } from './start.js';
 
 async function freePort(): Promise<number> {
@@ -126,10 +127,12 @@ test('ID-02 control: with the real address resolution on localhost the server st
       store: { db: string };
       mailSink: { status: string };
       qc: { status: string };
+      build: { schemaVersion: string };
     };
     assert.equal(report.store.db, 'unreachable');
     assert.equal(report.mailSink.status, 'ok');
     assert.equal(report.qc.status, 'ok');
+    assert.equal(report.build.schemaVersion, String(migrationFileCount()));
   } finally {
     await server.close();
   }
@@ -172,6 +175,63 @@ test('W1-02: an injected BU key list replaces the fixture list and is unioned wi
   });
   try {
     assert.deepEqual([...server.businessUnits.list()], ['XX', 'CM']);
+  } finally {
+    await server.close();
+  }
+});
+
+const moduleError = (message: string) => Object.assign(new Error(message), { code: 'ERR_MODULE_NOT_FOUND' });
+
+// A present but broken fixtures build must not start with no BU keys and no QC runner and say nothing.
+for (const [name, error] of [
+  ['a syntax error', new SyntaxError('Unexpected token')],
+  [
+    'an unbuilt module inside the package',
+    moduleError(
+      "Cannot find module '/srv/node_modules/@rai/fixtures/dist/data/users.js' imported from /srv/x.js",
+    ),
+  ],
+] as const) {
+  test(`a fixtures import failing with ${name} refuses to start with fixtures_import_failed`, async () => {
+    const lines: string[] = [];
+    const original = console.error;
+    console.error = (line: string) => lines.push(line);
+    try {
+      await assert.rejects(
+        startServer(envFor(await freePort(), 'fixture'), {
+          exit,
+          discovery,
+          fixtureUsers,
+          importFixture: () => Promise.reject(error),
+        }),
+        (err: unknown) => err instanceof Exited && err.code === 78,
+      );
+    } finally {
+      console.error = original;
+    }
+    assert.deepEqual(
+      lines.map((l) => JSON.parse(l) as unknown),
+      [{ event: 'process.refused', reason: 'fixtures_import_failed' }],
+    );
+  });
+}
+
+test('an absent fixtures package (a production install) starts with no fixture BU keys and no QC runner', async () => {
+  const port = await freePort();
+  const server = await startServer(envFor(port, 'fixture'), {
+    exit,
+    discovery,
+    fixtureUsers,
+    importFixture: () =>
+      Promise.reject(moduleError("Cannot find package '@rai/fixtures' imported from /srv/x.js")),
+  });
+  try {
+    assert.deepEqual([...server.businessUnits.list()], []);
+    const headers = { cookie: 'rai_session=RAI-DESK-SYNTHETIC-FIXTURE' };
+    const report = (await (await fetch(`http://127.0.0.1:${port}/readyz`, { headers })).json()) as {
+      qc: { status: string };
+    };
+    assert.equal(report.qc.status, 'disabled');
   } finally {
     await server.close();
   }
