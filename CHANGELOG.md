@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-09-25
+
+- W3 hardening (#127-#156): retro-review of the unreviewed W2/W3 PRs, with 71 confirmed findings: 67 fixed (three with a leftover part deferred), 3 deferred to Ta and 1 withdrawn.
+  - Approve requires the latest lane-QC run.
+  - QC fails closed on findings with no owning lane.
+  - Ready uses decision-time scopes (migration 0008).
+  - A cross-site guard covers every signed-in write.
+  - Pool and process resilience; readiness gates on pending migrations.
+  - Shared helpers and a shared integration harness; the substitute twin specs were retired.
+  - Integration runs from the documented `.env.example` setup.
+  - The owner sees the reviewer's send-back feedback on the successor draft, and the version shows its lane decisions. There is no false error after a send-back.
+  - Lane QC runs once per opening. The draft editor is offered only to the owner or BU SPOC. A decision notice no longer takes focus from a control the keyboard user already reached.
+  - Added a Nakhun walkthrough script and a #35 decision brief. Issue #35 stays open.
+
 ## 2026-09-23
 
 - Final W3 delivery: all nine engineering tickets merged, including PR #125 (`e62b669`). Actual-main CI [35781574925](https://github.com/tkhongsap-io/rai-workflow-platform-poc/actions/runs/35781574925) passed all 12 checks. Reconciled delivery records after merge; Ta’s package review, manual Google sign-in, workload confirmation and finding-ownership policy remain pending.

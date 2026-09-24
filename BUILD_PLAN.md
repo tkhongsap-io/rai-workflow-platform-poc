@@ -157,11 +157,11 @@ All recorded on 2026-09-21 in the [register](docs/product/decisions.md); the [br
 
 At G0 close, D04 and D07-D10 were open. D04 was subsequently recorded in ADR-0003; D07-D10 remain gates for W4-W8.
 
-## Status against this plan — 2026-09-22 (W3 delivery in progress)
+## Status against this plan — 2026-09-25 (W3 engineering exit and hardening)
 
 A dated read, not a rewrite. Packages above stay as written. DEVLOG.md is the live record; where they disagree, DEVLOG is newer.
 
-| Gate / package / milestone | Status on 2026-09-22 | Evidence | Next evidence needed |
+| Gate / package / milestone | Status on 2026-09-25 | Evidence | Next evidence needed |
 |---|---|---|---|
 | Documentation anchor | Prepared | changes/2026-09-20-build-anchor | — (used to close G0) |
 | Delivery pack | Prepared, reviewed by two workflows, A11 accepted | changes/2026-09-21-delivery-planning | Team kickoff |
@@ -171,7 +171,7 @@ A dated read, not a rewrite. Packages above stay as written. DEVLOG.md is the li
 | M1 (W1) | **Reached** (2026-09-22) | changes/2026-09-22-w1-exit/review.md | — |
 | W2 | **Exit recorded 2026-09-22** | changes/2026-09-22-w2-exit/review.md (lint, typecheck; 15 W2-INT evidence browser tests; 6 W2-INT negatives; check:substitute-absent 463/0; fixture set slice1-synthetic@1 7c80ccd43663) | — |
 | M2 (W2) | **Reached** (2026-09-22) | changes/2026-09-22-w2-exit/review.md | — |
-| M3 (W3, slice 1) | Authorized (D03), in progress. W3-05 SLA and W3-01 queue API landed; mail-sink dependency available | PR #104, #109, #107; DEVLOG and ticket review records | Queue UI, notifications/digest/retries, observability, W3-INT and W3-06 exit evidence |
+| M3 (W3, slice 1) | **Synthetic engineering exit recorded 2026-09-23; hardening H1-H29 merged** | changes/2026-09-23-w3-exit/review.md; changes/2026-09-23-w3-hardening/review.md (PRs #127-#156) | Ta's package review; Ta/operator confirmation of advisory workload/latency targets |
 | W4-W8 | **Not authorized** | — | D07-D10 and package gate entries |
 
 ### Where the build diverged from the plan
@@ -180,19 +180,17 @@ None on authorization: W0–W3 remain the synthetic-data scope of D03; W4–W8 s
 
 The [delivery pack](docs/delivery/README.md) breaks G0, W0 and W1-W3 into decision briefs and assignable tickets; it does not change these packages.
 
-W2 exit is recorded and Milestone M2 is reached. W3 delivery is in progress: SLA (PR #104), scoped queue API (PR #109), mail-sink dependency (PR #107) and the queue UI contract (PR #110) have merged. The W1-11 dependency is resolved; the remaining UI, notification and observability tickets proceed through separate reviewed PRs before W3-INT and the M3 exit. Issue #35 and epic #53 stay open. W4–W8 are not authorized. Supporting [architecture](docs/architecture/README.md), [threat model](docs/security/threat-model.md) and [evaluation](docs/evaluation/plan.md) remain part of the build contract. DEVLOG.md is the live record.
+After the W3 engineering exit, most W2/W3 PRs (#90-#126) turned out to have merged without an independent review verdict. On Ta's instruction the [W3 hardening change](changes/2026-09-23-w3-hardening/review.md) reviewed them retroactively, fixed, deferred or (in one case, removing the performance harness guard) withdrawn every confirmed finding, and simplified the code in reviewed batches. It changed no scope and no recorded decision.
 
-## Status against this plan — 2026-09-23 (W3 engineering exit)
-
-The preceding 2026-09-22 status is historical. W3 implementation and the synthetic engineering evidence are recorded in the [exit review](changes/2026-09-23-w3-exit/review.md). Ta’s package review is still pending; no production or operator acceptance is inferred.
+### W3 detail
 
 | Area | Current state | Remaining boundary |
 |---|---|---|
-| W3 queue, SLA and notifications | Implemented through reviewed prerequisite PRs and real-server integration | File mail sink only; no external delivery or exactly-once promise |
-| Operator diagnostics and slice-1 journey | Real-server evidence, fault/restart negatives, keyboard walkthrough and scoped views recorded | Synthetic identity/QC adapters; no real model-quality claim |
-| M3 engineering exit | Test, timing and recording evidence recorded in W3-06 | Ta’s package review; Ta/operator confirmation of advisory workload/latency targets |
-| W2 finding ownership | Existing issue #35 and epic #53 stay open | Slot5/9, pack and unavailable owning-lane semantics remain unresolved |
+| W3 queue, SLA and notifications | Implemented through reviewed PRs and real-server integration; hardened (derived status, notification shutdown, outbox) | File mail sink only; no external delivery or exactly-once promise |
+| Operator diagnostics and slice-1 journey | Real-server evidence, fault/restart negatives, keyboard walkthrough and scoped views recorded; readiness now gates on pending migrations | Synthetic identity/QC adapters; no real model-quality claim |
+| Resilience and request safety | Pool idle-error handler, connect timeout, fatal process handlers; `Sec-Fetch-Site` guard on every signed-in write | Secure-cookie enforcement for network mode is a W7-00 precondition |
+| W2 finding ownership | Issue #35 and epic #53 stay open; QC fails closed (run recorded unavailable) for findings with no owning lane | [Decision brief](changes/2026-09-23-w3-hardening/issue-35-decision-brief.md) for Ta and the review leads |
 | Local identity | Automated fixture boundary verified | Manual Google loopback sign-in remains pending Ta |
 | W4–W8 | Not authorized | Separate package gates and D07–D10; operator rehearsal and production release remain future work |
 
-The exit record retains failed/repaired checks, source identities and the PR120 premature-merge exception with subsequent verification. Later merges require all required checks to succeed on the exact independently reviewed head. There is no scope change or authorization to continue into W4 here.
+The W3 exit record retains failed/repaired checks, source identities and the PR120 premature-merge exception with subsequent verification. Every hardening batch PR (H1-H29, #128-#156) merged only after two independent reviewer verdicts and green CI on the reviewed head, except #136, which got its second verdict after merge. The docs-only frame PR #127 merged with no reviewer verdict and before its CI finished (CI passed afterwards). Both exceptions are recorded in the hardening review. There is no scope change or authorization to continue into W4 here.
