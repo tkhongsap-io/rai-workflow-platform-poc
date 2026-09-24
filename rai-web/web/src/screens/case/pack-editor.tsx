@@ -2,7 +2,8 @@
 // PackDraftUpdateRequest with the draft's ExpectedVersion (W0-06 5.1); the server's answer replaces the draft.
 // "Submit pack" (7.6) is offered only once nothing is unsaved, with a fresh Idempotency-Key per press. Every
 // action is a button or a native control, so the whole editor is keyboard-operable (section 9, item 5).
-// Nothing here decides who may save or submit: the API answers, and its envelope is rendered as received.
+// Only a case writer is offered the controls; anyone else reads the draft. The API still answers every save and
+// submit, and its envelope is rendered as received.
 
 import { useCallback, useState, type JSX } from 'react';
 import { CURRENT_LANE_MAPPING } from '@rai/shared/constants';
@@ -39,6 +40,8 @@ export interface PendingSettings {
 export interface PackEditorProps {
   caseId: string;
   draft: PackDraft;
+  /** The actor is the case's owner or the SPOC of its BU (isCaseWriter). */
+  canEdit: boolean;
   configuration: ConfigurationView;
   artifacts: ReadonlyMap<string, ArtifactLookup>;
   pendingSlots: PendingSlots;
@@ -57,7 +60,7 @@ export interface PackEditorProps {
 
 export function PackEditor(props: PackEditorProps): JSX.Element {
   const { t } = useLocale();
-  const { draft, configuration, pendingSlots, pendingSettings, busy } = props;
+  const { draft, canEdit, configuration, pendingSlots, pendingSettings, busy } = props;
   const [dialogSlot, setDialogSlot] = useState<SlotNumber | null>(null);
   const closeDialog = useCallback(() => setDialogSlot(null), []);
 
@@ -105,7 +108,7 @@ export function PackEditor(props: PackEditorProps): JSX.Element {
         </p>
       </div>
 
-      <fieldset className={'field pack-settings'} disabled={busy !== 'idle'}>
+      <fieldset className={'field pack-settings'} disabled={!canEdit || busy !== 'idle'}>
         <legend>{t('pack.settings_heading')}</legend>
         <div className={'field'}>
           <label htmlFor={'pack-template'}>{t('pack.template_version')}</label>
@@ -156,18 +159,23 @@ export function PackEditor(props: PackEditorProps): JSX.Element {
       <SlotRows
         rows={rows}
         mapping={CURRENT_LANE_MAPPING}
-        action={(row) => (
-          <button
-            type={'button'}
-            className={'btn btn-secondary btn-small'}
-            aria-label={t('pack.change_slot', { number: row.slot, name: t(slotNameKey(row.slot)) })}
-            disabled={busy !== 'idle'}
-            onClick={() => setDialogSlot(row.slot)}
-          >
-            {t('pack.action.change')}
-          </button>
-        )}
+        action={
+          canEdit
+            ? (row) => (
+                <button
+                  type={'button'}
+                  className={'btn btn-secondary btn-small'}
+                  aria-label={t('pack.change_slot', { number: row.slot, name: t(slotNameKey(row.slot)) })}
+                  disabled={busy !== 'idle'}
+                  onClick={() => setDialogSlot(row.slot)}
+                >
+                  {t('pack.action.change')}
+                </button>
+              )
+            : undefined
+        }
       />
+      {canEdit ? null : <p className={'muted'}>{t('pack.read_only')}</p>}
 
       {error !== null ? (
         <ErrorNotice error={props.error}>
@@ -187,38 +195,40 @@ export function PackEditor(props: PackEditorProps): JSX.Element {
         </p>
       ) : null}
 
-      <div className={'form-actions'}>
-        <button
-          type={'button'}
-          className={'btn btn-primary'}
-          disabled={busy !== 'idle' || unsaved === 0}
-          onClick={props.onSave}
-        >
-          {busy === 'saving' ? t('pack.saving') : t('pack.action.save')}
-        </button>
-        <button
-          type={'button'}
-          className={'btn btn-secondary'}
-          disabled={busy !== 'idle' || unsaved === 0}
-          onClick={props.onDiscard}
-        >
-          {t('pack.action.discard')}
-        </button>
-        <button
-          type={'button'}
-          className={'btn btn-secondary'}
-          disabled={busy !== 'idle' || unsaved > 0}
-          aria-describedby={'pack-submit-hint'}
-          onClick={props.onSubmit}
-        >
-          {busy === 'submitting' ? t('pack.submitting') : t('pack.action.submit')}
-        </button>
-        <span className={'muted small'} id={'pack-submit-hint'}>
-          {unsaved > 0 ? t('pack.pending_changes', { count: unsaved }) : t('pack.no_pending_changes')}
-          {' · '}
-          {unsaved > 0 ? t('pack.submit_save_first') : t('pack.submit_hint')}
-        </span>
-      </div>
+      {canEdit ? (
+        <div className={'form-actions'}>
+          <button
+            type={'button'}
+            className={'btn btn-primary'}
+            disabled={busy !== 'idle' || unsaved === 0}
+            onClick={props.onSave}
+          >
+            {busy === 'saving' ? t('pack.saving') : t('pack.action.save')}
+          </button>
+          <button
+            type={'button'}
+            className={'btn btn-secondary'}
+            disabled={busy !== 'idle' || unsaved === 0}
+            onClick={props.onDiscard}
+          >
+            {t('pack.action.discard')}
+          </button>
+          <button
+            type={'button'}
+            className={'btn btn-secondary'}
+            disabled={busy !== 'idle' || unsaved > 0}
+            aria-describedby={'pack-submit-hint'}
+            onClick={props.onSubmit}
+          >
+            {busy === 'submitting' ? t('pack.submitting') : t('pack.action.submit')}
+          </button>
+          <span className={'muted small'} id={'pack-submit-hint'}>
+            {unsaved > 0 ? t('pack.pending_changes', { count: unsaved }) : t('pack.no_pending_changes')}
+            {' · '}
+            {unsaved > 0 ? t('pack.submit_save_first') : t('pack.submit_hint')}
+          </span>
+        </div>
+      ) : null}
 
       {/* Always mounted: the shared Dialog opens with showModal(), traps Tab, and returns focus to the Change
           button on close (section 9 item 3); the form inside remounts per slot. */}

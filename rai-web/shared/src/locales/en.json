@@ -305,6 +305,7 @@
   "pack.no_draft": "This case has no open draft; the latest submitted version is shown",
   "pack.no_pending_changes": "No unsaved changes",
   "pack.pending_changes": "{count} unsaved change(s)",
+  "pack.read_only": "Only the case owner or the business unit's SPOC can change this draft.",
   "pack.saved": "Draft saved (revision {revision})",
   "pack.saving": "Saving…",
   "pack.settings_heading": "Pack settings",

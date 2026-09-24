@@ -1,6 +1,7 @@
 // The case screen: overview, version navigation, and the pack editor (under its parent's send-back feedback) or a
 // frozen version with its review workspaces and lane decisions. Every API answer is rendered as received: a 403 or
-// 404 shows the envelope's message key (a 401 drops the session in the API client). No client rule decides access.
+// 404 shows the envelope's message key (a 401 drops the session in the API client). The grants only choose which
+// controls to offer; the API decides access.
 
 import { useEffect, useRef, useState, type JSX } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
@@ -26,6 +27,7 @@ import { VersionNav } from './version-nav.js';
 import {
   SLOT_NUMBERS,
   applySlotChange,
+  isCaseWriter,
   reviewerWorkspaceLanes,
   type Notice,
   type PendingSlots,
@@ -81,6 +83,13 @@ export function CaseScreen(): JSX.Element {
   const [busy, setBusy] = useState<'idle' | 'saving' | 'submitting'>('idle');
   const [editorError, setEditorError] = useState<unknown>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
+  // A notice belongs to the view it was raised on: a route change clears it unless it names the new route (the
+  // submit notice names the version it opens).
+  const [noticeRoute, setNoticeRoute] = useState(versionId);
+  if (noticeRoute !== versionId) {
+    setNoticeRoute(versionId);
+    if (notice?.versionId !== versionId) setNotice(null);
+  }
 
   const state: LoadState =
     loadResult !== null && loadResult.key === loadKey ? loadResult.result : { kind: 'loading' };
@@ -186,7 +195,7 @@ export function CaseScreen(): JSX.Element {
         setLoadResult({ key: loadKey, result: { ...ready, view, draft: saved } });
         setPendingSlots({});
         setPendingSettings({});
-        setNotice({ key: 'pack.saved', params: { revision: saved.draftRevision } });
+        setNotice({ versionId: undefined, key: 'pack.saved', params: { revision: saved.draftRevision } });
       })
       .catch((err: unknown) => {
         setEditorError(err);
@@ -209,7 +218,11 @@ export function CaseScreen(): JSX.Element {
         crypto.randomUUID(), // W0-06 5.3: one key per user action
       )
       .then((version) => {
-        setNotice({ key: 'pack.submitted', params: { number: version.versionNumber } });
+        setNotice({
+          versionId: version.versionId,
+          key: 'pack.submitted',
+          params: { number: version.versionNumber },
+        });
         setReloadToken((n) => n + 1);
         void navigate(ROUTES.caseVersion(caseId, version.versionId));
       })
@@ -222,19 +235,18 @@ export function CaseScreen(): JSX.Element {
   };
 
   const onLaneDecided = (response: LaneDecisionResponse): void => {
-    if (response.ready) {
-      setNotice({ key: 'review.decided.ready', params: {} });
-    } else if (response.decision === 'approve') {
-      setNotice({ key: 'review.decided.approve', params: {} });
-    } else {
-      setNotice({ key: 'review.decided.send_back', params: {} });
-    }
+    const key = response.ready
+      ? 'review.decided.ready'
+      : response.decision === 'approve'
+        ? 'review.decided.approve'
+        : 'review.decided.send_back';
+    setNotice({ versionId, key, params: {} });
     setReloadToken((n) => n + 1);
   };
 
   const onDispositionRecorded = (response: DispositionResponse): void => {
     if (response.ready) {
-      setNotice({ key: 'review.decided.ready', params: {} });
+      setNotice({ versionId, key: 'review.decided.ready', params: {} });
       setReloadToken((n) => n + 1);
     }
   };
@@ -294,9 +306,12 @@ interface BodyProps {
   onDispositionRecorded: (response: DispositionResponse) => void;
 }
 
-/** A decision reloads the screen; focus moves to its outcome instead of dropping to <body>. */
-function focusOnMount(element: HTMLElement | null): void {
-  element?.focus();
+/**
+ * A decision reloads the screen and its controls unmount, dropping focus to <body>; the outcome notice picks it up.
+ * A keyboard user who has moved on while the reload ran keeps focus where they put it.
+ */
+function focusIfDropped(element: HTMLElement | null): void {
+  if (document.activeElement === document.body) element?.focus();
 }
 
 function BackToList(): JSX.Element {
@@ -364,13 +379,18 @@ function CaseScreenBody(props: BodyProps): JSX.Element {
                 <PackEditor
                   caseId={caseId}
                   draft={state.draft}
+                  canEdit={isCaseWriter(
+                    props.session.principal.roles,
+                    props.session.principal.subjectId,
+                    state.view,
+                  )}
                   configuration={state.configuration}
                   artifacts={props.artifacts}
                   pendingSlots={props.pendingSlots}
                   pendingSettings={props.pendingSettings}
                   busy={props.busy}
                   error={props.editorError}
-                  notice={props.notice?.key.startsWith('pack.') === true ? props.notice : null}
+                  notice={props.notice}
                   onSlotChange={props.onSlotChange}
                   onSettingsChange={props.onSettingsChange}
                   onSave={props.onSave}
@@ -392,7 +412,7 @@ function CaseScreenBody(props: BodyProps): JSX.Element {
                   className={'notice notice-success'}
                   role={'status'}
                   tabIndex={-1}
-                  ref={props.notice.key.startsWith('review.decided.') ? focusOnMount : undefined}
+                  ref={props.notice.key.startsWith('review.decided.') ? focusIfDropped : undefined}
                 >
                   {t(props.notice.key, props.notice.params)}
                 </p>

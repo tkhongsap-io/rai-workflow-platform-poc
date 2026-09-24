@@ -1,5 +1,6 @@
 // The reviewer workspace on the real server, by keyboard: findings render before the decision controls, the send-back
-// dialog keeps focus, a decision moves focus to its outcome, and frozen version N is unchanged. Axe in th and en.
+// dialog keeps focus, a decision moves focus to its outcome (never away from a control reached during the reload),
+// and frozen version N is unchanged. Axe in th and en.
 // Fixture set slice1-synthetic@1: fx-case-nonvendor (RAI-2000-0001); fx-user-owner-cm, fx-user-ai-coe, fx-user-admin.
 
 import { test, expect, type Page } from './support/real-test.js';
@@ -233,6 +234,34 @@ test.describe(`W2-INT reviewer workspace on the real server (${FIXTURE_SET}; fx-
     ).toBeFocused();
     await expect(page.locator('[data-review-controls="ready"]')).toHaveCount(0);
     await expectAccessible(page, testInfo, { name: 'w2-int-reviewer-after-approve-th', lang: 'th' });
+  });
+
+  test('the decision notice does not take focus from a control the keyboard user reached during the reload', async ({
+    page,
+  }) => {
+    const { caseId, versionId } = await submitNonvendor(page);
+    await signOut(page);
+    await openAsReviewer(page, caseId, versionId);
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await page.route(`**/api/cases/${caseId}`, async (route) => {
+      await held;
+      await route.continue();
+    });
+
+    await page.getByRole('button', { name: t('th', 'review.action.approve') }).click();
+    await expect(page.locator('.case-screen[aria-busy="true"]')).toBeVisible();
+    const shellSignOut = page.getByRole('banner').getByRole('button', { name: t('th', 'auth.sign_out') });
+    await tabTo(page, shellSignOut);
+    release();
+    await expect(
+      page.getByRole('status').filter({ hasText: t('th', 'review.decided.approve') }),
+    ).toBeVisible();
+    await expect(shellSignOut).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(
+      page.getByRole('dialog').getByRole('button', { name: t('th', 'auth.sign_out') }),
+    ).toBeVisible();
   });
 
   test('one opening runs lane QC once; approve names the unavailable run shown', async ({ page }) => {

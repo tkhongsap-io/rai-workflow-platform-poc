@@ -7,7 +7,8 @@
 // Interacts only through the UI (roles, labels, keyboard); the API is called directly only to sign in
 // (support/sign-in.ts), to read what the server serves for comparison, and to produce a concurrent edit for the
 // stale-version case. Fixture ids: fx-case-missing-slot (RAI-2000-0003), fx-case-nonvendor (RAI-2000-0001),
-// fx-case-na-reasons (RAI-2000-0004); users fx-user-owner-cm, fx-user-owner-cm-2.
+// fx-case-na-reasons (RAI-2000-0004), fx-case-hr-dualrole (RAI-2000-0005); users fx-user-owner-cm,
+// fx-user-owner-cm-2, fx-user-spoc-cm, the reviewers, fx-user-dpo-spoc-hr and fx-user-admin.
 
 import { test, expect, type Locator, type Page } from './support/real-test.js';
 import type { CaseListResponse } from '@rai/shared/schemas/cases';
@@ -24,6 +25,7 @@ const OTHER_OWNER = 'fx-user-owner-cm-2';
 const MISSING_SLOT_CASE = 'RAI-2000-0003';
 const NONVENDOR_CASE = 'RAI-2000-0001';
 const THAI_NAME_CASE = 'RAI-2000-0004';
+const HR_CASE = 'RAI-2000-0005';
 
 async function caseIdOf(page: Page, registryId: string): Promise<string> {
   const response = await page.request.get('/api/cases?pageSize=100');
@@ -253,6 +255,70 @@ test.describe(`W1-INT (W1-06) case flow on the real server (fx-case-missing-slot
     await expect(slotRow(page, 8)).toContainText('Idea stage: no deployment yet');
     await expect(page.getByText(t('th', 'pack.no_pending_changes'))).toBeVisible();
     await expectStatusElementsHaveText(page);
+  });
+
+  test('the draft editor is offered only to the case owner or its BU SPOC; everyone else reads the draft', async ({
+    page,
+  }, testInfo) => {
+    const save = page.getByRole('button', { name: t('th', 'pack.action.save') });
+    const discard = page.getByRole('button', { name: t('th', 'pack.action.discard') });
+    const submit = page.getByRole('button', { name: t('th', 'pack.action.submit') });
+    const readOnly = page.getByText(t('th', 'pack.read_only'));
+    const templateVersion = page.getByLabel(t('th', 'pack.template_version'));
+    const stageContext = page.getByLabel(t('th', 'pack.stage_context'));
+
+    // The dual-role DPO + HR SPOC edits the HR case as its SPOC.
+    const editors: [string, string][] = [
+      [OWNER, MISSING_SLOT_CASE],
+      ['fx-user-spoc-cm', MISSING_SLOT_CASE],
+      ['fx-user-dpo-spoc-hr', HR_CASE],
+    ];
+    for (const [user, registryId] of editors) {
+      await openCase(page, registryId, user);
+      await expect(changeButton(page, 7, 'slot.s7.name'), user).toBeVisible();
+      await expect(page.locator('.slot-actions'), user).toHaveCount(9);
+      await expect(save, user).toBeVisible();
+      await expect(discard, user).toBeVisible();
+      await expect(submit, user).toBeVisible();
+      await expect(readOnly, user).toHaveCount(0);
+      await expect(templateVersion, user).toBeEnabled();
+      await expect(stageContext, user).toBeEnabled();
+    }
+
+    // Reviewers, Admin, and the dual-role user on a CM case (DPO there, not SPOC) read the same draft, unchanged.
+    for (const user of [
+      'fx-user-ai-coe',
+      'fx-user-dpo',
+      'fx-user-it-security',
+      'fx-user-admin',
+      'fx-user-dpo-spoc-hr',
+    ]) {
+      const caseId = await openCase(page, MISSING_SLOT_CASE, user);
+      await expect(readOnly, user).toBeVisible();
+      await expect(page.locator('.slot-row'), user).toHaveCount(9);
+      await expect(slotRow(page, 1).getByRole('link'), user).toHaveText(
+        'RiskScreening_DispatchOptimiser.pdf',
+      );
+      await expect(slotRow(page, 7).locator('[data-status]'), user).toContainText(
+        t('th', 'slot.state.missing'),
+      );
+      await expect(page.locator('.slot-actions'), user).toHaveCount(0);
+      await expect(save, user).toHaveCount(0);
+      await expect(discard, user).toHaveCount(0);
+      await expect(submit, user).toHaveCount(0);
+      await expect(templateVersion, user).toBeDisabled();
+      await expect(stageContext, user).toBeDisabled();
+      // Hiding the controls is presentation: the server still refuses the save.
+      const draft = await readDraft(page, caseId);
+      const refused = await page.request.put(`/api/cases/${caseId}/draft`, {
+        data: {
+          expectedVersion: { versionId: draft.draftId, revision: draft.draftRevision },
+          slots: { 7: { state: 'not_yet' } },
+        },
+      });
+      expect(refused.status(), user).toBe(403);
+    }
+    await expectAccessible(page, testInfo, { name: 'draft-read-only-th', lang: 'th' });
   });
 
   test('the slot dialog contains focus, closes on Escape, and asks before discarding an unsaved reason', async ({

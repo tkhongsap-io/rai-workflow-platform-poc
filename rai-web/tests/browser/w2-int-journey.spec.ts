@@ -247,6 +247,15 @@ test.describe(`W2-INT journey on the real server: v1 → send-back → v2 → di
     const savedStem = t('th', 'pack.saved', { revision: '¶' }).split('¶')[0]!;
     await expect(page.getByRole('status')).toContainText(savedStem);
     await expectAccessible(page, testInfo, { name: 'w2-int-journey-successor-draft-th', lang: 'th' });
+    // The notice belongs to the draft: it is gone on v1 and stays gone back on the draft.
+    await nav.getByRole('link', { name: t('th', 'version.nav_submitted', { number: 1 }) }).click();
+    await expect(
+      page.getByRole('heading', { level: 2, name: t('th', 'version.heading', { number: 1 }) }),
+    ).toBeVisible();
+    await expect(page.getByText(savedStem)).toHaveCount(0);
+    await nav.getByRole('link', { name: t('th', 'version.nav_draft', { number: 2 }) }).click();
+    await expect(page.getByRole('heading', { level: 2, name: t('th', 'pack.heading') })).toBeVisible();
+    await expect(page.getByText(savedStem)).toHaveCount(0);
     const v2Id = await submitByKeyboard(page, caseId);
     await expect(page.getByRole('status')).toContainText(t('th', 'pack.submitted', { number: 2 }));
     await expect(
