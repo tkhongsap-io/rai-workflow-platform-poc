@@ -102,7 +102,7 @@ How these counts were reached. The three closure auditors reported:
 - **Notifications, runtime-ops and security:** 21 closed and 1 deferred (finding 39).
 - **Web-UI, architecture and tests-evidence:** a headline of 26 closed, 3 deferred and 1 withdrawn (68). Its itemised list has 27 closed, including finding 46's owner-filter part and finding 57's `app.ts`/`start.ts` headers, and 2 deferred whole (53, 61). The remainders of 46 and 57 are deferred.
 
-Counting whole findings gives 67, 3 and 1. The lead's first draft said 65 and 5, from the headline sums; round 1 of the review of #157 caught the mismatch.
+Counting whole findings gives 67, 3 and 1. The lead's first draft said 65 closed (the headline sum) and 5 deferred. The deferred headlines sum to 4; the fifth was a miscount. Round 1 of the review of #157 caught the mismatch.
 
 - Pool resilience: `server/src/db/client.ts` and `start.ts` (idle-error handler, 5 s connect timeout), tested by `w3-h4-pool-idle-error.test.ts`.
 - Process handlers: `main.ts`, tested by `w3-h4-fatal-handler.test.ts`.
@@ -131,7 +131,7 @@ The duplication that remains is in the in-memory API substitute, whose deletion 
 - Low: TESTING.md command descriptions, identity-adapter §6.4, and the observability `actorRole` note lagged the code. The substitute README did not record its approve drift. The Secure-cookie item was not recorded in the W7 outline. All fixed in H24.
 - Medium: BUILD_PLAN had two W3 statuses, and DEVLOG, CHANGELOG and README did not mention the hardening. Fixed in this hand-off PR.
 
-Fifteen other reported gaps were refuted: they were covered by existing suites, deferred, withdrawn or a matter of taste.
+Two more confirmed gaps were the hand-off records still pending: the write-up of retro finding 61 for Ta, and the Done-when records themselves. This PR adds them: section 5 item 2, this review, the walkthrough script and the #35 brief. In all, the verifiers reported 20 gaps; the skeptic confirmed 11 and refuted 9. The 9 refuted gaps were covered by existing suites, deferred, withdrawn or a matter of taste.
 
 ### Walkthrough re-verification
 
