@@ -62,7 +62,7 @@ cd rai-web && cp .env.example .env
 npm ci && npx playwright install chromium
 ```
 
-Local Postgres (from the repository root; `POSTGRES_PORT` selects the loopback host port, default 54320; per-ticket isolation uses `-p rai-<ticket-id>` and port `54320 + <ticket number>`, with `DATABASE_URL` in that worktree's `.env` set to match):
+Local Postgres (from the repository root; `POSTGRES_PORT` selects the loopback host port, default 54320; per-ticket isolation uses `-p rai-<ticket-id>` and port `54320 + <ticket number>`, with the three `DATABASE_*_URL` values in that worktree's `.env` set to match):
 
 ```sh
 POSTGRES_PORT=54320 docker compose -p rai-dev up -d --wait
@@ -88,7 +88,7 @@ npm run dev                # API http://127.0.0.1:8787 (local-google identity, l
 npm run build && npm start # the one deployable: server/dist serving web/dist
 ```
 
-Sign-in surface (W1-01, W0-03 section 6): `POST /auth/sign-in` → `GET /auth/callback` for `local-google` (loopback only; the process refuses to start on a non-loopback bind, an unknown mode, a missing client or `TRUST_PROXY=true`, exit 78 with the reason code), `GET /auth/fixture/users` and `POST /auth/fixture/sign-in { fixtureUserId }` in `fixture` mode only (`NODE_ENV=test`, loopback; the built server loads the eight identities from `@rai/fixtures` at run time, so `fixtures/dist` must exist: `npm run typecheck` or `npm run build -w fixtures` emits it; the slice-1 BU keys come from the same module in every mode, so an installed fixtures package that fails to import refuses to start with `fixtures_import_failed`, exit 78, and only an absent package, as in a production install, starts without them), `GET /api/session`, `POST /api/session/locale`, `POST /auth/sign-out` (needs `Sec-Fetch-Site: same-origin` or `none`). Every route declares its `config.auth`; a request without a session is `401 unauthenticated` before anything else and a wrong role or out-of-scope case is `403 forbidden` from `rai-web/server/src/authz/middleware.ts`, the only place scope is enforced. The same middleware refuses any signed-in write whose `Sec-Fetch-Site` is present and neither `same-origin` nor `none` (403, `authz.denied` reason `cross_site`); a request without the header passes, so `app.inject()` and Playwright request helpers need none.
+Sign-in surface (W1-01, W0-03 section 6): `POST /auth/sign-in` → `GET /auth/callback` for `local-google` (loopback only; the process refuses to start on a non-loopback bind, an unknown mode, a missing client or `TRUST_PROXY=true`, exit 78 with the reason code), `GET /auth/fixture/users` and `POST /auth/fixture/sign-in { fixtureUserId }` in `fixture` mode only (`NODE_ENV=test`, loopback; the built server loads the eight identities from `@rai/fixtures` at run time, so `fixtures/dist` must exist: `npm run typecheck` or `npm run build -w fixtures` emits it; the slice-1 BU keys come from the same module in every mode, so an installed fixtures package that fails to import refuses to start with `fixtures_import_failed`, exit 78, and only an absent package, as in a production install, starts without them), `GET /api/session`, `POST /api/session/locale`, `POST /auth/sign-out` (needs `Sec-Fetch-Site: same-origin` or `none`). Every route declares its `config.auth`; a request without a session is `401 unauthenticated` before anything else and a wrong role or out-of-scope case is `403 forbidden` from `rai-web/server/src/authz/middleware.ts`, the only place scope is enforced. The same middleware refuses any signed-in write whose `Sec-Fetch-Site` is present and neither `same-origin` nor `none` (403, `authz.denied` reason `cross_site`); a request without the header passes (sign-out excepted), so `app.inject()` and Playwright request helpers need none.
 
 Artifacts (W1-03, W0-02 section 7.4, W0-08, W0-04 "Artifact store"): `POST /api/cases/{caseId}/artifacts` takes `multipart/form-data` with one part named `file` and nothing else (owner or BU SPOC of the case, which must have an open draft); the bytes are staged under `BLOB_DIR/tmp/` while hashed, checked in the W0-08 section 4 order (filename rule, 25 MiB per file, non-empty, magic sniff, extension match, structural check, 150 MiB per pack under the case lock) and committed as `BLOB_DIR/sha256/<h[0:2]>/<h[2:4]>/<h>` (root `0700`, objects `0600`, no extension, deduplicated by hash) together with the `artifact` row and the `artifact.uploaded` audit event; the answer is `201 ArtifactRef` with the sniffed media type, or `422 unsafe_upload` with `details.reasonKey` from the W0-08 section 5 vocabulary (nothing stored, no audit row, one `upload.rejected` log line without the filename). `GET /api/artifacts/{artifactId}` streams the bytes as an attachment (`Content-Disposition` with the RFC 8187 `filename*` so a Thai name round-trips, `X-Content-Type-Options: nosniff`, `Content-Security-Policy: sandbox`, `Cache-Control: no-store`, `Referrer-Policy: no-referrer`; audit `artifact.downloaded`) and `GET /api/artifacts/{artifactId}/meta` returns the `ArtifactRef`; both follow the case-view scope of the owning case, answer `401` without a session, `403` out of scope (also for an unresolvable id when the caller holds only own/BU scope) and `404 not_found` (`resource: 'artifact'`) only for an `all_cases` holder. The blob directory is never served. `UPLOAD_MAX_FILE_BYTES`, `UPLOAD_MAX_PACK_BYTES` and `UPLOAD_MAX_IMAGE_PIXELS` above their W0-08 defaults are refused at start in `local-google` and `fixture` modes (exit 78). `tests/integration/w1-03-*.test.ts` run the Done-when clauses, the W0-05 T10/T11/T12/T33 rows for `artifact.*`, every W0-08 section 8.6 hostile row through the route (the per-file and pack-total boundaries at their real values), and the operator commands; `server/src/artifacts/*.test.ts` cover the sniff, the filename rule and the filesystem store.
 
@@ -97,17 +97,20 @@ Submit and versions (W1-05, W0-02 section 7.6, W0-06 4.3, W0-04 "Submit" row): `
 Test, lint, typecheck:
 
 ```sh
-npm run test:unit          # node:test over server, shared, web and fixtures sources; no database
+npm run test:unit          # node:test over server, shared, web, fixtures and tests/performance sources; no database
 npm run test:integration   # node:test against the real Postgres + in-process substitutes (identity, QC, mail sink)
 npm test                   # unit then integration
 npm run test:browser       # both Playwright suites below, in order
-npm run test:browser:server      # EVIDENCE: Playwright journeys + axe audit against the built deployable (SPA served by the server) in test mode on the real Postgres; the W1-INT journey, the promoted W1-06/W1-07 specs and the evidence-configuration check
+npm run test:browser:server      # EVIDENCE: Playwright journeys + axe audit against the built deployable (SPA served by the server) in test mode on the real Postgres; every tests/browser/*.spec.ts except *.substitute.spec.ts (the W1/W2/W3-INT journeys, the promoted specs, queue, desk health, fault controls, ready-readonly, mail links, the harness proof and the evidence-configuration check)
 npm run test:browser:substitute  # Lane B `*.substitute.spec.ts` against the W1-13 substitute behind the Vite dev server (no database; never evidence)
 npm run lint               # eslint, prettier --check, focus-outline check
-npm run typecheck          # tsc -b over all workspaces
+npm run typecheck          # tsc -b over all workspaces and tests/performance
 npm run verify             # lint + typecheck + test: run before every PR
 npm run verify:full        # verify + build + substitute-absence check + browser suite: what CI runs
+npm run perf:run -- <plan.json>  # W3-06 advisory performance harness; its guard refuses any Postgres but the dedicated port 54370 (plan: tests/performance/plan.template.json)
 ```
+
+Parallel worktrees each need their own ports as well as their own `POSTGRES_PORT`: set `PLAYWRIGHT_BASE_URL` (real-server suite, default `http://127.0.0.1:8788`), `SUBSTITUTE_PORT` (default 8789) and `SUBSTITUTE_WEB_PORT` (default 5175) in that worktree's shell. The Playwright configurations read them when they load, before anything reads `.env`.
 
 Repository checks (from the repository root; the scripts and their tests arrived with W1-12):
 

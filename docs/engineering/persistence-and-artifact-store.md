@@ -636,7 +636,7 @@ W0-02 section 5 (variables) and 3.3 (commands) are the register; W0-09 reconcile
 |---|---|---|
 | `DATABASE_URL` | `rai_app` connection for the process; port follows `POSTGRES_PORT` | `postgres://rai_app:rai_app@127.0.0.1:54320/rai` |
 | `DATABASE_MIGRATE_URL` | `rai_owner` connection for `npm run migrate` | `postgres://rai_owner:rai_owner@127.0.0.1:54320/rai` |
-| `DATABASE_OPERATOR_URL` | `rai_operator` connection for cleanup and verify commands; optional locally (defaults to `DATABASE_MIGRATE_URL`) | unset |
+| `DATABASE_OPERATOR_URL` | `rai_operator` connection for cleanup and verify commands; port follows `POSTGRES_PORT`; optional locally (empty defaults to `DATABASE_MIGRATE_URL`) | `postgres://rai_operator:rai_operator@127.0.0.1:54320/rai` |
 | `POSTGRES_PORT` | host port the compose file binds (per-ticket isolation: 54320 + ticket number) | `54320` |
 | `BLOB_DIR` | private blob root | `./.local/blobs` |
 | `UPLOAD_MAX_FILE_BYTES`, `UPLOAD_MAX_PACK_BYTES`, `UPLOAD_MAX_IMAGE_PIXELS` | W0-08 limits passed to the store and the route | `26214400`, `157286400`, `40000000` (W0-08 section 3) |
