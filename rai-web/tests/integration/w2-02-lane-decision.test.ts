@@ -8,19 +8,20 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import type { ErrorResponse } from '@rai/shared/errors';
-import type { LaneDecisionResponse, LaneQcRunResponse } from '@rai/shared/schemas/review';
+import type { LaneDecision, LaneDecisionResponse, LaneQcRunResponse } from '@rai/shared/schemas/review';
 import type { SubmittedVersion } from '@rai/shared/schemas/versions';
 import { auditStore } from '@rai/server/audit/store';
 import { findFixtureUser } from '@rai/fixtures/data/users';
 import { findFixtureCase } from '@rai/fixtures/data/cases/index';
 import { fixtureSetLabel, readManifest } from '@rai/fixtures/manifest';
 import { ScriptedQcRunner } from '@rai/fixtures/substitutes/qc/index';
-import { app, caseRevision, db, openFixtureApp, signIn, submitOk } from '../support/fixture-app.js';
+import { app, capture, caseRevision, db, openFixtureApp, signIn, submitOk } from '../support/fixture-app.js';
 import { asUser, type FixtureSession } from '../support/sign-in.js';
 
 const SET = fixtureSetLabel(readManifest());
 
 const OWNER_A = 'fx-user-owner-cm';
+const OWNER_B = 'fx-user-owner-cm-2';
 const DPO = 'fx-user-dpo';
 const AI_COE = 'fx-user-ai-coe';
 const IT_SEC = 'fx-user-it-security';
@@ -409,6 +410,65 @@ describe(`W2-02 lane decision — ${SET}`, () => {
     assert.equal((sent[0]!.targetRef as { lane: string }).lane, 'dpo');
     const created = (await auditStore.read(db.owner)).filter((e) => e.action === 'draft.successor_created');
     assert.equal(created.length, 1);
+  });
+
+  it('the version read carries its decisions: none before, approve without feedback, send-back with it; scope unchanged', async () => {
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, NONVENDOR.caseId);
+    const revision = await caseRevision(NONVENDOR.caseId);
+    const read = (session: FixtureSession, path: string) =>
+      app.inject({
+        method: 'GET',
+        url: `/api/cases/${NONVENDOR.caseId}/versions/${path}`,
+        headers: asUser(session),
+      });
+    const decisionsOf = async (session: FixtureSession, path: string): Promise<LaneDecision[]> => {
+      const res = await read(session, path);
+      assert.equal(res.statusCode, 200, res.body);
+      return res.json<SubmittedVersion>().decisions;
+    };
+    assert.deepEqual(await decisionsOf(owner, version.versionId), []);
+
+    const dpo = await signIn(DPO);
+    const approved = await decide(dpo, NONVENDOR.caseId, version.versionId, 'dpo', 'approve', {
+      expectedVersion: { versionId: version.versionId, revision },
+      qcRunId: (await laneQc(dpo, NONVENDOR.caseId, version.versionId, 'dpo', revision)).runId,
+    });
+    assert.equal(approved.statusCode, 201, approved.body);
+    clock += 60_000;
+    const feedback = {
+      items: [{ slot: 1, deficiency: 'Synthetic brief omits the model owner' }],
+      summary: 'Synthetic: add the owner and resubmit',
+    };
+    const ai = await signIn(AI_COE);
+    const sentBack = await decide(ai, NONVENDOR.caseId, version.versionId, 'ai_coe', 'send-back', {
+      expectedVersion: { versionId: version.versionId, revision },
+      feedback,
+    });
+    assert.equal(sentBack.statusCode, 201, sentBack.body);
+
+    const expected = [
+      {
+        lane: 'dpo',
+        decision: 'approve',
+        decidedBy: subjectOf(DPO),
+        decidedAt: approved.json<LaneDecisionResponse>().decidedAt,
+        feedback: null,
+      },
+      {
+        lane: 'ai_coe',
+        decision: 'send_back',
+        decidedBy: subjectOf(AI_COE),
+        decidedAt: sentBack.json<LaneDecisionResponse>().decidedAt,
+        feedback,
+      },
+    ];
+    assert.deepEqual(await decisionsOf(owner, version.versionId), expected);
+    assert.deepEqual(await decisionsOf(owner, 'latest'), expected); // the successor is a draft, N stays latest
+    assert.equal(capture.text().includes('Synthetic brief omits'), false, 'feedback is never logged');
+    const ownerB = await signIn(OWNER_B);
+    for (const path of [version.versionId, 'latest'])
+      assert.equal((await read(ownerB, path)).statusCode, 403);
   });
 
   it('D05: fx-user-dpo-spoc-hr cannot decide DPO on HR case; may decide DPO on CM case', async () => {

@@ -38,6 +38,7 @@ Uploads run W0-08 section 4 checks 1-8 and 10 (session, scope, open draft, filen
 ## Known drift from the server (rehearsal only, never evidence)
 
 - Approve checks only that `qcRunId` is a well-formed UUID. The server also refuses an approve when the version and lane have no lane-QC run (422 `lane_qc_not_run`) or when a newer run exists (409 `qc_run_superseded`). The substitute does neither.
+- Version reads always carry `decisions: []`. The server serves the version's lane decisions there, send-back feedback included (W0-02 7.6).
 - The substitute keeps its own UUID check (`requireQcRunId` in `workflow.ts`) and its own undispositioned-finding predicate for Ready (`applyReadyIfHeld`). Neither is the server's code.
 
 Deleting the substitute is Ta's decision and is on the W3 hardening deferred list. Until then this drift is documented here and is not fixed.

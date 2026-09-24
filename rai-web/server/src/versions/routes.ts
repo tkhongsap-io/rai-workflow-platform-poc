@@ -8,6 +8,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import { Type } from 'typebox';
+import { LaneDecisionSchema } from '@rai/shared/schemas/review';
 import { StageContextSchema } from '@rai/shared/schemas/slots';
 import { FrozenSlotSchema, SubmitRequestSchema, VersionSummarySchema } from '@rai/shared/schemas/versions';
 import { authorizedActor } from '../authz/middleware.js';
@@ -23,7 +24,8 @@ const CaseParamsSchema = Type.Object({ caseId: Type.String({ minLength: 1 }) });
 
 /**
  * The 7.6 `SubmittedVersion` as a response schema, key for key in the contract's order, so a fresh 201, its
- * replay from the stored key (jsonb keeps no key order) and every later read serialise byte-identically (A07).
+ * replay from the stored key (jsonb keeps no key order) and every later read serialise byte-identically (A07)
+ * until the case moves on: a later read carries the decisions made since and `isLatest` false after a resubmit.
  */
 const SlotKeys = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const;
 const SubmittedVersionResponseSchema = Type.Object({
@@ -39,6 +41,7 @@ const SubmittedVersionResponseSchema = Type.Object({
   laneMappingVersion: Type.String(),
   slots: Type.Object(Object.fromEntries(SlotKeys.map((k) => [k, FrozenSlotSchema]))),
   isLatest: Type.Boolean(),
+  decisions: Type.Array(LaneDecisionSchema),
 });
 const VersionListResponseSchema = Type.Object({ items: Type.Array(VersionSummarySchema) });
 const VersionParamsSchema = Type.Object({
@@ -100,7 +103,7 @@ export function registerVersionRoutes(fastify: FastifyInstance, deps: VersionRou
     (request) => latestVersion(deps.db, request.params.caseId),
   );
 
-  // GET /api/cases/{caseId}/versions/{versionId} → 200 SubmittedVersion, byte-identical on every read.
+  // GET /api/cases/{caseId}/versions/{versionId} → 200 SubmittedVersion with the decisions recorded so far.
   app.get(
     '/api/cases/:caseId/versions/:versionId',
     {

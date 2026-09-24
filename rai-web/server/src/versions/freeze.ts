@@ -10,6 +10,7 @@ import type { ConfigurationRevisionId } from '@rai/shared/ids';
 import type { ArtifactRef } from '@rai/shared/schemas/artifacts';
 import { CONFIGURATION_KINDS, type ConfigurationKind } from '@rai/shared/schemas/cases';
 import type { SlotNumber, StageContext } from '@rai/shared/schemas/pack';
+import type { LaneDecision } from '@rai/shared/schemas/review';
 import type { FrozenSlot, SubmittedVersion, VersionSummary } from '@rai/shared/schemas/versions';
 import { REASON_REQUIRED, SLOT_NUMBERS, reasonFromColumn } from '../pack/slots.js';
 
@@ -162,11 +163,12 @@ export class VersionNotSubmitted extends Error {
   }
 }
 
-/** The W0-02 7.6 `SubmittedVersion` from a submitted row, its frozen slots and whether it is the case's latest. */
+/** The W0-02 7.6 `SubmittedVersion` from a submitted row, its frozen slots, `isLatest` and its decisions. */
 export function submittedVersionView(
   row: SubmittedVersionColumns,
   slots: Record<SlotNumber, FrozenSlot>,
   isLatest: boolean,
+  decisions: LaneDecision[],
 ): SubmittedVersion {
   if (
     row.submittedAt === null ||
@@ -188,6 +190,7 @@ export function submittedVersionView(
     laneMappingVersion: row.laneMappingVersion,
     slots,
     isLatest,
+    decisions,
   };
 }
 

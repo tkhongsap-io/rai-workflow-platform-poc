@@ -707,7 +707,16 @@ export interface SubmittedVersion {
   laneMappingVersion: string;                 // the D02 constant's version, e.g. 'lane-mapping-v1'
   slots: Record<SlotNumber, FrozenSlot>;
   isLatest: boolean;
-  // W2 contract PRs add: lanes: LaneState[]; decisions: LaneDecision[]; findings: Finding[]; dispositions: Disposition[]
+  decisions: LaneDecision[];                  // the version's decided lanes as of the read, ascending by decidedAt then lane
+}
+
+// rai-web/shared/src/schemas/review.ts (7.7): one lane_decision row of the version
+export interface LaneDecision {
+  lane: Lane;
+  decision: 'approve' | 'send_back';
+  decidedBy: SubjectId;                       // same convention as submittedBy
+  decidedAt: string;
+  feedback: SendBackFeedback | null;          // the send-back feedback the owner revises against; null on approve
 }
 
 export interface VersionSummary {
@@ -723,8 +732,10 @@ export interface VersionListResponse { items: VersionSummary[] }    // ascending
 |---|---|---|---|
 | `POST /api/cases/{caseId}/draft/submit` | header `Idempotency-Key`; `SubmitRequest` | `201 SubmittedVersion`. In one transaction (W0-06 4.3): freeze the draft into a version row plus frozen slot rows, copy the artifact references, record `configurationRevisionId` and `laneMappingVersion`, set the case's `currentVersion`, close the draft, reset the three lane projections to `pending`, store the idempotency key, write audit `version.submitted` with actor, version and correlation id. W2-01 extends the same transaction to open the three lanes (`lane.opened` × 3, outbox rows). Pack QC runs after commit in its own transaction (W0-06 4.3, W0-07 3.4); the response does not wait for it. Replay with the same key → the same `201` body | `401`; `403`; `404`; `409 stale_version` (`revision_changed`, `version_superseded`); `422 invalid_input` when a slot is invalid at submit time (`validation.reason_required`) or the header is missing (`header.idempotency-key`); missing documents are *not* an error (soft QC, L7): they become findings in W2 |
 | `GET /api/cases/{caseId}/versions` | — | `200 VersionListResponse` | `401`; `403`; `404` |
-| `GET /api/cases/{caseId}/versions/{versionId}` | — | `200 SubmittedVersion`, byte-identical on every read for the life of the row | `401`; `403`; `404` (also when the version belongs to another case) |
-| `GET /api/cases/{caseId}/versions/latest` | — | `200 SubmittedVersion` | `401`; `403`; `404` when never submitted |
+| `GET /api/cases/{caseId}/versions/{versionId}` | — | `200 SubmittedVersion`. The frozen fields are byte-identical on every read for the life of the row; `isLatest` and `decisions` are read in the same snapshot and reflect the case at that instant | `401`; `403`; `404` (also when the version belongs to another case) |
+| `GET /api/cases/{caseId}/versions/latest` | — | `200 SubmittedVersion`, as by id | `401`; `403`; `404` when never submitted |
+
+`decisions` carries every `lane_decision` row of the version, send-back feedback included, under the same `version.view` authorization as the rest of the body: whoever may read the version may read its decisions, and there is no separate route. The submit `201` carries `decisions: []` (nothing is decided at the freeze), and so does its replay. Feedback is reviewer text: it is never logged and never written to an audit ref.
 
 Immutability at the store (W0-04, A07): the version and frozen-slot tables have no `UPDATE` path in the data-access layer, and the migration that creates them adds a trigger that raises on `UPDATE`/`DELETE`; the W1-05 "second write to that version's artifact ref is rejected" test exercises the trigger directly. Restart proof: the W1-INT journey stops and restarts the API process against the same database and re-reads the version.
 
@@ -737,7 +748,7 @@ Added by W2-02 (lane decision / send-back) and extended by W2-05 (findings/dispo
 | `POST /api/cases/{caseId}/versions/{versionId}/lanes/{lane}/approve` | header `Idempotency-Key`; `ApproveLaneRequest` (`expectedVersion`, `qcRunId`) | `201 LaneDecisionResponse` | `401`; `403` (wrong lane, Admin, D05 self-approval); `404`; `409 stale_version`; `422` missing key / `lane_qc_not_run` |
 | `POST /api/cases/{caseId}/versions/{versionId}/lanes/{lane}/send-back` | header `Idempotency-Key`; `SendBackLaneRequest` (`expectedVersion`, `feedback` with ≥1 item naming a slot) | `201 LaneDecisionResponse` (creates or reuses successor draft) | as approve, plus `422` when feedback does not name an artifact |
 
-Approve records `lane_decision` (`approve`), writes the lane projection, audits `lane.approved`. Send-back records `send_back` with feedback, writes the projection, creates version N+1 draft when none exists (`draft.successor_created`), queues a `send_back` notification to the owner, audits `lane.sent_back`. Ready is not evaluated here (W2-06).
+Approve records `lane_decision` (`approve`), writes the lane projection, audits `lane.approved`. Send-back records `send_back` with feedback, writes the projection, creates version N+1 draft when none exists (`draft.successor_created`), queues a `send_back` notification to the owner, audits `lane.sent_back`. Ready is not evaluated here (W2-06). The recorded decision, its feedback included, is read back as `SubmittedVersion.decisions` (7.6).
 
 ### 7.8 W3 shapes
 

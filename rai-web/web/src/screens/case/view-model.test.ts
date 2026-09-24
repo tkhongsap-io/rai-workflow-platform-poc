@@ -225,6 +225,7 @@ function baseVersion(overrides: Partial<SubmittedVersion> = {}): SubmittedVersio
       SLOT_NUMBERS.map((n) => [n, { state: 'missing' }]),
     ) as SubmittedVersion['slots'],
     isLatest: true,
+    decisions: [],
     ...overrides,
   };
 }

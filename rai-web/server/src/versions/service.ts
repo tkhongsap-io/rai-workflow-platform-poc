@@ -36,6 +36,7 @@ import { revisionInForce } from '../configuration/activation.js';
 import type { Db, Executor, Tx } from '../db/client.js';
 import { configurationRevision } from '../db/schema/configuration-revision.js';
 import { caseRef, keyRef, staleAt } from '../workflow/refs.js';
+import { listLaneDecisions } from '../workflow/repository.js';
 import {
   frozenSlotsOf,
   laneMappingContent,
@@ -161,7 +162,8 @@ export async function submitDraft(
         const after = await closeDraftOnCase(tx, before, version.id, now, {
           resetAiReadiness: isResubmit,
         });
-        const body = submittedVersionView(version, frozenSlotsOf(slots.rows, slots.artifacts), true);
+        // A version just frozen has no decisions yet.
+        const body = submittedVersionView(version, frozenSlotsOf(slots.rows, slots.artifacts), true, []);
         const slotRefs: AuditRefValue[] = slots.rows.map((r) => {
           const ref: Record<string, AuditRefValue> = { slot: r.slot, state: r.state };
           if (r.artifactId !== null) {
@@ -223,36 +225,37 @@ export async function listVersions(exec: Executor, caseId: string): Promise<Vers
   return { items: rows.map((v) => versionSummaryOf(v, v.id === row.currentVersionId)) };
 }
 
-async function viewOf(exec: Executor, caseRow: CaseRow, version: PackVersionRow): Promise<SubmittedVersion> {
-  const slots = await readSlotsWithArtifacts(exec, version.id);
-  return submittedVersionView(
-    version,
-    frozenSlotsOf(slots.rows, slots.artifacts),
-    version.id === caseRow.currentVersionId,
+/**
+ * The 7.6 read of one submitted version (`pick` names it from the case row), in one read-only snapshot so its
+ * slots, `isLatest` and decisions describe the same instant. 404 `version` also when the id belongs to another case.
+ */
+function readView(
+  db: Db,
+  caseId: string,
+  pick: (caseRow: CaseRow) => string | null,
+): Promise<SubmittedVersion> {
+  return db.transaction(
+    async (tx) => {
+      const row = await readCaseRow(tx, caseId);
+      if (row === undefined) throw new NotFoundError('case');
+      const versionId = pick(row);
+      const version = versionId === null ? undefined : await readSubmittedVersion(tx, caseId, versionId);
+      if (version === undefined) throw new NotFoundError('version');
+      const slots = await readSlotsWithArtifacts(tx, version.id);
+      return submittedVersionView(
+        version,
+        frozenSlotsOf(slots.rows, slots.artifacts),
+        version.id === row.currentVersionId,
+        await listLaneDecisions(tx, version.id),
+      );
+    },
+    { isolationLevel: 'repeatable read', accessMode: 'read only' },
   );
 }
 
-/** `GET /api/cases/{caseId}/versions/{versionId}`: 404 `version` also when the id belongs to another case. */
-export async function readVersion(
-  exec: Executor,
-  caseId: string,
-  versionId: string,
-): Promise<SubmittedVersion> {
-  const row = await readCaseRow(exec, caseId);
-  if (row === undefined) throw new NotFoundError('case');
-  const version = await readSubmittedVersion(exec, caseId, versionId);
-  if (version === undefined) throw new NotFoundError('version');
-  return viewOf(exec, row, version);
-}
+/** `GET /api/cases/{caseId}/versions/{versionId}`. */
+export const readVersion = (db: Db, caseId: string, versionId: string) =>
+  readView(db, caseId, () => versionId);
 
 /** `GET /api/cases/{caseId}/versions/latest`: 404 `version` when never submitted. */
-export async function latestVersion(exec: Executor, caseId: string): Promise<SubmittedVersion> {
-  const row = await readCaseRow(exec, caseId);
-  if (row === undefined) throw new NotFoundError('case');
-  const version =
-    row.currentVersionId === null
-      ? undefined
-      : await readSubmittedVersion(exec, caseId, row.currentVersionId);
-  if (version === undefined) throw new NotFoundError('version');
-  return viewOf(exec, row, version);
-}
+export const latestVersion = (db: Db, caseId: string) => readView(db, caseId, (row) => row.currentVersionId);
