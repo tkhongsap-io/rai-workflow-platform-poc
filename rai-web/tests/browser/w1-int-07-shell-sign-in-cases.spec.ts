@@ -5,7 +5,8 @@
 // absent), and the database reset to fixture set slice1-synthetic@1 through support/database.ts instead of the
 // substitute's reset hook. Every W1-07 Done-when clause keeps its test: sign-in for each fixture user lands on
 // that user's scoped list; an out-of-scope case is absent; no client-side check decides access (the list renders
-// what the server returned; a reviewer reaches the form and the server's 403 is what stops the create);
+// what the server returned; 'New case' is offered only to owners and BU SPOCs, and a reviewer who opens the form
+// directly is stopped by the server's 403);
 // keyboard-only operation; the axe audit with zero critical and zero serious violations on every screen state; no
 // hard-coded string. Proves A01 (browser layer, W0-02 8.2). Fixture ids: the eight W0-03 users and the five W0-08
 // cases of fixture set slice1-synthetic@1.
@@ -35,6 +36,8 @@ const SCOPES: {
   present: string[];
   absent: string[];
   scopeLine: string;
+  /** Holds an owner or bu_spoc role, so the shell offers 'New case' (the server still decides). */
+  createsCases: boolean;
 }[] = [
   {
     fixtureUserId: 'fx-user-owner-cm',
@@ -42,6 +45,7 @@ const SCOPES: {
     present: ALL_CASES,
     absent: [],
     scopeLine: th['scope.own_cases'],
+    createsCases: true,
   },
   {
     fixtureUserId: 'fx-user-owner-cm-2',
@@ -49,6 +53,7 @@ const SCOPES: {
     present: [],
     absent: ALL_CASES,
     scopeLine: th['scope.own_cases'],
+    createsCases: true,
   },
   {
     fixtureUserId: 'fx-user-spoc-cm',
@@ -56,6 +61,7 @@ const SCOPES: {
     present: CM_CASES,
     absent: HR_CASES,
     scopeLine: th['scope.business_unit'].replace('{businessUnit}', 'CM'),
+    createsCases: true,
   },
   {
     fixtureUserId: 'fx-user-ai-coe',
@@ -63,6 +69,7 @@ const SCOPES: {
     present: ALL_CASES,
     absent: [],
     scopeLine: th['scope.all_cases'],
+    createsCases: false,
   },
   {
     fixtureUserId: 'fx-user-dpo',
@@ -70,6 +77,7 @@ const SCOPES: {
     present: ALL_CASES,
     absent: [],
     scopeLine: th['scope.all_cases'],
+    createsCases: false,
   },
   {
     fixtureUserId: 'fx-user-it-security',
@@ -77,6 +85,7 @@ const SCOPES: {
     present: ALL_CASES,
     absent: [],
     scopeLine: th['scope.all_cases'],
+    createsCases: false,
   },
   {
     fixtureUserId: 'fx-user-admin',
@@ -84,6 +93,7 @@ const SCOPES: {
     present: ALL_CASES,
     absent: [],
     scopeLine: th['scope.all_cases'],
+    createsCases: false,
   },
   {
     fixtureUserId: 'fx-user-dpo-spoc-hr',
@@ -91,6 +101,7 @@ const SCOPES: {
     present: ALL_CASES,
     absent: [],
     scopeLine: th['scope.all_cases'],
+    createsCases: true,
   },
 ];
 
@@ -150,6 +161,12 @@ test.describe(`W1-INT (W1-07) sign-in and scoped list on the real server (fx-use
       ).toBeVisible();
       await expect(page.getByTestId('scope-line')).toHaveText(scope.scopeLine);
       await expect(page.getByTestId('case-count')).toBeVisible();
+      const newCase = { name: th['shell.nav.new_case'] };
+      if (scope.createsCases)
+        await expect(
+          page.getByRole('navigation', { name: th['shell.nav_label'] }).getByRole('link', newCase),
+        ).toBeVisible();
+      else await expect(page.getByRole('link', newCase)).toHaveCount(0);
       const listed = await registryIds(page);
       for (const id of scope.present)
         expect(listed, `${id} must be listed for ${scope.fixtureUserId}`).toContain(id);
@@ -282,11 +299,14 @@ test.describe('W1-INT (W1-07) new case on the real server (fx-user-owner-cm, fx-
     await signOut(page);
   });
 
-  test("no client-side check decides access: a reviewer reaches the form and the server's 403 is rendered", async ({
+  test("no client-side check decides access: a reviewer who opens the form directly gets the server's 403", async ({
     page,
   }) => {
     await signInThroughPicker(page, 'fx-user-dpo');
-    await page.getByRole('link', { name: th['shell.nav.new_case'] }).first().click();
+    await page.goto('/queue');
+    await expect(page.getByTestId('queue-count')).toBeVisible();
+    await expect(page.getByRole('link', { name: th['shell.nav.new_case'] })).toHaveCount(0);
+    await page.goto('/cases/new');
     await expect(page.getByRole('heading', { level: 1, name: th['new_case.title'] })).toBeVisible();
     await page.getByLabel(th['field.use_case_name']).fill('Reviewer attempt');
     await page.getByLabel(th['field.business_unit_id']).fill('CM');

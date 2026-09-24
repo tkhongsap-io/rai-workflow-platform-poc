@@ -312,6 +312,40 @@ test.describe(`W1-INT (W1-06) case flow on the real server (fx-case-missing-slot
     await expect(slotRow(page, 7).locator('[data-status]')).toContainText(t('th', 'slot.state.missing'));
   });
 
+  test('a refused upload names its reason in the slot dialog and attaches nothing', async ({
+    page,
+  }, testInfo) => {
+    const caseId = await openCase(page, MISSING_SLOT_CASE);
+    await changeButton(page, 7, 'slot.s7.name').click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('radio', { name: t('th', 'slot.state.attached'), exact: false }).check();
+    const fileInput = dialog.locator('input[type="file"]');
+    const apply = dialog.getByRole('button', { name: t('th', 'slot.dialog.apply') });
+    const alert = dialog.getByRole('alert');
+
+    await fileInput.setInputFiles({
+      name: 'empty.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.alloc(0),
+    });
+    await apply.click();
+    await expect(alert).toContainText(t('th', 'error.unsafe_upload'));
+    await expect(alert).toContainText(t('th', 'error.unsafe_upload.empty_file'));
+    await expectAccessible(page, testInfo, { name: 'slot-dialog-unsafe-upload-th', lang: 'th' });
+    await alert.getByRole('button', { name: t('th', 'action.dismiss') }).click();
+
+    // One byte over the 25 MiB default: the limit reaches the message through the envelope's params.
+    await fileInput.setInputFiles({
+      name: 'oversized.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.alloc(25 * 1024 * 1024 + 1),
+    });
+    await apply.click();
+    await expect(alert).toContainText(t('th', 'error.unsafe_upload.too_large', { max_file_mb: 25 }));
+    await expect(dialog).toBeVisible();
+    expect((await readDraft(page, caseId)).slots[7].state).toBe('missing');
+  });
+
   test('a save after another session saved shows the 409 guidance and reload recovers', async ({ page }) => {
     const caseId = await openCase(page, MISSING_SLOT_CASE);
     // Another session saves first (through the contract, with the current expected version).

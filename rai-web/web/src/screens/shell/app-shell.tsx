@@ -12,7 +12,7 @@ import { useSession } from '../../session/session-provider.js';
 import { ROUTES } from '../../routes.js';
 import { RouteFocus } from '../../route-focus.js';
 
-import { isOperatorAdmin } from '../operator/desk-health.view-model.js';
+import { canCreateCase, isOperatorAdmin } from '../operator/desk-health.view-model.js';
 
 export const MAIN_CONTENT_ID = 'main-content';
 
@@ -125,7 +125,9 @@ export function AppShell({ children }: { children: ReactNode }): JSX.Element {
           <NavLink to={ROUTES.cases} end={true}>
             {t('shell.nav.cases')}
           </NavLink>
-          <NavLink to={ROUTES.newCase}>{t('shell.nav.new_case')}</NavLink>
+          {canCreateCase(state.session) ? (
+            <NavLink to={ROUTES.newCase}>{t('shell.nav.new_case')}</NavLink>
+          ) : null}
           {isOperatorAdmin(state.session) ? (
             <NavLink to={ROUTES.operatorDeskHealth}>{t('operator.title')}</NavLink>
           ) : null}

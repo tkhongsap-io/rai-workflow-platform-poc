@@ -1,8 +1,5 @@
-// W1-07 (Lane B): renders an API failure the way section 10 item 3 asks: the envelope's messageKey in the viewer's
-// locale plus the correlation id for the operator; a NetworkError gets its own key. No text is ever taken from
-// the response body. W1-06 adds what the case flow needs: the stale-version guidance key, the invalid_input
-// field list (each a key, rendered through t()) and an optional actions row (`children`: reload, dismiss).
-// Nothing here interprets an error as a permission rule.
+// Renders an API failure only through locale keys from the error envelope, plus its correlation id; no response
+// text is shown and nothing here treats an error as a permission rule.
 
 import type { JSX, ReactNode } from 'react';
 import type { FieldError } from '@rai/shared/errors';
@@ -16,6 +13,9 @@ export interface ErrorDescription {
   guidanceKey?: string;
   /** W0-06 8.2 `stale_version.refreshPath`: the SPA path of the current version. */
   refreshPath?: string;
+  /** W0-08 section 5: why an upload was refused, with the limit it broke. */
+  reasonKey?: string;
+  reasonParams?: Record<string, string | number>;
   fields: FieldError[];
 }
 
@@ -27,6 +27,11 @@ export function describeError(error: unknown): ErrorDescription {
     if (stale !== undefined) {
       out.guidanceKey = stale.guidanceKey;
       out.refreshPath = stale.refreshPath;
+    }
+    const unsafe = error.unsafeUpload;
+    if (unsafe !== undefined) {
+      out.reasonKey = unsafe.reasonKey;
+      if (unsafe.params !== undefined) out.reasonParams = unsafe.params;
     }
     return out;
   }
@@ -41,17 +46,18 @@ export function ErrorNotice({
 }: {
   error: unknown;
   id?: string;
-  /** Actions offered with the notice (W1-06: reload after a stale version, dismiss). */
+  /** Actions offered with the notice, such as reload after a stale version or dismiss. */
   children?: ReactNode;
 }): JSX.Element {
   const { t } = useLocale();
-  const { messageKey, correlationId, guidanceKey, fields } = describeError(error);
+  const { messageKey, correlationId, guidanceKey, reasonKey, reasonParams, fields } = describeError(error);
   return (
     <div className={'notice notice-error'} role={'alert'} id={id} tabIndex={-1}>
       <p>
         <strong>{t('common.error_title')}</strong>
       </p>
       <p>{translateApiKey(t, messageKey)}</p>
+      {reasonKey !== undefined ? <p>{translateApiKey(t, reasonKey, reasonParams)}</p> : null}
       {guidanceKey !== undefined ? <p>{translateApiKey(t, guidanceKey)}</p> : null}
       {fields.length > 0 ? (
         <ul aria-label={t('error.field_list')}>
