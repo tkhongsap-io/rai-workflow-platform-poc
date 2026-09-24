@@ -5,6 +5,7 @@ import type { SendBackFeedback } from '@rai/shared/schemas/review';
 import {
   composeCaseMail,
   resolveRecipient,
+  safeBaseUrl,
   versionLink,
   CompositionError,
   type MailIdentity,
@@ -108,13 +109,17 @@ test('recipients are event-specific, synthetic and authorized; self-excluded rev
   );
 });
 test('unsafe base and path data fail closed; templates cannot inject a URL', () => {
+  assert.ok(safeBaseUrl(base));
   for (const url of [
     'http://user:secret@127.0.0.1',
     'http://127.0.0.1/path',
     'http://127.0.0.1?token=x',
+    'http://127.0.0.1/#fragment',
     'file:///',
-  ])
+  ]) {
+    assert.equal(safeBaseUrl(new URL(url)), false, url);
     assert.throws(() => versionLink(new URL(url), 'c', 'v'), CompositionError);
+  }
   for (const id of ['../evil', 'c?token=1', 'c#fragment', 'c/elsewhere'])
     assert.throws(() => versionLink(base, id, 'v'), CompositionError);
 });

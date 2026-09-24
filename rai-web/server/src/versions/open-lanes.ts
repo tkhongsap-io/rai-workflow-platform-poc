@@ -1,8 +1,6 @@
-// W2-01: open the three review lanes inside the submit transaction (W0-06 4.3 (d)+(f)). Resolves slots from the
-// version's recorded lane_mapping_version via LANE_MAPPINGS_BY_VERSION (D02); never reads risk_tier. One
-// lane.opened audit per lane, then one lane_open notification per (lane, recipient). Recipients are data passed
-// in (fixture identities that hold the lane in slice 1); this module never hard-codes addresses. W3-03/W3-04
-// deliver mail later; AD resolution is W8.
+// Opens the three review lanes inside the submit transaction (W0-06 4.3 (d)+(f)), so a failure rolls back the
+// whole submit. Slots resolve from the version's recorded lane_mapping_version (D02); risk_tier never routes.
+// Recipients are data passed in; this module never hard-codes addresses.
 import {
   LANES,
   LANE_MAPPINGS_BY_VERSION,
@@ -10,16 +8,11 @@ import {
   type Lane,
   type LaneMapping,
 } from '@rai/shared/constants';
-import { uuidv7 } from '@rai/shared/ids';
-import type { LocaleKey } from '@rai/shared/locales/keys';
-import { NOTIFICATION_EVENT_BY_KIND } from '@rai/shared/mail/types';
 import type { RoleScope } from '@rai/shared/schemas/auth';
 import type { AuditEventInput, AuditRefValue } from '../audit/store.js';
 import type { Tx } from '../db/client.js';
-import { notification } from '../db/schema/notification.js';
+import { enqueueCaseNotifications } from '../notifications/outbox.js';
 
-const TEMPLATE_KEY = 'mail.lane_opened' satisfies LocaleKey;
-const LANE_OPEN_EVENT = NOTIFICATION_EVENT_BY_KIND.lane_opened; // stored W0-04 value `lane_open`
 const LANE_ROLES = new Set<string>(LANES);
 
 export type LaneOpenRecipients = Readonly<Record<Lane, readonly string[]>>;
@@ -68,18 +61,6 @@ export interface OpenLanesInput {
   idempotencyKeyRef: string;
   occurredAt: Date;
   recipients: LaneOpenRecipients;
-  /** From AppConfig.nodeEnv (via VersionServiceDeps); never read from process.env here. */
-  nodeEnv: string;
-  /**
-   * Test-only: throws after the first notification insert has been attempted, so a rollback assertion
-   * fails if notification writes were outside the transaction. Ignored unless `nodeEnv` is `test`.
-   */
-  failAfterFirstLaneOpenNotification?: () => void;
-}
-
-/** Deep link path the SPA already serves for a frozen submitted version (no token). */
-export function laneOpenDeepLinkPath(caseId: string, versionId: string): string {
-  return `/cases/${caseId}/versions/${versionId}`;
 }
 
 function mappingForVersion(laneMappingVersion: string): LaneMapping {
@@ -105,15 +86,8 @@ export async function openLanesOnSubmit(input: OpenLanesInput): Promise<void> {
     idempotencyKeyRef,
     occurredAt,
     recipients,
-    nodeEnv,
-    failAfterFirstLaneOpenNotification,
   } = input;
   const mapping = mappingForVersion(laneMappingVersion);
-  const deepLinkPath = laneOpenDeepLinkPath(caseId, versionId);
-  const injectFailure =
-    nodeEnv === 'test' && failAfterFirstLaneOpenNotification !== undefined
-      ? failAfterFirstLaneOpenNotification
-      : undefined;
 
   for (const lane of LANES) {
     const slots = slotsForLane(lane, mapping);
@@ -132,28 +106,17 @@ export async function openLanesOnSubmit(input: OpenLanesInput): Promise<void> {
     });
   }
 
-  let notificationsAttempted = 0;
   for (const lane of LANES) {
-    for (const recipient of recipients[lane]) {
-      await tx.insert(notification).values({
-        id: uuidv7(),
-        event: LANE_OPEN_EVENT,
-        versionId,
-        caseId,
-        lane,
-        recipient,
-        deepLinkPath,
-        templateKey: TEMPLATE_KEY,
-        templateParams: { lane, version_id: versionId },
-        status: 'queued',
-        attempts: 0,
-        nextAttemptAt: null,
-        lastErrorCode: null,
-        createdAt: occurredAt,
-        correlationId,
-      });
-      notificationsAttempted += 1;
-      if (notificationsAttempted === 1 && injectFailure !== undefined) injectFailure();
-    }
+    await enqueueCaseNotifications(tx, {
+      event: 'lane_open',
+      caseId,
+      versionId,
+      lane,
+      recipients: recipients[lane],
+      templateKey: 'mail.lane_opened',
+      templateParams: { lane, version_id: versionId },
+      correlationId,
+      occurredAt,
+    });
   }
 }

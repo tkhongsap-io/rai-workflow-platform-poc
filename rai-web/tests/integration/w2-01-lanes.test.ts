@@ -1,6 +1,6 @@
 // W2-01 Done when: submit opens exactly three lanes (D02 slots via the version's recorded lane_mapping_version /
 // LANE_MAPPINGS_BY_VERSION / slotsForLane) and lane_open notification rows for every fixture identity that holds
-// the lane (including the dual-role DPO) in the same transaction as the freeze; an injected failure after the first
+// the lane (including the dual-role DPO) in the same transaction as the freeze; a database fault after the first
 // notification insert rolls the whole submit back (draft unsubmitted, zero lane.opened, zero notification);
 // risk_tier = high still opens all three (no routing); Idempotency-Key replay returns the original 201 and writes
 // no second set. Fixture set slice1-synthetic@1; identities from W0-03 section 7.
@@ -33,7 +33,8 @@ import { UPLOAD_LIMIT_DEFAULTS } from '@rai/server/config';
 import { createIdentityAdapter } from '@rai/server/identity/adapter';
 import { createFixtureIdentityProvider } from '@rai/server/identity/fixture';
 import { createPgSessionStore } from '@rai/server/identity/session';
-import { laneOpenDeepLinkPath, laneOpenRecipientsFromIdentities } from '@rai/server/versions/open-lanes';
+import { caseVersionPath } from '@rai/server/notifications/outbox';
+import { laneOpenRecipientsFromIdentities, type LaneOpenRecipients } from '@rai/server/versions/open-lanes';
 import { FIXTURE_USERS, findFixtureUser } from '@rai/fixtures/data/users';
 import { findFixtureCase } from '@rai/fixtures/data/cases/index';
 import { loadFixtures } from '@rai/fixtures/load';
@@ -63,8 +64,7 @@ let blobDir: string;
 let outputDir: string;
 let clock = Date.parse('2026-09-22T03:00:00Z');
 const now = () => new Date(clock);
-/** Test-only: when set, the next submit throws after the first lane_open notification insert. */
-let failAfterFirstLaneOpenNotification: (() => void) | undefined;
+let laneOpenRecipients: LaneOpenRecipients = LANE_OPEN_RECIPIENTS;
 
 async function rebuildApp(): Promise<void> {
   if (app !== undefined) await app.close();
@@ -105,8 +105,7 @@ async function rebuildApp(): Promise<void> {
     versions: {
       db: db.app,
       now,
-      laneOpenRecipients: LANE_OPEN_RECIPIENTS,
-      ...(failAfterFirstLaneOpenNotification === undefined ? {} : { failAfterFirstLaneOpenNotification }),
+      laneOpenRecipients,
     },
   });
   app = built.fastify;
@@ -123,7 +122,7 @@ before(async () => {
 });
 beforeEach(async () => {
   clock = Date.parse('2026-09-22T03:00:00Z');
-  failAfterFirstLaneOpenNotification = undefined;
+  laneOpenRecipients = LANE_OPEN_RECIPIENTS;
   await db.reset();
   await db.owner.execute(sql.raw('TRUNCATE TABLE "session", "registry_counter"'));
   await rm(path.join(blobDir, 'sha256'), { recursive: true, force: true });
@@ -259,7 +258,7 @@ describe(`W2-01 submit opens three lanes atomically — ${SET}, fx-case-nonvendo
         assert.equal(row.attempts, 0);
         assert.equal(row.template_key, 'mail.lane_opened');
         assert.equal(row.version_id, version.versionId);
-        assert.equal(row.deep_link_path, laneOpenDeepLinkPath(NONVENDOR.caseId, version.versionId));
+        assert.equal(row.deep_link_path, caseVersionPath(NONVENDOR.caseId, version.versionId));
         assert.deepEqual(row.template_params, { lane, version_id: version.versionId });
         assert.equal(row.correlation_id, res.headers['x-correlation-id']);
       }
@@ -276,10 +275,10 @@ describe(`W2-01 submit opens three lanes atomically — ${SET}, fx-case-nonvendo
     );
   });
 
-  it('injected failure after the first notification insert rolls back the submit: draft stays open, zero rows', async () => {
-    failAfterFirstLaneOpenNotification = () => {
-      throw new Error('w2-01 injected failure after first lane_open notification');
-    };
+  it('a database fault after the first notification insert rolls back the submit: draft stays open, zero rows', async () => {
+    // The repeated address violates notification_event_version_lane_recipient_key on the second insert.
+    const address = LANE_OPEN_RECIPIENTS.ai_coe[0]!;
+    laneOpenRecipients = { ...LANE_OPEN_RECIPIENTS, ai_coe: [address, address] };
     await rebuildApp();
     const owner = await signIn(OWNER_A);
     const { draft, body } = await current(owner, NONVENDOR.caseId);

@@ -1,10 +1,10 @@
-import { createErrorCapture, type ErrorCapture } from '../observability/errors.js';
-// Minimal W3-03a wiring; dynamic local-sink import keeps fixture code out of server/dist.
+// The dynamic local-sink import keeps fixture code out of server/dist.
 import type { FastifyInstance } from 'fastify';
 import type { MailSink } from '@rai/shared/mail/types';
 import type { AppConfig } from '../config.js';
 import type { Notifications } from './service.js';
 import type { Drain } from '../shutdown.js';
+import { createErrorCapture, type ErrorCapture } from '../observability/errors.js';
 import type { Emitter } from '../observability/log.js';
 
 /** Existing synthetic sink capability for startup readiness injection; delivery port stays unchanged. */

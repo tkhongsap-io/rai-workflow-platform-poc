@@ -173,7 +173,6 @@ function checkCommitted(request: DeliveryRequest): DeliveryError | null {
       event.versionId !== null ||
       event.versionNumber !== null ||
       event.lane !== null ||
-      !realDay(event.digestDay) ||
       request.recipient.basis !== 'operator_recipients'
     )
       return { code: 'malformed_request', message: 'event: invalid digest job provenance' };

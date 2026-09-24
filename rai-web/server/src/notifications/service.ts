@@ -1,9 +1,15 @@
-import type { ErrorCapture } from '../observability/errors.js';
-// W3-04 bounded retry dispatcher; W3-03a committed composition remains unchanged. Reads committed outbox rows on its own connection; never called with a workflow Tx.
+// Reads committed outbox rows on its own connection, never inside a workflow transaction, so an
+// uncommitted or rolled-back event cannot reach the sink.
 import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import { Value } from 'typebox/value';
 import { LANES, type Lane } from '@rai/shared/constants';
-import type { CommittedEvent, DeliveryReceipt, MailSink } from '@rai/shared/mail/types';
+import type {
+  CommittedEvent,
+  DeliveryErrorCode,
+  DeliveryReceipt,
+  DeliveryRequest,
+  MailSink,
+} from '@rai/shared/mail/types';
 import { SendBackFeedbackSchema } from '@rai/shared/schemas/review';
 import type { Db, Tx } from '../db/client.js';
 import {
@@ -16,6 +22,7 @@ import {
   session,
 } from '../db/schema/index.js';
 import { runWithContext } from '../observability/context.js';
+import type { ErrorCapture } from '../observability/errors.js';
 import type { Emitter } from '../observability/log.js';
 import { loadCommittedDigestRequest, DigestCompositionError } from './digest.js';
 import { deliveryUpdate, nextAttempt, RETRY_BACKOFF_MS } from './retry.js';
@@ -52,7 +59,7 @@ export interface NotificationDeps {
 export type NotificationRow = typeof notification.$inferSelect;
 
 /** Call only from the dispatcher's own transaction after reading a committed outbox row.
- * Composition has no delivery/status/log side effects. W3-04 supplies the attempt on the returned request.
+ * Composition has no delivery/status/log side effects; the dispatcher sets the attempt on the returned request.
  */
 export async function loadCommittedCaseRequest(
   tx: Tx,
@@ -153,7 +160,40 @@ export async function loadCommittedCaseRequest(
 
 export function createNotifications(deps: NotificationDeps) {
   const now = deps.now ?? (() => new Date());
-  /** Compatibility name: dispatches one eligible attempt, including retries. A crash before commit can replay it. */
+  async function send(
+    tx: Tx,
+    row: NotificationRow,
+    attempt: number,
+    signal?: AbortSignal,
+  ): Promise<DeliveryReceipt> {
+    const failed = (code: DeliveryErrorCode): DeliveryReceipt => ({
+      dedupKey: '',
+      status: 'failed',
+      attempt,
+      at: now().toISOString(),
+      sinkMessageId: null,
+      error: { code, message: 'composition or delivery failed' },
+    });
+    let request: DeliveryRequest;
+    try {
+      request =
+        row.event === 'sla_breach_digest'
+          ? await loadCommittedDigestRequest(tx, row, deps)
+          : await loadCommittedCaseRequest(tx, row, deps);
+    } catch (err) {
+      const code =
+        err instanceof CompositionError || err instanceof DigestCompositionError ? err.code : 'sink_failure';
+      return failed(code);
+    }
+    // Shutdown may stop an attempt only before the sink sees it; a settled result is always committed.
+    signal?.throwIfAborted();
+    try {
+      return await deps.sink.deliver({ ...request, attempt });
+    } catch {
+      return failed('sink_failure');
+    }
+  }
+  /** Dispatches at most one eligible attempt for this row; a crash before commit can replay it. */
   async function deliverInitial(id: string, signal?: AbortSignal): Promise<DeliveryReceipt | undefined> {
     signal?.throwIfAborted();
     const outcome = await deps.db.transaction(async (tx) => {
@@ -170,7 +210,7 @@ export function createNotifications(deps: NotificationDeps) {
         .for('update', { skipLocked: true });
       signal?.throwIfAborted();
       if (!row) return undefined;
-      // Legacy W3-03a failure has no completion timestamp: adopt once, never infer from createdAt.
+      // A failed first attempt recorded without a deadline: schedule from now, never infer from createdAt.
       if (row.attempts === 1 && row.nextAttemptAt === null) {
         await tx
           .update(notification)
@@ -181,35 +221,9 @@ export function createNotifications(deps: NotificationDeps) {
       }
       const attempt = nextAttempt({ ...row, status: 'queued' }, now());
       if (attempt === undefined) return undefined;
-      let receipt: DeliveryReceipt;
-      try {
-        const request =
-          row.event === 'sla_breach_digest'
-            ? await loadCommittedDigestRequest(tx, row, deps)
-            : await loadCommittedCaseRequest(tx, row, deps);
-        signal?.throwIfAborted();
-        receipt = await deps.sink.deliver({ ...request, attempt });
-      } catch (err) {
-        receipt = {
-          dedupKey: '',
-          status: 'failed',
-          attempt,
-          at: now().toISOString(),
-          sinkMessageId: null,
-          error: {
-            code:
-              err instanceof CompositionError || err instanceof DigestCompositionError
-                ? err.code
-                : 'sink_failure',
-            message: 'composition or delivery failed',
-          },
-        };
-      }
-      // Cancellation waits for sink settlement before rollback; never unlock a pending sink call.
-      signal?.throwIfAborted();
+      const receipt = await send(tx, row, attempt, signal);
       const update = deliveryUpdate(attempt, receipt, now());
       await tx.update(notification).set(update).where(eq(notification.id, id));
-      signal?.throwIfAborted();
       return { row, receipt, update, attempt };
     });
     if (outcome === undefined) return undefined;
