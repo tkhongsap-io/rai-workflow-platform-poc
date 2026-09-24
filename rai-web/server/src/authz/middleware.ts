@@ -16,6 +16,7 @@ import type { Principal, Role } from '@rai/shared/schemas/auth';
 import type { SessionRecord, SessionStore } from '../identity/session.js';
 import { maybeContext } from '../observability/context.js';
 import type { Emitter } from '../observability/log.js';
+import { isUuid } from '../workflow/refs.js';
 import {
   authorize,
   type Action,
@@ -72,7 +73,6 @@ export class RouteWithoutAuthDeclaration extends Error {
   }
 }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const LANE_SET: ReadonlySet<string> = new Set(LANES);
 const SAFE_METHODS: ReadonlySet<string> = new Set(['GET', 'HEAD', 'OPTIONS']);
 
@@ -150,7 +150,7 @@ export async function authorizeRequest(
     target = { kind: 'none' };
   } else if (auth.target === 'lane') {
     log.targetId = ids.caseId;
-    if (ids.caseId !== undefined && UUID.test(ids.caseId)) {
+    if (ids.caseId !== undefined && isUuid(ids.caseId)) {
       facts = await deps.facts.byCaseId(ids.caseId);
     }
     if (facts === undefined) {
@@ -165,7 +165,7 @@ export async function authorizeRequest(
   } else {
     const id = auth.target === 'case' ? ids.caseId : ids.artifactId;
     log.targetId = id;
-    if (id !== undefined && UUID.test(id)) {
+    if (id !== undefined && isUuid(id)) {
       facts = auth.target === 'case' ? await deps.facts.byCaseId(id) : await deps.facts.byArtifactId(id);
     }
     target = facts === undefined ? { kind: 'unresolved' } : { kind: 'case', facts };

@@ -6,23 +6,18 @@
 
 import { and, eq, sql } from 'drizzle-orm';
 import type { Readable } from 'node:stream';
-import {
-  InvalidInputError,
-  StaleVersionError,
-  UnsafeUploadError,
-  type UnsafeUploadReason,
-} from '@rai/shared/errors';
+import { InvalidInputError, UnsafeUploadError, type UnsafeUploadReason } from '@rai/shared/errors';
 import { uuidv7 } from '@rai/shared/ids';
 import type { AllowedMediaType, ArtifactRef } from '@rai/shared/schemas/artifacts';
 import { auditStore } from '../audit/store.js';
 import { readCaseRow, readVersionRow } from '../cases/repository.js';
-import { staleDetails } from '../cases/service.js';
 import type { Db, Executor } from '../db/client.js';
 import { artifact } from '../db/schema/artifact.js';
 import { artifactSlot } from '../db/schema/artifact-slot.js';
 import { cases } from '../db/schema/case.js';
 import { lockCase, withTransaction } from '../db/transaction.js';
 import type { Emitter } from '../observability/log.js';
+import { staleAt } from '../workflow/refs.js';
 import { StagingAborted, type BlobStore, type TempRef } from './blob-store.js';
 import { checkFilename, MEDIA_TYPE_BY_KIND } from './filename.js';
 import { inspectBytes } from './sniff.js';
@@ -87,15 +82,7 @@ async function assertNotReadyForUpload(exec: Executor, caseId: string): Promise<
   if (caseRow === undefined || caseRow.currentVersionId === null) return;
   const current = await readVersionRow(exec, caseRow.currentVersionId);
   if (current === undefined || current.readyAt == null) return;
-  throw new StaleVersionError(
-    staleDetails(
-      'version_closed',
-      'error.stale_version.guidance.ready',
-      current,
-      caseRow.rowVersion,
-      `/cases/${caseId}/versions/${current.id}`,
-    ),
-  );
+  throw staleAt('version_closed', 'error.stale_version.guidance.ready', current, caseRow);
 }
 
 /** W0-08 check 10: bytes the open draft's attached artifacts already reference. */

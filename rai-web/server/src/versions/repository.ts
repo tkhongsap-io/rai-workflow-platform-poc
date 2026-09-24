@@ -15,14 +15,9 @@ import { artifact } from '../db/schema/artifact.js';
 import { artifactSlot } from '../db/schema/artifact-slot.js';
 import { cases } from '../db/schema/case.js';
 import { packVersion } from '../db/schema/pack-version.js';
+import { isUuid } from '../workflow/refs.js';
 import type { ManifestSlot } from './manifest.js';
 import type { SlotColumnsIn } from './freeze.js';
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-export function isUuid(value: string): boolean {
-  return UUID.test(value);
-}
 
 /** The frozen columns the submit transaction writes once (W0-04 `pack_version`, "Frozen at submit"). */
 export interface FreezeInput {

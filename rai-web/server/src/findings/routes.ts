@@ -27,7 +27,7 @@ import { readVersionRow } from '../cases/repository.js';
 import { runAndPersistLaneQc, type QcOrchestratorDeps } from '../qc/orchestrator.js';
 import { listFindingsForVersion, owningLaneOf, readFindingForCase } from './repository.js';
 import { recordDisposition, type DispositionServiceDeps } from './service.js';
-import { isUuid } from '../versions/repository.js';
+import { isUuid } from '../workflow/refs.js';
 
 export interface FindingsRouteDeps extends DispositionServiceDeps {
   emitter: Emitter;

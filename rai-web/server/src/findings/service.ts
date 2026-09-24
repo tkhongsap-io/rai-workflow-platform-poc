@@ -2,19 +2,17 @@
 // transaction after the disposition write. Authorization maps body.kind → finding.* action; the route calls
 // authorize before this service.
 
-import { createHash } from 'node:crypto';
-import { InvalidInputError, NotFoundError, StaleVersionError } from '@rai/shared/errors';
+import { InvalidInputError, NotFoundError } from '@rai/shared/errors';
 import { uuidv7 } from '@rai/shared/ids';
-import type { Principal, Role } from '@rai/shared/schemas/auth';
 import type { DispositionKind, DispositionRequest, DispositionResponse } from '@rai/shared/schemas/review';
-import type { AuditAction, AuditRefValue } from '../audit/store.js';
+import type { AuditAction } from '../audit/store.js';
 import { requestDigest } from '../cases/idempotency.js';
-import { readVersionRow, type CaseRow, type PackVersionRow } from '../cases/repository.js';
-import { staleDetails } from '../cases/service.js';
+import { readVersionRow } from '../cases/repository.js';
 import type { Db } from '../db/client.js';
-import { withWorkflowTransaction, type WorkflowResult } from '../versions/transaction.js';
+import { REASON_REQUIRED } from '../pack/slots.js';
+import { withWorkflowTransaction, type ActionContext, type WorkflowResult } from '../versions/transaction.js';
 import { applyReadyIfHeld, type ReadyTrigger } from '../workflow/ready.js';
-import { isUuid } from '../versions/repository.js';
+import { caseRef, isUuid, keyRef, staleAt } from '../workflow/refs.js';
 import {
   findLatestSubmittedVersionId,
   insertDisposition,
@@ -29,12 +27,6 @@ export interface DispositionServiceDeps {
   readyRecipientsForOwner?: (ownerSubjectId: string) => readonly string[];
 }
 
-export interface ActionContext {
-  actor: Principal;
-  role: Role;
-  correlationId: string;
-}
-
 export const DISPOSITION_ACTION = 'finding.disposition' as const;
 
 const KIND_TO_AUDIT: Record<DispositionKind, AuditAction> = {
@@ -45,33 +37,10 @@ const KIND_TO_AUDIT: Record<DispositionKind, AuditAction> = {
   not_applicable: 'disposition.recorded',
 };
 
-const AUDIT_REF = /^[A-Za-z0-9_.:/@-]{1,64}$/;
-
-function keyRef(key: string): string {
-  return AUDIT_REF.test(key) ? key : createHash('sha256').update(key).digest('hex');
-}
-
-function refreshPathFor(caseId: string, version: PackVersionRow): string {
-  return `/cases/${caseId}/versions/${version.id}`;
-}
-
-function caseRef(row: CaseRow): Record<string, AuditRefValue> {
-  return {
-    draft_version_id: row.draftVersionId,
-    current_version_id: row.currentVersionId,
-    desk_status: row.deskStatus,
-    row_version: row.rowVersion,
-    privacy_status: row.privacyStatus,
-    security_status: row.securityStatus,
-    rai_status: row.raiStatus,
-    ai_readiness_status: row.aiReadinessStatus,
-  };
-}
-
 function requireReason(kind: DispositionKind, reason: string | undefined): string | null {
   if (kind === 'waived' || kind === 'not_applicable') {
     if (typeof reason !== 'string' || reason.trim() === '') {
-      throw new InvalidInputError([{ path: 'body.reason', messageKey: 'validation.reason_required' }]);
+      throw new InvalidInputError([{ path: 'body.reason', messageKey: REASON_REQUIRED }]);
     }
     return reason.trim();
   }
@@ -97,9 +66,7 @@ export async function recordDisposition(
     deps.db,
     caseId,
     {
-      actor: ctx.actor,
-      role: ctx.role,
-      correlationId: ctx.correlationId,
+      ...ctx,
       action: DISPOSITION_ACTION,
       idempotencyKey,
       requestDigest: requestDigest(DISPOSITION_ACTION, { ...request, findingId }),
@@ -117,41 +84,27 @@ export async function recordDisposition(
         const current =
           before.currentVersionId === null ? undefined : await readVersionRow(tx, before.currentVersionId);
         if (current?.readyAt != null) {
-          throw new StaleVersionError(
-            staleDetails(
-              'version_closed',
-              'error.stale_version.guidance.ready',
-              current,
-              before.rowVersion,
-              refreshPathFor(caseId, current),
-            ),
-          );
+          throw staleAt('version_closed', 'error.stale_version.guidance.ready', current, before);
         }
 
         const latestSubmittedId = await findLatestSubmittedVersionId(tx, caseId);
         if (latestSubmittedId === undefined || finding.versionId !== latestSubmittedId) {
-          const guidanceVersion = current ?? findingVersion;
-          throw new StaleVersionError(
-            staleDetails(
-              'version_superseded',
-              'error.stale_version.guidance.version_superseded',
-              guidanceVersion,
-              before.rowVersion,
-              refreshPathFor(caseId, guidanceVersion),
-            ),
+          const shown = current ?? findingVersion;
+          throw staleAt(
+            'version_superseded',
+            'error.stale_version.guidance.version_superseded',
+            shown,
+            before,
           );
         }
 
         // expectedVersion must name the finding's version (the latest submitted).
         if (request.expectedVersion.versionId !== finding.versionId) {
-          throw new StaleVersionError(
-            staleDetails(
-              'version_superseded',
-              'error.stale_version.guidance.version_superseded',
-              findingVersion,
-              before.rowVersion,
-              refreshPathFor(caseId, findingVersion),
-            ),
+          throw staleAt(
+            'version_superseded',
+            'error.stale_version.guidance.version_superseded',
+            findingVersion,
+            before,
           );
         }
 

@@ -18,18 +18,18 @@ import {
   UnsafeUploadError,
   type FieldError,
 } from '@rai/shared/errors';
-import type { Principal, Role } from '@rai/shared/schemas/auth';
 import type { PackDraft, PackDraftUpdateRequest, SlotNumber, SlotState } from '@rai/shared/schemas/pack';
 import type { ExpectedVersion } from '@rai/shared/schemas/versions';
 import type { UploadLimits } from '../artifacts/pipeline.js';
 import { auditStore, type AuditRefValue } from '../audit/store.js';
 import { readCaseRow, readVersionRow, updateDraftFields, type CaseRow } from '../cases/repository.js';
-import { staleDetails } from '../cases/service.js';
 import { currentBody } from '../configuration/store.js';
 import type { Db, Executor, Tx } from '../db/client.js';
 import { lockCase, withTransaction } from '../db/transaction.js';
 import { createErrorCapture, type ErrorCapture } from '../observability/errors.js';
 import type { Emitter } from '../observability/log.js';
+import type { ActionContext } from '../versions/transaction.js';
+import { staleDetails } from '../workflow/refs.js';
 import { noopUploadTrigger, type UploadTrigger, type UploadTriggerEvent } from './qc-trigger.js';
 import {
   ArtifactCaseMismatch,
@@ -50,13 +50,6 @@ export interface PackServiceDeps {
   errors?: ErrorCapture;
   uploadTrigger?: UploadTrigger; // the W0-07 hook point; the no-op until an orchestrator is bound
   now?: () => Date;
-}
-
-/** Who acts, as which role (the policy row that allowed), under which correlation id (W0-10). */
-export interface ActionContext {
-  actor: Principal;
-  role: Role;
-  correlationId: string;
 }
 
 export const NOT_IN_LIST = 'validation.not_in_configured_list' as const;

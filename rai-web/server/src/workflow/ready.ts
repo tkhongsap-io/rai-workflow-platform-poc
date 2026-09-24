@@ -4,7 +4,6 @@
 import { and, eq, sql } from 'drizzle-orm';
 import { LANE_MAPPINGS_BY_VERSION, type Lane } from '@rai/shared/constants';
 import type { RoleScope } from '@rai/shared/schemas/auth';
-import type { AuditRefValue } from '../audit/store.js';
 import { auditStore } from '../audit/store.js';
 import { isOwnerOrSpocOnCase, type CaseScopeFacts } from '../authz/policy.js';
 import { readVersionRow, type CaseRow } from '../cases/repository.js';
@@ -17,6 +16,7 @@ import { qcFinding } from '../db/schema/qc-finding.js';
 import { latestDisposition, undispositioned } from '../findings/repository.js';
 import { CaseRowChanged } from '../versions/repository.js';
 import { insertReadyNotifications } from './ready-notice.js';
+import { caseRef } from './refs.js';
 
 export type ReadyTrigger = {
   /** Audit / decision / disposition id that caused the recheck. */
@@ -38,19 +38,6 @@ export type ReadyEval =
       /** Lanes whose approver was owner or BU SPOC on the case (§6 condition 4); never counted. */
       selfApprovedLanes: Lane[];
     };
-
-function caseRef(row: CaseRow): Record<string, AuditRefValue> {
-  return {
-    draft_version_id: row.draftVersionId,
-    current_version_id: row.currentVersionId,
-    desk_status: row.deskStatus,
-    row_version: row.rowVersion,
-    privacy_status: row.privacyStatus,
-    security_status: row.securityStatus,
-    rai_status: row.raiStatus,
-    ai_readiness_status: row.aiReadinessStatus,
-  };
-}
 
 /**
  * Lanes required by the mapping frozen on the version (same resolution as open-lanes). Unknown or

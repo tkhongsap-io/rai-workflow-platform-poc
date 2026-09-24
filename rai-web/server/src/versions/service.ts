@@ -20,10 +20,8 @@
 //                     lane rolls everything back. The route schedules pack QC only after this promise resolves
 //                     with a fresh commit; the response never waits.
 
-import { createHash } from 'node:crypto';
 import { CURRENT_LANE_MAPPING } from '@rai/shared/constants';
-import { InvalidInputError, NotFoundError, StaleVersionError } from '@rai/shared/errors';
-import type { Principal, Role } from '@rai/shared/schemas/auth';
+import { InvalidInputError, NotFoundError } from '@rai/shared/errors';
 import type { ConfigurationKind } from '@rai/shared/schemas/cases';
 import type {
   ExpectedVersion,
@@ -34,10 +32,10 @@ import type {
 import type { AuditRefValue } from '../audit/store.js';
 import { requestDigest } from '../cases/idempotency.js';
 import { readCaseRow, readVersionRow, type CaseRow, type PackVersionRow } from '../cases/repository.js';
-import { staleDetails } from '../cases/service.js';
 import { revisionInForce } from '../configuration/activation.js';
 import type { Db, Executor, Tx } from '../db/client.js';
 import { configurationRevision } from '../db/schema/configuration-revision.js';
+import { caseRef, keyRef, staleAt } from '../workflow/refs.js';
 import {
   frozenSlotsOf,
   laneMappingContent,
@@ -56,7 +54,7 @@ import {
   readSlotsWithArtifacts,
   readSubmittedVersion,
 } from './repository.js';
-import { withWorkflowTransaction, type WorkflowResult } from './transaction.js';
+import { withWorkflowTransaction, type ActionContext, type WorkflowResult } from './transaction.js';
 
 export interface VersionServiceDeps {
   db: Db;
@@ -65,65 +63,23 @@ export interface VersionServiceDeps {
   laneOpenRecipients?: LaneOpenRecipients;
 }
 
-/** Who acts, as which role (the policy row that allowed), under which correlation id (W0-10). */
-export interface ActionContext {
-  actor: Principal;
-  role: Role;
-  correlationId: string;
-}
-
 export const SUBMIT_ACTION = 'case.submit' as const;
 /** Stored on `idempotency_key.action` when the locked draft had a parent (W0-06 4.6 / W2-04). Digest stays `case.submit`. */
 export const RESUBMIT_ACTION = 'case.resubmit' as const;
-const AUDIT_REF = /^[A-Za-z0-9_.:/@-]{1,64}$/;
-
-/** The key as an audit reference: verbatim when it is one (a UUID is), else its SHA-256 (the audit store admits no free text). */
-function keyRef(key: string): string {
-  return AUDIT_REF.test(key) ? key : createHash('sha256').update(key).digest('hex');
-}
-
-function refreshPathFor(caseId: string, version: PackVersionRow): string {
-  return version.submittedAt === null ? `/cases/${caseId}` : `/cases/${caseId}/versions/${version.id}`;
-}
 
 /** Step 6 (W0-06 5.2 submit row) for the named draft: the open draft, not Ready, revision matches. */
 async function assertExpectedDraft(tx: Tx, row: CaseRow, expected: ExpectedVersion): Promise<PackVersionRow> {
   const current = row.currentVersionId === null ? undefined : await readVersionRow(tx, row.currentVersionId);
-  if (current?.readyAt != null) {
-    throw new StaleVersionError(
-      staleDetails(
-        'version_closed',
-        'error.stale_version.guidance.ready',
-        current,
-        row.rowVersion,
-        refreshPathFor(row.id, current),
-      ),
-    );
-  }
+  if (current?.readyAt != null)
+    throw staleAt('version_closed', 'error.stale_version.guidance.ready', current, row);
   const draft = row.draftVersionId === null ? undefined : await readVersionRow(tx, row.draftVersionId);
   if (draft === undefined || draft.id !== expected.versionId) {
     const shown = draft ?? current;
     if (shown === undefined) throw new NotFoundError('version'); // no draft and no version: cannot happen after create
-    throw new StaleVersionError(
-      staleDetails(
-        'version_superseded',
-        'error.stale_version.guidance.version_superseded',
-        shown,
-        row.rowVersion,
-        refreshPathFor(row.id, shown),
-      ),
-    );
+    throw staleAt('version_superseded', 'error.stale_version.guidance.version_superseded', shown, row);
   }
   if (row.rowVersion !== expected.revision) {
-    throw new StaleVersionError(
-      staleDetails(
-        'revision_changed',
-        'error.stale_version.guidance.revision_changed',
-        draft,
-        row.rowVersion,
-        refreshPathFor(row.id, draft),
-      ),
-    );
+    throw staleAt('revision_changed', 'error.stale_version.guidance.revision_changed', draft, row);
   }
   return draft;
 }
@@ -171,9 +127,7 @@ export async function submitDraft(
     deps.db,
     caseId,
     {
-      actor: ctx.actor,
-      role: ctx.role,
-      correlationId: ctx.correlationId,
+      ...ctx,
       action: SUBMIT_ACTION,
       idempotencyKey,
       requestDigest: requestDigest(SUBMIT_ACTION, request),
@@ -240,15 +194,12 @@ export async function submitDraft(
           occurredAt: now,
         });
         // W2-01 (d)+(f): three lane.opened audits then lane_open notification rows; same correlation id.
-        if (version.laneMappingVersion === null) {
-          throw new Error('submit freeze left lane_mapping_version null');
-        }
         await openLanesOnSubmit({
           tx,
           audit,
           caseId: before.id,
           versionId: version.id,
-          laneMappingVersion: version.laneMappingVersion,
+          laneMappingVersion: CURRENT_LANE_MAPPING.version,
           correlationId: ctx.correlationId,
           idempotencyKeyRef: idempotencyKeyReference,
           occurredAt: now,
@@ -262,19 +213,6 @@ export async function submitDraft(
       },
     },
   );
-}
-
-function caseRef(row: CaseRow): Record<string, AuditRefValue> {
-  return {
-    draft_version_id: row.draftVersionId,
-    current_version_id: row.currentVersionId,
-    desk_status: row.deskStatus,
-    row_version: row.rowVersion,
-    privacy_status: row.privacyStatus,
-    security_status: row.securityStatus,
-    rai_status: row.raiStatus,
-    ai_readiness_status: row.aiReadinessStatus,
-  };
 }
 
 /** `GET /api/cases/{caseId}/versions`: ascending by versionNumber; empty while never submitted. */

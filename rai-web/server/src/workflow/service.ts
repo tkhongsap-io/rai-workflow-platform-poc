@@ -4,11 +4,9 @@
 // send_back notification, and the decision audit event. Ready (W2-06) is evaluated inside approve after the
 // decision write, under the same case lock.
 
-import { createHash } from 'node:crypto';
-import { InvalidInputError, NotFoundError, StaleVersionError } from '@rai/shared/errors';
+import { InvalidInputError, NotFoundError } from '@rai/shared/errors';
 import { uuidv7 } from '@rai/shared/ids';
 import type { Lane } from '@rai/shared/constants';
-import type { Principal, Role } from '@rai/shared/schemas/auth';
 import type {
   ApproveLaneRequest,
   LaneDecisionResponse,
@@ -16,10 +14,8 @@ import type {
   SendBackLaneRequest,
 } from '@rai/shared/schemas/review';
 import type { ExpectedVersion } from '@rai/shared/schemas/versions';
-import type { AuditRefValue } from '../audit/store.js';
 import { requestDigest } from '../cases/idempotency.js';
 import { readVersionRow, type CaseRow, type PackVersionRow } from '../cases/repository.js';
-import { staleDetails } from '../cases/service.js';
 import type { Db, Tx } from '../db/client.js';
 import { findLatestApproveAttemptRun, ruleRevisionOf } from '../qc/repository.js';
 import {
@@ -30,8 +26,8 @@ import {
 } from './repository.js';
 import { insertSendBackNotifications } from './send-back-notice.js';
 import { applyReadyIfHeld } from './ready.js';
-import { withWorkflowTransaction, type WorkflowResult } from '../versions/transaction.js';
-import { isUuid } from '../versions/repository.js';
+import { withWorkflowTransaction, type ActionContext, type WorkflowResult } from '../versions/transaction.js';
+import { caseRef, isUuid, keyRef, staleAt } from './refs.js';
 
 export interface DecideServiceDeps {
   db: Db;
@@ -40,44 +36,16 @@ export interface DecideServiceDeps {
   sendBackRecipientsForOwner?: (ownerSubjectId: string) => readonly string[];
 }
 
-export interface ActionContext {
-  actor: Principal;
-  role: Role;
-  correlationId: string;
-}
-
 export const APPROVE_ACTION = 'lane.approve' as const;
 export const SEND_BACK_ACTION = 'lane.send_back' as const;
-
-const AUDIT_REF = /^[A-Za-z0-9_.:/@-]{1,64}$/;
-
-function keyRef(key: string): string {
-  return AUDIT_REF.test(key) ? key : createHash('sha256').update(key).digest('hex');
-}
-
-function refreshPathFor(caseId: string, version: PackVersionRow): string {
-  return `/cases/${caseId}/versions/${version.id}`;
-}
-
-function caseRef(row: CaseRow): Record<string, AuditRefValue> {
-  return {
-    draft_version_id: row.draftVersionId,
-    current_version_id: row.currentVersionId,
-    desk_status: row.deskStatus,
-    row_version: row.rowVersion,
-    privacy_status: row.privacyStatus,
-    security_status: row.securityStatus,
-    rai_status: row.raiStatus,
-    ai_readiness_status: row.aiReadinessStatus,
-  };
-}
 
 /**
  * Shared expected-version / precondition checks for decide (W0-06 4.4 / 4.5 / 5.2).
  * Does **not** compare `expected.revision` to `case.row_version`: §5.1 freezes revision for submitted
  * versions, and §5.2 names version_superseded / version_closed / lane_already_decided for these actions.
  * Order matches W0-06 §4 / §5.2: existence (check 3), then Ready → version_closed for any mutating
- * action, then named-vs-current / submitted / successor checks. An unknown UUID stays not_found even
+ * action, then named-vs-current (current is always submitted, so a named draft is superseded) and successor
+ * checks. An unknown UUID stays not_found even
  * when Ready; a real non-current version of a Ready case is version_closed, not version_superseded.
  * `requireNoSuccessor`: approve only — a successor draft closes the version for further approvals.
  */
@@ -97,54 +65,14 @@ async function assertDecideTarget(
   if (current === undefined) throw new NotFoundError('version');
 
   // Check 6 — Ready closes every mutating action (§5.2), before named-vs-current.
-  if (current.readyAt != null) {
-    throw new StaleVersionError(
-      staleDetails(
-        'version_closed',
-        'error.stale_version.guidance.ready',
-        current,
-        row.rowVersion,
-        refreshPathFor(row.id, current),
-      ),
-    );
-  }
-
+  if (current.readyAt != null)
+    throw staleAt('version_closed', 'error.stale_version.guidance.ready', current, row);
   if (current.id !== named.id) {
-    throw new StaleVersionError(
-      staleDetails(
-        'version_superseded',
-        'error.stale_version.guidance.version_superseded',
-        current,
-        row.rowVersion,
-        refreshPathFor(row.id, current),
-      ),
-    );
+    throw staleAt('version_superseded', 'error.stale_version.guidance.version_superseded', current, row);
   }
-
-  if (named.submittedAt === null) {
-    throw new StaleVersionError(
-      staleDetails(
-        'version_superseded',
-        'error.stale_version.guidance.version_superseded',
-        named,
-        row.rowVersion,
-        refreshPathFor(row.id, named),
-      ),
-    );
-  }
-
   if (opts.requireNoSuccessor && row.draftVersionId !== null) {
-    throw new StaleVersionError(
-      staleDetails(
-        'version_closed',
-        'error.stale_version.guidance.version_closed',
-        named,
-        row.rowVersion,
-        refreshPathFor(row.id, named),
-      ),
-    );
+    throw staleAt('version_closed', 'error.stale_version.guidance.version_closed', named, row);
   }
-
   return named;
 }
 
@@ -154,16 +82,12 @@ async function assertLanePending(
   lane: Lane,
   caseRow: CaseRow,
 ): Promise<void> {
-  const existing = await findLaneDecision(tx, version.id, lane);
-  if (existing !== undefined) {
-    throw new StaleVersionError(
-      staleDetails(
-        'lane_already_decided',
-        'error.stale_version.guidance.lane_already_decided',
-        version,
-        caseRow.rowVersion,
-        refreshPathFor(caseRow.id, version),
-      ),
+  if ((await findLaneDecision(tx, version.id, lane)) !== undefined) {
+    throw staleAt(
+      'lane_already_decided',
+      'error.stale_version.guidance.lane_already_decided',
+      version,
+      caseRow,
     );
   }
 }
@@ -178,20 +102,16 @@ export function requireQcRunId(qcRunId: string | undefined): string {
   return qcRunId.trim();
 }
 
-/** A09: send-back feedback must name at least one artifact (slot). Schema enforces minItems; belt-and-braces. */
-export function requireNamedArtifactFeedback(feedback: SendBackFeedback | undefined): SendBackFeedback {
-  if (feedback === undefined || !Array.isArray(feedback.items) || feedback.items.length === 0) {
+/** A09: each item names a slot and a deficiency. The schema checks the shape; a blank deficiency passes it. */
+function requireNamedArtifactFeedback(feedback: SendBackFeedback): SendBackFeedback {
+  const blank = feedback.items.findIndex((item) => item.deficiency.trim() === '');
+  if (blank !== -1) {
     throw new InvalidInputError([
-      { path: 'body.feedback.items', messageKey: 'error.invalid_input.send_back_artifact_required' },
+      {
+        path: `body.feedback.items[${blank}]`,
+        messageKey: 'error.invalid_input.send_back_artifact_required',
+      },
     ]);
-  }
-  for (let i = 0; i < feedback.items.length; i += 1) {
-    const item = feedback.items[i]!;
-    if (item.slot === undefined || item.deficiency === undefined || item.deficiency.trim() === '') {
-      throw new InvalidInputError([
-        { path: `body.feedback.items[${i}]`, messageKey: 'error.invalid_input.send_back_artifact_required' },
-      ]);
-    }
   }
   return feedback;
 }
@@ -240,9 +160,7 @@ export async function approveLane(
     deps.db,
     caseId,
     {
-      actor: ctx.actor,
-      role: ctx.role,
-      correlationId: ctx.correlationId,
+      ...ctx,
       action: APPROVE_ACTION,
       idempotencyKey,
       requestDigest: requestDigest(APPROVE_ACTION, { ...request, lane, versionId }),
@@ -264,14 +182,11 @@ export async function approveLane(
           ]);
         }
         if (latest.id !== qcRunId) {
-          throw new StaleVersionError(
-            staleDetails(
-              'qc_run_superseded',
-              'error.stale_version.guidance.qc_run_superseded',
-              version,
-              before.rowVersion,
-              refreshPathFor(before.id, version),
-            ),
+          throw staleAt(
+            'qc_run_superseded',
+            'error.stale_version.guidance.qc_run_superseded',
+            version,
+            before,
           );
         }
 
@@ -350,9 +265,7 @@ export async function sendBackLane(
     deps.db,
     caseId,
     {
-      actor: ctx.actor,
-      role: ctx.role,
-      correlationId: ctx.correlationId,
+      ...ctx,
       action: SEND_BACK_ACTION,
       idempotencyKey,
       requestDigest: requestDigest(SEND_BACK_ACTION, { ...request, lane, versionId }),

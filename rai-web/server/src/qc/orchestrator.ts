@@ -24,7 +24,6 @@ import { checkOwningLane, validateQcFinding } from '@rai/shared/qc/validate';
 import type { StoredFindingSummary } from '@rai/shared/schemas/review';
 import type { CaseRow, PackVersionRow } from '../cases/repository.js';
 import { readCaseRow, readVersionRow } from '../cases/repository.js';
-import { staleDetails } from '../cases/service.js';
 import type { Db, Tx } from '../db/client.js';
 import { lockCase, withTransaction } from '../db/transaction.js';
 import { auditStore } from '../audit/store.js';
@@ -34,6 +33,7 @@ import { runWithContext, maybeContext } from '../observability/context.js';
 import { qcLateResult } from '../db/schema/operator-job-run.js';
 import { readSlotsWithArtifacts } from '../versions/repository.js';
 import { nextMonotonicStamp } from '../workflow/monotonic-stamp.js';
+import { staleAt } from '../workflow/refs.js';
 import {
   findLatestApproveAttemptRun,
   findLatestSubmitRun,
@@ -92,10 +92,6 @@ function runKeyOf(
 function slotOfFinding(finding: QcFinding): Slot | null {
   if (finding.scope.kind === 'artifact' || finding.scope.kind === 'slot') return finding.scope.slot;
   return null;
-}
-
-function refreshPathFor(caseId: string, version: PackVersionRow): string {
-  return `/cases/${caseId}/versions/${version.id}`;
 }
 
 function evidenceForStore(finding: QcFinding): unknown {
@@ -302,41 +298,15 @@ async function loadOpenSubmittedTarget(
   if (current === undefined) throw new NotFoundError('version');
 
   if (current.readyAt != null) {
-    throw new StaleVersionError(
-      staleDetails(
-        'version_closed',
-        'error.stale_version.guidance.ready',
-        current,
-        caseRow.rowVersion,
-        refreshPathFor(input.caseId, current),
-      ),
-    );
+    throw staleAt('version_closed', 'error.stale_version.guidance.ready', current, caseRow);
   }
+  // The current version is always a submitted one, so a named draft is superseded here.
   if (current.id !== version.id) {
-    throw new StaleVersionError(
-      staleDetails(
-        'version_superseded',
-        'error.stale_version.guidance.version_superseded',
-        current,
-        caseRow.rowVersion,
-        refreshPathFor(input.caseId, current),
-      ),
-    );
-  }
-  if (version.submittedAt === null) {
-    throw new NotFoundError('version');
+    throw staleAt('version_superseded', 'error.stale_version.guidance.version_superseded', current, caseRow);
   }
   // Send-back sets draft_version_id and leaves current_version_id on N (W0-06 §5.2 approve row).
   if (caseRow.draftVersionId !== null) {
-    throw new StaleVersionError(
-      staleDetails(
-        'version_closed',
-        'error.stale_version.guidance.version_closed',
-        version,
-        caseRow.rowVersion,
-        refreshPathFor(input.caseId, version),
-      ),
-    );
+    throw staleAt('version_closed', 'error.stale_version.guidance.version_closed', version, caseRow);
   }
   return { caseRow, version };
 }
