@@ -39,7 +39,8 @@ Two independent reviewer agents (Claude Opus, fresh context each) posted on PR #
 | Round | Head | Correctness and tests (whole branch) | Contract, security, simplicity |
 |---|---|---|---|
 | 1 | `5c738ea` | PASS; minors: an unknown mapping version threw while storing the outage finding (less fail-closed than main), an extra lookup on the replay path, three test gaps (audit `finding_count` on reuse; a later completed run leaves the finding open; the late path writes no finding), stale W0-07 lines | BLOCKING on records: stale W0-07 text (46, 192, 221, 239, 261, 556), two ledger rulings missing here, link count 801 vs 804, walkthrough step 2 and bullet wording; non-blocking: silent AI/COE fallback for an approve attempt with no lane, W0-06 7.3 stating `finding_outside_lane` for slot 5 only, no 403 test for a non-owning lane or Admin on the outage finding, two type imports from one module |
-| 2 | (round-2 head) | pending | pending |
+| 2 | `06875a4` | PASS; one minor: two more W0-07 wording lines (527, 587), fixed in round 3 | BLOCKING on records: eight more stale spots (observability contract 121, 263, 326, 376; W0-07 252, 261, 527; the W0-06 7.2 signature), fixed in round 3; the desk-health `owningLane` field is documented as not yet filled (W3-07 follow-up) rather than filled here |
+| 3 | (round-3 head, documentation only) | see the PR | see the PR |
 
 Round-1 fixes: `unavailableOwningLane` needs the mapping only for an upload run and the orchestrator no longer throws on an unknown mapping; an approve attempt with no lane throws instead of falling back to AI/COE (unreachable by type); the `qc.run.unavailable` log line carries the finding's `owningLane` (W0-10 3.3); three regression pins and the 403 test were added; the stale W0-07 and W0-06 text, the walkthrough wording and this record were corrected. Deferred as minors: the replay path's extra lookup; `scripts.ts` repeating the lane branching rather than calling `checkOwningLane` (a `ScriptedFinding` is not a `QcFinding`).
 
@@ -64,4 +65,5 @@ Decisions taken during execution, each with its cost if wrong. None changes the 
 - Upload-triggered QC does not exist in slice 1, so the slot-5 and slot-9 upload sub-case of part 4 is defined with upload QC (W4). `unavailableOwningLane` throws rather than guesses for it.
 - With no runner bound (`QC_MODE=none`), every submit and every approve attempt now stores a `QC-UNAVAILABLE` finding its lane must disposition before Ready. That is W0-07 3.6 as written, not a new choice; in fixture mode with the substitute bound it happens only on a simulated outage.
 - `PACK-CONTRADICTION` has the rule but no fixture; nothing in slice 1 needs one.
+- The Admin desk-health list's `unavailableQc` entries do not yet carry the outage finding's `owningLane` (W0-10 5.x lists the optional field). Filling it is a desk-health query change, outside this ticket; recorded in the observability contract as a W3-07 follow-up.
 - W2-05 closes #35 and epic #53 on merge. W4-W8 remain unauthorized.

@@ -396,8 +396,8 @@ Recorded 2026-09-25 (section 7.3, part 4). A `kind = unavailable` finding is own
 ```ts
 export function unavailableOwningLane(
   run: { trigger: 'approve_attempt'; lane: Lane } | { trigger: 'submit'; lane: null } | { trigger: 'upload'; slot: Slot },
-  mapping: LaneMapping,
-): Lane; // throws for an upload on slot 5 or 9: never a guess
+  mapping?: LaneMapping, // needed for an upload run only; an unknown mapping never blocks recording an outage
+): Lane; // throws for an upload on slot 5 or 9, or without a mapping: never a guess
 ```
 
 The orchestrator appends the W0-07 3.6 `QC-UNAVAILABLE` finding once per open scope: while the latest such finding for the same version, trigger and lane is undispositioned, a further outage records its run and reuses that finding. Two things stay as written: the finding counts as undispositioned for Ready until dispositioned (section 6, condition 3: "never counts as clean"), and the reviewer sees the `unavailable` run before deciding (section 4.4).
