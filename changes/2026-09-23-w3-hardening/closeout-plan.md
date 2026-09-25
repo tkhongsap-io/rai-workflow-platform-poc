@@ -4,11 +4,12 @@ Written 2026-09-25 before any change, on Ta's instruction to plan the hardening 
 
 ## Starting point
 
-PR #157 (`aa9e8ab`) merged the [review record](review.md), the [walkthrough script](walkthrough-script.md), the [#35 brief](issue-35-decision-brief.md) and the DEVLOG, CHANGELOG, README and BUILD_PLAN updates. Spec Done-when 1-5 are met except for these three gaps:
+PR #157 (`aa9e8ab`) merged the [review record](review.md), the [walkthrough script](walkthrough-script.md), the [#35 brief](issue-35-decision-brief.md) and the DEVLOG, CHANGELOG, README and BUILD_PLAN updates. Spec Done-when 1-5 are met except for these gaps (the fourth was found by the contract reviewer on #158):
 
 1. **Final-head evidence.** Section 3 of the review records the clean-checkout full run at `4522074`, which is before H24-H29. Each of H24-H29 then passed its own full suite and CI, and `main` at `aa9e8ab` passed CI run [36041409928](https://github.com/tkhongsap-io/rai-workflow-platform-poc/actions/runs/36041409928) (12 of 12 jobs). The review does not cite that run.
 2. **Build board.** `docs/board/lane-lead-integration.md` has no claim and no entry for the hardening, although AGENTS.md and the board README require both.
 3. **Local branches.** Spec Done-when 4 says stale local branches are pruned. 29 local branches remain: `codex/harden-h1` to `h29` (no h24) and `codex/w3-hardening-handoff`. Each one maps to a merged PR, #128-#157, and GitHub keeps each head as `refs/pull/<n>/head`.
+4. **#157 row.** Done-when 4 asks the review to list every PR and its verdicts. Section 2 had no row for #157, which took six review rounds.
 
 ## Tasks
 
@@ -17,8 +18,12 @@ PR #157 (`aa9e8ab`) merged the [review record](review.md), the [walkthrough scri
 - [x] **3. Board entry.** Append a W3 hardening entry (What, Why, Next, Author, Evidence) that links the review and #128-#157. It must say that W3 acceptance and the section 5 items stay with Ta.
 - [x] **4. Local branches.** Before deleting each branch, check that its PR is `MERGED` and record its tip SHA below. Then run `git branch -D` on each. Do not touch the other session's worktree at `/private/tmp/rai-w3-mail-compat` or any remote branch.
 - [x] **5. Record.** Add a line to review.md section 6 that points at this plan and states what it changed.
-- [x] **6. Checks.** From the repository root: `node scripts/check-links.mjs`, `node scripts/check-frozen-source.mjs`, `git diff --check`, and prettier on the changed Markdown files.
+- [x] **6. Checks.** From the repository root: `node scripts/check-links.mjs`, `node scripts/check-frozen-source.mjs`, `git diff --check`, and prettier on `closeout-plan.md` only. Earlier board entries and review tables are not reformatted: the board is append-only and the records keep their existing layout.
 - [ ] **7. PR.** Open a docs PR from `codex/w3-hardening-closeout`, have two independent reviewer agents post verdicts, then wait for CI. Merging to `main` waits for Ta's go-ahead, because this is a documentation branch rather than a D03 ticket.
+
+## Review correction
+
+Round 1 of #158: running prettier on the board stream and the review had re-padded 15 earlier board entries and all five review tables. The contract reviewer blocked it under the board's append-only rule. Both files were restored from `main`, and only the additions were re-applied. The same round added the #157 row and made the board Evidence field the PR link.
 
 ## Branch tips before deletion (task 4)
 
