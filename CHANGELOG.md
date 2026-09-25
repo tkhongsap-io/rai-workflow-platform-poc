@@ -2,6 +2,7 @@
 
 ## 2026-09-26
 
+- W3-07 follow-up: the Admin desk-health list names the lane that owns each QC outage.
 - W3 accepted by Ta after the synthetic walkthrough with Nakhun (no change requested); milestone M3 reached, epic #54 closed. W4-W8 remain gated.
 
 ## 2026-09-25

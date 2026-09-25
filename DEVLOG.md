@@ -1,5 +1,9 @@
 # Development log
 
+## W3-07 follow-up: desk-health owning lane — 2026-09-26
+
+The Admin desk-health list now names the lane that owns each QC outage (W0-06 7.2, derived from the run), closing the follow-up W2-05 recorded. Tests pin a DPO approve-attempt outage and a real submit timeout (AI/COE). 582 unit, 329 integration, 193 + 48 browser. [Review](changes/2026-09-26-desk-health-owning-lane/review.md).
+
 ## W3 accepted — 2026-09-26
 
 Ta accepted W3 (slice 1) after the synthetic walkthrough with Nakhun, who asked for no changes ([notes](changes/2026-09-26-nakhun-walkthrough/notes.md)). Milestone M3 is reached and epic #54 closes. The script's four product questions stay open, as do confirmation of the advisory workload and latency targets and the manual Google loopback sign-in; none blocks. W4-W8 stay unauthorized. Next: decision briefs for D08 and D09 and a draft W4 gate for Ta, in parallel with the W3-07 desk-health follow-up (the outage finding's lane).
