@@ -21,7 +21,7 @@ Same as G0. Record the decision ID, the exact answer, the approver's name and ro
 
 Facts from the repository, so the owners do not have to re-derive them:
 
-- **W3.** The [W3 exit record](../../changes/2026-09-23-w3-exit/review.md) and the [W3 hardening review](../../changes/2026-09-23-w3-hardening/review.md) are on main. Ta accepted W3 on 2026-09-26; that record is on branch `codex/w3-acceptance` and was not yet on main when this brief was written.
+- **W3.** The [W3 exit record](../../changes/2026-09-23-w3-exit/review.md) and the [W3 hardening review](../../changes/2026-09-23-w3-hardening/review.md) are on main. Ta accepted W3 on 2026-09-26 ([BUILD_PLAN 2026-09-26 status](../../BUILD_PLAN.md), [walkthrough notes](../../changes/2026-09-26-nakhun-walkthrough/notes.md), PR #161).
 - **The QC port exists.** [W0-07](../engineering/qc-boundary-and-mail-sink.md) sections 1-3 define the `QcRunner` port, the orchestrator, the three triggers and the validation. The slice-1 runner is `ScriptedQcRunner`, a scripted substitute (3.9). `QC_MODE=substitute` is the only defined value. W4 replaces the runner behind the same port.
 - **Runs and findings are append-only.** A run row is inserted once with its final status. Findings carry locators and at most an `excerptHash`, never document text (W0-07 3.1, 3.4).
 - **Unavailable is a finding.** Timeout, runner error, not configured and unreadable artifact all produce the `QC-UNAVAILABLE` finding, owned per the D05 refinement (#35) row of 2026-09-25. [That rule](../../changes/2026-09-25-w2-05-owning-lane/spec.md) leaves one gap for W4: who owns an upload-trigger unavailable finding on slot 5 or slot 9.
@@ -164,7 +164,7 @@ Note the difference between two kinds of threshold. The v1.0 bands judge the **s
 
 ## Related questions for Ta outside D08 and D09
 
-These are product or contract questions W4 will hit. None is decided here.
+These are product or contract questions W4 will hit. Items 2 and 3 were ruled by Ta on 2026-09-26; the rest are not decided here.
 
 1. **Upload-trigger unavailable finding on slot 5 or slot 9.** The #35 rule defers it to W4.
    - (a) Slot 5: AI/COE, as on submit and for the pack. Slot 9: no upload rules run, so no run and no unavailable finding.
@@ -173,9 +173,9 @@ These are product or contract questions W4 will hit. None is decided here.
 
    Recommendation (proposal only): (a). It reuses the existing submit and pack rule and keeps slot 9 informational. Ta records it as a D05 refinement row, acting for the review leads as on 2026-09-25.
 
-2. **QC evidence arriving after a send-back** (W3 hardening review, section 5 item 2). W0-06 and W0-07 3.4 disagree; main refuses the append. Real extraction and model latency make this case more frequent. Ta's choice between a code change and a W0-07 amendment should come before W4-04.
+2. **QC evidence arriving after a send-back** (W3 hardening review, section 5 item 2). **Ruled by Ta on 2026-09-26** (register row "W3 deferred rulings"): a version closed by a send-back takes no new QC evidence; the successor gets its own, and W0-07 3.4 was amended to match. Real extraction and model latency make the refused case more frequent, so W4-04 should expect it and test it.
 
-3. **Defect count in the lane-opened mail** (hardening item 11). With real findings, "every finding on the version" versus "this lane's findings" becomes visible to reviewers.
+3. **Defect count in the lane-opened mail** (hardening item 11). **Ruled by Ta on 2026-09-26:** that lane's findings stored at send time, labelled as recorded so far (ticket #165, before W4). W4 changes when findings exist, not the rule.
 
 4. **Checklist item anchoring** ([later packages](later-packages-outline.md), candidate backlog 1). Whether W4 findings carry checklist item IDs. Not in scope unless Ta adds it.
 
