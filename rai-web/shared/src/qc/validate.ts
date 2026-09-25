@@ -5,7 +5,7 @@
 
 import { Type } from 'typebox';
 import { Value } from 'typebox/value';
-import { LANES, type Lane, type LaneMapping, owningLaneForSlot } from '../constants.js';
+import { LANES, type Lane, type LaneMapping, owningLaneRule } from '../constants.js';
 import { QC_RULE_ID_PATTERN, type FindingScope, type QcFinding } from './types.js';
 
 const SlotSchema = Type.Union([1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => Type.Literal(n)));
@@ -162,7 +162,8 @@ export type QcFindingViolation =
   | 'finding_key_mismatch'
   | 'schema_violation'
   | 'owning_lane_mismatch'
-  | 'owning_lane_rule_pending';
+  | 'owning_lane_slot_informational'
+  | 'finding_outside_lane';
 
 /** The request fields a finding is checked against (a subset of `QcRunRequest`). */
 export interface QcFindingContext {
@@ -234,14 +235,22 @@ export function validateQcFinding(value: unknown, context: QcFindingContext): Qc
 }
 
 /**
- * Step 5 of W0-07 3.4: the runner's `owningLane` must equal the W0-06 7.1 rule for the version's mapping. A scope
- * on slot 5, slot 9 or the pack is `owning_lane_rule_pending` until W0-06 7.3 is recorded; never a guessed lane.
+ * Step 5 of W0-07 3.4 under W0-06 section 7 as recorded on 2026-09-25: a single-lane slot and the pack have one
+ * lane; slot 5 belongs to the lane whose rule raised it; slot 9 carries no defects. On an approve-attempt run
+ * every finding must belong to that run's lane. A run-scoped finding is refused earlier (`run_scope_forbidden`).
  */
-export function checkOwningLane(finding: QcFinding, mapping: LaneMapping): QcFindingViolation | null {
-  if (finding.scope.kind === 'pack' || finding.scope.kind === 'run') return 'owning_lane_rule_pending';
-  const expected: Lane | 'refinement_pending' = owningLaneForSlot(finding.scope.slot, mapping);
-  if (expected === 'refinement_pending') return 'owning_lane_rule_pending';
-  return expected === finding.owningLane ? null : 'owning_lane_mismatch';
+export function checkOwningLane(
+  finding: QcFinding,
+  mapping: LaneMapping,
+  runLane: Lane | null,
+): QcFindingViolation | null {
+  if (finding.scope.kind === 'run') return 'run_scope_forbidden';
+  const rule = owningLaneRule(finding.scope, mapping);
+  if (rule.kind === 'no_defects') return 'owning_lane_slot_informational';
+  if (rule.kind === 'lane' && rule.lane !== finding.owningLane) return 'owning_lane_mismatch';
+  if (rule.kind === 'raising_lane' && !rule.lanes.includes(finding.owningLane)) return 'owning_lane_mismatch';
+  if (runLane !== null && finding.owningLane !== runLane) return 'finding_outside_lane';
+  return null;
 }
 
 /** Type guards over the sub-schemas, so callers outside `shared` need no schema library of their own. */
