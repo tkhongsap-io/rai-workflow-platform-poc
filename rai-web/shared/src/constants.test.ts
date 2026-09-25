@@ -10,7 +10,9 @@ import {
   LANES,
   SLOTS,
   lanesForSlot,
-  owningLaneForSlot,
+  PACK_OWNING_LANE,
+  owningLaneRule,
+  unavailableOwningLane,
   slotsForLane,
 } from './constants.js';
 
@@ -41,11 +43,29 @@ test('timezone, lanes and slots are the D06 and source-spec constants', () => {
   assert.deepEqual([...SLOTS], [1, 2, 3, 4, 5, 6, 7, 8, 9]);
 });
 
-test('owningLaneForSlot follows W0-06 7.1: single-lane slots map, slots 5 and 9 are refinement_pending', () => {
-  assert.equal(owningLaneForSlot(1, LANE_MAPPING_V1), 'ai_coe');
-  for (const slot of [2, 3, 4] as const) assert.equal(owningLaneForSlot(slot, LANE_MAPPING_V1), 'dpo');
+test('owningLaneRule: single-lane slots map (7.1); slot 5 is the raising lane, slot 9 no defects, pack AI/COE (7.3, 2026-09-25)', () => {
+  assert.deepEqual(owningLaneRule({ kind: 'slot', slot: 1 }, LANE_MAPPING_V1), { kind: 'lane', lane: 'ai_coe' });
+  for (const slot of [2, 3, 4] as const)
+    assert.deepEqual(owningLaneRule({ kind: 'slot', slot }, LANE_MAPPING_V1), { kind: 'lane', lane: 'dpo' });
   for (const slot of [6, 7, 8] as const)
-    assert.equal(owningLaneForSlot(slot, LANE_MAPPING_V1), 'it_security');
-  assert.equal(owningLaneForSlot(5, LANE_MAPPING_V1), 'refinement_pending');
-  assert.equal(owningLaneForSlot(9, LANE_MAPPING_V1), 'refinement_pending');
+    assert.deepEqual(owningLaneRule({ kind: 'artifact', slot }, LANE_MAPPING_V1), {
+      kind: 'lane',
+      lane: 'it_security',
+    });
+  assert.deepEqual(owningLaneRule({ kind: 'slot', slot: 5 }, LANE_MAPPING_V1), {
+    kind: 'raising_lane',
+    lanes: ['ai_coe', 'dpo', 'it_security'],
+  });
+  assert.deepEqual(owningLaneRule({ kind: 'slot', slot: 9 }, LANE_MAPPING_V1), { kind: 'no_defects' });
+  assert.deepEqual(owningLaneRule({ kind: 'pack' }, LANE_MAPPING_V1), { kind: 'lane', lane: PACK_OWNING_LANE });
+  assert.equal(PACK_OWNING_LANE, 'ai_coe');
+});
+
+test('unavailableOwningLane follows the run (7.3 part 4): approve attempt → its lane; submit → pack owner; upload → the slot lane', () => {
+  assert.equal(unavailableOwningLane({ trigger: 'approve_attempt', lane: 'dpo' }, LANE_MAPPING_V1), 'dpo');
+  assert.equal(unavailableOwningLane({ trigger: 'submit', lane: null }, LANE_MAPPING_V1), 'ai_coe');
+  assert.equal(unavailableOwningLane({ trigger: 'upload', slot: 7 }, LANE_MAPPING_V1), 'it_security');
+  // Upload on slot 5 or 9 is defined with upload QC (W4); until then it is a thrown error, never a guess.
+  assert.throws(() => unavailableOwningLane({ trigger: 'upload', slot: 5 }, LANE_MAPPING_V1), /upload QC/);
+  assert.throws(() => unavailableOwningLane({ trigger: 'upload', slot: 9 }, LANE_MAPPING_V1), /upload QC/);
 });
