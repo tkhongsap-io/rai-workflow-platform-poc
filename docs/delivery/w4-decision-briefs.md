@@ -44,7 +44,7 @@ In plain terms: may W4 send anything to an AI model, which model service may it 
 
 **Scope of this brief.** D08 in the register covers retention, real-data permission, model-provider data handling and upload limits for real data. This brief asks only for the **W4 part**. The real-data part (real upload limits, malware scanning, rejected-upload retention and blob deletion; [upload safety](../engineering/upload-safety-and-fixtures.md) section 10 and the [W0-04 deletion options](../engineering/persistence-and-artifact-store.md#retention-and-deletion-options-for-d08)) stays open for the W7 gate, before the first real case. Splitting D08 this way is itself a proposal for Ta and the owners.
 
-**Why it blocks W4.** BUILD_PLAN W4 entry says D08 model/data handling must be resolved before probabilistic QC. The [threat model](../security/threat-model.md) requires review of data use, model provider, transfer region, telemetry and subprocessors. D08 sets what is permitted. ADR-0006 ([ADR index](../../adr/README.md)) then records the engine choice **within** what D08 permits; it cannot widen it.
+**Why it blocks W4.** BUILD_PLAN W4 entry says D08 model/data handling must be resolved before probabilistic QC. D08 sets what is permitted. (The [threat model](../security/threat-model.md) also requires a review of data use, model provider, transfer region, telemetry and subprocessors before real-case ingestion; that review applies at W7, not to W4's synthetic data.) ADR-0006 ([ADR index](../../adr/README.md)) then records the engine choice **within** what D08 permits; it cannot widen it.
 
 **Unknown to this repository.** Whether True or CP Group has an approved enterprise agreement with any model provider, which hosting regions or tenancies are permitted, what data classification case documents carry, and whether True has a secret store engineers can use before D10. IT/Security and the DPO would know. Nothing below assumes an answer.
 
@@ -70,7 +70,7 @@ In plain terms: may W4 send anything to an AI model, which model service may it 
    - (b) As (a), plus content logging on synthetic data in local development. _Trade-off:_ easier debugging; one misconfiguration from logging real text later.
    - (c) As (a), and accept the provider's own logging or abuse monitoring. _Trade-off:_ often a provider default; acceptable only if IT/Security accepts the provider's terms.
 
-5. **How the desk opens documents.** W4 is the first code that parses document contents; slice 1 reads only file headers (upload safety section 2.4).
+5. **How the desk opens documents.** W4 is the first code that parses document contents; slice 1 does not parse them, and its upload check only sniffs bytes (it scans PDF bytes for active-content tokens and reads the ZIP central directory; upload safety section 2.4).
    - (a) Parse in the server process with pure-JavaScript parsers. _Trade-off:_ fewest parts; a parser bug runs next to the database connection.
    - (b) Parse in a separate worker process with memory, time and output limits and no database or network. _Trade-off:_ ADR-0003 and the W0-07 port already allow it; one more process to run.
    - (c) Parse in a separate sandboxed service or container. _Trade-off:_ strongest isolation; hosting weight that D10 would have to approve.
@@ -80,7 +80,7 @@ In plain terms: may W4 send anything to an AI model, which model service may it 
    - (b) The same key also in the CI secret store, so CI runs the evaluation. _Trade-off:_ repeatable runs; CI becomes an outbound path and a secret holder, a CI change agents may not make.
    - (c) IT/Security holds the key and runs the recorded evaluations. _Trade-off:_ strongest custody; slows every iteration.
 
-   In every option the key is issued by IT/Security for synthetic use only, spend-capped and revoked at W4 exit, and never committed.
+   Proposed conditions for IT/Security to approve, in every option: the key is issued by IT/Security for synthetic use only, spend-capped and revoked at W4 exit. It is never committed (AGENTS.md).
 
 ### Recommendation (proposal only; not decided)
 
@@ -101,7 +101,7 @@ In plain terms: may W4 send anything to an AI model, which model service may it 
 | Who                                                      | Questions to answer                                                                               | By when                                                                                                 |
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | **AI/COE lead** (to be named)                            | 1 (evaluation set), 2 (how thresholds are set), 6 (cost and latency), 7 (who signs)               | Before Ta's W4 gate entry (before W4b under the split option); thresholds before the first held-out run |
-| **Lane experts** (DPO, IT/Security and AI/COE reviewers) | 3 (band boundaries), 4 (grounded citations); label the fixtures and sign the rules your lane owns | Labels before the set is frozen; rule sign-off at W4 exit                                               |
+| **Lane experts** (DPO, IT/Security and AI/COE reviewers) | 3 (band boundaries), 4 (grounded citations); label the fixtures and sign only the rules your own lane owns (D09 is not co-owned by the lanes) | Labels before the set is frozen; rule sign-off at W4 exit                                               |
 | **IT/Security**                                          | 5 (probes)                                                                                        | Before the set is frozen                                                                                |
 
 In plain terms: which test documents prove QC works, how good each rule must be, how to judge a borderline number or a citation, which attacks to try, and who signs that the results are good enough.
@@ -124,7 +124,7 @@ Two kinds of threshold must stay apart. The v1.0 bands judge the **submitted use
    - (b) Baseline on a development split, set numbers, judge on the held-out split. _Trade-off:_ informed numbers; credible only with held-out discipline.
    - (c) Deterministic rules exact on every fixture; probabilistic rules numbered by (a) or (b). _Trade-off:_ no tolerance where none is needed; two regimes to explain.
 
-3. **Band boundaries.** The source states the bands as strict "less than", so a value equal to a band fails. Open is precision. Either way, evidence missing the metric, denominator or unit is already a finding under A08.
+3. **Band boundaries.** The source states the bands as strict "less than", so a value equal to a band fails. Open is precision. Either way, evidence missing the metric, denominator, threshold or evidence reference is already a finding under A08.
    - (a) Compare the value exactly as reported. _Trade-off:_ simple; an author's rounding can flip the result.
    - (b) Compare at the precision the template states. _Trade-off:_ matches the template's intent; works only if the template states one (unknown).
 
@@ -210,7 +210,7 @@ These rules are recorded or specified already. They are not open in D08 or D09.
 | Source                                                                                                 | Rule                                                                                                                                                                                                                              |
 | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | D03 register row                                                                                       | Synthetic data only until D08 permits real data                                                                                                                                                                                   |
-| Source spec, "v1 locked decisions" L7                                                                  | QC is soft: it never blocks submit or a reviewer                                                                                                                                                                                  |
+| Source spec, "v1 locked decisions" L7 and its "Soft everywhere" paragraph                                                                  | QC is soft: it never blocks submit or a reviewer                                                                                                                                                                                  |
 | [W0-07](../engineering/qc-boundary-and-mail-sink.md) 3.1                                               | QC never decides: Ready reads finding dispositions, never runner output. The runner gets read handles to authorized artifacts only; no database, session or HTTP client; output is typed data; no document text leaves the runner |
 | W0-07 3.4 step 4                                                                                       | Output carrying document text, or an invalid shape, becomes `unavailable:runner_error`, never a finding                                                                                                                           |
 | [Observability contract](../engineering/observability-contract.md) section 4                           | Log fields are an allow-list; document text, filenames and secrets never reach a log line                                                                                                                                         |
