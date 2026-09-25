@@ -121,3 +121,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=w3-03b-digest-consumer model=codex
 - Scope: producer, persisted-provenance loader, standalone local scheduling hook and tests; dispatcher binding awaits parent confirmation. No other lane takeover.
 - Evidence: changes/2026-09-22-w3-03b-digest-consumer/plan.md
+
+## 2026-09-25 20:05 — CLAIM lane-b: W2-05 owning-lane rule (#35)
+- Author: operator=ta session=claude-code-w2-05-owning-lane model=claude-fable-5-1
+- Takes over from: session=none (reason: new; the ticket was status:ready and blocked on W0-06 7.3)
+- Scope: the rule Ta accepted on 2026-09-25, per changes/2026-09-25-w2-05-owning-lane/. One PR.
