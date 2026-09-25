@@ -1,6 +1,6 @@
 # RAI Workflow Platform PoC
 
-**Working product name: RAI web. Status: W3 synthetic implementation and engineering exit recorded 2026-09-23 and hardened 2026-09-23 to 2026-09-25; Ta’s package review remains pending. Production release and W4–W8 remain gated.**
+**Working product name: RAI web. Status: W3 synthetic implementation and engineering exit recorded 2026-09-23 and hardened 2026-09-23 to 2026-09-25; accepted by Ta on 2026-09-26 (slice 1 complete on synthetic data). Production release and W4–W8 remain gated.**
 
 A review desk for one submitted AI-use-case pack, with parallel AI/COE, DPO and IT/Security review, versioned send-back and soft document QC. This is not True's official AI register and does not operate the eight-stage AI lifecycle.
 

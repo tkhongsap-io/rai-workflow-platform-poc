@@ -1,6 +1,6 @@
 # Nakhun walkthrough: notes
 
-Script: [walkthrough-script.md](../2026-09-23-w3-hardening/walkthrough-script.md). Synthetic data only (fixture set `slice1-synthetic@1`); fixture identity mode on loopback. Operator: Nakhun (D01). Session held by Ta with Nakhun; Ta confirmed on 2026-09-26 that it took place.
+Script: [walkthrough-script.md](../2026-09-23-w3-hardening/walkthrough-script.md), which sets up synthetic data only (fixture set `slice1-synthetic@1`) and fixture identity mode on loopback. Operator: Nakhun (D01). Ta confirmed on 2026-09-26 that the walkthrough took place; how the session was set up is not recorded beyond the script.
 
 ## Outcome
 
