@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "rai-web-walkthrough",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd rai-web && set -a && . ./.env && set +a && NODE_ENV=test exec node server/dist/main.js"
+      ],
+      "port": 8797
+    }
+  ]
+}
