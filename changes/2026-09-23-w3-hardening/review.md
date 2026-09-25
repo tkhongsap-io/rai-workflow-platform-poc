@@ -6,11 +6,11 @@ Framed in [intent](intent.md), [spec](spec.md) and [plan](plan.md) (PR #127, mer
 
 Most W2/W3 PRs, #90 to #126, merged without an independent review verdict. A dynamic workflow reviewed `main` at `d815a8e` through eight lenses (workflow-core, queue-SLA, notifications, runtime-ops, security-crosscut, web-UI, architecture, tests-evidence). A skeptic then checked every finding against the code.
 
-| Result | Count |
-|---|---|
-| Findings confirmed | 71 (5 high, 20 medium, 46 low) |
-| Findings refuted by the skeptic | 17 |
-| Fix batches | 23 planned (H1-H23), then H24 from the final verification and H25-H29 from the two walkthrough re-checks |
+| Result                                           | Count                                                                                                                                                                   |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Findings confirmed                               | 71 (5 high, 20 medium, 46 low)                                                                                                                                          |
+| Findings refuted by the skeptic                  | 17                                                                                                                                                                      |
+| Fix batches                                      | 23 planned (H1-H23), then H24 from the final verification and H25-H29 from the two walkthrough re-checks                                                                |
 | Deferred to the owner, with a reason (section 5) | 3 whole findings, issue #35, 3 leftover parts of closed findings, 2 spec questions raised by closed findings, and 3 questions from the walkthrough re-checks (12 items) |
 
 The five high findings are four distinct bugs; two lenses reported the approve bug separately:
@@ -35,38 +35,38 @@ Every batch followed the same steps:
 
 Each batch has its own record, `h<n>.md`, in this folder.
 
-| PR | Batch | Merge | Lines | Reviewer verdicts (in order posted) |
-|---|---|---|---|---|
-| #127 | Frame the change (docs) | `d815a8e` | +24/−0 | none (section 4) |
-| #128 | H1 Retire the five promoted substitute twin specs | `d63adbb` | +74/−1777 | contract PASS, correctness PASS |
-| #134 | H2 Approve requires the latest lane-QC run; owed W0-06 §10 tests | `d10578d` | +498/−61 | contract PASS, correctness PASS |
-| #137 | H3 One derived case status; queue and SLA correctness | `1b4d49e` | +298/−189 | correctness PASS, contract PASS |
-| #131 | H4 Pool and process resilience | `94fd34a` | +226/−19 | contract PASS, correctness PASS |
-| #139 | H5 Reviewer case screen: every stored finding, multi-lane reviewers, focus | `ce18046` | +382/−424 | correctness PASS, contract PASS |
-| #132 | H6 `Sec-Fetch-Site` guard on state-changing requests | `792a664` | +206/−6 | contract PASS, correctness PASS |
-| #141 | H7 QC fails closed on invalid or unmappable findings; `runQc` simplified | `2f26c77` | +446/−314 | round 1: correctness BLOCKING; round 2: both PASS |
-| #143 | H8 Ready uses decision-time scopes; stamps after the lock; `observed_qc_run_id` FK (migration 0008) | `e27666a` | +3022/−191 (2690 is the generated Drizzle snapshot) | round 1: correctness BLOCKING; then rebased over H9 and re-reviewed: both PASS twice |
-| #140 | H9 Disposition route authorization; no 500s on bad ids; no hard-coded lane | `9a40b9d` | +304/−199 | round 1: correctness BLOCKING; round 2: both PASS |
-| #129 | H10 Observability contract: log line schema, readiness enforced, actor on `request.completed` | `59c500b` | +186/−68 | correctness PASS, contract PASS |
-| #133 | H11 Fail closed on retention thresholds and on submissions without a frozen SLA/calendar | `dc6cfb9` | +127/−15 | round 1: contract BLOCKING; round 2: both PASS |
-| #142 | H12 'New case' only for roles that can create; specific `unsafe_upload` reason | `1e9f353` | +195/−22 | correctness PASS, contract PASS |
-| #145 | H13 Notifications: true README, settled deliveries committed on shutdown, one outbox helper | `b246cf1` | +247/−269 | contract PASS, correctness PASS |
-| #136 | H14 Browser evidence harness: shared process capture, no fixed port | `1ab240b` | +122/−87 | one combined reviewer PASS before merge; second reviewer PASS after merge (section 4) |
-| #135 | H15 Reproducible performance harness entry point | `180b07f` | +585/−62 | correctness PASS, contract PASS |
-| #138 | H16 Evidence and spec records | `4faa19b` | +180/−46 | contract PASS, correctness PASS |
-| #130 | H17 Concurrent reuse of one Idempotency-Key returns 422, not 500 | `8849961` | +242/−12 | correctness PASS, contract PASS |
-| #146 | H18 One definition of "latest disposition"; no N+1 in the findings list | `cf87c13` | +208/−215 | contract PASS, correctness PASS |
-| #148 | H19 Composition root reads as composition | `b53e70f` | +244/−168 | correctness PASS, contract PASS |
-| #147 | H20 Shared workflow refs; dead code removed | `e8efb73` | +219/−392 | correctness PASS, contract PASS |
-| #144 | H21 SPA: one 401 handler | `7617197` | +161/−101 | correctness PASS, contract PASS |
-| #149 | H22 Shared integration app harness, part 1 | `1c52b3f` | +529/−857 | correctness PASS, contract PASS |
-| #150 | H23 Shared integration app harness, part 2 | `4522074` | +236/−931 | round 1: both reviewers died (API unreachable); round 2 on head `3358a19`: both PASS |
-| #151 | H24 Final-verification follow-ups: integration runs from the documented `.env.example`; specs and substitute README match the code | `9103668` | +90/−25 | round 1: correctness PASS, contract BLOCKING (one doc line); round 2 on head `368037d`: both PASS |
-| #153 | H25 Reviewer workspace: no false "Action failed" after a successful send-back | `db729fd` | +141/−38 | round 1: both BLOCKING; round 2: contract PASS, correctness BLOCKING (no test covered the lane-QC "no findings" message); round 3 on head `637a17b`: both PASS |
-| #152 | H26 Contract and server: the submitted-version read carries its lane decisions, including send-back feedback | `b011139` | +218/−44 | stopped as a draft until H25 merged (one line in H25's test file); on rebased head `bfe0908`: both PASS |
-| #154 | H27 UI: send-back feedback on the sent-back version and on the owner's successor draft | `dfe84b3` | +241/−34 | both PASS on head `c54c739` |
-| #156 | H28 Lane QC runs once per opening: no duplicate unavailable runs, no spurious 409 on approve | `23b02b6` | +177/−35 | both PASS on head `3981736` |
-| #155 | H29 Draft editor only for users who can edit; no stale "Draft saved" notice on another version | `1d473dd` | +318/−75 | both PASS on `8c91373`; the rebased combined head `ebd57d5` failed CI (see below); fix round; round 2: correctness BLOCKING (no test for the disabled pack settings); round 3 on `fd6e736`: both PASS, CI 12/12 |
+| PR   | Batch                                                                                                                              | Merge     | Lines                                               | Reviewer verdicts (in order posted)                                                                                                                                                                             |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------- | --------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| #127 | Frame the change (docs)                                                                                                            | `d815a8e` | +24/−0                                              | none (section 4)                                                                                                                                                                                                |
+| #128 | H1 Retire the five promoted substitute twin specs                                                                                  | `d63adbb` | +74/−1777                                           | contract PASS, correctness PASS                                                                                                                                                                                 |
+| #134 | H2 Approve requires the latest lane-QC run; owed W0-06 §10 tests                                                                   | `d10578d` | +498/−61                                            | contract PASS, correctness PASS                                                                                                                                                                                 |
+| #137 | H3 One derived case status; queue and SLA correctness                                                                              | `1b4d49e` | +298/−189                                           | correctness PASS, contract PASS                                                                                                                                                                                 |
+| #131 | H4 Pool and process resilience                                                                                                     | `94fd34a` | +226/−19                                            | contract PASS, correctness PASS                                                                                                                                                                                 |
+| #139 | H5 Reviewer case screen: every stored finding, multi-lane reviewers, focus                                                         | `ce18046` | +382/−424                                           | correctness PASS, contract PASS                                                                                                                                                                                 |
+| #132 | H6 `Sec-Fetch-Site` guard on state-changing requests                                                                               | `792a664` | +206/−6                                             | contract PASS, correctness PASS                                                                                                                                                                                 |
+| #141 | H7 QC fails closed on invalid or unmappable findings; `runQc` simplified                                                           | `2f26c77` | +446/−314                                           | round 1: correctness BLOCKING; round 2: both PASS                                                                                                                                                               |
+| #143 | H8 Ready uses decision-time scopes; stamps after the lock; `observed_qc_run_id` FK (migration 0008)                                | `e27666a` | +3022/−191 (2690 is the generated Drizzle snapshot) | round 1: correctness BLOCKING; then rebased over H9 and re-reviewed: both PASS twice                                                                                                                            |
+| #140 | H9 Disposition route authorization; no 500s on bad ids; no hard-coded lane                                                         | `9a40b9d` | +304/−199                                           | round 1: correctness BLOCKING; round 2: both PASS                                                                                                                                                               |
+| #129 | H10 Observability contract: log line schema, readiness enforced, actor on `request.completed`                                      | `59c500b` | +186/−68                                            | correctness PASS, contract PASS                                                                                                                                                                                 |
+| #133 | H11 Fail closed on retention thresholds and on submissions without a frozen SLA/calendar                                           | `dc6cfb9` | +127/−15                                            | round 1: contract BLOCKING; round 2: both PASS                                                                                                                                                                  |
+| #142 | H12 'New case' only for roles that can create; specific `unsafe_upload` reason                                                     | `1e9f353` | +195/−22                                            | correctness PASS, contract PASS                                                                                                                                                                                 |
+| #145 | H13 Notifications: true README, settled deliveries committed on shutdown, one outbox helper                                        | `b246cf1` | +247/−269                                           | contract PASS, correctness PASS                                                                                                                                                                                 |
+| #136 | H14 Browser evidence harness: shared process capture, no fixed port                                                                | `1ab240b` | +122/−87                                            | one combined reviewer PASS before merge; second reviewer PASS after merge (section 4)                                                                                                                           |
+| #135 | H15 Reproducible performance harness entry point                                                                                   | `180b07f` | +585/−62                                            | correctness PASS, contract PASS                                                                                                                                                                                 |
+| #138 | H16 Evidence and spec records                                                                                                      | `4faa19b` | +180/−46                                            | contract PASS, correctness PASS                                                                                                                                                                                 |
+| #130 | H17 Concurrent reuse of one Idempotency-Key returns 422, not 500                                                                   | `8849961` | +242/−12                                            | correctness PASS, contract PASS                                                                                                                                                                                 |
+| #146 | H18 One definition of "latest disposition"; no N+1 in the findings list                                                            | `cf87c13` | +208/−215                                           | contract PASS, correctness PASS                                                                                                                                                                                 |
+| #148 | H19 Composition root reads as composition                                                                                          | `b53e70f` | +244/−168                                           | correctness PASS, contract PASS                                                                                                                                                                                 |
+| #147 | H20 Shared workflow refs; dead code removed                                                                                        | `e8efb73` | +219/−392                                           | correctness PASS, contract PASS                                                                                                                                                                                 |
+| #144 | H21 SPA: one 401 handler                                                                                                           | `7617197` | +161/−101                                           | correctness PASS, contract PASS                                                                                                                                                                                 |
+| #149 | H22 Shared integration app harness, part 1                                                                                         | `1c52b3f` | +529/−857                                           | correctness PASS, contract PASS                                                                                                                                                                                 |
+| #150 | H23 Shared integration app harness, part 2                                                                                         | `4522074` | +236/−931                                           | round 1: both reviewers died (API unreachable); round 2 on head `3358a19`: both PASS                                                                                                                            |
+| #151 | H24 Final-verification follow-ups: integration runs from the documented `.env.example`; specs and substitute README match the code | `9103668` | +90/−25                                             | round 1: correctness PASS, contract BLOCKING (one doc line); round 2 on head `368037d`: both PASS                                                                                                               |
+| #153 | H25 Reviewer workspace: no false "Action failed" after a successful send-back                                                      | `db729fd` | +141/−38                                            | round 1: both BLOCKING; round 2: contract PASS, correctness BLOCKING (no test covered the lane-QC "no findings" message); round 3 on head `637a17b`: both PASS                                                  |
+| #152 | H26 Contract and server: the submitted-version read carries its lane decisions, including send-back feedback                       | `b011139` | +218/−44                                            | stopped as a draft until H25 merged (one line in H25's test file); on rebased head `bfe0908`: both PASS                                                                                                         |
+| #154 | H27 UI: send-back feedback on the sent-back version and on the owner's successor draft                                             | `dfe84b3` | +241/−34                                            | both PASS on head `c54c739`                                                                                                                                                                                     |
+| #156 | H28 Lane QC runs once per opening: no duplicate unavailable runs, no spurious 409 on approve                                       | `23b02b6` | +177/−35                                            | both PASS on head `3981736`                                                                                                                                                                                     |
+| #155 | H29 Draft editor only for users who can edit; no stale "Draft saved" notice on another version                                     | `1d473dd` | +318/−75                                            | both PASS on `8c91373`; the rebased combined head `ebd57d5` failed CI (see below); fix round; round 2: correctness BLOCKING (no test for the disabled pack settings); round 3 on `fd6e736`: both PASS, CI 12/12 |
 
 ## 3. Final verification (Done-when 1-3)
 
@@ -74,31 +74,32 @@ A separate workflow checked `origin/main` at `4522074` (after H23), each part in
 
 **Full CI job list on a clean checkout:** every step passed with no skips, retries or flakes.
 
-| Check | Result |
-|---|---|
-| `npm ci` | 442 packages added, lock file unchanged |
-| migrate, empty database | 9 migrations applied |
-| lint, typecheck | clean |
-| `test:unit` | 580/580 |
-| `test:integration` (with `DATABASE_OPERATOR_URL` and `OBS_MIGRATION_ADMIN_URL`, as in CI) | 316/316 |
-| build, `check:substitute-absent` | 595 files, 0 markers |
-| `npm audit --omit=dev --audit-level=high` | 0 vulnerabilities |
-| `test:browser`, real server | 181/181 |
-| `test:browser`, substitute config | 48/48 |
-| `drizzle-kit generate` | no schema changes |
-| repository tests (`tests/*.test.mjs`, `scripts/*.test.mjs`) | 22/22 and 18/18 |
-| links, frozen source hash | 773 links, 0 broken; source-spec sha256 `92c4f712…b354` matches |
+| Check                                                                                     | Result                                                          |
+| ----------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `npm ci`                                                                                  | 442 packages added, lock file unchanged                         |
+| migrate, empty database                                                                   | 9 migrations applied                                            |
+| lint, typecheck                                                                           | clean                                                           |
+| `test:unit`                                                                               | 580/580                                                         |
+| `test:integration` (with `DATABASE_OPERATOR_URL` and `OBS_MIGRATION_ADMIN_URL`, as in CI) | 316/316                                                         |
+| build, `check:substitute-absent`                                                          | 595 files, 0 markers                                            |
+| `npm audit --omit=dev --audit-level=high`                                                 | 0 vulnerabilities                                               |
+| `test:browser`, real server                                                               | 181/181                                                         |
+| `test:browser`, substitute config                                                         | 48/48                                                           |
+| `drizzle-kit generate`                                                                    | no schema changes                                               |
+| repository tests (`tests/*.test.mjs`, `scripts/*.test.mjs`)                               | 22/22 and 18/18                                                 |
+| links, frozen source hash                                                                 | 773 links, 0 broken; source-spec sha256 `92c4f712…b354` matches |
 
 **Closure of the 71 findings:**
 
-| Outcome | Count |
-|---|---|
-| Closed, with the code on `main` cited. Most have a proving test or a measurable change; behaviour-preserving refactors and docs-only fixes rely on the existing suites, as the auditors list. Three of them (findings 17, 46 and 57) have a leftover part deferred: section 5 items 5, 8 and 9. | 67 |
-| Deferred whole, with a reason (section 5) | 3 |
-| Withdrawn: the H15 perf-harness guard, kept on purpose (section 4) | 1 |
-| Open | 0 |
+| Outcome                                                                                                                                                                                                                                                                                         | Count |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| Closed, with the code on `main` cited. Most have a proving test or a measurable change; behaviour-preserving refactors and docs-only fixes rely on the existing suites, as the auditors list. Three of them (findings 17, 46 and 57) have a leftover part deferred: section 5 items 5, 8 and 9. | 67    |
+| Deferred whole, with a reason (section 5)                                                                                                                                                                                                                                                       | 3     |
+| Withdrawn: the H15 perf-harness guard, kept on purpose (section 4)                                                                                                                                                                                                                              | 1     |
+| Open                                                                                                                                                                                                                                                                                            | 0     |
 
 How these counts were reached. The three closure auditors reported:
+
 - **Workflow-core and queue-SLA:** 18 closed, plus one gap: the queue-SLA N+1 fix has no counting test. The skeptic refuted the gap, so this slice counts 19 closed.
 - **Notifications, runtime-ops and security:** 21 closed and 1 deferred (finding 39).
 - **Web-UI, architecture and tests-evidence:** a headline of 26 closed, 3 deferred and 1 withdrawn (68). Its itemised list has 27 closed, including finding 46's owner-filter part and finding 57's `app.ts`/`start.ts` headers, and 2 deferred whole (53, 61). The remainders of 46 and 57 are deferred.
@@ -111,18 +112,18 @@ Counting whole findings gives 67, 3 and 1. The lead's first draft said 65 closed
 
 **Before and after** (`d815a8e` → `4522074`, exact counts under `rai-web/`):
 
-| Measure | Before | After |
-|---|---|---|
-| Non-test source | 28,316 lines | 27,707 lines (−609) |
-| Test code | 38,295 lines | 37,406 lines (−889) |
-| Substitute browser specs and harness | 2,188 lines | 426 lines |
-| `runQc`, the longest function the retro named | 227 lines | 58 lines |
-| UUID regex copies in server | 4 | 1 |
-| `caseRef` | 4 | 1 |
-| `keyRef` | 3 | 1 |
-| "Latest disposition" definitions in server | 4, one an N+1 loop | 1 subquery |
-| "Undispositioned" rule | 2 | 1 |
-| Ticket-ID lines in source (W1-W9 and INT) | 301 | 236 |
+| Measure                                       | Before             | After               |
+| --------------------------------------------- | ------------------ | ------------------- |
+| Non-test source                               | 28,316 lines       | 27,707 lines (−609) |
+| Test code                                     | 38,295 lines       | 37,406 lines (−889) |
+| Substitute browser specs and harness          | 2,188 lines        | 426 lines           |
+| `runQc`, the longest function the retro named | 227 lines          | 58 lines            |
+| UUID regex copies in server                   | 4                  | 1                   |
+| `caseRef`                                     | 4                  | 1                   |
+| `keyRef`                                      | 3                  | 1                   |
+| "Latest disposition" definitions in server    | 4, one an N+1 loop | 1 subquery          |
+| "Undispositioned" rule                        | 2                  | 1                   |
+| Ticket-ID lines in source (W1-W9 and INT)     | 301                | 236                 |
 
 The duplication that remains is in the in-memory API substitute, whose deletion is deferred (section 5).
 
@@ -146,6 +147,7 @@ The re-check also showed that the walkthrough can reach #35: changing slot 1 on 
 After H25-H27 merged, a second independent agent walked all nine steps again on `main` `dfe84b3`. It used the script's own port instructions (Postgres 55399, server 8797), and the recipe worked as written. The send-back showed "Sent back; a successor draft is open" with no error alert. The owner's v2 draft showed "Feedback from version 1" with the lane, slot, deficiency and summary. Version 1 listed the DPO decision. Ready arrived only after both findings on RAI-2000-0002 were dispositioned. The script was corrected again: the slot-1 trigger, where the due dates appear, step 8 needs 0005 and 0003 submitted first, the disposition buttons, and finding the send-back mail.
 
 The re-check found three more defects, fixed before hand-off:
+
 - Opening a case whose lane QC is unavailable fired the lane-QC request twice. That created two unavailable runs, so an approve could hit 409 (H28).
 - Admin and reviewers were shown the draft editor, which the server refused (H29).
 - A "Draft saved" notice carried over onto another version (H29).
@@ -158,12 +160,15 @@ Two questions went to Ta instead (section 5, items 10 and 11).
 - **A second failure in the same fix round came from the test.** `w1-int-07` at desktop width tabbed past the use-case select while it was still disabled and loading, which is correct product behaviour. The test now waits for the select to be enabled, and passed 15 of 15 repeat runs.
 
 **Final check, after H28 and H29 merged.** An independent agent checked `main` at `1d473dd` from the script's recipe, with its port instructions. All four checks passed:
+
 - Only the owner and the BU SPOC get the draft editor. Reviewers, Admin and a non-SPOC reviewer see the draft read-only, with the pack settings disabled and a note saying why.
 - No "Draft saved" notice carries over to another version.
 - Opening a QC-unavailable lane issues exactly one lane-QC request, and approve returns 201.
 - Steps 7-9 work as written. Ready arrived only after the second disposition, Rattanaporn gets no decision panel on the HR case and gets one on the Consumer Mobile case, and desk health lists the one unavailable run.
 
 Only wording fixes to the script followed. The agent also noted that the send-back mail links to version 1, not to the version 2 draft. W3-03 specifies "a deep link" without naming the version, and the code links the decided version. Now that H27 shows the feedback on the successor draft, linking there may serve the owner better. This is recorded as a question (section 5, item 12), not changed.
+
+**Final `main`, after #157.** CI run [36041409928](https://github.com/tkhongsap-io/rai-workflow-platform-poc/actions/runs/36041409928) on `aa9e8ab` passed all 12 jobs: install, lint, typecheck, unit tests, migrations and integration tests, build and substitute absence, browser journeys and accessibility audit, dependency advisories, legacy demo suite and frozen-source hash, markdown link check, whitespace, and `required`. No separate local full suite was rerun on `aa9e8ab`. The clean-checkout counts above are for `4522074`, and each of H24-H29 recorded its own full run in its batch record. Added by the [close-out](closeout-plan.md) on 2026-09-25.
 
 ## 4. Exceptions and incidents
 
@@ -181,6 +186,7 @@ Only wording fixes to the script followed. The agent also noted that the send-ba
 ## 5. Deferred for Ta (none decided here)
 
 Three of the 71 findings were deferred whole: items 2, 3 and 4 (retro findings 61, 53 and 39, numbered by their position in the retro's confirmed list, not GitHub numbers). Item 1 is the existing GitHub issue #35; the closed findings around it fail closed. Items 5, 8 and 9 are parts left over from findings that were otherwise closed:
+
 - item 5, `scopedCases`, from retro finding 17;
 - item 8, display names, from retro finding 46;
 - item 9, the optional parts of retro finding 57 (H19 fixed its `app.ts`/`start.ts` part) and of other findings.
@@ -212,6 +218,7 @@ Items 10-12 are questions from the walkthrough re-checks.
   - Local worktrees from this change were removed.
   - Older `codex/w*` remote branches from earlier sessions are listed for Ta, not deleted.
   - The other session's worktree `/private/tmp/rai-w3-mail-compat` was left untouched. The final verification found its content already on `main` or superseded by it.
+- Close-out on 2026-09-25 ([plan](closeout-plan.md)): this review now cites the final-`main` CI run, the lead-integration board has a claim and a hardening entry, and the 29 merged local branches were deleted after their PRs were checked as merged. Their tips are listed in the plan.
 - Hand-off documents: the [walkthrough script](walkthrough-script.md) for Nakhun (synthetic, about 45 minutes) and the [issue #35 decision brief](issue-35-decision-brief.md).
 
 W3 package acceptance remains Ta's. Nothing here is operator or production acceptance, and W4-W8 are not authorized.
