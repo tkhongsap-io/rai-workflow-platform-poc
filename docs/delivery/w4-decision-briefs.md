@@ -70,7 +70,7 @@ In plain terms: may W4 send anything to an AI model, which model service may it 
    - (b) As (a), plus content logging on synthetic data in local development. _Trade-off:_ easier debugging; one misconfiguration from logging real text later.
    - (c) As (a), and accept the provider's own logging or abuse monitoring. _Trade-off:_ often a provider default; acceptable only if IT/Security accepts the provider's terms.
 
-5. **How the desk opens documents.** W4 is the first code that parses document contents; slice 1 does not parse them, and its upload check only sniffs bytes (it scans PDF bytes for active-content tokens and reads the ZIP central directory; upload safety section 2.4).
+5. **How the desk opens documents.** W4 is the first code that parses document contents; slice 1 does not parse them, and its upload check only sniffs bytes (it scans PDF bytes for active-content tokens and reads the ZIP central directory; upload safety sections 2.1-2.4).
    - (a) Parse in the server process with pure-JavaScript parsers. _Trade-off:_ fewest parts; a parser bug runs next to the database connection.
    - (b) Parse in a separate worker process with memory, time and output limits and no database or network. _Trade-off:_ ADR-0003 and the W0-07 port already allow it; one more process to run.
    - (c) Parse in a separate sandboxed service or container. _Trade-off:_ strongest isolation; hosting weight that D10 would have to approve.
@@ -98,11 +98,11 @@ In plain terms: may W4 send anything to an AI model, which model service may it 
 
 ### What we need from you
 
-| Who                                                      | Questions to answer                                                                                                                           | By when                                                                                                 |
-| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| **AI/COE lead** (to be named)                            | 1 (evaluation set), 2 (how thresholds are set), 6 (cost and latency), 7 (who signs)                                                           | Before Ta's W4 gate entry (before W4b under the split option); thresholds before the first held-out run |
-| **Lane experts** (DPO, IT/Security and AI/COE reviewers) | 3 (band boundaries), 4 (grounded citations); label the fixtures and sign only the rules your own lane owns (D09 is not co-owned by the lanes) | Labels before the set is frozen; rule sign-off at W4 exit                                               |
-| **IT/Security**                                          | 5 (probes)                                                                                                                                    | Before the set is frozen                                                                                |
+| Who                                                      | Questions to answer                                                                                                                              | By when                                                                                                 |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| **AI/COE lead** (to be named)                            | 1 (evaluation set), 2 (how thresholds are set), 6 (cost and latency), 7 (who signs)                                                              | Before Ta's W4 gate entry (before W4b under the split option); thresholds before the first held-out run |
+| **Lane experts** (DPO, IT/Security and AI/COE reviewers) | 3 (band boundaries), 4 (grounded citations); label the fixtures and sign only the rules your own lane owns (no single lane signs D09 as a whole) | Labels before the set is frozen; rule sign-off at W4 exit                                               |
+| **IT/Security**                                          | 5 (probes)                                                                                                                                       | Before the set is frozen                                                                                |
 
 In plain terms: which test documents prove QC works, how good each rule must be, how to judge a borderline number or a citation, which attacks to try, and who signs that the results are good enough.
 
