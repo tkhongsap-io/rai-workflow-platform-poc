@@ -44,7 +44,10 @@ test('timezone, lanes and slots are the D06 and source-spec constants', () => {
 });
 
 test('owningLaneRule: single-lane slots map (7.1); slot 5 is the raising lane, slot 9 no defects, pack AI/COE (7.3, 2026-09-25)', () => {
-  assert.deepEqual(owningLaneRule({ kind: 'slot', slot: 1 }, LANE_MAPPING_V1), { kind: 'lane', lane: 'ai_coe' });
+  assert.deepEqual(owningLaneRule({ kind: 'slot', slot: 1 }, LANE_MAPPING_V1), {
+    kind: 'lane',
+    lane: 'ai_coe',
+  });
   for (const slot of [2, 3, 4] as const)
     assert.deepEqual(owningLaneRule({ kind: 'slot', slot }, LANE_MAPPING_V1), { kind: 'lane', lane: 'dpo' });
   for (const slot of [6, 7, 8] as const)
@@ -57,7 +60,10 @@ test('owningLaneRule: single-lane slots map (7.1); slot 5 is the raising lane, s
     lanes: ['ai_coe', 'dpo', 'it_security'],
   });
   assert.deepEqual(owningLaneRule({ kind: 'slot', slot: 9 }, LANE_MAPPING_V1), { kind: 'no_defects' });
-  assert.deepEqual(owningLaneRule({ kind: 'pack' }, LANE_MAPPING_V1), { kind: 'lane', lane: PACK_OWNING_LANE });
+  assert.deepEqual(owningLaneRule({ kind: 'pack' }, LANE_MAPPING_V1), {
+    kind: 'lane',
+    lane: PACK_OWNING_LANE,
+  });
   assert.equal(PACK_OWNING_LANE, 'ai_coe');
 });
 

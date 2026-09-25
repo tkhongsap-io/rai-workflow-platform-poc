@@ -4,12 +4,7 @@
 // body.kind → action mapping. History remains the existing version read (immutable). Synthetic fixtures only.
 
 import { authorize, type Action } from '@rai/server/authz/policy';
-import {
-  LANE_MAPPINGS_BY_VERSION,
-  LANES,
-  slotsForLane,
-  type Lane,
-} from '@rai/shared/constants';
+import { LANE_MAPPINGS_BY_VERSION, LANES, slotsForLane, type Lane } from '@rai/shared/constants';
 import { ForbiddenError, InvalidInputError, NotFoundError, UnauthenticatedError } from '@rai/shared/errors';
 import { uuidv7 } from '@rai/shared/ids';
 import type {
@@ -96,7 +91,12 @@ function decisionResponse(
 function storeableFindings(
   findings: readonly QcFinding[],
   mappingVersion: string,
-  context: { trigger: 'approve_attempt'; lane: Lane; qcRulesRevision: string; checklistTemplateVersion: string },
+  context: {
+    trigger: 'approve_attempt';
+    lane: Lane;
+    qcRulesRevision: string;
+    checklistTemplateVersion: string;
+  },
 ): QcFinding[] {
   const mapping = LANE_MAPPINGS_BY_VERSION[mappingVersion];
   if (mapping === undefined) return [];

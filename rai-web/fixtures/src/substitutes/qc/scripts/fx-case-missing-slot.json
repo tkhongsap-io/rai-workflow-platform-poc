@@ -8,12 +8,76 @@
       "findings": [
         {
           "ruleId": "PACK-SLOT-MISSING",
-          "scope": { "kind": "slot", "slot": 7 },
+          "scope": {
+            "kind": "slot",
+            "slot": 7
+          },
           "severity": "medium",
           "owningLane": "it_security",
-          "evidence": [{ "slot": 7, "locator": { "kind": "absent" } }],
+          "evidence": [
+            {
+              "slot": 7,
+              "locator": {
+                "kind": "absent"
+              }
+            }
+          ],
           "measure": null,
-          "message": { "key": "qc.finding.pack_slot_missing", "params": { "slot": 7 } }
+          "message": {
+            "key": "qc.finding.pack_slot_missing",
+            "params": {
+              "slot": 7
+            }
+          }
+        },
+        {
+          "ruleId": "PACK-STAGE-MISMATCH",
+          "scope": {
+            "kind": "pack"
+          },
+          "severity": "medium",
+          "owningLane": "ai_coe",
+          "evidence": [
+            {
+              "slot": null,
+              "locator": {
+                "kind": "absent"
+              }
+            }
+          ],
+          "measure": null,
+          "message": {
+            "key": "qc.finding.pack_stage_mismatch",
+            "params": {}
+          }
+        }
+      ]
+    },
+    {
+      "trigger": "approve_attempt",
+      "lane": "dpo",
+      "findings": [
+        {
+          "ruleId": "ACC-METRIC-CITED",
+          "scope": {
+            "kind": "slot",
+            "slot": 5
+          },
+          "severity": "medium",
+          "owningLane": "dpo",
+          "evidence": [
+            {
+              "slot": 5,
+              "locator": {
+                "kind": "absent"
+              }
+            }
+          ],
+          "measure": null,
+          "message": {
+            "key": "qc.finding.acc_metric_cited",
+            "params": {}
+          }
         }
       ]
     }

@@ -6,18 +6,12 @@
 // id (`fx-doc-<case>-<slot>`) plus its slot and the runner resolves `artifactId`/`contentHash` from the request's
 // authorized artifact in that slot (W0-08 section 8.4: defects are "scripted against the fixture artifact ID").
 //
-// W0-06 section 7.4 posture, enforced by `validateScript` at construction: only `artifact`- or `slot`-scoped
-// findings on single-lane slots (1, 2, 3, 4, 6, 7, 8) whose `owningLane` equals `owningLaneForSlot`; no slot 5,
-// slot 9, pack-level or run-scoped finding and never `QC-UNAVAILABLE`. The reserved rows of W0-07 3.5 are absent.
+// W0-06 section 7 as recorded on 2026-09-25 (#35), enforced by `validateScript` at construction: every finding
+// carries the lane `owningLaneRule` gives its scope (single-lane slot: that lane; slot 5: a reviewing lane, and on
+// an approve attempt the run's lane; pack: AI/COE); slot 9 carries no defects; no run-scoped finding and never
+// `QC-UNAVAILABLE`, which only the orchestrator builds (W0-07 3.6).
 
-import {
-  LANES,
-  LANE_MAPPINGS_BY_VERSION,
-  SLOTS,
-  type Lane,
-  type Slot,
-  owningLaneForSlot,
-} from '@rai/shared/constants';
+import { LANES, LANE_MAPPINGS_BY_VERSION, SLOTS, type Lane, owningLaneRule } from '@rai/shared/constants';
 import { QC_RULE_ID_PATTERN } from '@rai/shared/qc/types';
 import type { EvidenceLocator, Measure, QcTrigger, Severity, SlotNumber } from '@rai/shared/qc/types';
 import { isLocaleKey } from '@rai/shared/locales/keys';
@@ -28,7 +22,9 @@ import fxCaseMissingSlot from './scripts/fx-case-missing-slot.json' with { type:
 import fxCaseNaReasons from './scripts/fx-case-na-reasons.json' with { type: 'json' };
 
 export type ScriptedScope =
-  { kind: 'artifact'; slot: SlotNumber; fixtureArtifactId: string } | { kind: 'slot'; slot: SlotNumber };
+  | { kind: 'artifact'; slot: SlotNumber; fixtureArtifactId: string }
+  | { kind: 'slot'; slot: SlotNumber }
+  | { kind: 'pack' };
 
 export interface ScriptedEvidence {
   fixtureArtifactId?: string; // resolved to the request artifact in `slot`; absent for an omission
@@ -78,11 +74,6 @@ export class QcScriptError extends Error {
   }
 }
 
-const SINGLE_LANE_SLOTS: ReadonlySet<Slot> = new Set(
-  SLOTS.filter(
-    (slot) => owningLaneForSlot(slot, LANE_MAPPINGS_BY_VERSION['lane-mapping/v1']!) !== 'refinement_pending',
-  ),
-);
 const FIXTURE_DOC_ID = /^fx-doc-(\d{4})-(\d{2})$/;
 const TRIGGERS: readonly QcTrigger[] = ['upload', 'submit', 'approve_attempt'];
 const SEVERITIES: readonly Severity[] = ['high', 'medium', 'low'];
@@ -132,21 +123,24 @@ function validateFinding(raw: unknown, script: QcScript, entry: ScriptEntry, whe
   if (ruleId === 'QC-UNAVAILABLE') fail('qc_unavailable_rule_forbidden', where); // orchestrator-built only (3.6)
   const scope = raw['scope'];
   if (!isRecord(scope)) fail('scope_invalid', where);
-  if (scope['kind'] === 'pack' || scope['kind'] === 'run')
-    fail(`scope_${String(scope['kind'])}_forbidden`, where); // W0-06 7.4
-  if (scope['kind'] !== 'artifact' && scope['kind'] !== 'slot') fail('scope_invalid', where);
-  const slot = scope['slot'];
-  if (!(SLOTS as readonly unknown[]).includes(slot)) fail('scope_slot_invalid', where);
-  if (!SINGLE_LANE_SLOTS.has(slot as Slot)) fail(`scope_slot_${String(slot)}_pending_w0_06_7_3`, where); // W0-06 7.3 open
+  if (scope['kind'] === 'run') fail('scope_run_forbidden', where); // orchestrator-built only (3.6)
+  if (scope['kind'] !== 'artifact' && scope['kind'] !== 'slot' && scope['kind'] !== 'pack')
+    fail('scope_invalid', where);
   let typedScope: ScriptedScope;
-  if (scope['kind'] === 'artifact') {
-    const fixtureArtifactId = scope['fixtureArtifactId'];
-    if (typeof fixtureArtifactId !== 'string' || !FIXTURE_DOC_ID.test(fixtureArtifactId))
-      fail('fixture_artifact_id_invalid', where);
-    if (Number(fixtureArtifactId.slice(-2)) !== slot) fail('fixture_artifact_slot_mismatch', where);
-    typedScope = { kind: 'artifact', slot: slot as SlotNumber, fixtureArtifactId };
+  if (scope['kind'] === 'pack') {
+    typedScope = { kind: 'pack' };
   } else {
-    typedScope = { kind: 'slot', slot: slot as SlotNumber };
+    const slot = scope['slot'];
+    if (!(SLOTS as readonly unknown[]).includes(slot)) fail('scope_slot_invalid', where);
+    if (scope['kind'] === 'artifact') {
+      const fixtureArtifactId = scope['fixtureArtifactId'];
+      if (typeof fixtureArtifactId !== 'string' || !FIXTURE_DOC_ID.test(fixtureArtifactId))
+        fail('fixture_artifact_id_invalid', where);
+      if (Number(fixtureArtifactId.slice(-2)) !== slot) fail('fixture_artifact_slot_mismatch', where);
+      typedScope = { kind: 'artifact', slot: slot as SlotNumber, fixtureArtifactId };
+    } else {
+      typedScope = { kind: 'slot', slot: slot as SlotNumber };
+    }
   }
   const severity = raw['severity'];
   if (!(SEVERITIES as readonly unknown[]).includes(severity)) fail('severity_invalid', where);
@@ -154,7 +148,12 @@ function validateFinding(raw: unknown, script: QcScript, entry: ScriptEntry, whe
   if (!(LANES as readonly unknown[]).includes(owningLane)) fail('owning_lane_invalid', where);
   const mapping = LANE_MAPPINGS_BY_VERSION[script.laneMappingVersion];
   if (mapping === undefined) fail('lane_mapping_version_unknown', where);
-  if (owningLaneForSlot(typedScope.slot, mapping) !== owningLane) fail('owning_lane_mismatch', where); // W0-06 7.1
+  const rule = owningLaneRule(typedScope, mapping); // W0-06 section 7
+  if (rule.kind === 'no_defects')
+    fail(`scope_slot_${String(typedScope.kind === 'pack' ? 'pack' : typedScope.slot)}_informational`, where);
+  if (rule.kind === 'lane' && rule.lane !== owningLane) fail('owning_lane_mismatch', where);
+  if (rule.kind === 'raising_lane' && !rule.lanes.includes(owningLane as Lane))
+    fail('owning_lane_mismatch', where);
   if (entry.trigger === 'approve_attempt' && entry.lane !== owningLane) fail('finding_outside_lane', where);
   const rawEvidence = raw['evidence'];
   if (!Array.isArray(rawEvidence) || rawEvidence.length === 0) fail('evidence_missing', where);
@@ -240,7 +239,7 @@ export function validateScript(raw: unknown): QcScript {
     }
     const keys = new Set<string>();
     for (const f of entry.findings) {
-      const k = `${f.ruleId}:${f.scope.kind}:${f.scope.slot}`;
+      const k = `${f.ruleId}:${f.scope.kind}:${f.scope.kind === 'pack' ? '-' : f.scope.slot}`;
       if (keys.has(k)) fail('duplicate_finding_key', entryWhere);
       keys.add(k);
     }

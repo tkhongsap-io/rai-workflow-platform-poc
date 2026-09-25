@@ -326,6 +326,7 @@
   "qc.finding.acc_extraction_not_hallucination": "The extraction accuracy figure ({metric}) is not a hallucination rate",
   "qc.finding.acc_metric_cited": "A \"Yes\" on hallucination or accuracy must cite the metric, denominator, threshold and artefact",
   "qc.finding.pack_slot_missing": "Slot {slot} has no document and no reason recorded",
+  "qc.finding.pack_stage_mismatch": "The pack does not match its stage context",
   "qc.finding.unavailable": "QC was unavailable ({reason}) on {trigger}; this result is never a clean pass",
   "queue.all_fields": "All fields",
   "queue.any": "All",

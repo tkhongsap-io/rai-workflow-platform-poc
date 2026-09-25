@@ -326,6 +326,7 @@
   "qc.finding.acc_extraction_not_hallucination": "ค่าความแม่นยำในการสกัดข้อมูล ({metric}) ไม่ใช่อัตราการสร้างข้อมูลเท็จ",
   "qc.finding.acc_metric_cited": "การตอบ \"ใช่\" เรื่องความถูกต้องหรือการสร้างข้อมูลเท็จต้องอ้างอิงตัวชี้วัด ตัวหาร เกณฑ์ และเอกสารอ้างอิง",
   "qc.finding.pack_slot_missing": "ช่องเอกสารที่ {slot} ไม่มีเอกสารและไม่ได้ระบุเหตุผล",
+  "qc.finding.pack_stage_mismatch": "ชุดเอกสารไม่สอดคล้องกับขั้นตอนที่ระบุ",
   "qc.finding.unavailable": "QC ไม่พร้อมใช้งาน ({reason}) ในขั้นตอน {trigger} ผลนี้ไม่ถือว่าผ่านการตรวจ",
   "queue.all_fields": "ทุกฟิลด์",
   "queue.any": "ทั้งหมด",

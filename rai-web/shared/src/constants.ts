@@ -76,5 +76,7 @@ export function unavailableOwningLane(
   if (run.trigger === 'submit') return PACK_OWNING_LANE;
   const rule = owningLaneRule({ kind: 'slot', slot: run.slot }, mapping);
   if (rule.kind === 'lane') return rule.lane;
-  throw new Error(`owning lane for an unavailable upload run on slot ${run.slot} is defined with upload QC (W4)`);
+  throw new Error(
+    `owning lane for an unavailable upload run on slot ${run.slot} is defined with upload QC (W4)`,
+  );
 }
