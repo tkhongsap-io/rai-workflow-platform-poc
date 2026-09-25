@@ -189,7 +189,7 @@ After the W3 engineering exit, most W2/W3 PRs (#90-#126) turned out to have merg
 | W3 queue, SLA and notifications | Implemented through reviewed PRs and real-server integration; hardened (derived status, notification shutdown, outbox) | File mail sink only; no external delivery or exactly-once promise |
 | Operator diagnostics and slice-1 journey | Real-server evidence, fault/restart negatives, keyboard walkthrough and scoped views recorded; readiness now gates on pending migrations | Synthetic identity/QC adapters; no real model-quality claim |
 | Resilience and request safety | Pool idle-error handler, connect timeout, fatal process handlers; `Sec-Fetch-Site` guard on every signed-in write | Secure-cookie enforcement for network mode is a W7-00 precondition |
-| W2 finding ownership | Issue #35 and epic #53 stay open; QC fails closed (run recorded unavailable) for findings with no owning lane | [Decision brief](changes/2026-09-23-w3-hardening/issue-35-decision-brief.md) for Ta and the review leads |
+| W2 finding ownership | Decided 2026-09-25 (register row "D05 refinement (#35)"): slot 5 the raising lane, slot 9 informational, pack AI/COE, QC-unavailable follows the run, nothing carried to N+1; implemented by W2-05 | [Decision brief](changes/2026-09-23-w3-hardening/issue-35-decision-brief.md) for Ta and the review leads |
 | Local identity | Automated fixture boundary verified | Manual Google loopback sign-in remains pending Ta |
 | W4–W8 | Not authorized | Separate package gates and D07–D10; operator rehearsal and production release remain future work |
 
