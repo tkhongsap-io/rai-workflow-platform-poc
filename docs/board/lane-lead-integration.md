@@ -104,3 +104,15 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Takes over from: none; parent delegates only isolated harness preparation, not lead-lane integration ownership.
 - Scope: guards, real-API seed and measurement functions, pure tests; no DB actions, benchmark, PR or M3 acceptance.
 - Evidence: [plan](../../changes/2026-09-22-w3-06-performance/plan.md).
+
+## 2026-09-25 15:25 — CLAIM lead-integration: W3 hardening close-out
+- Author: operator=ta session=claude-code-w3-hardening-closeout model=claude-opus-5-5
+- Takes over from: session=none (reason: new; the hardening lead session ended with #157 merged)
+- Scope: records only, per [close-out plan](../../changes/2026-09-23-w3-hardening/closeout-plan.md): final-head CI evidence, board entry, local branch pruning. No code, no decision.
+
+## 2026-09-25 15:40 — W3 hardening H1-H29 merged; records closed
+- What: The retro-review of the unreviewed W2/W3 PRs confirmed 71 findings. H1-H23 (#128-#150) closed 67 of them, 3 were deferred to Ta and 1 was withdrawn. H24 (#151) fixed what the final verification found, and H25-H29 (#152-#156) fixed defects found by running the Nakhun walkthrough. #157 added the review record, the walkthrough script and the #35 decision brief. `main` `aa9e8ab` passed CI run 36041409928 (12/12). The close-out cited that run in the review, added the missing #157 row, added this board record and pruned the 29 merged local branches.
+- Why: Ta's 2026-09-23 instruction not to accept W3 until the unreviewed code was reviewed, fixed and simplified. The board had no record of that work.
+- Next: Ta's W3 package review (epic #54) and the synthetic walkthrough with Nakhun. Section 5 of the review lists the items only Ta can decide, including #35. W4-W8 are not authorized.
+- Author: operator=ta session=claude-code-w3-hardening-closeout model=claude-opus-5-5
+- Evidence: https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/158

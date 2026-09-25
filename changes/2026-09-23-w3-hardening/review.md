@@ -67,6 +67,7 @@ Each batch has its own record, `h<n>.md`, in this folder.
 | #154 | H27 UI: send-back feedback on the sent-back version and on the owner's successor draft | `dfe84b3` | +241/−34 | both PASS on head `c54c739` |
 | #156 | H28 Lane QC runs once per opening: no duplicate unavailable runs, no spurious 409 on approve | `23b02b6` | +177/−35 | both PASS on head `3981736` |
 | #155 | H29 Draft editor only for users who can edit; no stale "Draft saved" notice on another version | `1d473dd` | +318/−75 | both PASS on `8c91373`; the rebased combined head `ebd57d5` failed CI (see below); fix round; round 2: correctness BLOCKING (no test for the disabled pack settings); round 3 on `fd6e736`: both PASS, CI 12/12 |
+| #157 | Hand-off records: this review, the walkthrough script, the #35 decision brief; DEVLOG, CHANGELOG, README, BUILD_PLAN | `aa9e8ab` | +366/−14 | honesty BLOCKING rounds 1-4, PASS rounds 5-6; records PASS rounds 1-2, BLOCKING rounds 3-5; round 6: both PASS, CI 12/12 on `aa9e8ab`. Row added by the [close-out](closeout-plan.md). |
 
 ## 3. Final verification (Done-when 1-3)
 
@@ -165,6 +166,8 @@ Two questions went to Ta instead (section 5, items 10 and 11).
 
 Only wording fixes to the script followed. The agent also noted that the send-back mail links to version 1, not to the version 2 draft. W3-03 specifies "a deep link" without naming the version, and the code links the decided version. Now that H27 shows the feedback on the successor draft, linking there may serve the owner better. This is recorded as a question (section 5, item 12), not changed.
 
+**Final `main`, after #157.** CI run [36041409928](https://github.com/tkhongsap-io/rai-workflow-platform-poc/actions/runs/36041409928) on `aa9e8ab` passed all 12 jobs: install, lint, typecheck, unit tests, migrations and integration tests, build and substitute absence, browser journeys and accessibility audit, dependency advisories, legacy demo suite and frozen-source hash, markdown link check, whitespace, and `required`. No separate local full suite was rerun on `aa9e8ab`. The clean-checkout counts above are for `4522074`; each of H24-H29 recorded its own full run in its batch record. Added by the [close-out](closeout-plan.md) on 2026-09-25.
+
 ## 4. Exceptions and incidents
 
 - **#127, the change frame, merged with no reviewer verdict and before its CI finished.** It is docs only: intent, spec and plan, written before any code as AGENTS.md requires. The lead merged it at 13:03:37Z, one second after its CI run started (run 35864480688). The run passed at 13:23:28Z. No independent reviewer read it before merge; the reviewers of every later batch read it as context.
@@ -212,6 +215,7 @@ Items 10-12 are questions from the walkthrough re-checks.
   - Local worktrees from this change were removed.
   - Older `codex/w*` remote branches from earlier sessions are listed for Ta, not deleted.
   - The other session's worktree `/private/tmp/rai-w3-mail-compat` was left untouched. The final verification found its content already on `main` or superseded by it.
+- Close-out on 2026-09-25 ([plan](closeout-plan.md), PR #158): this review now cites the final-`main` CI run and has a #157 row in section 2, the lead-integration board has a claim and a hardening entry, and the 29 merged local branches were deleted after their PRs were checked as merged. Their tips are listed in the plan.
 - Hand-off documents: the [walkthrough script](walkthrough-script.md) for Nakhun (synthetic, about 45 minutes) and the [issue #35 decision brief](issue-35-decision-brief.md).
 
 W3 package acceptance remains Ta's. Nothing here is operator or production acceptance, and W4-W8 are not authorized.
