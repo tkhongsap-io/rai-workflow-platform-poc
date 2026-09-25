@@ -1,6 +1,6 @@
 # Build Plan: RAI Workflow Platform PoC
 
-Version: 1.0, 2026-09-21 (draft 1 was 2026-09-20). **Canonical implementation anchor. G0 closed 2026-09-21; W0-W3 authorized on synthetic data (D03). Package text below stays as written. Current status is the dated section at the end: W3 synthetic engineering exit recorded; Ta’s package review remains pending.**
+Version: 1.0, 2026-09-21 (draft 1 was 2026-09-20). **Canonical implementation anchor. G0 closed 2026-09-21; W0-W3 authorized on synthetic data (D03). Package text below stays as written. Current status is the dated section at the end: W3 accepted by Ta on 2026-09-26; W4-W8 remain gated.**
 
 Read [PRD](PRD.md) for product scope, [acceptance](docs/acceptance.md) for expected behavior and [decisions](docs/product/decisions.md) for the recorded rules (D01-D06, D11, D12, including the D03 merge-authority amendment) and the open items (D07-D10). The older repository-foundation plan describes documentation setup only. This document governs the staged product build.
 
@@ -194,3 +194,14 @@ After the W3 engineering exit, most W2/W3 PRs (#90-#126) turned out to have merg
 | W4–W8 | Not authorized | Separate package gates and D07–D10; operator rehearsal and production release remain future work |
 
 The W3 exit record retains failed/repaired checks, source identities and the PR120 premature-merge exception with subsequent verification. Every hardening batch PR (H1-H29, #128-#156) merged only after two independent reviewer verdicts and green CI on the reviewed head, except #136, which got its second verdict after merge. The docs-only frame PR #127 merged with no reviewer verdict and before its CI finished (CI passed afterwards). Both exceptions are recorded in the hardening review. There is no scope change or authorization to continue into W4 here.
+
+## Status against this plan — 2026-09-26 (W3 accepted)
+
+A dated read; the 2026-09-25 section above stays as written.
+
+| Gate / package / milestone | Status on 2026-09-26 | Evidence | Next evidence needed |
+|---|---|---|---|
+| M3 (W3, slice 1) | **Accepted by Ta, 2026-09-26** (package review after the synthetic walkthrough with Nakhun; no change requested) | changes/2026-09-23-w3-exit/review.md; changes/2026-09-23-w3-hardening/review.md; changes/2026-09-26-nakhun-walkthrough/notes.md | Not blocking: Ta/operator confirmation of the advisory workload and latency targets; Ta's manual `local-google` sign-in (W1) |
+| W4-W8 | **Not authorized** | — | D08 and D09 before W4 probabilistic QC, a W4 gate entry by Ta; D07 before W5; D10 before networked tests or W8 |
+
+Slice 1 (W1-W3) is complete on synthetic data. This is desk-completion acceptance of a synthetic build, not operator acceptance (W7) or release (W8), and it authorizes nothing beyond D03.

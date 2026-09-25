@@ -174,3 +174,7 @@ Next owner action: review the synthetic engineering exit, confirm or revise work
 ## Final preparation checks
 
 At performance checkpoint `f70440bd7186efdf5ede40fe4eb6e56fb332c47c`, normal unit verification passed 565 tests with zero skips, and typecheck/lint passed. After adding this exit packet and scoped current-state documentation, root tests passed 40/40 with zero skips, the link checker checked 242 Markdown files/756 relative links with zero broken, the frozen-source SHA matched and `git diff --check` passed. No production code or runtime configuration changed in this exit-document step. The final CI pipeline, not a relabeled historical run, verifies the delivered head.
+
+## Package review — 2026-09-26
+
+Ta accepted W3 on 2026-09-26, after the W3 hardening ([review](../2026-09-23-w3-hardening/review.md)), W2-05's owning-lane rule (PR #159) and the synthetic walkthrough with Nakhun ([notes](../2026-09-26-nakhun-walkthrough/notes.md); no change requested). Channel: Ta's answer in the Claude Code session of 2026-09-26. Milestone M3 is reached; epic #54 closes. Still open, not blocking: confirmation of the advisory workload and latency targets, and the manual `local-google` sign-in. The acceptance covers the synthetic desk only; W4-W8, real data, real QC and external mail stay gated.

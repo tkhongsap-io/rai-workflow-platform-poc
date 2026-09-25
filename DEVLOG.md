@@ -1,5 +1,9 @@
 # Development log
 
+## W3 accepted — 2026-09-26
+
+Ta accepted W3 (slice 1) after the synthetic walkthrough with Nakhun, who asked for no changes ([notes](changes/2026-09-26-nakhun-walkthrough/notes.md)). Milestone M3 is reached and epic #54 closes. The script's four product questions stay open, as do confirmation of the advisory workload and latency targets and the manual Google loopback sign-in; none blocks. W4-W8 stay unauthorized. Next: decision briefs for D08 and D09 and a draft W4 gate for Ta, in parallel with the W3-07 desk-health follow-up (the outage finding's lane).
+
 ## W2-05 owning-lane rule (#35) — 2026-09-25
 
 Ta accepted the five recommendations of the [#35 decision brief](changes/2026-09-23-w3-hardening/issue-35-decision-brief.md) and approved the register row "D05 refinement (#35)": slot 5 belongs to the lane whose QC rule raised the finding (on an approve attempt, that run's lane); slot 9 is informational, QC raises no defect there; the pack belongs to AI/COE; a QC-unavailable finding follows the run (the approving lane, or AI/COE on submit); nothing is carried to N+1. W0-06 sections 7.1-7.4 and W0-07 3.4-3.9 now state the rule.

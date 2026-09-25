@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-26
+
+- W3 accepted by Ta after the synthetic walkthrough with Nakhun (no change requested); milestone M3 reached, epic #54 closed. W4-W8 remain gated.
+
 ## 2026-09-25
 
 - W2-05 (#35): the owning-lane rule for slot-5, slot-9, pack-level and QC-unavailable findings is recorded (register row "D05 refinement (#35)") and implemented. An unavailable QC run now stores a `QC-UNAVAILABLE` finding owned by the lane that saw it, once per open scope; Ready waits for that lane's disposition. The substitute scripts one slot-5 and one pack-level finding. No migration.
