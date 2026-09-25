@@ -1,0 +1,7 @@
+
+> @rai/root@0.0.0 lint
+> eslint . && prettier --check . && node scripts/check-css.mjs
+
+Checking formatting...
+All matched files use Prettier code style!
+check-css: no outline removal outside :focus-visible

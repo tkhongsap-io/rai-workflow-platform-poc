@@ -86,9 +86,10 @@ test('operator SQL preserves unknown QC and unscheduled failures, derives termin
   });
   const report = await readDeskHealth(db.app, await readiness(), []);
   assert.equal(report.unavailableQc.length, 100);
+  // W0-06 7.2 (recorded 2026-09-25): an outage belongs to the lane whose run saw it; the rows are DPO approve attempts.
   assert.ok(
     report.unavailableQc.every(
-      (run) => run.reason === 'unknown' && run.owningLane === undefined && run.correlationId === correlation,
+      (run) => run.reason === 'unknown' && run.owningLane === 'dpo' && run.correlationId === correlation,
     ),
   );
   const queued = report.failedMail.find((mail) => mail.status === 'queued')!;

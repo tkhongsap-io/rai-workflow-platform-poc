@@ -132,7 +132,13 @@ test('OBS17: failed send-back and submit timeout correlate once; Admin keyboard 
       expect(targetMail).toHaveLength(1);
       expect(targetMail[0]).toMatchObject({ status: 'failed', attempts: 4, correlationId: mailCorrelation });
       expect(report.unavailableQc.filter((row) => row.qcRunId === qc.id)).toEqual([
-        expect.objectContaining({ reason: 'timeout', trigger: 'submit', correlationId: submitCorrelation }),
+        // W0-06 7.2: a submit outage belongs to the pack owner, AI/COE.
+        expect.objectContaining({
+          reason: 'timeout',
+          trigger: 'submit',
+          owningLane: 'ai_coe',
+          correlationId: submitCorrelation,
+        }),
       ]);
       await page.goto(url('/operator/desk-health'));
       for (const locale of ['th', 'en'] as const) {

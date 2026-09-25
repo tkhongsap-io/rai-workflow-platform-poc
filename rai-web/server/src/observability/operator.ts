@@ -1,4 +1,5 @@
 import { and, desc, eq, gt, or, sql } from 'drizzle-orm';
+import { LANES, type Lane, unavailableOwningLane } from '@rai/shared/constants';
 import { Value } from 'typebox/value';
 import {
   DeskHealthReportSchema,
@@ -16,6 +17,15 @@ import {
 } from '../db/schema/index.js';
 
 /** Caller must enforce operator.view. Recipient is authorized response data, never log data. */
+
+/** The lane an unavailable run's QC-UNAVAILABLE finding belongs to; upload runs (none in slice 1) are never guessed. */
+function owningLaneOfUnavailableRun(trigger: string, lane: string | null): Lane | undefined {
+  if (trigger === 'approve_attempt' && lane !== null && (LANES as readonly string[]).includes(lane))
+    return unavailableOwningLane({ trigger: 'approve_attempt', lane: lane as Lane });
+  if (trigger === 'submit') return unavailableOwningLane({ trigger: 'submit', lane: null });
+  return undefined;
+}
+
 export async function readDeskHealth(
   db: Db,
   readiness: ReadinessReport,
@@ -57,6 +67,7 @@ export async function readDeskHealth(
           caseId: packVersion.caseId,
           versionId: qcRun.versionId,
           trigger: qcRun.trigger,
+          lane: qcRun.lane,
           reason: qcRun.unavailableReason,
           requestedAt: qcRun.requestedAt,
           correlationId: qcRun.correlationId,
@@ -123,12 +134,17 @@ export async function readDeskHealth(
               ? {}
               : { nextAttemptAt: row.nextAttemptAt.toISOString() }),
         })),
-        // Triggering lane is not owning lane: the authoritative unavailable-finding lane remains unresolved.
-        unavailableQc: unavailable.map((row) => ({
-          ...row,
-          reason: row.reason ?? 'unknown',
-          requestedAt: row.requestedAt.toISOString(),
-        })),
+        // W0-06 7.2 (recorded 2026-09-25): the outage finding's lane follows the run, so it is derived from the run
+        // itself; that also covers a run that reused an earlier open finding and has no finding row of its own.
+        unavailableQc: unavailable.map(({ lane, ...row }) => {
+          const owningLane = owningLaneOfUnavailableRun(row.trigger, lane);
+          return {
+            ...row,
+            reason: row.reason ?? 'unknown',
+            ...(owningLane === undefined ? {} : { owningLane }),
+            requestedAt: row.requestedAt.toISOString(),
+          };
+        }),
         lateQc: late.map(({ lane, ...row }) => ({
           ...row,
           ...(lane === null ? {} : { lane }),

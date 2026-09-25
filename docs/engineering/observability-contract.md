@@ -323,7 +323,7 @@ export interface DeskHealthReport {
     qcRunId: string; caseId: string; versionId: string;
     trigger: 'upload' | 'submit' | 'approve_attempt';   // W0-04 qc_run.trigger
     reason: 'timeout' | 'runner_error' | 'not_configured' | 'artifact_unreadable';   // W0-07 QcUnavailableReason
-    owningLane?: 'ai_coe' | 'dpo' | 'it_security';       // the QC-unavailable finding's lane (W0-07 3.6); not yet filled by the desk-health query, a W3-07 follow-up
+    owningLane?: 'ai_coe' | 'dpo' | 'it_security';       // the QC-unavailable finding's lane (W0-07 3.6), derived from the run under W0-06 7.2; absent for an upload run
     requestedAt: string;                                // W0-04 qc_run.requested_at
     correlationId: CorrelationId;
   }>;
