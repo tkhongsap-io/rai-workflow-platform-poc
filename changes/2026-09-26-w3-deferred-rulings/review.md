@@ -21,6 +21,14 @@ Framed in [intent](intent.md), [spec](spec.md) and [plan](plan.md). Decision: Ta
 
 No ticket: 3 (substitute kept until W4 kickoff), 6 (unchanged until W7), 9 (not pursued). Item 4 was already a W7-00 precondition, and item 1 (#35) was decided on 2026-09-25.
 
+## Document of record
+
+The seven tickets are rows W3-F1 to W3-F7 in the new "W3 follow-ups" table of [the slice-1 breakdown](../../docs/delivery/slice-1-work-breakdown.md); if an issue and that table disagree, the table wins.
+
+## Review round 1
+
+Record honesty: BLOCKING on ruling 10 naming "owner or BU SPOC" where Ta accepted SPOC only; narrowed in the row, #164 and W0-05 (the owner case stays open). Consistency: BLOCKING on the row's affected documents (items 10-12 live in W0-05, W0-06 and W0-07, not W3-03; items 5 and 7 touch W0-04, performance-targets and W0-02), on the DEVLOG claiming the walkthrough's questions were ruled (the day-start queue question was not), and on the tickets having no document of record. All fixed here; W0-07 3.4 step 7 also says a refused closed version emits no completion or late line. Issue bodies #164, #166-#169 were corrected in place.
+
 ## Checks
 
 `node scripts/check-links.mjs` 0 broken; `git diff --check` clean. Reviewer verdicts are recorded on the PR.
