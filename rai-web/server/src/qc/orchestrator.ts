@@ -1,13 +1,14 @@
-// W2-05 QC orchestrator: builds a request, calls the injected QcRunner, validates, and persists single-lane
-// defect findings (W0-06 7.1 / 7.4). One finding that fails validation or has no recorded owning lane (slot 5,
-// slot 9, pack; issue #35) fails the whole run as unavailable:runner_error, never a silently shorter clean run.
-// Unavailable results store a qc_run with status unavailable and zero findings (W0-07 3.4 / 3.6). An unbound
-// runner (production) persists engine_id `unbound` and replays that row.
+// W2-05 QC orchestrator: builds a request, calls the injected QcRunner, validates, and persists defect findings
+// with the owning lane W0-06 section 7 gives them (recorded 2026-09-25, #35). One finding that fails validation
+// or the owning-lane check fails the whole run as unavailable:runner_error, never a silently shorter clean run.
+// An unavailable result stores a qc_run with status unavailable plus the QC-UNAVAILABLE finding of W0-07 3.6,
+// owned per W0-06 7.3 part 4 and appended once per open scope. An unbound runner (production) persists engine_id
+// `unbound` and replays that row.
 
 import { createHash } from 'node:crypto';
 import { Value } from 'typebox/value';
 import { QcUnavailableReasonSchema } from '@rai/shared/schemas/observability';
-import { LANE_MAPPINGS_BY_VERSION, type Lane, type Slot } from '@rai/shared/constants';
+import { LANE_MAPPINGS_BY_VERSION, type Lane, type Slot, unavailableOwningLane } from '@rai/shared/constants';
 import { NotFoundError, StaleVersionError } from '@rai/shared/errors';
 import { uuidv7 } from '@rai/shared/ids';
 import type {
@@ -27,6 +28,7 @@ import { readCaseRow, readVersionRow } from '../cases/repository.js';
 import type { Db, Tx } from '../db/client.js';
 import { lockCase, withTransaction } from '../db/transaction.js';
 import { auditStore } from '../audit/store.js';
+import { findLatestUnavailableFinding } from '../findings/repository.js';
 import type { Emitter } from '../observability/log.js';
 import type { ErrorCapture } from '../observability/errors.js';
 import { runWithContext, maybeContext } from '../observability/context.js';
@@ -68,10 +70,16 @@ type RunQcInput = RunSubmitQcInput &
 
 export type PersistQcOutcome =
   | { status: 'completed'; runId: string; findings: StoredFindingSummary[] }
-  | { status: 'unavailable'; reason: QcUnavailableReason; runId: string; findings: [] };
+  | {
+      status: 'unavailable';
+      reason: QcUnavailableReason;
+      runId: string;
+      findings: StoredFindingSummary[]; // the open QC-UNAVAILABLE finding for this run's scope (W0-07 3.6)
+    };
 
 export type SubmitQcOutcome =
-  PersistQcOutcome | { status: 'unavailable'; reason: 'unknown'; runId: string; findings: [] };
+  | PersistQcOutcome
+  | { status: 'unavailable'; reason: 'unknown'; runId: string; findings: StoredFindingSummary[] };
 
 function runKeyOf(
   versionId: string,
@@ -183,10 +191,10 @@ function checkedResult(result: QcRunResult, request: QcRunRequest, stamp: Date):
   if (result.status === 'unavailable') return result;
   const mapping = LANE_MAPPINGS_BY_VERSION[request.laneMappingVersion];
   for (const finding of result.findings) {
-    // An unknown mapping has no recorded owning-lane rule for any finding.
+    // An unknown mapping can vouch for no lane.
     const violation =
       validateQcFinding(finding, request) ??
-      (mapping === undefined ? 'owning_lane_rule_pending' : checkOwningLane(finding, mapping));
+      (mapping === undefined ? 'owning_lane_mismatch' : checkOwningLane(finding, mapping, request.lane));
     if (violation !== null) return unavailableResult('runner_error', violation, stamp);
   }
   return result;
@@ -240,8 +248,13 @@ async function persistResult(
   run: RunRecord,
 ): Promise<PersistQcOutcome> {
   if (result.status === 'unavailable') {
-    await recordRun(tx, version, request, run, result.reason, 0);
-    return { status: 'unavailable', reason: result.reason, runId: run.id, findings: [] };
+    const prior = await findLatestUnavailableFinding(tx, version.id, request.trigger, request.lane);
+    const reuse = prior !== undefined && prior.undispositioned;
+    await recordRun(tx, version, request, run, result.reason, reuse ? 0 : 1);
+    if (reuse)
+      return { status: 'unavailable', reason: result.reason, runId: run.id, findings: [prior.summary] };
+    const summary = await appendUnavailableFinding(tx, version, request, run, result.reason);
+    return { status: 'unavailable', reason: result.reason, runId: run.id, findings: [summary] };
   }
   await recordRun(tx, version, request, run, null, result.findings.length);
   const findings: StoredFindingSummary[] = [];
@@ -277,6 +290,54 @@ async function persistResult(
     });
   }
   return { status: 'completed', runId: run.id, findings };
+}
+
+/** W0-07 3.6: the one finding the orchestrator builds itself. Its lane follows the run (W0-06 7.3 part 4). */
+async function appendUnavailableFinding(
+  tx: Tx,
+  version: PackVersionRow,
+  request: QcRunRequest,
+  run: RunRecord,
+  reason: QcUnavailableReason,
+): Promise<StoredFindingSummary> {
+  const mapping = LANE_MAPPINGS_BY_VERSION[request.laneMappingVersion];
+  if (mapping === undefined) throw new Error(`unknown lane mapping ${request.laneMappingVersion}`);
+  // The orchestrator runs submit and approve_attempt only (RunQcInput); upload QC arrives with W4.
+  const owningLane = unavailableOwningLane(
+    request.trigger === 'approve_attempt' && request.lane !== null
+      ? { trigger: 'approve_attempt', lane: request.lane }
+      : { trigger: 'submit', lane: null },
+    mapping,
+  );
+  const findingId = uuidv7(run.stamp.getTime());
+  const messageParams = { reason, trigger: request.trigger, rulesEvaluated: 0 };
+  await insertQcFinding(tx, {
+    id: findingId,
+    runId: run.id,
+    versionId: version.id,
+    slot: null,
+    kind: 'unavailable',
+    ruleId: 'QC-UNAVAILABLE',
+    ruleRevision: request.qcRulesRevision,
+    severity: 'high',
+    owningLane,
+    evidence: [{ artifact_id: null, content_hash: null, slot: null, locator: { kind: 'absent' } }],
+    metric: null,
+    denominator: null,
+    threshold: null,
+    messageKey: 'qc.finding.unavailable',
+    messageParams,
+    createdAt: run.stamp,
+  });
+  return {
+    findingId,
+    ruleId: 'QC-UNAVAILABLE',
+    slot: null,
+    severity: 'high',
+    owningLane,
+    messageKey: 'qc.finding.unavailable',
+    messageParams,
+  };
 }
 
 /** Case lock plus W0-06 4.4 preconditions: submitted, current, not Ready. */
@@ -331,14 +392,17 @@ async function replayPrior(
   if (prior.status === 'completed') {
     return { status: 'completed', runId: prior.id, findings: await listFindingsForRun(tx, prior.id) };
   }
+  // An unavailable replay carries the scope's latest QC-UNAVAILABLE finding, as the recorded run did (W0-07 3.8).
+  const latest = await findLatestUnavailableFinding(tx, version.id, input.trigger, input.lane);
+  const findings = latest === undefined ? [] : [latest.summary];
   if (input.trigger === 'submit') {
     const reason = Value.Check(QcUnavailableReasonSchema, prior.unavailableReason)
       ? prior.unavailableReason
       : 'unknown';
-    return { status: 'unavailable', reason, runId: prior.id, findings: [] };
+    return { status: 'unavailable', reason, runId: prior.id, findings };
   }
   if (!runnerBound && prior.engineId === UNBOUND_ENGINE_ID) {
-    return { status: 'unavailable', reason: 'not_configured', runId: prior.id, findings: [] };
+    return { status: 'unavailable', reason: 'not_configured', runId: prior.id, findings };
   }
   return undefined;
 }

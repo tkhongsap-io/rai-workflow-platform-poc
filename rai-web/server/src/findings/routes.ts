@@ -177,11 +177,12 @@ export function registerFindingsRoutes(fastify: FastifyInstance, deps: FindingsR
         },
       );
       if (outcome.status === 'unavailable') {
+        // The body carries the scope's QC-UNAVAILABLE finding (W0-07 3.6 / 3.8), never an empty list.
         return {
           runId: outcome.runId,
           status: 'unavailable' as const,
           reason: outcome.reason,
-          findings: [],
+          findings: outcome.findings,
         };
       }
       return {
