@@ -307,4 +307,48 @@ test.describe(`W2-INT reviewer workspace on the real server (${FIXTURE_SET}; fx-
       page.getByRole('status').filter({ hasText: t('th', 'review.decided.approve') }),
     ).toBeFocused();
   });
+
+  test('an unavailable run shows its QC-UNAVAILABLE finding under the notice; the owning lane can waive it there', async ({
+    page,
+  }, testInfo) => {
+    // W0-06 7.3 part 4 (recorded 2026-09-25): the outage finding belongs to the lane whose run saw it (W0-07 3.6).
+    await signInAsFixture(page, OWNER);
+    const caseId = await caseIdOf(page, NA_REASONS_CASE);
+    const draft = (await (await page.request.get(`/api/cases/${caseId}/draft`)).json()) as PackDraft;
+    const saved = await page.request.put(`/api/cases/${caseId}/draft`, {
+      data: {
+        expectedVersion: { versionId: draft.draftId, revision: draft.draftRevision },
+        slots: { 1: { state: 'not_yet' } },
+      },
+    });
+    expect(saved.status()).toBe(200);
+    const { draftRevision } = (await saved.json()) as PackDraft;
+    const submit = await page.request.post(`/api/cases/${caseId}/draft/submit`, {
+      data: { expectedVersion: { versionId: draft.draftId, revision: draftRevision } },
+      headers: { 'idempotency-key': crypto.randomUUID() },
+    });
+    expect(submit.status()).toBe(201);
+    const { versionId } = (await submit.json()) as { versionId: string };
+    await signOut(page);
+
+    await openAsReviewer(page, caseId, versionId);
+    await expect(page.locator('[data-review-qc="unavailable"]')).toBeVisible();
+    const rows = page.locator('[data-review-qc="findings"] [data-finding-id]');
+    await expect(rows).toHaveCount(1);
+    const row = rows.first();
+    await expect(row).toContainText(t('th', 'review.findings.slot_none'));
+    await expect(row.locator('[data-disposition-kind-action="waived"]')).toBeVisible();
+    await expectStatusElementsHaveText(page);
+    await expectAccessible(page, testInfo, { name: 'w2-int-07-outage-finding-th', lang: 'th' });
+
+    await row.locator('[data-disposition-kind-action="waived"]').click();
+    const dialog = page.getByRole('dialog', { name: t('th', 'review.disposition.reason.title') });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('textbox').fill('synthetic waiver: QC outage seen before deciding');
+    await dialog.getByRole('button', { name: t('th', 'review.disposition.reason.submit') }).click();
+    await expect(dialog).toBeHidden();
+    await expect(row.locator('[data-disposition-kind="waived"]')).toContainText(
+      t('th', 'review.disposition.waived'),
+    );
+  });
 });
