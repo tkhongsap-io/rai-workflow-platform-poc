@@ -158,6 +158,9 @@ test('OBS17: failed send-back and submit timeout correlate once; Admin keyboard 
             .filter({ has: page.getByRole('heading', { name: t(locale, heading), exact: true }) });
           const row = section.getByRole('listitem').filter({ has: page.getByText(id, { exact: true }) });
           await expect(row).toHaveCount(1);
+          // The QC outage row names the lane that owns it (W0-06 7.2): a submit outage belongs to AI/COE.
+          if (heading === 'operator.unavailable_qc')
+            await expect(row).toContainText(t(locale, 'lane.ai_coe'));
           const input = row.getByRole('textbox', {
             name: t(locale, 'operator.correlation_copy', { recordId: id }),
             exact: true,

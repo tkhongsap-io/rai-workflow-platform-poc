@@ -16,8 +16,6 @@ import {
   qcLateResult,
 } from '../db/schema/index.js';
 
-/** Caller must enforce operator.view. Recipient is authorized response data, never log data. */
-
 /** The lane an unavailable run's QC-UNAVAILABLE finding belongs to; upload runs (none in slice 1) are never guessed. */
 function owningLaneOfUnavailableRun(trigger: string, lane: string | null): Lane | undefined {
   if (trigger === 'approve_attempt' && lane !== null && (LANES as readonly string[]).includes(lane))
@@ -26,6 +24,7 @@ function owningLaneOfUnavailableRun(trigger: string, lane: string | null): Lane 
   return undefined;
 }
 
+/** Caller must enforce operator.view. Recipient is authorized response data, never log data. */
 export async function readDeskHealth(
   db: Db,
   readiness: ReadinessReport,

@@ -26,4 +26,8 @@ Worktree `/tmp/rai-dh-lane`, Postgres `rai-dh-lane` on 55371, one suite at a tim
 
 ## Reviewer verdicts
 
-Posted on the PR; recorded here after they land.
+| Round | Head | Correctness | Simplicity and records |
+|---|---|---|---|
+| 1 | `871d159` | BLOCKING only on six raw test logs committed at the repository root by mistake; code correct on all six checks | BLOCKING on the same logs; code correct |
+
+Round-1 fixes: the six logs are removed (`git rm`); the new helper sits above the "Caller must enforce operator.view" comment so the comment describes `readDeskHealth` again; the desk-health browser test also asserts the lane label on the Admin page in Thai and English (3 passed at 1440, 834 and 390 px). The `check:substitute-absent` line above comes from that command's own output (595 files, 0 markers), which was printed, not written to a log. The `LANES` membership check stays: it keeps the field out if a value is ever unexpected, at the cost of mirroring the database check.
