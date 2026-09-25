@@ -23,6 +23,9 @@ Worktree `/tmp/rai-w2-05` from `origin/main` `2d6cf13`, Postgres compose project
 | `npm run typecheck` | exit 0 |
 | `npm run test:unit` | 582 tests, 582 pass, 0 fail, 0 skipped |
 | `npm run test:integration` | 327 tests, 327 pass, 0 fail, 0 skipped |
+| `npm run build && npm run check:substitute-absent` | build exit 0; scanned 595 files, 0 with the marker |
+| `npm run test:browser:server` | 193 passed (7.5m), 0 failed, at 1440, 834 and 390 px |
+| `npm run test:browser:substitute` | 48 passed (30.1s) |
 | `node --test tests/*.test.mjs` (root) | 22 tests, 22 pass |
 | `node --test scripts/*.test.mjs` (root) | 18 tests, 18 pass |
 | `node scripts/check-links.mjs` (root) | 293 Markdown files, 801 relative links, 0 broken |

@@ -1,5 +1,15 @@
 # Development log
 
+## W2-05 owning-lane rule (#35) — 2026-09-25
+
+Ta accepted the five recommendations of the [#35 decision brief](changes/2026-09-23-w3-hardening/issue-35-decision-brief.md) and approved the register row "D05 refinement (#35)": slot 5 belongs to the lane whose QC rule raised the finding (on an approve attempt, that run's lane); slot 9 is informational, QC raises no defect there; the pack belongs to AI/COE; a QC-unavailable finding follows the run (the approving lane, or AI/COE on submit); nothing is carried to N+1. W0-06 sections 7.1-7.4 and W0-07 3.4-3.9 now state the rule.
+
+- **Behaviour changes:** an unavailable QC run stores the W0-07 3.6 `QC-UNAVAILABLE` finding, owned by the lane that saw it and appended once per open scope, so a case can no longer reach Ready after an outage until that lane dispositions it (A08); the run body and the reviewer workspace show the finding under the outage notice; a runner defect on slot 9 or outside the approving lane fails the run closed; the W1-10 substitute carries one slot-5 and one pack-level finding on `fx-case-missing-slot`. No migration. With no runner bound, every submit and approve attempt now yields such a finding (W0-07 3.6 as written).
+- **Code:** `owningLaneRule` and `unavailableOwningLane` replace `owningLaneForSlot`; `checkOwningLane` takes the run's lane; `owning_lane_rule_pending` and `refinement_pending` are gone.
+- **Verification** in the worktree, serially on its own Postgres: lint, typecheck, 582 unit, 327 integration, 193 real-server browser, 48 substitute browser, 22 + 18 repository tests, 801 links, source hash; all green, no skips. [Review](changes/2026-09-25-w2-05-owning-lane/review.md).
+
+Issue #35 and epic #53 close on merge. Ta's W3 package review and the Nakhun walkthrough are unchanged; the [walkthrough script](changes/2026-09-23-w3-hardening/walkthrough-script.md) notes the new outage finding. W4-W8 are not authorized.
+
 ## W3 hardening H1-H29 — 2026-09-25
 
 Most W2/W3 PRs (#90-#126) had merged without an independent review verdict. On Ta's instruction a retro-review of `main` at `d815a8e` confirmed 71 findings (5 high) and refuted 17. Batches H1-H23 (#128-#150) closed 67 of them, three with a leftover part deferred. Three were deferred to Ta and one was withdrawn. H24 (#151) fixed what the final verification found. H25-H29 (#152-#156) fixed defects found by running the Nakhun walkthrough for real. They include a false "Action failed" after a successful send-back, and send-back feedback that reached the owner only by mail. The feedback is now on the version read (a contract PR) and shown on the owner's successor draft. Also fixed: a duplicate lane-QC request that could make an approve 409, the draft editor being offered to users who cannot edit, and a focus race after lane decisions that was already on `main`. Each batch went through the full suite, two independent reviewer verdicts on the PR and green CI on the reviewed head. #136 had one reviewer before merge and a second after; see the review record.
