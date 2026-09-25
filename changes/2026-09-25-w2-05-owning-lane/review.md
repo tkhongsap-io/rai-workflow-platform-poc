@@ -14,7 +14,20 @@ Framed in [intent](intent.md), [spec](spec.md) and [plan](plan.md), written befo
 
 ## 2. Commands and results
 
-Filled in by Task 9 (clean run in the worktree `/tmp/rai-w2-05`, Postgres `rai-w2-05` on 55370).
+Worktree `/tmp/rai-w2-05` from `origin/main` `2d6cf13`, Postgres compose project `rai-w2-05` on 55370, `.env` from `.env.example` with the ports rewritten, `DATABASE_OPERATOR_URL` and `OBS_MIGRATION_ADMIN_URL` set as CI sets them. Run serially, one suite at a time on the database (an earlier overlap of two suites on one database produced spurious failures; see section 4).
+
+| Command (from `rai-web/` unless noted) | Result |
+|---|---|
+| `npm run migrate` | applied 9 migration(s), 0 already applied |
+| `npm run lint` | exit 0 (eslint, prettier, check-css) |
+| `npm run typecheck` | exit 0 |
+| `npm run test:unit` | 582 tests, 582 pass, 0 fail, 0 skipped |
+| `npm run test:integration` | 327 tests, 327 pass, 0 fail, 0 skipped |
+| `node --test tests/*.test.mjs` (root) | 22 tests, 22 pass |
+| `node --test scripts/*.test.mjs` (root) | 18 tests, 18 pass |
+| `node scripts/check-links.mjs` (root) | 293 Markdown files, 801 relative links, 0 broken |
+| `node scripts/check-frozen-source.mjs` (root) | source-spec sha256 `92c4f712…` matches |
+| `git diff --check` (root) | clean |
 
 ## 3. Reviewer verdicts
 
@@ -22,7 +35,17 @@ Two independent reviewer agents post on the PR; recorded here with the head they
 
 ## 4. Rulings and exceptions
 
-From the execution ledger; each names its cost if wrong.
+Decisions taken during execution, each with its cost if wrong. None changes the recorded rule.
+
+- **Worktree by `git worktree add` at `/tmp/rai-w2-05`** rather than the app's managed worktree: the approved plan names the path and a per-change Postgres, the hardening convention. Cost: cleanup is manual.
+- **No true integration baseline.** The baseline run started after Task 1 had removed `owningLaneForSlot`, so it measured the edit, not `main`; the reference is main's CI run 36041409928 and the hardening's clean-checkout 316/316. Cost: an environment failure could have been misread; the serial Task 9 run (327/327) is the record.
+- **`findLatestUnavailableFinding` lives in `findings/repository.ts`** beside `latestDisposition`, not in `qc/repository.ts` as the plan said: `findings/repository.ts` already imports `qc/repository.ts`, and the plan's placement would have made an ESM cycle. Cost: one import path.
+- **The lane-QC route built its unavailable body with `findings: []`**; it now passes the outcome's findings through. Cost: none; the response schema already typed the array.
+- **Three scripted-runner unit tests and one W2-05 integration test encoded the old posture** (one finding on that submit; a pack finding throws; a slot-5 finding is invalid; the late-finding test used a slot-5 finding). Each was updated with the spec citation; the construction guard is now proven with slot 9 and the late test with a lane mismatch, so no test lost its intent.
+- **The W2-05 invalid-finding loop was reordered** so the refused case runs before the slot-5 case on the same lane: a completed approve-attempt run replays for the next case (W0-07 3.7), which would have masked the mismatch.
+- **Two suites on one database.** The first run of the new integration file overlapped with the background full run on Postgres 55370; both truncate the same tables. The three failures (an owner submit 403, two fixture-reset duplicate keys) vanished on a serial rerun (9/9; the slot-9 case 1/1 alone), and the one failure in that background run (`w3-int-browser-lifecycle`, 500 on a built child) passed 10/10 alone on a settled build. Rule: one suite at a time per database; Task 9 ran serially.
+- **No UI code change.** The reviewer workspace already lists every stored finding owned by the viewing lane under the outage notice (`laneFindings` over GET …/findings, loaded after the run). The view-model unit test the plan named was dropped for a browser test that proves it end to end at three widths.
+- **`w2-int-09-disposition.spec.ts` changed expectation** (Done-when 7): `fx-case-missing-slot` now raises the AI/COE pack-level finding on submit and the DPO's slot-5 finding on its approve attempt, so the journey lists both, has each owning lane waive its finding by API, and sorts the list before comparing because the two submit findings share a timestamp. The reason is in the test's comments.
 
 ## 5. Remaining boundaries
 
