@@ -1,5 +1,8 @@
 # Development log
 
+## W3 deferred rulings — 2026-09-26
+
+Ta ruled on the questions the W3 hardening review and the walkthrough script had left open (register row "W3 deferred rulings"). W0-07 now states the refusing behaviour for QC evidence after a send-back, which the code already had. Seven follow-up tickets are open under package W3 (#163-#169): display names, three notification fixes, one Thai term for desk completion, and two small clean-ups. [Review](changes/2026-09-26-w3-deferred-rulings/review.md).
 ## W3-07 follow-up: desk-health owning lane — 2026-09-26
 
 The Admin desk-health list now names the lane that owns each QC outage (W0-06 7.2, derived from the run), closing the follow-up W2-05 recorded. Tests pin a DPO approve-attempt outage and a real submit timeout (AI/COE). 582 unit, 329 integration, 193 + 48 browser. [Review](changes/2026-09-26-desk-health-owning-lane/review.md).

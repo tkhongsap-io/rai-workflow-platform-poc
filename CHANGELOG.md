@@ -2,6 +2,7 @@
 
 ## 2026-09-26
 
+- Ta ruled on the W3 deferred questions (register row "W3 deferred rulings"); W0-07 amended for QC after a send-back; follow-up tickets #163-#169 opened.
 - W3-07 follow-up: the Admin desk-health list names the lane that owns each QC outage.
 - W3 accepted by Ta after the synthetic walkthrough with Nakhun (no change requested); milestone M3 reached, epic #54 closed. W4-W8 remain gated.
 
