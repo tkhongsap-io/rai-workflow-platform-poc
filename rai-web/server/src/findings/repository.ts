@@ -1,11 +1,17 @@
 // W2-05: qc_finding / disposition_event reads and appends, and the one definition of a finding's latest disposition.
-import { and, asc, desc, eq, isNotNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { QueryBuilder } from 'drizzle-orm/pg-core';
 import type { Lane } from '@rai/shared/constants';
-import type { DispositionKind, FindingWithDisposition } from '@rai/shared/schemas/review';
+import type { QcTrigger } from '@rai/shared/qc/types';
+import type {
+  DispositionKind,
+  FindingWithDisposition,
+  StoredFindingSummary,
+} from '@rai/shared/schemas/review';
 import type { Executor, Tx } from '../db/client.js';
 import { dispositionEvent } from '../db/schema/disposition-event.js';
 import { qcFinding } from '../db/schema/qc-finding.js';
+import { qcRun } from '../db/schema/qc-run.js';
 import { packVersion } from '../db/schema/pack-version.js';
 import { storedFindingSummary, type QcFindingRow } from '../qc/repository.js';
 
@@ -67,6 +73,42 @@ export async function listFindingsForVersion(
     ...storedFindingSummary(row.finding),
     latestDisposition: row.latestDisposition as DispositionKind | null,
   }));
+}
+
+export interface LatestUnavailableFinding {
+  summary: StoredFindingSummary;
+  undispositioned: boolean;
+}
+
+/**
+ * The latest QC-UNAVAILABLE finding for one version, trigger and lane, with whether it is still open. The scope
+ * key of W0-07 3.6 is `run:${trigger}:${lane}`, which the finding's run row carries; dedup (3.4 step 6) appends a
+ * new finding only when this one is dispositioned or absent.
+ */
+export async function findLatestUnavailableFinding(
+  exec: Executor,
+  versionId: string,
+  trigger: QcTrigger,
+  lane: Lane | null,
+): Promise<LatestUnavailableFinding | undefined> {
+  const [row] = await exec
+    .select({ finding: qcFinding, open: undispositioned })
+    .from(qcFinding)
+    .innerJoin(qcRun, eq(qcFinding.runId, qcRun.id))
+    .leftJoinLateral(latestDisposition, sql`true`)
+    .where(
+      and(
+        eq(qcFinding.versionId, versionId),
+        eq(qcFinding.kind, 'unavailable'),
+        eq(qcRun.trigger, trigger),
+        lane === null ? isNull(qcRun.lane) : eq(qcRun.lane, lane),
+      ),
+    )
+    .orderBy(desc(qcFinding.createdAt), desc(qcFinding.id))
+    .limit(1);
+  return row === undefined
+    ? undefined
+    : { summary: storedFindingSummary(row.finding), undispositioned: row.open };
 }
 
 /** Latest submitted version id for a case (max version_number among submitted rows). */

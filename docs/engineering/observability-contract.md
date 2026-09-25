@@ -118,7 +118,7 @@ Names are stable identifiers: W8 alert rules and the W3-07 tests match on them, 
 | `upload.stored` | info | `caseId`, `artifactId`, `contentHash`, `sizeBytes`, `mediaType` (no slot: the attach is a later `draft.saved`) | W1-03 |
 | `qc.run.started` | info | `qcRunId`, `caseId`, `versionId`, `trigger` (`upload` / `submit` / `approve_attempt`, the W0-04 column values; W0-09 aligned the labels), `lane?` (the `approve_attempt` lane; registered at W0-09), `qcKind` (`substitute` in slice 1) | W1-10, W2-05 |
 | `qc.run.completed` | info | `qcRunId`, `findingCount`, `durationMs` | W1-10, W2-05 |
-| `qc.run.unavailable` | error | `qcRunId`, `caseId`, `versionId`, `reason` (`timeout` / `runner_error` / `not_configured` / `artifact_unreadable`, the W0-07 `QcUnavailableReason`; W0-09 aligned the values), `owningLane?` (absent until W0-06 section 7.3 records the rule for `unavailable` findings) | W1-10, W2-05; the `qc_unavailable` capture |
+| `qc.run.unavailable` | error | `qcRunId`, `caseId`, `versionId`, `reason` (`timeout` / `runner_error` / `not_configured` / `artifact_unreadable`, the W0-07 `QcUnavailableReason`; W0-09 aligned the values), `owningLane?` (the QC-unavailable finding's lane under W0-06 7.3 as recorded on 2026-09-25; absent only when no finding was stored, for instance a late run) | W1-10, W2-05; the `qc_unavailable` capture |
 | `qc.run.late` | warn | `qcRunId`, `caseId`, `versionId`, `trigger`, `lane?`, `status` (`completed` / `unavailable`), `refusedFindingCount`; emitted once when the orchestrator refuses to append a run's findings because the version is already Ready (W0-06 section 6; W0-07 3.4 step 6). Registered at W0-09 on W0-06's requirement and W0-07's proposal | W2-05, W2-06 |
 | `mail.enqueued` | info | `notificationId`, `eventType` (`lane_open` / `send_back` / `ready` / `sla_breach_digest`, the W0-04 `notification.event` values), `caseId?`, `versionId?`, `lane?`, `recipientCount` | W3-03 |
 | `mail.deduplicated` | info | `eventType` (the W0-04 values above), `caseId?`, `versionId?`, `lane?`, `existingNotificationId` | W3-04 |
@@ -260,7 +260,7 @@ Every error that reaches the Fastify error handler goes through `captureError(er
 | `stale_version` | 409 | info | `route`, `caseId`, `expectedVersionId`, `currentVersionId` | no | yes | Normal concurrency; also `workflow.stale_version` |
 | `invalid_input` | 422 | info | `route`, `fieldPaths[]` | no | yes | Field paths only (`"pack.slots[2].reason"`), never values |
 | `unsafe_upload` | 422 | warn | `route`, `caseId`, `slot?`, `reason` (W0-08 vocabulary), `sniffedMediaType?`, `declaredMediaType?`, `sizeBytes` | no | yes | Also `upload.rejected`; bytes are already discarded (W0-08); never the filename |
-| `qc_unavailable` | 503 | error | `route`, `qcRunId`, `caseId`, `versionId`, `reason`, `owningLane?` | no | yes | Also `qc.run.unavailable`; the run row (and, once W0-06 7.3 is recorded, the finding row) is the durable record, the log is the trace. Reachable only from a synchronous QC endpoint, none in slice 1 (W0-06 8.1) |
+| `qc_unavailable` | 503 | error | `route`, `qcRunId`, `caseId`, `versionId`, `reason`, `owningLane?` | no | yes | Also `qc.run.unavailable`; the run row and the QC-unavailable finding row are the durable record, the log is the trace. Reachable only from a synchronous QC endpoint, none in slice 1 (W0-06 8.1) |
 | `mail_delivery_failed` | 502 | error | `notificationId`, `attempts`, `errorCode` | no | yes | Recorded on the notification record (W0-07); never returned to the business action that already committed. Captured from the W3-04 job, not from a request |
 | `not_found` | 404 | info | `route`, `targetType` | no | yes | In-scope reference that does not exist; confirmed by W0-06 8.1 |
 | `internal_error` | 500 | error | `route`, `stackHash`, `stack` | yes, sanitized | yes | Anything else, including database and `openid-client` failures. The response carries `code: 'internal_error'`, `error.internal_error` and the correlation ID only (W0-06 8.1) |
@@ -323,7 +323,7 @@ export interface DeskHealthReport {
     qcRunId: string; caseId: string; versionId: string;
     trigger: 'upload' | 'submit' | 'approve_attempt';   // W0-04 qc_run.trigger
     reason: 'timeout' | 'runner_error' | 'not_configured' | 'artifact_unreadable';   // W0-07 QcUnavailableReason
-    owningLane?: 'ai_coe' | 'dpo' | 'it_security';       // from the QC-unavailable finding once W0-06 7.3 is recorded (W0-07 3.6)
+    owningLane?: 'ai_coe' | 'dpo' | 'it_security';       // the QC-unavailable finding's lane (W0-07 3.6); not yet filled by the desk-health query, a W3-07 follow-up
     requestedAt: string;                                // W0-04 qc_run.requested_at
     correlationId: CorrelationId;
   }>;
@@ -373,7 +373,7 @@ Substitutes are loaded only under the test configuration; the evidence configura
 | OBS-07 | integration | A lane decision that commits a notification (W3-03) yields a notification record whose `correlation_id` equals the audit event's; a decision that rolls back (forced stale version) yields neither row and no `mail.enqueued` line with that ID |
 | OBS-08 | integration | A lane-approval attempt that triggers the QC substitute (W2-05) writes a QC run whose `correlation_id` equals the request's |
 | OBS-09 | integration | With `failAlways()` on the mail sink, a send-back produces exactly one `failedMail` entry in `GET /api/operator/desk-health`, `mail.failed` appears exactly once in the log, and both carry the same `correlationId`; `mail.attempt_failed` appears three times with `attempt` 1-3 and `mail.failed` carries `attempts: 4` (first send plus three retries, D06) |
-| OBS-10 | integration | With `simulateTimeout()` on the QC substitute, a submit produces exactly one `unavailableQc` entry and exactly one `qc.run.unavailable` line with the same `correlationId`; the `qc_run` row exists with `status = 'unavailable'`, and the QC-unavailable finding row with its `owning_lane` once W0-06 section 7.3 is recorded (W0-07 3.6) |
+| OBS-10 | integration | With `simulateTimeout()` on the QC substitute, a submit produces exactly one `unavailableQc` entry and exactly one `qc.run.unavailable` line with the same `correlationId`; the `qc_run` row exists with `status = 'unavailable'`, and the QC-unavailable finding row with its `owning_lane` (W0-07 3.6; W0-06 7.3 recorded 2026-09-25) |
 | OBS-11 | integration | A forced digest failure at each `stage` writes an `operator_job_run` row and one `sla.digest.failed` line with the same `correlationId`, and the view's `slaDigest.recentFailures` lists it |
 | OBS-12 | integration | `GET /api/operator/desk-health` is 401 without a session, 403 for each of the five non-Admin fixture roles (including the dual-role fixture identity), 200 for Admin |
 | OBS-13 | integration | Each of the eight contract codes, forced in turn, produces one `error.captured` line with the correct `category`, `httpStatus` and level, an `X-Correlation-Id` header, and a body `correlationId` equal to it; `invalid_input` logs `fieldPaths` and no submitted value; `unsafe_upload` logs no filename |

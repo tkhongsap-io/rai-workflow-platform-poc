@@ -44,12 +44,43 @@ export function slotsForLane(lane: Lane, mapping: LaneMapping = CURRENT_LANE_MAP
   return [...mapping.slotsByLane[lane]];
 }
 
+/** W0-06 7.3 part 3, recorded 2026-09-25: pack-level findings are AI/COE's. */
+export const PACK_OWNING_LANE: Lane = 'ai_coe';
+
+/** W0-06 section 7: who owns a `defect` finding of the given scope under the mapping recorded on its version. */
+export type OwningLaneRule =
+  | { kind: 'lane'; lane: Lane } // a single-lane slot (7.1), or the pack (7.3 part 3)
+  | { kind: 'raising_lane'; lanes: readonly Lane[] } // slot 5: the lane whose rule raised it (7.3 part 1)
+  | { kind: 'no_defects' }; // slot 9: informational only, QC raises no defect (7.3 part 2)
+
+export function owningLaneRule(
+  scope: { kind: 'pack' } | { kind: 'slot' | 'artifact'; slot: Slot },
+  mapping: LaneMapping,
+): OwningLaneRule {
+  if (scope.kind === 'pack') return { kind: 'lane', lane: PACK_OWNING_LANE };
+  const lanes = lanesForSlot(scope.slot, mapping);
+  if (lanes.length === 1) return { kind: 'lane', lane: lanes[0]! };
+  if (lanes.length === 0) return { kind: 'no_defects' };
+  return { kind: 'raising_lane', lanes };
+}
+
 /**
- * W0-06 section 7.1, verbatim: a `defect` finding on a single-lane slot (1, 2, 3, 4, 6, 7, 8) is owned by the one
- * lane that reviews it under the mapping recorded on the finding's version. Slots 5 and 9 return
- * `'refinement_pending'` until the review leads record W0-06 section 7.3; no finding is ever stored with that value.
+ * W0-06 7.3 part 4: a QC-unavailable finding follows the run that saw the outage. Only an upload run needs the
+ * mapping (the slot's lane), so an unknown mapping never turns a submit or approve-attempt outage into an error.
  */
-export function owningLaneForSlot(slot: Slot, mapping: LaneMapping): Lane | 'refinement_pending' {
-  const lanes = lanesForSlot(slot, mapping);
-  return lanes.length === 1 ? lanes[0]! : 'refinement_pending'; // slots 5 and 9: section 7.3
+export function unavailableOwningLane(
+  run:
+    | { trigger: 'approve_attempt'; lane: Lane }
+    | { trigger: 'submit'; lane: null }
+    | { trigger: 'upload'; slot: Slot },
+  mapping?: LaneMapping,
+): Lane {
+  if (run.trigger === 'approve_attempt') return run.lane;
+  if (run.trigger === 'submit') return PACK_OWNING_LANE;
+  if (mapping === undefined) throw new Error("an unavailable upload run needs the version's lane mapping");
+  const rule = owningLaneRule({ kind: 'slot', slot: run.slot }, mapping);
+  if (rule.kind === 'lane') return rule.lane;
+  throw new Error(
+    `owning lane for an unavailable upload run on slot ${run.slot} is defined with upload QC (W4)`,
+  );
 }

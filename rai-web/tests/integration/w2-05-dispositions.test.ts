@@ -1,8 +1,9 @@
 // W2-05 Done when (A09 / D05 / W0-06 §7.4 single-lane only): synthetic single-lane defect from the W1-10
 // substitute can be dispositioned append-only. Reason required for waived/N/A; non-owning lane 403; owner's
 // fixed stays proposed until owning lane confirms; finding bytes unchanged after disposition; second event
-// appends; unavailable stores qc_run status=unavailable with zero findings. #35 stays open (slot-5 / pack /
-// unavailable owning lane blocked until §7.3). Ready is W2-06. Fixture set slice1-synthetic@1.
+// appends; unavailable stores qc_run status=unavailable plus the QC-UNAVAILABLE finding owned per W0-06 7.3 as
+// recorded on 2026-09-25 (#35; the category cases are in w2-05-owning-lane.test.ts). Ready is W2-06. Fixture set
+// slice1-synthetic@1.
 
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -188,7 +189,11 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
     assert.deepEqual(await runAndPersistSubmitQc(deps, input), first);
     assert.equal(calls, 1);
     assert.equal(first.status, 'unavailable');
-    assert.deepEqual(first.findings, []);
+    // W0-07 3.6 / W0-06 7.3 (2026-09-25): an unavailable submit run stores its finding, owned by the pack owner.
+    assert.equal(first.findings.length, 1);
+    assert.equal(first.findings[0]!.ruleId, 'QC-UNAVAILABLE');
+    assert.equal(first.findings[0]!.slot, null);
+    assert.equal(first.findings[0]!.owningLane, 'ai_coe');
     const rows = await db.owner.execute(
       sql`SELECT trigger, lane, unavailable_reason, correlation_id FROM qc_run WHERE id = ${first.runId}`,
     );
@@ -469,8 +474,7 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
     assert.ok(rows.rows.length >= 1);
     for (const row of rows.rows as Array<{ owning_lane: string; kind: string; slot: number }>) {
       assert.equal(row.kind, 'defect');
-      assert.notEqual(row.owning_lane, 'refinement_pending');
-      assert.ok([1, 2, 3, 4, 6, 7, 8].includes(row.slot));
+      assert.ok([1, 2, 3, 4, 6, 7, 8].includes(row.slot)); // fx-case-vendor scripts single-lane findings only
     }
   });
 
@@ -745,13 +749,17 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
     assert.equal(firstBody.status, 'unavailable');
     assert.equal(firstBody.reason, 'not_configured');
     assert.ok(firstBody.runId);
-    assert.equal(firstBody.findings.length, 0);
+    // W0-07 3.6 (rule recorded 2026-09-25): not_configured stores the QC-UNAVAILABLE finding, owned by the run's lane.
+    assert.equal(firstBody.findings.length, 1);
+    assert.equal(firstBody.findings[0]!.ruleId, 'QC-UNAVAILABLE');
+    assert.equal(firstBody.findings[0]!.owningLane, 'ai_coe');
 
     const second = await runLaneQc(ai, VENDOR.caseId, version.versionId, 'ai_coe', revision);
     assert.equal(second.statusCode, 200);
     const secondBody = second.body as LaneQcRunResponse;
     assert.equal(secondBody.status, 'unavailable');
     assert.equal(secondBody.runId, firstBody.runId);
+    assert.equal(secondBody.findings[0]!.findingId, firstBody.findings[0]!.findingId);
     assert.equal(
       capture
         .lines()
@@ -773,22 +781,23 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
     assert.equal(runs.rows.length, 1);
     assert.equal((runs.rows[0] as { status: string }).status, 'unavailable');
     assert.equal((runs.rows[0] as { engine_id: string }).engine_id, 'unbound');
+    // W0-07 3.6 (rule recorded 2026-09-25): the unbound run stores its one QC-UNAVAILABLE finding and records it.
     const findings = await db.owner.execute(
-      sql`SELECT id FROM qc_finding WHERE version_id = ${version.versionId}`,
+      sql`SELECT id, kind FROM qc_finding WHERE version_id = ${version.versionId}`,
     );
-    assert.equal(findings.rows.length, 0);
+    assert.deepEqual(findings.rows, [{ id: firstBody.findings[0]!.findingId, kind: 'unavailable' }]);
     const audits = await db.owner.execute(sql`
       SELECT target_ref->>'finding_count' AS finding_count
       FROM audit_event
       WHERE action = 'qc.run_recorded' AND target_version_id = ${version.versionId}
     `);
     assert.equal(audits.rows.length, 1);
-    assert.equal((audits.rows[0] as { finding_count: string }).finding_count, '0');
+    assert.equal((audits.rows[0] as { finding_count: string }).finding_count, '1');
 
     await rebuildApp();
   });
 
-  it('unavailable result stores qc_run status=unavailable with zero findings and returns runId', async () => {
+  it('unavailable result stores qc_run status=unavailable plus the QC-UNAVAILABLE finding and returns runId', async () => {
     const owner = await signIn(OWNER_A);
     const version = await submitOk(owner, VENDOR.caseId);
     const revision = await caseRevision(VENDOR.caseId);
@@ -799,12 +808,16 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
     const body = qc.body as LaneQcRunResponse;
     assert.equal(body.status, 'unavailable');
     assert.ok(body.runId);
-    assert.equal(body.findings.length, 0);
+    // W0-07 3.6 (rule recorded 2026-09-25): the outage is a stored finding of kind unavailable, never zero findings.
+    assert.equal(body.findings.length, 1);
+    assert.equal(body.findings[0]!.ruleId, 'QC-UNAVAILABLE');
 
     const findings = await db.owner.execute(
-      sql`SELECT id FROM qc_finding WHERE version_id = ${version.versionId}`,
+      sql`SELECT id, kind, owning_lane FROM qc_finding WHERE version_id = ${version.versionId}`,
     );
-    assert.equal(findings.rows.length, 0);
+    assert.deepEqual(findings.rows, [
+      { id: body.findings[0]!.findingId, kind: 'unavailable', owning_lane: 'ai_coe' },
+    ]);
     const runs = await db.owner.execute(
       sql`SELECT id, status FROM qc_run WHERE version_id = ${version.versionId}`,
     );
@@ -948,12 +961,14 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
     ]);
   });
 
-  it('a slot-5 or lane-mismatched runner finding records the run unavailable runner_error with no findings', async () => {
+  it('a lane-mismatched runner finding records the run unavailable runner_error plus the QC-UNAVAILABLE finding; slot 5 stores', async () => {
     const owner = await signIn(OWNER_A);
     const version = await submitOk(owner, VENDOR.caseId);
     const cases = [
-      { lane: 'ai_coe', slot: 5, owningLane: 'ai_coe', stored: false }, // slot 5: owning lane pending (#35)
+      // Order matters: a completed ai_coe run would replay for the next ai_coe case (W0-07 3.7); the refused
+      // run is retried, so the slot-5 case still runs fresh.
       { lane: 'ai_coe', slot: 1, owningLane: 'dpo', stored: false }, // slot 1 belongs to ai_coe
+      { lane: 'ai_coe', slot: 5, owningLane: 'ai_coe', stored: true }, // slot 5: the raising lane (W0-06 7.3, 2026-09-25)
       { lane: 'dpo', slot: 2, owningLane: 'dpo', stored: true }, // control: the same finding shape is valid
     ] as const;
     for (const { lane, slot, owningLane, stored } of cases) {
@@ -974,14 +989,14 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
         assert.equal(findings.rows.length, 1);
         continue;
       }
-      assert.deepEqual(outcome, {
-        status: 'unavailable',
-        reason: 'runner_error',
-        runId: outcome.runId,
-        findings: [],
-      });
+      assert.equal(outcome.status, 'unavailable');
+      assert.equal(outcome.reason, 'runner_error');
+      // W0-07 3.6: the refused run leaves the QC-UNAVAILABLE finding, owned by the approving lane.
+      assert.equal(outcome.findings.length, 1);
+      assert.equal(outcome.findings[0]!.ruleId, 'QC-UNAVAILABLE');
+      assert.equal(outcome.findings[0]!.owningLane, lane);
       assert.deepEqual(run.rows, [{ status: 'unavailable', unavailable_reason: 'runner_error' }]);
-      assert.equal(findings.rows.length, 0);
+      assert.equal(findings.rows.length, 1);
       const settled = capture
         .lines()
         .filter(
@@ -1018,7 +1033,7 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
           async run(request) {
             enter();
             await gate;
-            return slotMissingResult(request, 5, 'ai_coe'); // slot 5: owning lane pending (#35)
+            return slotMissingResult(request, 1, 'dpo'); // slot 1 belongs to ai_coe: an owning-lane mismatch
           },
         },
       },
@@ -1036,6 +1051,11 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
       sql`SELECT status, refused_finding_count FROM qc_late_result WHERE version_id=${version.versionId}`,
     );
     assert.deepEqual(late.rows, [{ status: 'unavailable', refused_finding_count: 0 }]);
+    // A late run writes nothing: not even the QC-UNAVAILABLE finding (W0-07 3.4 step 6).
+    const lateFindings = await db.owner.execute(
+      sql`SELECT id FROM qc_finding WHERE version_id = ${version.versionId} AND kind = 'unavailable'`,
+    );
+    assert.equal(lateFindings.rows.length, 0);
     const logged = capture
       .lines()
       .filter((line) => line.event === 'qc.run.late' && line.correlationId === correlationId);

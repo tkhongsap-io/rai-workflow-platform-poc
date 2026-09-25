@@ -1,4 +1,4 @@
-// W0-04 `qc_finding`: append-only. owning_lane is NOT NULL; W2-05 stores only single-lane defects (W0-06 7.1).
+// W0-04 `qc_finding`: append-only. owning_lane is NOT NULL and follows W0-06 section 7 as recorded on 2026-09-25 (#35).
 import { sql } from 'drizzle-orm';
 import {
   check,

@@ -99,8 +99,9 @@ test('returns the slot-scoped PACK-SLOT-MISSING finding on submit of fx-case-mis
   const runner = new ScriptedQcRunner();
   const { request } = buildRequest('fx-case-missing-slot', { trigger: 'submit' });
   const result = completed(await runner.run(request, new AbortController().signal));
-  assert.equal(result.findings.length, 1);
-  const finding = result.findings[0]!;
+  // Two since W0-06 7.3 was recorded (2026-09-25): the slot-7 omission and the pack-level PACK-STAGE-MISMATCH.
+  assert.equal(result.findings.length, 2);
+  const finding = result.findings.find((f) => f.ruleId === 'PACK-SLOT-MISSING')!;
   assert.equal(finding.ruleId, 'PACK-SLOT-MISSING');
   assert.deepEqual(finding.scope, { kind: 'slot', slot: 7 });
   assert.equal(finding.owningLane, 'it_security');
@@ -156,7 +157,7 @@ test('fixtureCaseIdOf resolves a row id to a fixture case (the W2-05 binding)', 
   });
   const { request } = buildRequest('fx-case-missing-slot', { trigger: 'submit', caseId: 'row-42' });
   const result = completed(await runner.run(request, new AbortController().signal));
-  assert.equal(result.findings.length, 1);
+  assert.equal(result.findings.length, 2); // slot-7 omission plus the pack-level finding (W0-06 7.3, 2026-09-25)
 });
 
 test('unavailable on demand, for every trigger, with no lane and a safe detail', async () => {
@@ -327,20 +328,32 @@ test('script() adds findings for a selector, validated like a bundled script, an
   const vendor = buildRequest('fx-case-vendor', { trigger: 'approve_attempt', lane: 'ai_coe' });
   assert.deepEqual(completed(await runner.run(vendor.request, new AbortController().signal)).findings, []);
 
+  // W0-06 7.3 recorded 2026-09-25: a pack-level finding owned by AI/COE is valid; slot 9 still carries no defects.
+  runner.script({ fixtureCaseId: 'fx-case-hr-dualrole', trigger: 'submit' }, [
+    {
+      ruleId: 'PACK-STAGE-MISMATCH',
+      scope: { kind: 'pack' },
+      severity: 'medium',
+      owningLane: 'ai_coe',
+      evidence: [{ slot: null, locator: { kind: 'absent' } }],
+      measure: null,
+      message: { key: 'qc.finding.pack_stage_mismatch', params: {} },
+    },
+  ]);
   assert.throws(
     () =>
       runner.script({ fixtureCaseId: 'fx-case-hr-dualrole', trigger: 'submit' }, [
         {
-          ruleId: 'PACK-STAGE-MISMATCH',
-          scope: { kind: 'pack' } as never,
+          ruleId: 'PACK-SLOT-MISSING',
+          scope: { kind: 'slot', slot: 9 },
           severity: 'medium',
           owningLane: 'ai_coe',
-          evidence: [{ slot: null, locator: { kind: 'absent' } }],
+          evidence: [{ slot: 9, locator: { kind: 'absent' } }],
           measure: null,
-          message: { key: 'qc.finding.pack_slot_missing', params: {} },
+          message: { key: 'qc.finding.pack_slot_missing', params: { slot: 9 } },
         },
       ]),
-    (err: QcScriptError) => err instanceof QcScriptError && err.code === 'scope_pack_forbidden',
+    (err: unknown) => err instanceof QcScriptError && err.code === 'scope_slot_9_informational',
   );
 });
 

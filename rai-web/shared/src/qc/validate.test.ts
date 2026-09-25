@@ -113,21 +113,37 @@ test('a conforming finding validates; each step-4 rule has a named violation; no
   );
 });
 
-test('step 5: owning lane per W0-06 7.1; slot 5, slot 9 and pack are rule_pending until 7.3 is recorded', () => {
-  assert.equal(checkOwningLane(finding, LANE_MAPPING_V1), null);
-  assert.equal(checkOwningLane({ ...finding, owningLane: 'dpo' }, LANE_MAPPING_V1), 'owning_lane_mismatch');
+test('step 5: owning lane per W0-06 7.1 and the 7.3 rule recorded 2026-09-25', () => {
+  // single-lane slot (7.1): `finding` is slot 7, it_security
+  assert.equal(checkOwningLane(finding, LANE_MAPPING_V1, null), null);
   assert.equal(
-    checkOwningLane({ ...finding, scope: { kind: 'slot', slot: 5 } }, LANE_MAPPING_V1),
-    'owning_lane_rule_pending',
+    checkOwningLane({ ...finding, owningLane: 'dpo' }, LANE_MAPPING_V1, null),
+    'owning_lane_mismatch',
+  );
+  // slot 5: any reviewing lane on submit; on an approve attempt only that run's lane
+  const slot5 = { ...finding, scope: { kind: 'slot', slot: 5 } as const };
+  assert.equal(checkOwningLane({ ...slot5, owningLane: 'dpo' }, LANE_MAPPING_V1, null), null);
+  assert.equal(checkOwningLane({ ...slot5, owningLane: 'dpo' }, LANE_MAPPING_V1, 'dpo'), null);
+  assert.equal(
+    checkOwningLane({ ...slot5, owningLane: 'dpo' }, LANE_MAPPING_V1, 'it_security'),
+    'finding_outside_lane',
+  );
+  // slot 9: informational only
+  assert.equal(
+    checkOwningLane({ ...finding, scope: { kind: 'slot', slot: 9 } }, LANE_MAPPING_V1, null),
+    'owning_lane_slot_informational',
+  );
+  // pack: AI/COE
+  assert.equal(
+    checkOwningLane({ ...finding, scope: { kind: 'pack' }, owningLane: 'ai_coe' }, LANE_MAPPING_V1, null),
+    null,
   );
   assert.equal(
-    checkOwningLane({ ...finding, scope: { kind: 'slot', slot: 9 } }, LANE_MAPPING_V1),
-    'owning_lane_rule_pending',
+    checkOwningLane({ ...finding, scope: { kind: 'pack' }, owningLane: 'dpo' }, LANE_MAPPING_V1, null),
+    'owning_lane_mismatch',
   );
-  assert.equal(
-    checkOwningLane({ ...finding, scope: { kind: 'pack' } }, LANE_MAPPING_V1),
-    'owning_lane_rule_pending',
-  );
+  // a single-lane finding on another lane's approve attempt is outside that lane
+  assert.equal(checkOwningLane(finding, LANE_MAPPING_V1, 'dpo'), 'finding_outside_lane');
 });
 
 test('QcRunResultSchema accepts both result shapes and rejects a lane or findings on an unavailable result', () => {

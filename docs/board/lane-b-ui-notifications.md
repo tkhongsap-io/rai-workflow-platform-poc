@@ -121,3 +121,15 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=w3-03b-digest-consumer model=codex
 - Scope: producer, persisted-provenance loader, standalone local scheduling hook and tests; dispatcher binding awaits parent confirmation. No other lane takeover.
 - Evidence: changes/2026-09-22-w3-03b-digest-consumer/plan.md
+
+## 2026-09-25 20:05 — CLAIM lane-b: W2-05 owning-lane rule (#35)
+- Author: operator=ta session=claude-code-w2-05-owning-lane model=claude-fable-5-1
+- Takes over from: session=none (reason: new; the ticket was status:ready and blocked on W0-06 7.3)
+- Scope: the rule Ta accepted on 2026-09-25, per changes/2026-09-25-w2-05-owning-lane/. One PR.
+
+## 2026-09-25 22:30 — W2-05 owning-lane rule implemented (#35)
+- What: Ta accepted the five #35 recommendations and approved the register row "D05 refinement (#35)". One rule function replaces the pending placeholder; the QC boundary enforces it with the run's lane; an outage stores the QC-UNAVAILABLE finding owned by the lane that saw it, once per open scope, and Ready waits for that lane's disposition; the W1-10 substitute carries one slot-5 and one pack-level finding; W0-06 7.1-7.4 and W0-07 3.4-3.9 state the rule.
+- Why: W2-05's done-when named a slot-5, a pack-level and an unavailable case that were blocked on W0-06 7.3; the hardening walkthrough showed a case reaching Ready after a QC outage.
+- Next: reviewer verdicts and CI on the PR; on merge close #35 and epic #53 and mark W2-05 evidence-recorded. Ta's W3 package review and the Nakhun walkthrough are unchanged; the walkthrough script notes the new outage finding.
+- Author: operator=ta session=claude-code-w2-05-owning-lane model=claude-fable-5-1
+- Evidence: changes/2026-09-25-w2-05-owning-lane/review.md; PR on `codex/w2-05-owning-lane`

@@ -1,5 +1,7 @@
 # Decision brief: who owns a finding that no single lane owns (issue #35)
 
+> **Decided 2026-09-25.** Ta accepted all five recommendations; the register row "D05 refinement (#35)" in [decisions.md](../../docs/product/decisions.md) is the record, and [W0-06 section 7.3](../../docs/engineering/workflow-transition-and-error-contract.md) carries the rule. Implemented in [changes/2026-09-25-w2-05-owning-lane](../2026-09-25-w2-05-owning-lane/review.md). The brief below is kept as written.
+
 For Ta and the review leads (AI/COE, DPO, IT/Security). One decision, five parts. It is a refinement inside D05, so it needs a register row with approver and date; agents do not decide it.
 
 ## Why it matters now
@@ -15,7 +17,7 @@ Nakhun can see this in the walkthrough: changing the risk-screening slot on some
 
 ## The five parts, with a recommendation for each
 
-The full option table is in [docs/engineering/workflow-transition-and-error-contract.md section 7.3](../../docs/engineering/workflow-transition-and-error-contract.md#73-open-d05-refinement-the-review-leads-record-before-w2-05).
+The full option table is in [docs/engineering/workflow-transition-and-error-contract.md section 7.3](../../docs/engineering/workflow-transition-and-error-contract.md#73-recorded-d05-refinement-2026-09-25).
 
 | # | Finding on… | Recommended | Why | Alternatives |
 |---|---|---|---|---|

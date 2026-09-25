@@ -258,7 +258,7 @@ export function materializeFindings(
   const requestSlots = new Set(request.slots.map((s) => s.slot));
   const applicable =
     request.trigger === 'upload'
-      ? entry.findings.filter((f) => requestSlots.has(f.scope.slot))
+      ? entry.findings.filter((f) => f.scope.kind !== 'pack' && requestSlots.has(f.scope.slot))
       : entry.findings;
   const mapping = LANE_MAPPINGS_BY_VERSION[request.laneMappingVersion];
   if (mapping === undefined)
@@ -293,22 +293,24 @@ export function materializeFindings(
       message: { key: scripted.message.key, params: { ...scripted.message.params } },
       provenance: { runner: provenance.runner, runnerVersion: provenance.runnerVersion },
     };
-    const violation = validateQcFinding(finding, request) ?? checkOwningLane(finding, mapping);
+    const violation = validateQcFinding(finding, request) ?? checkOwningLane(finding, mapping, request.lane);
     if (violation !== null) throw new QcScriptError(violation, where);
     return finding;
   });
 }
 
 function resolveScope(scripted: ScriptedFinding, request: QcRunRequest, where: string): FindingScope {
-  if (scripted.scope.kind === 'slot') {
-    if (!request.slots.some((s) => s.slot === scripted.scope.slot))
+  const { scope } = scripted;
+  if (scope.kind === 'pack') return { kind: 'pack' };
+  if (scope.kind === 'slot') {
+    if (!request.slots.some((s) => s.slot === scope.slot))
       throw new QcScriptError('slot_not_in_request', where);
-    return { kind: 'slot', slot: scripted.scope.slot };
+    return { kind: 'slot', slot: scope.slot };
   }
-  const ref = attachedArtifact(request, scripted.scope.slot, where);
+  const ref = attachedArtifact(request, scope.slot, where);
   return {
     kind: 'artifact',
-    slot: scripted.scope.slot,
+    slot: scope.slot,
     artifactId: ref.artifactId,
     contentHash: ref.contentHash,
   };

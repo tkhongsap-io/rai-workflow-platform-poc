@@ -4,13 +4,7 @@
 // body.kind → action mapping. History remains the existing version read (immutable). Synthetic fixtures only.
 
 import { authorize, type Action } from '@rai/server/authz/policy';
-import {
-  LANE_MAPPINGS_BY_VERSION,
-  LANES,
-  owningLaneForSlot,
-  slotsForLane,
-  type Lane,
-} from '@rai/shared/constants';
+import { LANE_MAPPINGS_BY_VERSION, LANES, slotsForLane, type Lane } from '@rai/shared/constants';
 import { ForbiddenError, InvalidInputError, NotFoundError, UnauthenticatedError } from '@rai/shared/errors';
 import { uuidv7 } from '@rai/shared/ids';
 import type {
@@ -93,23 +87,23 @@ function decisionResponse(
   };
 }
 
-/** Keep only defect findings whose slot maps to a real owning lane (no slot 5 / 9 / pack / unavailable). */
+/** Keep only defect findings that pass the boundary checks for this lane's run (W0-06 section 7 as recorded). */
 function storeableFindings(
   findings: readonly QcFinding[],
   mappingVersion: string,
-  context: { trigger: 'approve_attempt'; qcRulesRevision: string; checklistTemplateVersion: string },
+  context: {
+    trigger: 'approve_attempt';
+    lane: Lane;
+    qcRulesRevision: string;
+    checklistTemplateVersion: string;
+  },
 ): QcFinding[] {
   const mapping = LANE_MAPPINGS_BY_VERSION[mappingVersion];
   if (mapping === undefined) return [];
   const out: QcFinding[] = [];
   for (const finding of findings) {
     if (validateQcFinding(finding, context) !== null) continue;
-    const laneCheck = checkOwningLane(finding, mapping);
-    if (laneCheck !== null) continue;
-    const slot =
-      finding.scope.kind === 'slot' || finding.scope.kind === 'artifact' ? finding.scope.slot : null;
-    if (slot === null) continue;
-    if (owningLaneForSlot(slot, mapping) === 'refinement_pending') continue;
+    if (checkOwningLane(finding, mapping, context.lane) !== null) continue;
     out.push(finding);
   }
   return out;
@@ -274,6 +268,7 @@ async function runLaneQc(
 
   const kept = storeableFindings(result.findings, version.laneMappingVersion, {
     trigger: 'approve_attempt',
+    lane,
     qcRulesRevision: version.configurationRevisionId,
     checklistTemplateVersion: version.checklistTemplateVersion,
   });

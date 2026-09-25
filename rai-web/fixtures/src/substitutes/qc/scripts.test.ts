@@ -1,14 +1,15 @@
-// W0-07 section 3.9 rows "schema conformance" and "owning lane follows W0-06 7.1 only", plus the W0-06 7.4 posture:
+// W0-07 section 3.9 rows "schema conformance" and "owning lane follows W0-06 section 7" as recorded on 2026-09-25:
 // every bundled script finding passes the shared validator once materialised; a finding carrying document text or a
-// malformed excerptHash fails; every script finding sits on a single-lane slot with the mapped owning lane; a script
-// with a slot-5, slot-9, pack-level, run-scoped or QC-UNAVAILABLE finding throws at construction; the reserved
-// W0-07 3.5 rule ids are absent; message keys are locale keys in both catalogues (D12).
+// malformed excerptHash fails; every script finding carries the lane owningLaneRule gives its scope (slot 5: a
+// reviewing lane, the run's lane on an approve attempt; pack: AI/COE); a script with a slot-9, run-scoped or
+// QC-UNAVAILABLE finding throws at construction; PACK-CONTRADICTION has no fixture yet; message keys are locale keys
+// in both catalogues (D12).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { LANE_MAPPINGS_BY_VERSION, owningLaneForSlot } from '@rai/shared/constants';
+import { LANE_MAPPINGS_BY_VERSION, owningLaneRule } from '@rai/shared/constants';
 import { LOCALE_CATALOGUES, isLocaleKey } from '@rai/shared/locales/keys';
 import type { QcFinding } from '@rai/shared/qc/types';
 import { checkOwningLane, validateQcFinding } from '@rai/shared/qc/validate';
@@ -22,8 +23,9 @@ const SCRIPTED_RULE_IDS = [
   'ACC-EXTRACTION-NOT-HALLUCINATION',
   'ACC-BAND-V1-SHEET3',
   'ACC-CLASSIC-ML-METRIC',
+  'PACK-STAGE-MISMATCH', // W0-06 7.3 recorded 2026-09-25: pack-level, AI/COE
 ];
-const RESERVED_RULE_IDS = ['PACK-STAGE-MISMATCH', 'PACK-CONTRADICTION', 'QC-UNAVAILABLE']; // W0-07 3.5, W0-06 7.3
+const RESERVED_RULE_IDS = ['PACK-CONTRADICTION', 'QC-UNAVAILABLE']; // W0-07 3.5: no fixture yet; orchestrator-only
 
 function baseScript(finding: Record<string, unknown>): Record<string, unknown> {
   return {
@@ -91,7 +93,7 @@ test('schema conformance: every materialised bundled finding passes the shared v
       assert.equal(result.findings.length, entry.findings.length, `${script.fixtureCaseId}/${entry.trigger}`);
       for (const finding of result.findings) {
         assert.equal(validateQcFinding(finding, built.request), null, finding.findingKey);
-        assert.equal(checkOwningLane(finding, mapping), null, finding.findingKey);
+        assert.equal(checkOwningLane(finding, mapping, entry.lane ?? null), null, finding.findingKey);
         checked += 1;
       }
     }
@@ -153,37 +155,41 @@ test('a finding carrying an excerpt (document text) or a malformed excerptHash f
   wrongLane.owningLane = 'dpo';
   assert.equal(validateQcFinding(wrongLane, request), null, 'step 4 passes; step 5 catches it');
   assert.equal(
-    checkOwningLane(wrongLane, LANE_MAPPINGS_BY_VERSION['lane-mapping/v1']!),
+    checkOwningLane(wrongLane, LANE_MAPPINGS_BY_VERSION['lane-mapping/v1']!, null),
     'owning_lane_mismatch',
   );
 });
 
-test('owning lane follows W0-06 7.1 only: every script finding is on a single-lane slot with the mapped lane', () => {
+test('owning lane follows W0-06 section 7 as recorded: every script finding satisfies owningLaneRule for its scope', () => {
   let count = 0;
+  let shared = 0;
   for (const script of BUNDLED_QC_SCRIPTS) {
     const mapping = LANE_MAPPINGS_BY_VERSION[script.laneMappingVersion]!;
     for (const entry of script.entries) {
       for (const finding of entry.findings) {
         count += 1;
-        assert.ok(finding.scope.kind === 'artifact' || finding.scope.kind === 'slot');
-        assert.ok(
-          [1, 2, 3, 4, 6, 7, 8].includes(finding.scope.slot),
-          `slot ${finding.scope.slot} is single-lane`,
-        );
-        assert.equal(finding.owningLane, owningLaneForSlot(finding.scope.slot, mapping));
+        const rule = owningLaneRule(finding.scope, mapping);
+        assert.notEqual(rule.kind, 'no_defects', 'slot 9 carries no defects');
+        if (rule.kind === 'lane') assert.equal(finding.owningLane, rule.lane);
+        if (rule.kind === 'raising_lane') {
+          shared += 1;
+          assert.ok(rule.lanes.includes(finding.owningLane));
+        }
         if (entry.trigger === 'approve_attempt') assert.equal(finding.owningLane, entry.lane);
         assert.ok(SCRIPTED_RULE_IDS.includes(finding.ruleId), finding.ruleId);
-        assert.ok(
-          !RESERVED_RULE_IDS.includes(finding.ruleId),
-          `${finding.ruleId} is reserved until W0-06 7.3`,
-        );
+        assert.ok(!RESERVED_RULE_IDS.includes(finding.ruleId), `${finding.ruleId} has no fixture`);
         for (const evidence of finding.evidence) assert.ok(!('excerpt' in evidence));
       }
     }
   }
-  assert.ok(count >= 6);
-  // The five scripted families of W0-07 3.5 all appear with the severities that section states.
+  assert.ok(count >= 8);
+  assert.equal(shared, 1, 'one slot-5 finding is scripted (fx-case-missing-slot, dpo approve attempt)');
   const all = BUNDLED_QC_SCRIPTS.flatMap((s) => s.entries.flatMap((e) => e.findings));
+  assert.ok(
+    all.some((f) => f.scope.kind === 'pack'),
+    'one pack-level finding is scripted',
+  );
+  // The six scripted families of W0-07 3.5 all appear with the severities that section states.
   for (const ruleId of SCRIPTED_RULE_IDS)
     assert.ok(
       all.some((f) => f.ruleId === ruleId),
@@ -197,21 +203,41 @@ test('owning lane follows W0-06 7.1 only: every script finding is on a single-la
   }
 });
 
-test('the substitute throws at construction on slot 5, slot 9, pack, run scope, QC-UNAVAILABLE or a wrong lane', () => {
-  const slot5 = { ...goodSlotFinding, scope: { kind: 'slot', slot: 5 }, owningLane: 'ai_coe' };
+test('the substitute accepts slot-5 and pack findings with the recorded lane; throws on slot 9, run scope, QC-UNAVAILABLE or a wrong lane', () => {
+  // W0-06 7.3 recorded 2026-09-25: slot 5 belongs to a reviewing lane, the pack to AI/COE.
+  const slot5 = {
+    ...goodSlotFinding,
+    scope: { kind: 'slot', slot: 5 },
+    owningLane: 'dpo',
+    evidence: [{ slot: 5, locator: { kind: 'absent' } }],
+  };
+  assert.equal(validateScript(baseScript(slot5)).entries[0]!.findings[0]!.owningLane, 'dpo');
+  const pack = {
+    ...goodSlotFinding,
+    ruleId: 'PACK-STAGE-MISMATCH',
+    scope: { kind: 'pack' },
+    owningLane: 'ai_coe',
+    evidence: [{ slot: null, locator: { kind: 'absent' } }],
+    message: { key: 'qc.finding.pack_stage_mismatch', params: {} },
+  };
+  assert.deepEqual(validateScript(baseScript(pack)).entries[0]!.findings[0]!.scope, { kind: 'pack' });
   assert.equal(
-    codeOf(() => validateScript(baseScript(slot5))),
-    'scope_slot_5_pending_w0_06_7_3',
+    codeOf(() => validateScript(baseScript({ ...pack, owningLane: 'dpo' }))),
+    'owning_lane_mismatch',
   );
   const slot9 = { ...goodSlotFinding, scope: { kind: 'slot', slot: 9 }, owningLane: 'ai_coe' };
   assert.equal(
     codeOf(() => validateScript(baseScript(slot9))),
-    'scope_slot_9_pending_w0_06_7_3',
+    'scope_slot_9_informational',
   );
-  const pack = { ...goodSlotFinding, scope: { kind: 'pack' }, owningLane: 'ai_coe' };
+  // On an approve attempt a slot-5 finding must belong to that run's lane.
+  const slot5OutsideLane = {
+    ...baseScript(slot5),
+    entries: [{ trigger: 'approve_attempt', lane: 'it_security', findings: [slot5] }],
+  };
   assert.equal(
-    codeOf(() => validateScript(baseScript(pack))),
-    'scope_pack_forbidden',
+    codeOf(() => validateScript(slot5OutsideLane)),
+    'finding_outside_lane',
   );
   const run = { ...goodSlotFinding, scope: { kind: 'run', trigger: 'submit', lane: null } };
   assert.equal(

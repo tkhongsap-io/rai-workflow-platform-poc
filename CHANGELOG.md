@@ -2,6 +2,8 @@
 
 ## 2026-09-25
 
+- W2-05 (#35): the owning-lane rule for slot-5, slot-9, pack-level and QC-unavailable findings is recorded (register row "D05 refinement (#35)") and implemented. An unavailable QC run now stores a `QC-UNAVAILABLE` finding owned by the lane that saw it, once per open scope; Ready waits for that lane's disposition. The substitute scripts one slot-5 and one pack-level finding. No migration.
+
 - W3 hardening (#127-#156): retro-review of the unreviewed W2/W3 PRs, with 71 confirmed findings: 67 fixed (three with a leftover part deferred), 3 deferred to Ta and 1 withdrawn.
   - Approve requires the latest lane-QC run.
   - QC fails closed on findings with no owning lane.

@@ -54,6 +54,20 @@ async function seedAiCoeFindings(page: Page, caseId: string, versionId: string):
   expect(body.findings.length).toBeGreaterThan(0);
 }
 
+/** Waives one finding as its owning lane over the API, with a reason (D05). */
+async function waiveByApi(page: Page, user: string, caseId: string, versionId: string, findingId: string) {
+  await signInAsFixture(page, user);
+  const waived = await page.request.post(`/api/cases/${caseId}/findings/${findingId}/dispositions`, {
+    data: {
+      expectedVersion: { versionId, revision: 1 },
+      kind: 'waived',
+      reason: 'synthetic waiver so the lane journey can reach Ready',
+    },
+    headers: { 'idempotency-key': crypto.randomUUID() },
+  });
+  expect(waived.status(), await waived.text()).toBe(201);
+}
+
 /** Runs the lane's QC and approves with that run, as a reviewer who saw it would. */
 async function approveByApi(page: Page, user: string, caseId: string, versionId: string, lane: string) {
   await signInAsFixture(page, user);
@@ -193,21 +207,34 @@ test.describe(`W2-INT disposition UI on the real server (${FIXTURE_SET})`, () =>
   }, testInfo) => {
     const { caseId, versionId } = await submitCase(page, MISSING_SLOT_CASE);
     const findingsPath = `/api/cases/${caseId}/versions/${versionId}/findings`;
-    // Submit QC runs after the submit response; wait until its it_security finding is stored.
+    // Submit QC runs after the submit response; wait until its findings are stored. Since W0-06 7.3 was recorded
+    // (2026-09-25) the script also raises the pack-level PACK-STAGE-MISMATCH, owned by AI/COE.
+    const listFindings = async () => {
+      const response = await page.request.get(findingsPath);
+      expect(response.status(), await response.text()).toBe(200);
+      return (await response.json()) as {
+        findings: { findingId: string; ruleId: string; owningLane: string }[];
+      };
+    };
     await expect
-      .poll(
-        async () => {
-          const listed = (await (await page.request.get(findingsPath)).json()) as {
-            findings: { ruleId: string; owningLane: string }[];
-          };
-          return listed.findings.map((f) => `${f.ruleId}/${f.owningLane}`);
-        },
-        { timeout: 15_000 },
-      )
-      .toEqual(['PACK-SLOT-MISSING/it_security']);
+      .poll(async () => (await listFindings()).findings.map((f) => `${f.ruleId}/${f.owningLane}`).sort(), {
+        timeout: 15_000,
+      })
+      .toEqual(['PACK-SLOT-MISSING/it_security', 'PACK-STAGE-MISMATCH/ai_coe']);
+    const packFinding = (await listFindings()).findings.find((f) => f.ruleId === 'PACK-STAGE-MISMATCH')!;
     await signOut(page);
     await approveByApi(page, AI_COE, caseId, versionId, 'ai_coe');
+    // AI/COE dispositions its pack-level finding (W0-06 7.3 part 3).
+    await waiveByApi(page, AI_COE, caseId, versionId, packFinding.findingId);
     await approveByApi(page, DPO, caseId, versionId, 'dpo');
+    // The DPO's lane QC raises the scripted slot-5 finding it owns (7.3 part 1); it dispositions that one too,
+    // so only IT/Security's finding then stands between the case and Ready.
+    await signInAsFixture(page, DPO); // approveByApi signs out
+    const slot5Finding = (await listFindings()).findings.find(
+      (f) => f.ruleId === 'ACC-METRIC-CITED' && f.owningLane === 'dpo',
+    )!;
+    expect(slot5Finding).toBeTruthy();
+    await waiveByApi(page, DPO, caseId, versionId, slot5Finding.findingId);
 
     await signInAsFixture(page, IT_SEC);
     await page.goto(`/cases/${caseId}/versions/${versionId}`);
