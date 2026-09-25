@@ -43,3 +43,14 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: the tickets through the reviewed flow, #163 (display names) first.
 - Author: operator=ta session=claude-code-w3-deferred-rulings model=claude-opus-5-5
 - Evidence: PR on `codex/w3-deferred-rulings`
+
+## 2026-09-26 02:19 — CLAIM lane-decisions-and-docs
+- Author: operator=ta session=w4-gate-briefs model=claude-opus-5-5
+- Takes over from: session=none (reason: new)
+
+## 2026-09-26 02:40 — W4 gate material drafted (D08, D09 briefs; draft W4 tickets)
+- What: draft decision briefs for D08 (W4 part) and D09, with D07/D10 notes, related questions for Ta and a draft W4 gate entry; a draft W4 ticket breakdown with a W4a/W4b option for Ta. Nothing decided; W4 not authorized.
+- Why: Ta's instruction of 2026-09-26, after accepting W3, to prepare the next package's gate material.
+- Next: Ta names the AI/COE lead and IT/Security owner; the owners review the briefs; Ta records D08, D09 and the W4 gate entry, or asks for changes.
+- Author: operator=ta session=w4-gate-briefs model=claude-opus-5-5
+- Evidence: changes/2026-09-26-w4-gate-briefs/, branch codex/w4-gate-briefs
