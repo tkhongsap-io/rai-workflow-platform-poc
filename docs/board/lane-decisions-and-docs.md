@@ -53,4 +53,4 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Why: Ta's instruction of 2026-09-26, after accepting W3, to prepare the next package's gate material.
 - Next: Ta names the AI/COE lead and IT/Security owner; the owners review the briefs; Ta records D08, D09 and the W4 gate entry, or asks for changes.
 - Author: operator=ta session=w4-gate-briefs model=claude-opus-5-5
-- Evidence: changes/2026-09-26-w4-gate-briefs/, branch codex/w4-gate-briefs
+- Evidence: https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/171

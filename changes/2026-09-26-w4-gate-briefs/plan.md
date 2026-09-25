@@ -5,4 +5,4 @@
 3. **Write** the two delivery documents on branch `codex/w4-gate-briefs`, created from `origin/main`.
 4. **Link** them from the delivery README and the later-packages outline without changing any other text.
 5. **Check** from the repository root: `node scripts/check-links.mjs`, `node scripts/check-frozen-source.mjs`, `git diff --check`, and prettier `--check` on the new files only.
-6. **Commit** on the branch. No push, PR or merge; the branch goes back to Ta.
+6. **Commit** on the branch. The coordinator opened it as PR #171; revisions are pushed to the same branch. No merge from this session; merging follows the D03 reviewed-ticket flow.

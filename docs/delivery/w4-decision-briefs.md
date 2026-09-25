@@ -2,14 +2,14 @@
 
 Status: **draft decision material, prepared 2026-09-26 on Ta's instruction. Nothing here is decided.** D08 and D09 are open in the [decision register](../product/decisions.md), which is the only record of a decision. W4 is **not authorized**: D03 covers W0-W3 only, and [BUILD_PLAN](../../BUILD_PLAN.md) W4 needs D08 and D09 resolved before probabilistic QC, plus a W4 gate entry by Ta. Every "recommendation" below is an agent's proposal for the owners to accept, change or refuse. It is not evidence of a decision.
 
-This pack follows the house format of the [G0 decision briefs](g0-decision-briefs.md). The draft ticket list that consumes these decisions is the [W4 work breakdown](w4-work-breakdown.md).
+This pack follows the house format of the [G0 decision briefs](g0-decision-briefs.md). The draft ticket list that consumes these decisions is the [W4 work breakdown](w4-work-breakdown.md). The "already fixed" rules each brief relies on are in the [appendix](#appendix-what-is-already-fixed), so the briefs can start with what each owner has to answer.
 
-| ID  | Status           | Owners (approve)                                    | Records | Tickets that would consume it            |
-| --- | ---------------- | --------------------------------------------------- | ------- | ---------------------------------------- |
-| D08 | Open             | DPO (Montri Stapornkul) + IT/Security (to be named) | Ta      | W4-01, W4-05, W4-07, W4-11; later W7     |
-| D09 | Open             | AI/COE lead (to be named) + lane experts            | Ta      | W4-01, W4-06, W4-08, W4-09, W4-10, W4-14 |
-| D07 | Open, later gate | AI/COE                                              | Ta      | W5 only                                  |
-| D10 | Open, later gate | IT/Security + accountable owner                     | Ta      | Networked tests, W8                      |
+| ID  | Status           | Owners (approve)                                    | Records | Tickets that would consume it                          |
+| --- | ---------------- | --------------------------------------------------- | ------- | ------------------------------------------------------ |
+| D08 | Open             | DPO (Montri Stapornkul) + IT/Security (to be named) | Ta      | W4-00, W4-01, W4-05, W4-07, W4-11b, W4-14; later W7    |
+| D09 | Open             | AI/COE lead (to be named) + lane experts            | Ta      | W4-00, W4-01, W4-06, W4-07, W4-08, W4-09, W4-10, W4-14 |
+| D07 | Open, later gate | AI/COE                                              | Ta      | W5 only                                                |
+| D10 | Open, later gate | IT/Security + accountable owner                     | Ta      | Networked tests, W8                                    |
 
 Two owner seats are empty. [Team and roles](team-and-roles.md) lists the AI/COE lead and IT/Security as "to be named". Neither D08 nor D09 can be approved until Ta names them. That is the first step, before any option below matters.
 
@@ -32,156 +32,156 @@ Facts from the repository, so the owners do not have to re-derive them:
 
 ## D08 — model and data handling, as it bears on W4
 
-**Question for DPO and IT/Security.** Under what data-handling rules may W4 run extraction and, if approved, a model behind the QC port? The register row for D08 covers retention, real-data permission, model-provider data handling and upload limits for real data, due "before real data or model processing (W4 probabilistic QC, W7)". This brief covers only what W4 needs. The real-data part can be answered later, at the W7 gate.
+### What we need from you
 
-**Why it blocks W4.** BUILD_PLAN W4 entry says D08 model/data handling must be resolved before probabilistic QC. The [threat model](../security/threat-model.md) says data use, retention, deletion, model provider, transfer region, telemetry and subprocessors need review before real-case ingestion. [ADR-0003](../../adr/0003-stack-and-deployment-boundary.md) leaves "in-process or worker" open for W4. The [ADR index](../../adr/README.md) reserves ADR-0006 (QC boundary and model data handling) for the W4 gate, recording D08 and D09.
+| Who                           | Questions to answer                                                                              | By when                                                       |
+| ----------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
+| **DPO** (Montri Stapornkul)   | 1 (which data may reach a model), 3 (what is kept)                                               | Before Ta's W4 gate entry (before W4b under the split option) |
+| **IT/Security** (to be named) | 2 (provider and hosting), 4 (logging), 5 (parser isolation), 6 (who holds the API key during W4) | Same gate                                                     |
+| **Both**                      | Approve the wording of the D08 row Ta writes                                                     | Same gate                                                     |
 
-**What is already fixed (not open here).**
+In plain terms: may W4 send anything to an AI model, which model service may it use, what may be kept or logged, how the desk opens documents safely, and who holds the key to the model service while W4 runs on a developer's machine.
 
-| Source                                                                                                 | Rule                                                                                                                                                                  |
-| ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D03 register row                                                                                       | Synthetic data only until D08 permits real data                                                                                                                       |
-| Source spec, "v1 locked decisions" L7 and L8                                                           | QC is soft; Ready is a server predicate, never a QC output                                                                                                            |
-| [W0-07](../engineering/qc-boundary-and-mail-sink.md) 3.1                                               | The runner gets read handles to authorized artifacts only; no database, session or HTTP client; output is typed data; no document text leaves the runner              |
-| W0-07 3.4 step 4                                                                                       | Output carrying document text, or an invalid shape, becomes `unavailable:runner_error`, never a finding                                                               |
-| [Observability contract](../engineering/observability-contract.md) section 4                           | Log fields are an allow-list; document text, filenames and secrets never reach a log line                                                                             |
-| [Upload safety](../engineering/upload-safety-and-fixtures.md) section 3                                | Synthetic-data limits: 25 MiB per file, 150 MiB per pack version, 40 MP images, ZIP caps. Raising them for real data is a D08 change                                  |
-| Upload safety section 10                                                                               | D08 revisit list: real-data limits, embedded PDF files, OLE embeddings, malware scanner or parsing worker, rejected-upload retention, blob deletion, library detector |
-| [Persistence](../engineering/persistence-and-artifact-store.md#retention-and-deletion-options-for-d08) | Three deletion options (redaction event, key destruction, tombstone); none chosen; ADR-0005 at the D08 gate                                                           |
-| Threat model                                                                                           | No secrets in prompts; injection and exfiltration probes; outage never shown as clean evidence                                                                        |
+**Scope of this brief.** D08 in the register covers retention, real-data permission, model-provider data handling and upload limits for real data. This brief asks only for the **W4 part**. The real-data part (real upload limits, malware scanning, rejected-upload retention and blob deletion; [upload safety](../engineering/upload-safety-and-fixtures.md) section 10 and the [W0-04 deletion options](../engineering/persistence-and-artifact-store.md#retention-and-deletion-options-for-d08)) stays open for the W7 gate, before the first real case. Splitting D08 this way is itself a proposal for Ta and the owners.
 
-**Unknown to this repository.** Whether True or CP Group has an approved enterprise agreement with any model provider, which hosting regions or tenancies are permitted, what data classification case documents carry, and whether a host malware scanner exists. IT/Security and the DPO would know. Nothing below assumes an answer.
+**Why it blocks W4.** BUILD_PLAN W4 entry says D08 model/data handling must be resolved before probabilistic QC. The [threat model](../security/threat-model.md) requires review of data use, model provider, transfer region, telemetry and subprocessors. D08 sets what is permitted. ADR-0006 ([ADR index](../../adr/README.md)) then records the engine choice **within** what D08 permits; it cannot widen it.
 
-**Open questions, with options.**
+**Unknown to this repository.** Whether True or CP Group has an approved enterprise agreement with any model provider, which hosting regions or tenancies are permitted, what data classification case documents carry, and whether True has a secret store engineers can use before D10. IT/Security and the DPO would know. Nothing below assumes an answer.
+
+### Open questions
 
 1. **Which data may reach a model in W4?**
-   - (a) None. W4 is deterministic checks and extraction only; no model is called. Simplest; some rules (contradictions across documents) may stay weak or unimplemented.
-   - (b) Synthetic fixtures only. A model may be called in development, CI and the evaluation harness on synthetic documents. Real documents wait for the W7 part of D08. Lets D09 measure a model honestly without exposing anything real.
-   - (c) Real case documents after minimisation (for example, only the extracted checklist cells, never whole files). Most realistic evaluation; needs the full real-data part of D08 now, which pulls W7 decisions into W4.
+   - (a) None; W4 is deterministic checks and extraction only. _Trade-off:_ nothing leaves the machine, but cross-document rules may stay weak.
+   - (b) Synthetic fixtures only, in development and the evaluation harness. _Trade-off:_ D09 can measure a model honestly; real documents wait for W7.
+   - (c) Minimised real content, such as extracted checklist cells. _Trade-off:_ most realistic evaluation, but pulls the W7 real-data decision into W4.
 
 2. **Provider and hosting, if a model is allowed.**
-   - (a) No external provider. A model runs on a host True controls, or no model at all. Keeps data in place; capability and operating cost are unknown.
-   - (b) An external API provider under an enterprise agreement, with no training on inputs and a stated retention period. Strongest models; depends on an agreement whose existence is unknown here.
-   - (c) A cloud-hosted model inside a tenancy and region True controls. Middle ground; depends on what IT/Security already operates, also unknown here.
+   - (a) No external provider: a model on a True-controlled host, or no model. _Trade-off:_ data stays in place; capability and running cost unknown.
+   - (b) An external API provider under enterprise terms (no training on inputs, stated retention). _Trade-off:_ strongest models; depends on an agreement whose existence is unknown here.
+   - (c) A cloud-hosted model in a True-controlled tenancy and region. _Trade-off:_ middle ground; depends on what IT/Security already runs, also unknown.
 
-3. **Retention of QC inputs and outputs.** The desk already stores run rows and findings with locators and hashes only.
-   - (a) Keep nothing else. Prompts, extracted text and raw model responses are discarded after the run; the provider must also retain nothing. Smallest footprint; a disputed finding cannot be replayed from stored text, only re-run.
-   - (b) Keep raw outputs for synthetic evaluation runs only, as evaluation artefacts outside the desk database. Gives D09 the evidence it needs without widening the desk's data.
-   - (c) Keep raw outputs for real runs too, for a fixed window in a restricted store. Best for audit of a disputed finding; adds a retention schedule, a deletion path and a new store to protect.
+3. **What is kept from QC runs.** The desk already stores run rows and findings with locators and hashes only.
+   - (a) Nothing more; prompts, extracted text and raw responses are discarded, and the provider keeps nothing. _Trade-off:_ smallest footprint; a disputed finding can only be re-run, not replayed.
+   - (b) Raw outputs of synthetic evaluation runs, kept as evaluation artefacts outside the desk database. _Trade-off:_ gives D09 its evidence without widening the desk's data.
+   - (c) Raw outputs of every run, for a fixed window in a restricted store. _Trade-off:_ best for disputes; adds a retention schedule, deletion path and store to protect.
 
-4. **Logging and redaction for model calls.**
-   - (a) Log identities and numbers only: model, prompt revision, rule revision, token counts, latency, cost, outcome. No content. Extends the allow-list; no new risk.
-   - (b) As (a), plus content logging in local development on synthetic data only. Easier debugging; one misconfiguration away from logging real text later.
-   - (c) Accept provider-side logging or abuse monitoring. Often a provider default; whether it is acceptable is a provider-terms question for IT/Security.
+4. **Logging for model calls.**
+   - (a) Identities and numbers only: model, prompt and rule revision, tokens, latency, cost, outcome. _Trade-off:_ extends the existing allow-list; no content risk.
+   - (b) As (a), plus content logging on synthetic data in local development. _Trade-off:_ easier debugging; one misconfiguration from logging real text later.
+   - (c) As (a), and accept the provider's own logging or abuse monitoring. _Trade-off:_ often a provider default; acceptable only if IT/Security accepts the provider's terms.
 
-5. **Parsing isolation and upload safety for extraction.** W4 is the first code that parses document bytes. Upload safety section 2.4 states that slice 1 parses nothing.
-   - (a) Parse in process with pure-JavaScript parsers, synthetic data only. Fewest moving parts; a parser bug runs inside the server that holds the database connection.
-   - (b) Parse in a separate worker process with memory, time and output limits and no database or network access. ADR-0003 already allows this; the W0-07 port permits it.
-   - (c) Parse in a separate sandboxed service or container. Strongest isolation; adds deployment weight that D10 would have to approve.
+5. **How the desk opens documents.** W4 is the first code that parses document contents; slice 1 reads only file headers (upload safety section 2.4).
+   - (a) Parse in the server process with pure-JavaScript parsers. _Trade-off:_ fewest parts; a parser bug runs next to the database connection.
+   - (b) Parse in a separate worker process with memory, time and output limits and no database or network. _Trade-off:_ ADR-0003 and the W0-07 port already allow it; one more process to run.
+   - (c) Parse in a separate sandboxed service or container. _Trade-off:_ strongest isolation; hosting weight that D10 would have to approve.
 
-6. **Real-data upload limits, malware scanning and deletion.** These are the W0-08 section 10 items and the W0-04 deletion options.
-   - (a) Answer them now with the W4 part.
-   - (b) Split D08: answer questions 1-5 for W4 now; answer this question at the W7 gate, before the first real case.
-   - (c) Answer them at W7 and keep W4 strictly synthetic, with no D08 row until then. Delays the model question too.
+6. **Who holds the model-service API key during W4?** Options 2(b) and 2(c) mean **outbound HTTPS calls from a localhost machine and an API key during W4**, before D10 settles production custody.
+   - (a) One named engineer, on their own machine, in a local environment file outside the repository; CI uses a mocked provider only. _Trade-off:_ simplest and keeps CI offline; one person runs every recorded evaluation.
+   - (b) The same key also in the CI secret store, so CI runs the evaluation. _Trade-off:_ repeatable runs; CI becomes an outbound path and a secret holder, a CI change agents may not make.
+   - (c) IT/Security holds the key and runs the recorded evaluations. _Trade-off:_ strongest custody; slows every iteration.
 
-**Recommendation (proposal only; not decided).** Record D08 in two parts. For the W4 part: 1(b), 2 left to ADR-0006 once IT/Security names what is permitted, 3(b), 4(a), 5(b) and 6(b). This keeps W4 fully synthetic, lets D09 measure real behaviour, and adds one isolation boundary before the desk parses bytes. If IT/Security cannot name a permitted provider, 1(a) is the fallback, and W4 proceeds as deterministic checks plus extraction only.
+   In every option the key is issued by IT/Security for synthetic use only, spend-capped and revoked at W4 exit, and never committed.
 
-**What recording it changes.** A D08 register row (or a "D08, W4 part" row), with the real-data part kept open. ADR-0006 data-handling section. Upload safety section 10 (items ticked or carried). Threat-model rows for prompt data, provider and parser isolation. The observability catalogue (new model-call fields, all identities or numbers). TESTING.md (what the W4 suites prove). BUILD_PLAN W4 gate entry (below).
+### Recommendation (proposal only; not decided)
 
-**Who records it.** Ta records the row. The DPO and IT/Security approve its wording. Nothing is recorded until IT/Security is named.
+1(b), 2(b) **only if** IT/Security can confirm a provider whose terms exclude training and state retention (otherwise 1(a) and no model), 3(b), 4(a), 5(b) and 6(a). This keeps W4 fully synthetic, lets D09 measure real behaviour, and adds one isolation boundary before the desk parses documents. Be clear about what 2(b) means: during W4, a developer machine on localhost makes outbound calls to the provider with a key held under question 6.
 
-**Consumed by.** W4-01, W4-05, W4-07, W4-11; later W7 and ADR-0005.
+**What recording it changes.** A "D08, W4 part" register row, with the real-data part kept open. ADR-0006 data-handling section, written inside that row. Upload safety section 10 (items carried to W7). Threat-model rows for prompt data, provider, key custody and parser isolation. The observability catalogue (model-call fields, identities and numbers only). TESTING.md. BUILD_PLAN W4 gate entry.
+
+**Who records it.** Ta records the row; the DPO and IT/Security approve its wording. Nothing is recorded until IT/Security is named.
+
+**Consumed by.** W4-00, W4-01, W4-05, W4-07, W4-11b, W4-14; later W7 and ADR-0005.
 
 ---
 
 ## D09 — QC evaluation
 
-**Question for the AI/COE lead and the lane experts.** Which frozen evaluation set, which per-rule thresholds and whose sign-off decide that W4 QC is good enough to show its findings to reviewers?
+### What we need from you
 
-**Why it blocks W4.** BUILD_PLAN W4 exit requires "the frozen evaluation suite", below/equal/above cases, template-version isolation, grounded citations and injection and timeout probes. It stops promotion if agreed quality thresholds are unmet. The [evaluation plan](../evaluation/plan.md) says domain reviewers must freeze the dataset and thresholds before AI implementation, and that "other numeric quality, cost and latency thresholds remain D09". Without D09, any threshold in code would be invented.
+| Who                                                      | Questions to answer                                                                               | By when                                                                                                 |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| **AI/COE lead** (to be named)                            | 1 (evaluation set), 2 (how thresholds are set), 6 (cost and latency), 7 (who signs)               | Before Ta's W4 gate entry (before W4b under the split option); thresholds before the first held-out run |
+| **Lane experts** (DPO, IT/Security and AI/COE reviewers) | 3 (band boundaries), 4 (grounded citations); label the fixtures and sign the rules your lane owns | Labels before the set is frozen; rule sign-off at W4 exit                                               |
+| **IT/Security**                                          | 5 (probes)                                                                                        | Before the set is frozen                                                                                |
 
-**What is already fixed (not open here).**
+In plain terms: which test documents prove QC works, how good each rule must be, how to judge a borderline number or a citation, which attacks to try, and who signs that the results are good enough.
 
-| Source                                                       | Rule                                                                                                                                                                                                                                                                                                                                                                                               |
-| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Source spec, "v1 product", section "QC"                      | Completeness and contradictions; a hallucination or accuracy "Yes" cites metric, denominator, threshold and artefact; extraction % is not hallucination rate; v1.0 Sheet-3 SL#2.1 bands H <1%, M <2%, L <3% only for that template version; classic ML uses its matching metric or N/A; append-only log per version; three triggers                                                                |
-| [Acceptance](../acceptance.md) A08                           | Below/equal/above tests for the v1.0 bands; v2.0 never inherits them; QC failure is visible, never a clean pass; no soft finding blocks submit or review                                                                                                                                                                                                                                           |
-| Acceptance A09                                               | Open findings prevent only the final Ready transition; dispositions are attributable; waiver and N/A need reasons                                                                                                                                                                                                                                                                                  |
-| Evaluation plan                                              | The planned fixture list; a held-out set; recorded disagreements; zero successes for unauthorized disclosure, fabricated approval, template leakage and capability-bearing prompt disclosure; every run records code, prompt, model, provider, template, rules, dataset and grader identities; mocked providers prove contracts only; human acceptance, not an aggregate score, controls promotion |
-| [W0-07](../engineering/qc-boundary-and-mail-sink.md) 3.5     | Stable rule IDs (`PACK-SLOT-MISSING`, `PACK-STAGE-MISMATCH`, `PACK-CONTRADICTION`, `ACC-METRIC-CITED`, `ACC-EXTRACTION-NOT-HALLUCINATION`, `ACC-BAND-V1-SHEET3`, `ACC-CLASSIC-ML-METRIC`, `QC-UNAVAILABLE`); the severities there are fixture values, not thresholds of record                                                                                                                     |
-| [Performance targets](../engineering/performance-targets.md) | QC orchestrator deadline 10,000 ms; expiry is `unavailable:timeout`                                                                                                                                                                                                                                                                                                                                |
+**Why it blocks W4.** BUILD_PLAN W4 exit requires "the frozen evaluation suite", below/equal/above cases, template-version isolation, grounded citations, and injection and timeout probes. It stops promotion if agreed quality thresholds are unmet. The [evaluation plan](../evaluation/plan.md) says domain reviewers freeze the dataset and thresholds before AI implementation, and that "other numeric quality, cost and latency thresholds remain D09". Without D09, any threshold in code would be invented.
 
-Note the difference between two kinds of threshold. The v1.0 bands judge the **submitted use case**. D09 thresholds judge **this desk's QC**. The evaluation plan keeps them apart; so should the register row.
+Two kinds of threshold must stay apart. The v1.0 bands judge the **submitted use case**. D09 thresholds judge **this desk's QC**.
 
-**Unknown to this repository.** Which checklist template versions exist beyond v1.0 and v2.0, how many historic packs exist, and whether any may be used, even anonymised, for evaluation. The AI/COE lead and the DPO would know.
+**Unknown to this repository.** Which checklist template versions exist beyond v1.0 and v2.0, whether v1.0 states a precision for its percentages, how many historic packs exist, and whether any may be used for evaluation. The AI/COE lead and the DPO would know.
 
-**Open questions, with options.**
+### Open questions
 
 1. **Evaluation set: source and freezing.**
-   - (a) Fully synthetic. Agents generate documents from the evaluation-plan fixture list; lane experts label them. Available now; may miss real-world document shapes.
-   - (b) Synthetic plus anonymised historic packs. More realistic; needs the real-data part of D08 first.
-   - (c) Synthetic for the W4 gate, with permitted real cases added as a new frozen version at W7. Honest about what W4 can prove; W7 re-runs the suite.
+   - (a) Fully synthetic; agents generate documents, lane experts label them. _Trade-off:_ available now; may miss real document shapes.
+   - (b) Synthetic plus anonymised historic packs. _Trade-off:_ more realistic; needs D08's real-data part first.
+   - (c) Synthetic for W4, with permitted real cases added as a new frozen version at W7. _Trade-off:_ honest about what W4 proves; W7 re-runs the suite.
 
-2. **Per-rule acceptance thresholds.**
-   - (a) Owners set numeric precision, recall and grounded-citation thresholds per rule before the first run. No fitting to results; the numbers may be guesses.
-   - (b) Run a baseline on a development split first, then set thresholds, then judge on the held-out split. Informed numbers; needs the held-out discipline to stay credible.
-   - (c) Split by rule type. Deterministic rules must be exact on every fixture (no tolerance). Probabilistic rules get numeric thresholds by (a) or (b).
+2. **How per-rule thresholds are set.**
+   - (a) Owners set precision, recall and grounded-citation numbers per rule before any run. _Trade-off:_ no fitting to results; the numbers may be guesses.
+   - (b) Baseline on a development split, set numbers, judge on the held-out split. _Trade-off:_ informed numbers; credible only with held-out discipline.
+   - (c) Deterministic rules exact on every fixture; probabilistic rules numbered by (a) or (b). _Trade-off:_ no tolerance where none is needed; two regimes to explain.
 
-3. **Boundary semantics for below/equal/above.** The source states the bands as strict "less than", so a value equal to the band fails. What is open is precision.
-   - (a) Compare the value exactly as reported in the document.
-   - (b) Compare at the precision the template states, and treat anything finer as reported.
-   - (c) Raise a separate finding when the evidence lacks the precision, denominator or unit needed to decide.
+3. **Band boundaries.** The source states the bands as strict "less than", so a value equal to a band fails. Open is precision. Either way, evidence missing the metric, denominator or unit is already a finding under A08.
+   - (a) Compare the value exactly as reported. _Trade-off:_ simple; an author's rounding can flip the result.
+   - (b) Compare at the precision the template states. _Trade-off:_ matches the template's intent; works only if the template states one (unknown).
 
-4. **Citation grounding.** When is a citation "grounded"?
-   - (a) Automatically: the locator resolves inside an artifact of the same version, and the `excerptHash` matches the text at that location.
-   - (b) By human graders on a sample.
-   - (c) Both: automatic on every finding, human on a stated sample per rule.
+4. **When is a citation grounded?**
+   - (a) Automatically: the locator resolves in the same version and the `excerptHash` matches. _Trade-off:_ cheap and complete; proves location, not meaning.
+   - (b) Human graders on a sample. _Trade-off:_ judges meaning; costs expert time and covers a sample only.
+   - (c) Both: automatic on every finding, human on a stated sample per rule. _Trade-off:_ best coverage; the cost of both.
 
-5. **Injection, exfiltration and timeout probes.** Zero successes is already fixed. Open: who writes the probes and how far they go.
-   - (a) A synthetic hostile set in the repository, generated at test time like the W0-08 hostile set.
-   - (b) (a) plus probes supplied by IT/Security.
-   - (c) (b) plus an independent red-team pass. Heavier; arguably belongs to the W8 security review under D10.
+5. **Injection, exfiltration and timeout probes.** Zero successes is already fixed. Open: who writes them and how far they go.
+   - (a) A synthetic hostile set in the repository, generated at test time. _Trade-off:_ repeatable; limited to what the team imagines.
+   - (b) (a) plus probes supplied by IT/Security. _Trade-off:_ wider coverage; depends on IT/Security's time.
+   - (c) (b) plus an independent red-team pass. _Trade-off:_ strongest; arguably the W8 security review under D10.
 
 6. **Cost and latency.**
-   - (a) Set budgets now (per run and per month) and gate on them.
-   - (b) Record cost and latency per run without a gate in W4; set budgets before W7.
-   - (c) Gate only on the existing 10,000 ms deadline; ADR-0006 may propose a different deadline for model calls, which the owners then approve.
+   - (a) Set per-run and monthly budgets now and gate on them. _Trade-off:_ no surprises; budgets without data may be arbitrary.
+   - (b) Record cost and latency per run; set budgets before W7. _Trade-off:_ real data for the budget; W4 could pass while too slow or costly.
+   - (c) Gate only on the existing 10,000 ms deadline, with any different model deadline approved here. _Trade-off:_ one clear limit; says nothing about cost.
 
-7. **Sign-off.**
-   - (a) The AI/COE lead signs the whole suite.
-   - (b) The AI/COE lead signs the set and method; each lane's expert signs the rules whose findings that lane owns (per D05 and the #35 refinement). Disagreements are recorded, as the evaluation plan requires.
-   - (c) (b) plus the operator (Nakhun) confirming that findings are usable in the queue.
+7. **Who signs.**
+   - (a) The AI/COE lead signs the whole suite. _Trade-off:_ one signature; one person judges other lanes' rules.
+   - (b) The AI/COE lead signs the set and method; each lane's expert signs the rules that lane owns (D05 and the #35 refinement). _Trade-off:_ the owners of findings judge them; three signatures to collect.
+   - (c) (b) plus the operator (Nakhun) confirming the findings are usable in the queue. _Trade-off:_ checks usability; the operator is not a domain expert, and sign-off slows.
 
-**Recommendation (proposal only; not decided).** 1(c), 2(c) with (b) for probabilistic rules, 3(c) on top of (a), 4(c), 5(b), 6(b) with 6(c)'s deadline review inside ADR-0006, and 7(b). This makes deterministic checks provable at once, keeps numbers honest for any model, and puts sign-off with the people who own the findings.
+### Recommendation (proposal only; not decided)
 
-**What recording it changes.** A D09 register row naming the frozen set's identity (name and version), the thresholds table and the signers. The evaluation plan (status moves from "designed, not run" once the set is frozen). A08 test notes. ADR-0006 evaluation section. TESTING.md. BUILD_PLAN W4 gate entry.
+1(c), 2(c) with (b) for probabilistic rules, 3(b) falling back to (a) where the template states no precision, 4(c), 5(b), 6(b) plus 6(c)'s deadline review, and 7(b). This makes deterministic checks provable at once, keeps numbers honest for any model, and puts sign-off with the people who own the findings.
 
-**Who records it.** Ta records the row. The AI/COE lead and the lane experts approve. Nothing is recorded until the AI/COE lead is named.
+**What recording it changes.** A D09 register row naming the frozen set (name and version), the thresholds table and the signers. The evaluation plan (status moves from "designed, not run" once the set is frozen). A08 test notes. ADR-0006 evaluation section. TESTING.md. BUILD_PLAN W4 gate entry.
 
-**Consumed by.** W4-01, W4-06, W4-08, W4-09, W4-10, W4-14.
+**Who records it.** Ta records the row; the AI/COE lead and the lane experts approve. Nothing is recorded until the AI/COE lead is named.
+
+**Consumed by.** W4-00, W4-01, W4-06, W4-07, W4-08, W4-09, W4-10, W4-14.
 
 ---
 
 ## Related questions for Ta outside D08 and D09
 
-These are product or contract questions W4 will hit. Items 2 and 3 were ruled by Ta on 2026-09-26; the rest are not decided here.
+These are product or contract questions W4 will hit. Items 2, 3 and 4 were ruled by Ta on 2026-09-26 (register row "W3 deferred rulings"); the rest are not decided here.
 
 1. **Upload-trigger unavailable finding on slot 5 or slot 9.** The #35 rule defers it to W4.
-   - (a) Slot 5: AI/COE, as on submit and for the pack. Slot 9: no upload rules run, so no run and no unavailable finding.
-   - (b) Slot 5: one finding per reviewing lane (three findings). Slot 9: as (a).
-   - (c) Slot 5 and 9: record the unavailable run only, no finding; submit QC re-covers the pack.
+   - (a) Slot 5: AI/COE, as on submit and for the pack. Slot 9: no upload rules run, so no run and no finding. _Trade-off:_ reuses a recorded rule; AI/COE carries BRD upload outages.
+   - (b) Slot 5: one finding per reviewing lane. Slot 9: as (a). _Trade-off:_ every lane sees the outage; three findings to disposition for one event.
+   - (c) Slots 5 and 9: record the unavailable run only, no finding. _Trade-off:_ least noise; an outage no one must disposition, which the #35 rule avoided elsewhere.
 
-   Recommendation (proposal only): (a). It reuses the existing submit and pack rule and keeps slot 9 informational. Ta records it as a D05 refinement row, acting for the review leads as on 2026-09-25.
+   Recommendation (proposal only): (a). Ta records it as a D05 refinement row, acting for the review leads as on 2026-09-25.
 
-2. **QC evidence arriving after a send-back** (W3 hardening review, section 5 item 2). **Ruled by Ta on 2026-09-26** (register row "W3 deferred rulings"): a version closed by a send-back takes no new QC evidence; the successor gets its own, and W0-07 3.4 was amended to match. Real extraction and model latency make the refused case more frequent, so W4-04 should expect it and test it.
+2. **QC evidence arriving after a send-back** (W3 hardening review, section 5 item 2). **Ruled by Ta on 2026-09-26:** a version closed by a send-back takes no new QC evidence; the successor gets its own, and W0-07 3.4 was amended to match. Real extraction and model latency make the refused case more frequent, so W4-04 should expect it and test it.
 
-3. **Defect count in the lane-opened mail** (hardening item 11). **Ruled by Ta on 2026-09-26:** that lane's findings stored at send time, labelled as recorded so far (ticket #165, before W4). W4 changes when findings exist, not the rule.
+3. **In-memory API substitute** (hardening item 3). **Ruled by Ta on 2026-09-26:** kept; revisit at W4 kickoff. The W4-00 file-level plan carries that revisit.
 
-4. **Checklist item anchoring** ([later packages](later-packages-outline.md), candidate backlog 1). Whether W4 findings carry checklist item IDs. Not in scope unless Ta adds it.
+4. **Defect count in the lane-opened mail** (hardening item 11). **Ruled by Ta on 2026-09-26:** that lane's findings stored at send time, labelled as recorded so far (ticket #165, before W4). W4 changes when findings exist, not the rule.
 
-5. **Runtime operated elsewhere** (candidate backlog 2). Whether W4 fixtures include the attested-evidence scenario. Not in scope unless Ta adds it.
+5. **Checklist item anchoring** ([later packages](later-packages-outline.md), candidate backlog 1). Whether W4 findings carry checklist item IDs. Not in scope unless Ta adds it.
 
-6. **Deterministic checks as a separable, earlier sub-package.** BUILD_PLAN requires D08 and D09 only "before probabilistic QC". Metadata-only deterministic checks on synthetic data call no model and parse no bytes. Ta could authorize them as W4a ahead of D08 and D09. The [work breakdown](w4-work-breakdown.md#option-for-ta-one-package-or-w4a-then-w4b) sets out both shapes. This is an option for Ta, not a choice made here.
+6. **Runtime operated elsewhere** (candidate backlog 2). Whether W4 fixtures include the attested-evidence scenario. Not in scope unless Ta adds it.
+
+7. **Deterministic checks as a separable, earlier sub-package.** BUILD_PLAN requires D08 and D09 only "before probabilistic QC". Metadata-only deterministic checks on synthetic data call no model and parse no document contents. Ta could authorize them as W4a ahead of D08 and D09. The [work breakdown](w4-work-breakdown.md#option-for-ta-one-package-or-w4a-then-w4b) sets out both shapes. This is an option for Ta, not a choice made here.
 
 ---
 
@@ -189,7 +189,7 @@ These are product or contract questions W4 will hit. Items 2 and 3 were ruled by
 
 **D07 (AI/COE, before W5).** The exact seven-question questionnaire, rubric version and reference labels for the risk proposal. W4 does not consume it. The only link is shared evaluation discipline: the [evaluation plan](../evaluation/plan.md) "Risk proposal" section needs two domain-labelled reference cases plus boundary and PII/unknown cases, and those should be frozen the same way as the D09 set. The rubric summary in the operating model must not be coded as the approved instrument.
 
-**D10 (IT/Security and the accountable owner, before networked tests or W8).** Production AD groups, host, audit and backup, incident channels and engineering risk acceptance. W4 runs on localhost and needs none of it. Two W4 answers touch it: if D08 question 5 picks (c), a sandboxed parsing service needs D10 hosting; if D08 question 2 picks (b) or (c), the credential custody for a provider key is a D10 question. ADR-0004 and ADR-0007 stay reserved for this gate.
+**D10 (IT/Security and the accountable owner, before networked tests or W8).** Production AD groups, host, audit and backup, incident channels and engineering risk acceptance. W4 runs on localhost and needs none of it. Two W4 answers touch it: a sandboxed parsing service (D08 question 5(c)) would need D10 hosting, and the W4 key custody of D08 question 6 is a stopgap that D10 replaces for anything beyond localhost. ADR-0004 and ADR-0007 stay reserved for this gate.
 
 ---
 
@@ -197,4 +197,36 @@ These are product or contract questions W4 will hit. Items 2 and 3 were ruled by
 
 **Draft for Ta to record; not recorded, and not an authorization.**
 
-> W4 gate entry (dated when Ta records it). Ta authorizes W4, version-aware soft QC, on synthetic data only, under the same branch, reviewed-PR and merge flow as D03 and its 2026-09-21 amendment, with the tickets of the W4 work breakdown. Preconditions, all recorded before the first W4 code PR: (1) W3 accepted by Ta (2026-09-26); (2) the AI/COE lead and the IT/Security owner named; (3) D08, at least its W4 part, recorded with DPO and IT/Security approval, covering which data may reach a model, provider and hosting, retention of QC inputs and outputs, logging, and parser isolation; (4) D09 recorded with the AI/COE lead's and lane experts' approval, naming the frozen evaluation set, the per-rule thresholds and the signers; (5) the slot-5 and slot-9 upload-unavailable owning lane recorded as a D05 refinement; (6) the W4 file-level plan (W4-00) merged, and ADR-0006 accepted before any extraction or model code merges. Real data, networked access and external mail stay excluded until D08's real-data part, D10 and W7. If Ta splits the package, a W4a entry for metadata-only deterministic checks needs only (1), (5), the lane experts' labels for the deterministic fixtures and its own file-level plan (W4-00a), and W4b keeps every precondition above.
+> W4 gate entry (dated when Ta records it). Ta authorizes W4, version-aware soft QC, on synthetic data only, under the same branch, reviewed-PR and merge flow as D03 and its 2026-09-21 amendment, with the tickets of the W4 work breakdown. Preconditions, all recorded before the first W4 code PR: (1) W3 accepted by Ta (2026-09-26); (2) the AI/COE lead and the IT/Security owner named; (3) D08's W4 part recorded with DPO and IT/Security approval, covering which data may reach a model, provider and hosting, what is kept, logging, parser isolation and who holds any API key during W4; (4) D09 recorded with the AI/COE lead's and lane experts' approval, naming the frozen evaluation set, the per-rule thresholds and the signers; (5) the slot-5 and slot-9 upload-unavailable owning lane recorded as a D05 refinement; (6) the W4 file-level plan (W4-00) merged, and ADR-0006, within what D08 permits, accepted before any extraction or model code merges. Real data, networked access and external mail stay excluded until D08's real-data part, D10 and W7. If Ta splits the package, a W4a entry for metadata-only deterministic checks needs only (1), (5) and its own file-level plan (W4-00a); its fixture labels are provisional until D09 is recorded, and W4b keeps every precondition above.
+
+---
+
+## Appendix: what is already fixed
+
+These rules are recorded or specified already. They are not open in D08 or D09.
+
+### For D08
+
+| Source                                                                                                 | Rule                                                                                                                                                                                                                              |
+| ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D03 register row                                                                                       | Synthetic data only until D08 permits real data                                                                                                                                                                                   |
+| Source spec, "v1 locked decisions" L7                                                                  | QC is soft: it never blocks submit or a reviewer                                                                                                                                                                                  |
+| [W0-07](../engineering/qc-boundary-and-mail-sink.md) 3.1                                               | QC never decides: Ready reads finding dispositions, never runner output. The runner gets read handles to authorized artifacts only; no database, session or HTTP client; output is typed data; no document text leaves the runner |
+| W0-07 3.4 step 4                                                                                       | Output carrying document text, or an invalid shape, becomes `unavailable:runner_error`, never a finding                                                                                                                           |
+| [Observability contract](../engineering/observability-contract.md) section 4                           | Log fields are an allow-list; document text, filenames and secrets never reach a log line                                                                                                                                         |
+| [Upload safety](../engineering/upload-safety-and-fixtures.md) section 3                                | Synthetic-data limits: 25 MiB per file, 150 MiB per pack version, 40 MP images, ZIP caps. Raising them for real data is a D08 change                                                                                              |
+| Upload safety section 10                                                                               | The real-data revisit list: limits, embedded PDF files, OLE embeddings, malware scanner or parsing worker, rejected-upload retention, blob deletion, library detector                                                             |
+| [Persistence](../engineering/persistence-and-artifact-store.md#retention-and-deletion-options-for-d08) | Three deletion options (redaction event, key destruction, tombstone); none chosen; ADR-0005 at the D08 gate                                                                                                                       |
+| [Threat model](../security/threat-model.md)                                                            | No secrets in prompts; injection and exfiltration probes; an outage is never shown as clean evidence                                                                                                                              |
+| [ADR-0003](../../adr/0003-stack-and-deployment-boundary.md)                                            | In-process or worker QC is decided at W4 entry in ADR-0006                                                                                                                                                                        |
+
+### For D09
+
+| Source                                                       | Rule                                                                                                                                                                                                                                                                                                                                                                                               |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Source spec, "v1 product", section "QC"                      | Completeness and contradictions; a hallucination or accuracy "Yes" cites metric, denominator, threshold and artefact; extraction % is not hallucination rate; v1.0 Sheet-3 SL#2.1 bands H <1%, M <2%, L <3% only for that template version; classic ML uses its matching metric or N/A; append-only log per version; three triggers                                                                |
+| [Acceptance](../acceptance.md) A08                           | Below/equal/above tests for the v1.0 bands; v2.0 never inherits them; classic ML uses its matching metric or a justified N/A; QC failure is visible, never a clean pass; no soft finding blocks submit or review                                                                                                                                                                                   |
+| Acceptance A09                                               | Open findings prevent only the final Ready transition; dispositions are attributable; waiver and N/A need reasons                                                                                                                                                                                                                                                                                  |
+| [Evaluation plan](../evaluation/plan.md)                     | The planned fixture list; a held-out set; recorded disagreements; zero successes for unauthorized disclosure, fabricated approval, template leakage and capability-bearing prompt disclosure; every run records code, prompt, model, provider, template, rules, dataset and grader identities; mocked providers prove contracts only; human acceptance, not an aggregate score, controls promotion |
+| [W0-07](../engineering/qc-boundary-and-mail-sink.md) 3.5     | Stable rule IDs (`PACK-SLOT-MISSING`, `PACK-STAGE-MISMATCH`, `PACK-CONTRADICTION`, `ACC-METRIC-CITED`, `ACC-EXTRACTION-NOT-HALLUCINATION`, `ACC-BAND-V1-SHEET3`, `ACC-CLASSIC-ML-METRIC`, `QC-UNAVAILABLE`); the severities there are fixture values, not thresholds of record                                                                                                                     |
+| [Performance targets](../engineering/performance-targets.md) | QC orchestrator deadline 10,000 ms; expiry is `unavailable:timeout`                                                                                                                                                                                                                                                                                                                                |
