@@ -1051,6 +1051,11 @@ describe(`W2-05 findings and dispositions — ${SET}`, () => {
       sql`SELECT status, refused_finding_count FROM qc_late_result WHERE version_id=${version.versionId}`,
     );
     assert.deepEqual(late.rows, [{ status: 'unavailable', refused_finding_count: 0 }]);
+    // A late run writes nothing: not even the QC-UNAVAILABLE finding (W0-07 3.4 step 6).
+    const lateFindings = await db.owner.execute(
+      sql`SELECT id FROM qc_finding WHERE version_id = ${version.versionId} AND kind = 'unavailable'`,
+    );
+    assert.equal(lateFindings.rows.length, 0);
     const logged = capture
       .lines()
       .filter((line) => line.event === 'qc.run.late' && line.correlationId === correlationId);

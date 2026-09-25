@@ -14,7 +14,7 @@ Framed in [intent](intent.md), [spec](spec.md) and [plan](plan.md), written befo
 
 ## 2. Commands and results
 
-Worktree `/tmp/rai-w2-05` from `origin/main` `2d6cf13`, Postgres compose project `rai-w2-05` on 55370, `.env` from `.env.example` with the ports rewritten, `DATABASE_OPERATOR_URL` and `OBS_MIGRATION_ADMIN_URL` set as CI sets them. Run serially, one suite at a time on the database (an earlier overlap of two suites on one database produced spurious failures; see section 4).
+Worktree `/tmp/rai-w2-05` from `origin/main` `2d6cf13`, Postgres compose project `rai-w2-05` on 55370, `.env` from `.env.example` with the ports rewritten, `DATABASE_OPERATOR_URL` and `OBS_MIGRATION_ADMIN_URL` set as CI sets them. Suites run in full on head `5c738ea` (PR #159) and again in full on the round-2 head after the review fixes; the counts below are the round-2 run (the round-1 run differed only by the two integration tests added since: 327 then). Run serially, one suite at a time on the database (an earlier overlap of two suites on one database produced spurious failures; see section 4).
 
 | Command (from `rai-web/` unless noted) | Result |
 |---|---|
@@ -22,19 +22,26 @@ Worktree `/tmp/rai-w2-05` from `origin/main` `2d6cf13`, Postgres compose project
 | `npm run lint` | exit 0 (eslint, prettier, check-css) |
 | `npm run typecheck` | exit 0 |
 | `npm run test:unit` | 582 tests, 582 pass, 0 fail, 0 skipped |
-| `npm run test:integration` | 327 tests, 327 pass, 0 fail, 0 skipped |
+| `npm run test:integration` | 329 tests, 329 pass, 0 fail, 0 skipped |
 | `npm run build && npm run check:substitute-absent` | build exit 0; scanned 595 files, 0 with the marker |
-| `npm run test:browser:server` | 193 passed (7.5m), 0 failed, at 1440, 834 and 390 px |
-| `npm run test:browser:substitute` | 48 passed (30.1s) |
+| `npm run test:browser:server` | 193 passed (7.6m), 0 failed, at 1440, 834 and 390 px |
+| `npm run test:browser:substitute` | 48 passed (30.3s) |
 | `node --test tests/*.test.mjs` (root) | 22 tests, 22 pass |
 | `node --test scripts/*.test.mjs` (root) | 18 tests, 18 pass |
-| `node scripts/check-links.mjs` (root) | 293 Markdown files, 801 relative links, 0 broken |
+| `node scripts/check-links.mjs` (root) | 293 Markdown files, 804 relative links, 0 broken (at the PR head; 801 before this review record's own links were added) |
 | `node scripts/check-frozen-source.mjs` (root) | source-spec sha256 `92c4f712…` matches |
 | `git diff --check` (root) | clean |
 
 ## 3. Reviewer verdicts
 
-Two independent reviewer agents post on the PR; recorded here with the head they reviewed.
+Two independent reviewer agents (Claude Opus, fresh context each) posted on PR #159.
+
+| Round | Head | Correctness and tests (whole branch) | Contract, security, simplicity |
+|---|---|---|---|
+| 1 | `5c738ea` | PASS; minors: an unknown mapping version threw while storing the outage finding (less fail-closed than main), an extra lookup on the replay path, three test gaps (audit `finding_count` on reuse; a later completed run leaves the finding open; the late path writes no finding), stale W0-07 lines | BLOCKING on records: stale W0-07 text (46, 192, 221, 239, 261, 556), two ledger rulings missing here, link count 801 vs 804, walkthrough step 2 and bullet wording; non-blocking: silent AI/COE fallback for an approve attempt with no lane, W0-06 7.3 stating `finding_outside_lane` for slot 5 only, no 403 test for a non-owning lane or Admin on the outage finding, two type imports from one module |
+| 2 | (round-2 head) | pending | pending |
+
+Round-1 fixes: `unavailableOwningLane` needs the mapping only for an upload run and the orchestrator no longer throws on an unknown mapping; an approve attempt with no lane throws instead of falling back to AI/COE (unreachable by type); the `qc.run.unavailable` log line carries the finding's `owningLane` (W0-10 3.3); three regression pins and the 403 test were added; the stale W0-07 and W0-06 text, the walkthrough wording and this record were corrected. Deferred as minors: the replay path's extra lookup; `scripts.ts` repeating the lane branching rather than calling `checkOwningLane` (a `ScriptedFinding` is not a `QcFinding`).
 
 ## 4. Rulings and exceptions
 
@@ -42,6 +49,8 @@ Decisions taken during execution, each with its cost if wrong. None changes the 
 
 - **Worktree by `git worktree add` at `/tmp/rai-w2-05`** rather than the app's managed worktree: the approved plan names the path and a per-change Postgres, the hardening convention. Cost: cleanup is manual.
 - **No true integration baseline.** The baseline run started after Task 1 had removed `owningLaneForSlot`, so it measured the edit, not `main`; the reference is main's CI run 36041409928 and the hardening's clean-checkout 316/316. Cost: an environment failure could have been misread; the serial Task 9 run (327/327) is the record.
+- **The validator unit test's base fixture is slot 7 / IT-Security**, not slot 1 / AI-COE as the plan assumed; the test values were adapted, the cases are the same. Cost: none.
+- **After Task 2 the typecheck also failed in `orchestrator.ts` and `scripted-runner.ts`** (the `checkOwningLane` arity), not only in `scripts.ts` as the plan said; both were Task 3/4 files and were fixed there. Cost: none.
 - **`findLatestUnavailableFinding` lives in `findings/repository.ts`** beside `latestDisposition`, not in `qc/repository.ts` as the plan said: `findings/repository.ts` already imports `qc/repository.ts`, and the plan's placement would have made an ESM cycle. Cost: one import path.
 - **The lane-QC route built its unavailable body with `findings: []`**; it now passes the outcome's findings through. Cost: none; the response schema already typed the array.
 - **Three scripted-runner unit tests and one W2-05 integration test encoded the old posture** (one finding on that submit; a pack finding throws; a slot-5 finding is invalid; the late-finding test used a slot-5 finding). Each was updated with the spec citation; the construction guard is now proven with slot 9 and the late test with a lane mismatch, so no test lost its intent.

@@ -277,6 +277,11 @@ describe(`W2-05 owning lane (W0-06 7.3 recorded 2026-09-25) — ${SET}`, () => {
       .lines()
       .find((l) => l.event === 'qc.run.unavailable' && l.correlationId === correlationId);
     assert.equal(line?.fields?.reason, 'runner_error');
+    assert.equal(
+      line?.fields?.owningLane,
+      'ai_coe',
+      "W0-10: the log line names the finding's lane once it exists",
+    );
   });
 
   it('a finding outside the approving lane fails the approve-attempt run closed; the outage finding is owned by that lane', async () => {
@@ -311,6 +316,58 @@ describe(`W2-05 owning lane (W0-06 7.3 recorded 2026-09-25) — ${SET}`, () => {
     const rows = await findingRows(version.versionId);
     assert.equal(rows.length, 1);
     assert.equal(rows[0]!.owning_lane, 'it_security');
+    // The audit row of each run counts what that run appended: one, then none (the open finding was reused).
+    const counts = await db.owner.execute(
+      sql`SELECT target_ref->>'finding_count' AS n FROM audit_event WHERE action = 'qc.run_recorded' AND target_version_id = ${version.versionId} ORDER BY occurred_at, id`,
+    );
+    assert.deepEqual(
+      counts.rows.map((r) => (r as { n: string }).n),
+      ['1', '0'],
+    );
+  });
+
+  it('a later completed run on the same lane leaves the outage finding open; a person must disposition it', async () => {
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, HR.caseId);
+    const it_ = await signIn(IT_SECURITY);
+    runner.simulateError('runner_error');
+    const outage = await laneQcRunId(it_, HR.caseId, version.versionId, 'it_security');
+    const healthy = await laneQcRunId(it_, HR.caseId, version.versionId, 'it_security');
+    assert.equal(healthy.status, 'completed');
+    const onVersion = await app.inject({
+      method: 'GET',
+      url: `/api/cases/${HR.caseId}/versions/${version.versionId}/findings`,
+      headers: asUser(it_),
+    });
+    const listed = onVersion.json<VersionFindingsResponse>().findings;
+    assert.deepEqual(
+      listed.map((f) => [f.findingId, f.latestDisposition]),
+      [[outage.findings[0]!.findingId, null]],
+    );
+  });
+
+  it("only the owning lane may disposition the outage finding: AI/COE and Admin get 403 on the DPO's; the DPO records N/A", async () => {
+    const owner = await signIn(OWNER_A);
+    const version = await submitOk(owner, HR.caseId);
+    const dpo = await signIn(DPO);
+    runner.simulateError('runner_error');
+    const outage = await laneQcRunId(dpo, HR.caseId, version.versionId, 'dpo');
+    const findingId = outage.findings[0]!.findingId;
+    for (const other of [AI_COE, 'fx-user-admin']) {
+      const res = await waive(await signIn(other), HR.caseId, version.versionId, findingId);
+      assert.equal(res.statusCode, 403, `${other}: ${res.body}`);
+    }
+    const na = await app.inject({
+      method: 'POST',
+      url: `/api/cases/${HR.caseId}/findings/${findingId}/dispositions`,
+      headers: { 'content-type': 'application/json', 'idempotency-key': randomUUID(), ...asUser(dpo) },
+      payload: {
+        expectedVersion: { versionId: version.versionId, revision: await caseRevision(HR.caseId) },
+        kind: 'not_applicable',
+        reason: "synthetic: the outage did not concern this lane's documents",
+      },
+    });
+    assert.equal(na.statusCode, 201, na.body);
   });
 
   it('after the owning lane waives the outage finding, the next outage appends a new open finding', async () => {

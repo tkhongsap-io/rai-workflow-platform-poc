@@ -64,16 +64,20 @@ export function owningLaneRule(
   return { kind: 'raising_lane', lanes };
 }
 
-/** W0-06 7.3 part 4: a QC-unavailable finding follows the run that saw the outage. */
+/**
+ * W0-06 7.3 part 4: a QC-unavailable finding follows the run that saw the outage. Only an upload run needs the
+ * mapping (the slot's lane), so an unknown mapping never turns a submit or approve-attempt outage into an error.
+ */
 export function unavailableOwningLane(
   run:
     | { trigger: 'approve_attempt'; lane: Lane }
     | { trigger: 'submit'; lane: null }
     | { trigger: 'upload'; slot: Slot },
-  mapping: LaneMapping,
+  mapping?: LaneMapping,
 ): Lane {
   if (run.trigger === 'approve_attempt') return run.lane;
   if (run.trigger === 'submit') return PACK_OWNING_LANE;
+  if (mapping === undefined) throw new Error("an unavailable upload run needs the version's lane mapping");
   const rule = owningLaneRule({ kind: 'slot', slot: run.slot }, mapping);
   if (rule.kind === 'lane') return rule.lane;
   throw new Error(

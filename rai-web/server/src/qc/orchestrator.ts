@@ -300,14 +300,14 @@ async function appendUnavailableFinding(
   run: RunRecord,
   reason: QcUnavailableReason,
 ): Promise<StoredFindingSummary> {
-  const mapping = LANE_MAPPINGS_BY_VERSION[request.laneMappingVersion];
-  if (mapping === undefined) throw new Error(`unknown lane mapping ${request.laneMappingVersion}`);
-  // The orchestrator runs submit and approve_attempt only (RunQcInput); upload QC arrives with W4.
+  // The orchestrator runs submit and approve_attempt only (RunQcInput); upload QC arrives with W4. Neither needs
+  // the mapping, so an outage is recorded whatever the version's mapping version is.
+  if (request.trigger === 'approve_attempt' && request.lane === null)
+    throw new Error('an approve-attempt run names its lane'); // unreachable by construction (RunQcInput)
   const owningLane = unavailableOwningLane(
-    request.trigger === 'approve_attempt' && request.lane !== null
-      ? { trigger: 'approve_attempt', lane: request.lane }
+    request.trigger === 'approve_attempt'
+      ? { trigger: 'approve_attempt', lane: request.lane as Lane }
       : { trigger: 'submit', lane: null },
-    mapping,
   );
   const findingId = uuidv7(run.stamp.getTime());
   const messageParams = { reason, trigger: request.trigger, rulesEvaluated: 0 };
@@ -414,7 +414,8 @@ type Settled =
 function settle(deps: QcOrchestratorDeps, input: RunQcInput, settled: Settled, startedAt: number) {
   if (settled.kind === 'recorded') {
     const { outcome } = settled;
-    if (outcome.status === 'unavailable') emitUnavailable(deps, input, outcome.runId, outcome.reason);
+    if (outcome.status === 'unavailable')
+      emitUnavailable(deps, input, outcome.runId, outcome.reason, outcome.findings[0]?.owningLane);
     else
       deps.emitter?.log('qc.run.completed', {
         qcRunId: outcome.runId,
@@ -565,9 +566,14 @@ function emitUnavailable(
   input: RunSubmitQcInput,
   runId: string,
   reason: QcUnavailableReason,
+  owningLane?: Lane,
 ): void {
   const fields = { qcRunId: runId, caseId: input.caseId, versionId: input.versionId, reason };
-  deps.emitter?.log('qc.run.unavailable', fields);
+  // W0-10 3.3: the log line names the QC-UNAVAILABLE finding's lane (W0-07 3.6); the error capture keeps its shape.
+  deps.emitter?.log('qc.run.unavailable', {
+    ...fields,
+    ...(owningLane === undefined ? {} : { owningLane }),
+  });
   deps.errors?.job({ category: 'qc_unavailable', ...fields });
 }
 

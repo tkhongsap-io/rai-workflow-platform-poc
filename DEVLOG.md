@@ -6,7 +6,7 @@ Ta accepted the five recommendations of the [#35 decision brief](changes/2026-09
 
 - **Behaviour changes:** an unavailable QC run stores the W0-07 3.6 `QC-UNAVAILABLE` finding, owned by the lane that saw it and appended once per open scope, so a case can no longer reach Ready after an outage until that lane dispositions it (A08); the run body and the reviewer workspace show the finding under the outage notice; a runner defect on slot 9 or outside the approving lane fails the run closed; the W1-10 substitute carries one slot-5 and one pack-level finding on `fx-case-missing-slot`. No migration. With no runner bound, every submit and approve attempt now yields such a finding (W0-07 3.6 as written).
 - **Code:** `owningLaneRule` and `unavailableOwningLane` replace `owningLaneForSlot`; `checkOwningLane` takes the run's lane; `owning_lane_rule_pending` and `refinement_pending` are gone.
-- **Verification** in the worktree, serially on its own Postgres: lint, typecheck, 582 unit, 327 integration, 193 real-server browser, 48 substitute browser, 22 + 18 repository tests, 801 links, source hash; all green, no skips. [Review](changes/2026-09-25-w2-05-owning-lane/review.md).
+- **Verification** in the worktree, serially on its own Postgres: lint, typecheck, 582 unit, 329 integration, 193 real-server browser, 48 substitute browser, 22 + 18 repository tests, 804 links, source hash; all green, no skips. [Review](changes/2026-09-25-w2-05-owning-lane/review.md).
 
 Issue #35 and epic #53 close on merge. Ta's W3 package review and the Nakhun walkthrough are unchanged; the [walkthrough script](changes/2026-09-23-w3-hardening/walkthrough-script.md) notes the new outage finding. W4-W8 are not authorized.
 

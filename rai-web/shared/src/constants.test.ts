@@ -71,6 +71,10 @@ test('unavailableOwningLane follows the run (7.3 part 4): approve attempt → it
   assert.equal(unavailableOwningLane({ trigger: 'approve_attempt', lane: 'dpo' }, LANE_MAPPING_V1), 'dpo');
   assert.equal(unavailableOwningLane({ trigger: 'submit', lane: null }, LANE_MAPPING_V1), 'ai_coe');
   assert.equal(unavailableOwningLane({ trigger: 'upload', slot: 7 }, LANE_MAPPING_V1), 'it_security');
+  // Only an upload run needs the mapping; an unknown mapping must not turn an outage into an error.
+  assert.equal(unavailableOwningLane({ trigger: 'approve_attempt', lane: 'it_security' }), 'it_security');
+  assert.equal(unavailableOwningLane({ trigger: 'submit', lane: null }), 'ai_coe');
+  assert.throws(() => unavailableOwningLane({ trigger: 'upload', slot: 7 }), /mapping/);
   // Upload on slot 5 or 9 is defined with upload QC (W4); until then it is a thrown error, never a guess.
   assert.throws(() => unavailableOwningLane({ trigger: 'upload', slot: 5 }, LANE_MAPPING_V1), /upload QC/);
   assert.throws(() => unavailableOwningLane({ trigger: 'upload', slot: 9 }, LANE_MAPPING_V1), /upload QC/);

@@ -3,8 +3,11 @@ import { and, asc, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { QueryBuilder } from 'drizzle-orm/pg-core';
 import type { Lane } from '@rai/shared/constants';
 import type { QcTrigger } from '@rai/shared/qc/types';
-import type { StoredFindingSummary } from '@rai/shared/schemas/review';
-import type { DispositionKind, FindingWithDisposition } from '@rai/shared/schemas/review';
+import type {
+  DispositionKind,
+  FindingWithDisposition,
+  StoredFindingSummary,
+} from '@rai/shared/schemas/review';
 import type { Executor, Tx } from '../db/client.js';
 import { dispositionEvent } from '../db/schema/disposition-event.js';
 import { qcFinding } from '../db/schema/qc-finding.js';
