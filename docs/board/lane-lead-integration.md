@@ -116,3 +116,10 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: Ta's W3 package review (epic #54) and the synthetic walkthrough with Nakhun. Section 5 of the review lists the items only Ta can decide, including #35. W4-W8 are not authorized.
 - Author: operator=ta session=claude-code-w3-hardening-closeout model=claude-opus-5-5
 - Evidence: https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/158
+
+## 2026-09-26 09:10 — W3 accepted; M3 reached
+- What: Ta accepted the W3 package after the synthetic walkthrough with Nakhun (no change requested). Recorded in BUILD_PLAN (2026-09-26 status), the W3 exit review, the walkthrough notes, DEVLOG, CHANGELOG, README and the delivery pack; epic #54 closes.
+- Why: the last gate of slice 1 (BUILD_PLAN W3 exit); the hardening and W2-05 had closed the findings Ta asked for first.
+- Next: D08/D09 decision briefs and a draft W4 gate for Ta (lead, documentation only); the W3-07 desk-health follow-up (the outage finding's lane) as a ticket. W4-W8 remain unauthorized.
+- Author: operator=ta session=claude-code-w3-acceptance model=claude-opus-5-5
+- Evidence: PR on `codex/w3-acceptance`
