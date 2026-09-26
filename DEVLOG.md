@@ -1,5 +1,9 @@
 # Development log
 
+## W3-F7 BLOB_TMP_MAX_AGE_HOURS minimum 1 — 2026-09-26
+
+`BLOB_TMP_MAX_AGE_HOURS` below 1 is refused at start-up and by `store:cleanup`, so the sweep cannot remove an upload younger than an hour (ruling item 7, ticket #169). W0-02 section 5 says "Integer ≥ 1"; W0-04 records the floor. [Review](changes/2026-09-26-w3-f7-blob-tmp-min/review.md).
+
 ## W3-F3 lane-opened mail counts that lane's findings — 2026-09-26
 
 The lane-opened mail now counts only that lane's findings, recorded when the delivered mail is composed, and says "findings recorded so far" in both languages (ruling item 11, ticket #165). A QC-unavailable finding counts too, so an outage never reads as 0; dispositioned findings still count. [Review](changes/2026-09-26-w3-f3-lane-defect-count/review.md).
