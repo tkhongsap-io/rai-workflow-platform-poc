@@ -12,6 +12,11 @@ export function caseVersionPath(caseId: string, versionId: string): string {
   return `/cases/${caseId}/versions/${versionId}`;
 }
 
+/** The case page, where the owner edits the successor draft after a send-back (W3-F4). */
+export function casePath(caseId: string): string {
+  return `/cases/${caseId}`;
+}
+
 /** One queued row per recipient. Recipients are data from the caller; no address is chosen here. */
 export async function enqueueCaseNotifications(
   tx: Tx,
@@ -28,7 +33,10 @@ export async function enqueueCaseNotifications(
   },
 ): Promise<void> {
   const { recipients, occurredAt, ...row } = input;
-  const deepLinkPath = caseVersionPath(row.caseId, row.versionId);
+  // W3-F4 (ruling item 12): a send-back opens the case, where the successor draft and its feedback are; the
+  // worker refuses to send a mail whose composed link differs from this committed path.
+  const deepLinkPath =
+    row.event === 'send_back' ? casePath(row.caseId) : caseVersionPath(row.caseId, row.versionId);
   for (const recipient of recipients)
     await tx
       .insert(notification)

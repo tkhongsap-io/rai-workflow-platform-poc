@@ -390,7 +390,7 @@ export interface DeliveryRequest {
   dedupKey: string;                      // section 4.4; the W0-04 `notification` unique index (event, version_id, lane, recipient) as one string, D06
   event: CommittedEvent;
   recipient: AuthorizedRecipient;
-  deepLinks: SafeDeepLink[];             // at least one. lane_opened, sent_back, ready_for_launch: exactly one, route 'case' or 'case_version', caseId === event.caseId.
+  deepLinks: SafeDeepLink[];             // at least one. lane_opened, sent_back, ready_for_launch: exactly one, route 'case' or 'case_version', caseId === event.caseId. sent_back uses 'case' (W3-F4, 2026-09-26): the case page shows the owner's successor draft; the others use 'case_version'.
                                          // sla_breach_digest: one route 'case' link per breached case (A05 "correct authorized case links"), optionally plus one 'queue_sla_breach' link
   digestCases: DigestCaseRef[] | null;   // non-empty for sla_breach_digest; null for every other kind
   mail: RenderedMail;
