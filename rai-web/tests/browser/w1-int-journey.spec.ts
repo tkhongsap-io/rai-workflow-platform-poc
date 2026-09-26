@@ -40,6 +40,14 @@ const SPOC_SUBJECT = 'fixture:fx-user-spoc-cm';
 // W3-F1 (#163): the screens show display names; the subject ids stay in the API bodies checked elsewhere.
 const OWNER_NAME = findFixtureUser(OWNER)!.displayName;
 const SPOC_NAME = findFixtureUser('fx-user-spoc-cm')!.displayName;
+
+/** W3-F1: the value of one labelled fact (`dl.facts`), so a name check cannot match the shell's own "signed in as". */
+function fact(page: Page, label: string) {
+  return page
+    .locator('dl.facts > div')
+    .filter({ has: page.getByText(label, { exact: true }) })
+    .getByRole('definition');
+}
 const NONVENDOR_CASE = 'RAI-2000-0001'; // fx-case-nonvendor, owned by fx-user-owner-cm, BU CM
 
 const UPLOAD_NAME = 'BRD_W1_journey_synthetic.pdf';
@@ -228,7 +236,8 @@ test.describe(`W1-INT journey on the real server: create → attach → submit �
         t('th', 'status.in_review'),
       );
       await expect(slotRow(page, 1).getByRole('link')).toHaveText(UPLOAD_NAME);
-      await expect(page.getByText(OWNER_NAME).last()).toBeVisible();
+      await expect(fact(page, t('th', 'version.field.submitted_by'))).toHaveText(OWNER_NAME);
+      await expect(page.locator('.version-meta').first()).toContainText(OWNER_NAME); // the version list
       await expectStatusElementsHaveText(page);
       await expectAccessible(page, testInfo, { name: 'journey-version-frozen-th', lang: 'th' });
 
@@ -305,7 +314,8 @@ test.describe(`W1-INT journey on the real server: create → attach → submit �
       await expect(slotRow(page, 2).locator('[data-status]')).toContainText(t('th', 'slot.state.not_yet'));
       await expect(slotRow(page, 5)).toContainText(NA_REASON);
       await expect(slotRow(page, 7).locator('[data-status]')).toContainText(t('th', 'slot.state.not_yet'));
-      await expect(page.getByText(OWNER_NAME).last()).toBeVisible();
+      await expect(fact(page, t('th', 'version.field.submitted_by'))).toHaveText(OWNER_NAME);
+      await expect(page.locator('.version-meta').first()).toContainText(OWNER_NAME); // the version list
       await expect(page.getByRole('button', { name: t('th', 'pack.action.change') })).toHaveCount(0); // frozen
       await expectStatusElementsHaveText(page);
       await expectAccessible(page, testInfo, { name: 'journey-version-after-restart-th', lang: 'th' });
@@ -382,7 +392,8 @@ test.describe(`W1-INT BU SPOC on behalf on the real server (${FIXTURE_SET}; fx-u
     await expect(page.getByRole('button', { name: t('th', 'pack.action.submit') })).toBeEnabled();
     const versionId = await submitByKeyboard(page, caseId);
     await expect(page.getByRole('status')).toContainText(t('th', 'pack.submitted', { number: 1 }));
-    await expect(page.getByText(SPOC_NAME).last()).toBeVisible(); // submittedBy: the actor, not the owner
+    // submittedBy: the actor, not the owner; scoped to the frozen version, since the SPOC is also the signed-in user
+    await expect(fact(page, t('th', 'version.field.submitted_by'))).toHaveText(SPOC_NAME);
     await expectStatusElementsHaveText(page);
     await expectAccessible(page, testInfo, { name: 'spoc-version-frozen-th', lang: 'th' });
 
@@ -426,8 +437,9 @@ test.describe(`W1-INT BU SPOC on behalf on the real server (${FIXTURE_SET}; fx-u
     await expect(card.getByText(t('th', 'case.submission.version', { number: 1 }))).toBeVisible();
     await expect(card).toContainText(OWNER_NAME); // W3-F1: the My cases card names the owner
     await page.goto(`${origin}/cases/${caseId}/versions/${versionId}`);
-    await expect(page.getByText(SPOC_NAME).last()).toBeVisible();
+    await expect(fact(page, t('th', 'version.field.submitted_by'))).toHaveText(SPOC_NAME);
+    await expect(page.locator('.version-meta').first()).toContainText(SPOC_NAME); // the version list
     await page.goto(`${origin}/cases/${caseId}`);
-    await expect(page.getByRole('definition').filter({ hasText: OWNER_NAME }).first()).toBeVisible(); // W3-F1: the case header
+    await expect(fact(page, t('th', 'case.field.business_owner'))).toHaveText(OWNER_NAME); // W3-F1: the case header
   });
 });

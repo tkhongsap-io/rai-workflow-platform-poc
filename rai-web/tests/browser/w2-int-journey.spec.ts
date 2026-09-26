@@ -12,6 +12,7 @@
 // submit; axe (th) on the states reached; three widths from playwright.config.ts. Fixture set slice1-synthetic@1
 // reloaded before each test. Users: fx-user-owner-cm, fx-user-ai-coe, fx-user-dpo, fx-user-it-security.
 
+import { findFixtureUser } from '@rai/fixtures/data/users';
 import { test, expect, type Page } from './support/real-test.js';
 import type { CaseListResponse, CaseView } from '@rai/shared/schemas/cases';
 import type { SubmittedVersion } from '@rai/shared/schemas/versions';
@@ -40,7 +41,7 @@ async function expectSendBackFeedback(page: Page, heading: string): Promise<void
   const decision = region.getByRole('listitem').filter({ hasText: t('th', 'lane.dpo') });
   await expect(decision).toContainText(t('th', 'projection.sent_back'));
   await expect(decision).toContainText(
-    t('th', 'version.decisions.decided_by', { subject: 'Pimchanok R.' }), // W3-F1: the DPO reviewer's display name
+    t('th', 'version.decisions.decided_by', { subject: findFixtureUser(DPO)!.displayName }), // W3-F1: the DPO's name
   );
   const item = decision.getByRole('listitem');
   await expect(item).toHaveCount(1);

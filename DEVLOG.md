@@ -2,7 +2,7 @@
 
 ## W3-F1 display names, part 2 — 2026-09-26
 
-The case header, the My cases card, the version list, the frozen version and the lane decisions (including the owner's send-back feedback) now show names instead of subject IDs such as `fixture:fx-user-owner-cm`, falling back to the ID when a read carries no name. This completes ticket #163. [Review](changes/2026-09-26-w3-f1-display-names/review.md).
+The case header, the My cases card, the version list, the frozen version and the lane decisions (including the owner's send-back feedback) now show names instead of subject IDs such as `fixture:fx-user-owner-cm`, falling back to the ID when a read carries no name, in Thai and English, with a test pinning each surface. This completes ticket #163. Correction to part 1's entry below: its byte identity holds in fixture mode; with a sign-in directory a name can change over time (display only, a W7 follow-up), as W0-02 now says. [Review](changes/2026-09-26-w3-f1-display-names/review.md).
 
 ## W3-F1 display names, part 1 — 2026-09-26
 

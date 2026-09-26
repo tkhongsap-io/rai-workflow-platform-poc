@@ -43,3 +43,11 @@ The five surfaces the ruling names render `displayName ?? subjectId`: the case h
 Tests: RED first, the row-model unit test (the card falls back to the id, and shows the name when the read carries one) failed before the change; the browser specs that asserted subject ids on screen now assert the names (`w1-int-journey`, `w1-int-06-case-pack-versions`, `w2-int-journey`), subject ids stay asserted wherever the API or the database is checked, and the journey also checks the My cases card and the case header. Those three specs: 36 passed at three widths on a fresh build.
 
 Full suite for part 2 (same worktree and database, one suite at a time): lint and typecheck clean; 587 unit; 332 integration, 0 skipped; build, 603 files, 0 substitute markers; 193 real-server browser; 48 substitute browser.
+
+### Part 2 reviewer verdicts
+
+| Round | Head | Correctness | Contract and privacy |
+|---|---|---|---|
+| 1 | `9f3e5a9` | PASS; the SPOC-signed-in assertion at `w1-int-journey` got weaker (the SPOC's name also matches the shell's "signed in as"); stale comment in `lane-decisions.tsx`; hardcoded name in `w2-int-journey` | BLOCKING on records: the done-when asks for both locales and a test pinning each surface, but every check was Thai and `getByText(name).last()` did not pin the version list and the frozen version separately |
+
+Round-1 changes: each name check is scoped to its surface, with a `fact()` locator over `dl.facts` for the case header and the frozen version's "submitted by" and `.version-meta` for the version list, so none can match the shell's own name; English checks on the case header (`overview-draft-en`) and the My cases card (`list-en`); the w2 name comes from the fixture users; the `lane-decisions.tsx` header comment is corrected. The four affected specs (`w1-int-journey`, `w1-int-06-case-pack-versions`, `w1-int-07-shell-sign-in-cases`, `w2-int-journey`): 96 passed at three widths; lint and typecheck clean. Only test code and one comment changed after the full suite above.

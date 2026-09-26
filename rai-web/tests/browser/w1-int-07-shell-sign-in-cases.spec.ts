@@ -11,6 +11,7 @@
 // hard-coded string. Proves A01 (browser layer, W0-02 8.2). Fixture ids: the eight W0-03 users and the five W0-08
 // cases of fixture set slice1-synthetic@1.
 
+import { findFixtureUser } from '@rai/fixtures/data/users';
 import { test, expect, type Page } from './support/real-test.js';
 import th from '@rai/shared/locales/th.json' with { type: 'json' };
 import en from '@rai/shared/locales/en.json' with { type: 'json' };
@@ -479,6 +480,10 @@ test.describe('W1-INT (W1-07) keyboard-only, dialog, locale and reflow on the re
       en['scope.business_unit'].replace('{businessUnit}', 'CM'),
     );
     await expect(page).toHaveTitle(en['app.title']);
+    // W3-F1 in English: the My cases card names the owner (the CM SPOC lists the CM owner's cases)
+    await expect(page.locator('article[data-registry-id="RAI-2000-0001"]')).toContainText(
+      findFixtureUser('fx-user-owner-cm')!.displayName,
+    );
     await expectAccessible(page, testInfo, { name: 'list-en', lang: 'en' });
     await page.reload();
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');

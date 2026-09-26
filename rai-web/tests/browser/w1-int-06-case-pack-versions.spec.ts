@@ -19,6 +19,16 @@ import { expectAccessible, expectStatusElementsHaveText } from './support/axe.js
 import { expectVisibleFocus, focusedElement, pressTab, tabUntil } from './support/keyboard.js';
 import { signInAsFixture, signOut } from './support/sign-in.js';
 import { FIXTURE_SET } from './support/database.js';
+import { findFixtureUser } from '@rai/fixtures/data/users';
+const OWNER_NAME = findFixtureUser('fx-user-owner-cm')!.displayName;
+
+/** W3-F1: the value of one labelled fact (`dl.facts`), so a name check cannot match the shell's own "signed in as". */
+function fact(page: Page, label: string) {
+  return page
+    .locator('dl.facts > div')
+    .filter({ has: page.getByText(label, { exact: true }) })
+    .getByRole('definition');
+}
 
 const OWNER = 'fx-user-owner-cm';
 const OTHER_OWNER = 'fx-user-owner-cm-2';
@@ -458,7 +468,7 @@ test.describe(`W1-INT (W1-06) case flow on the real server (fx-case-missing-slot
     await expect(page.getByRole('button', { name: t('th', 'pack.action.change') })).toHaveCount(0); // read-only
     await expect(page.getByRole('button', { name: t('th', 'pack.action.submit') })).toHaveCount(0);
     // W3-F1: submittedBy is shown as the display name; the subject id stays in the API body
-    await expect(page.getByText('ณัฐพร ส. (Nattaporn S.)').last()).toBeVisible();
+    await expect(fact(page, t('th', 'version.field.submitted_by'))).toHaveText(OWNER_NAME);
     await expect(page.getByText('lane-mapping/v1')).toBeVisible();
     await expect(slotRow(page, 3)).toContainText(t('th', 'slot.na.reason.non_vendor_default'));
     await expect(slotRow(page, 1).getByRole('link')).toHaveText('RiskScreening_ChurnScoring.pdf');
@@ -532,6 +542,7 @@ test.describe(`W1-INT (W1-06) case flow on the real server (fx-case-missing-slot
     await expect(page.getByRole('heading', { level: 2, name: t('en', 'pack.heading') })).toBeVisible();
     await expect(page.locator('[data-status="draft"]').first()).toContainText(t('en', 'status.draft'));
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(fact(page, t('en', 'case.field.business_owner'))).toHaveText(OWNER_NAME); // W3-F1 in English
     await expectStatusElementsHaveText(page);
     await expectAccessible(page, testInfo, { name: 'overview-draft-en', lang: 'en' });
   });

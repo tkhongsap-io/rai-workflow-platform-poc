@@ -134,4 +134,4 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Why: ruling item 8 (register row "W3 deferred rulings"), ticket #163.
 - Next: two reviewers and CI on this PR; on merge, #163 closes with status evidence-recorded, then W3-F2 (#164).
 - Author: operator=ta session=claude-code-w3-f1-display-names model=claude-opus-5-5
-- Evidence: PR on `codex/w3-f1-display-names-ui`
+- Evidence: https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/173
