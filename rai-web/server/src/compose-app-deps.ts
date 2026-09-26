@@ -15,7 +15,7 @@ import { createFixtureIdentityProvider, type FixtureIdentity } from './identity/
 import { createPgSessionStore } from './identity/session.js';
 import type { IdentityAdapter } from './identity/types.js';
 import { noopUploadTrigger } from './pack/qc-trigger.js';
-import { laneOpenRecipientsFromIdentities } from './versions/open-lanes.js';
+import { laneOpenRecipientsFromIdentities, laneReviewerSpocUnits } from './versions/open-lanes.js';
 import { sendBackRecipientsFromIdentities } from './workflow/send-back-notice.js';
 
 export interface ComposeInputs {
@@ -69,6 +69,7 @@ export function composeAppDeps(inputs: ComposeInputs): AppDeps {
     versions: {
       subjects, // W3-F1: the same directory names submitters and deciders on reads
       laneOpenRecipients: laneOpenRecipientsFromIdentities(knownIdentities),
+      laneReviewerSpocUnits: laneReviewerSpocUnits(knownIdentities), // W3-F2
       qc: qcRunner === undefined ? {} : { runner: qcRunner },
     },
     decide: { sendBackRecipientsForOwner: ownerRecipients },

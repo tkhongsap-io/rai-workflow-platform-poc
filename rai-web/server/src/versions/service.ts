@@ -49,7 +49,13 @@ import {
 import { readNames, type SubjectDirectory } from '../cases/subject-directory.js';
 import { withDeciderName, withSubmitterName } from './display-names.js';
 import { manifestHash } from './manifest.js';
-import { openLanesOnSubmit, EMPTY_LANE_OPEN_RECIPIENTS, type LaneOpenRecipients } from './open-lanes.js';
+import {
+  openLanesOnSubmit,
+  laneOpenRecipientsForCase,
+  EMPTY_LANE_OPEN_RECIPIENTS,
+  type LaneOpenRecipients,
+  type LaneReviewerSpocUnits,
+} from './open-lanes.js';
 import {
   closeDraftOnCase,
   freezeDraft,
@@ -66,6 +72,8 @@ export interface VersionServiceDeps {
   subjects?: SubjectDirectory;
   /** Slice-1: fixture reviewers who hold each lane (from identity data). Empty until W8 AD resolution otherwise. */
   laneOpenRecipients?: LaneOpenRecipients;
+  /** W3-F2: lane reviewers' BU-SPOC grants; a reviewer who is SPOC of the case's BU gets no lane-opened mail. */
+  laneReviewerSpocUnits?: LaneReviewerSpocUnits;
 }
 
 export const SUBMIT_ACTION = 'case.submit' as const;
@@ -215,7 +223,11 @@ export async function submitDraft(
           correlationId: ctx.correlationId,
           idempotencyKeyRef: idempotencyKeyReference,
           occurredAt: now,
-          recipients: deps.laneOpenRecipients ?? EMPTY_LANE_OPEN_RECIPIENTS,
+          recipients: laneOpenRecipientsForCase(
+            deps.laneOpenRecipients ?? EMPTY_LANE_OPEN_RECIPIENTS,
+            deps.laneReviewerSpocUnits,
+            before.businessUnitId,
+          ),
         });
         return {
           status: 201,

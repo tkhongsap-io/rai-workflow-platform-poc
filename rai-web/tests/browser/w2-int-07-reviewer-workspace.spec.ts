@@ -351,4 +351,37 @@ test.describe(`W2-INT reviewer workspace on the real server (${FIXTURE_SET}; fx-
       t('th', 'review.disposition.waived'),
     );
   });
+
+  test('W3-F2: a DPO reviewer who is BU SPOC of the case sees why there is no decision panel, in Thai and English', async ({
+    page,
+  }, testInfo) => {
+    // The walkthrough's step 8: Rattanaporn (DPO reviewer, BU SPOC of HR) on the HR case RAI-2000-0005.
+    await signInAsFixture(page, OWNER);
+    const caseId = await caseIdOf(page, 'RAI-2000-0005');
+    const draft = (await (await page.request.get(`/api/cases/${caseId}/draft`)).json()) as PackDraft;
+    const submitted = await page.request.post(`/api/cases/${caseId}/draft/submit`, {
+      data: { expectedVersion: { versionId: draft.draftId, revision: draft.draftRevision } },
+      headers: { 'idempotency-key': crypto.randomUUID() },
+    });
+    expect(submitted.status()).toBe(201);
+    const { versionId } = (await submitted.json()) as { versionId: string };
+    await signOut(page);
+
+    await signInAsFixture(page, 'fx-user-dpo-spoc-hr');
+    await page.goto(`/cases/${caseId}/versions/${versionId}`);
+    const note = page.locator('[data-lane-excluded="bu_spoc"]');
+    await expect(note).toHaveText(
+      t('th', 'review.excluded.bu_spoc', { businessUnit: 'HR', lanes: t('th', 'lane.dpo') }),
+    );
+    await expect(page.getByRole('button', { name: t('th', 'review.action.approve') })).toHaveCount(0);
+    await expectAccessible(page, testInfo, { name: 'w3-f2-excluded-note-th', lang: 'th' });
+
+    const locale = await page.request.post('/api/session/locale', { data: { locale: 'en' } });
+    expect(locale.status()).toBe(204);
+    await page.reload();
+    await expect(note).toHaveText(
+      t('en', 'review.excluded.bu_spoc', { businessUnit: 'HR', lanes: t('en', 'lane.dpo') }),
+    );
+    await expectAccessible(page, testInfo, { name: 'w3-f2-excluded-note-en', lang: 'en' });
+  });
 });

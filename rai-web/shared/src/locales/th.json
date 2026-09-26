@@ -380,6 +380,7 @@
   "review.disposition.status_label": "สถานะ: {kind}",
   "review.disposition.waived": "ยกเว้น",
   "review.findings.empty": "การตรวจ QC ของช่องทางนี้ไม่พบข้อค้นพบ",
+  "review.excluded.bu_spoc": "คุณเป็น BU SPOC ของหน่วยธุรกิจของเคสนี้ ({businessUnit}) จึงไม่สามารถตัดสินใจช่องทาง {lanes} ของเคสนี้ได้",
   "review.findings.heading": "ข้อค้นพบของช่องทาง {lane}",
   "review.findings.intro": "ผลตรวจ QC ของช่องทางนี้แสดงก่อนการตัดสินใจ อนุมัติได้เฉพาะหลังเห็นผลนี้แล้ว",
   "review.findings.list_label": "รายการข้อค้นพบ",

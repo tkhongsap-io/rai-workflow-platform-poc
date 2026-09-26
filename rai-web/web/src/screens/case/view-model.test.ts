@@ -20,6 +20,7 @@ import {
   findingMessageParams,
   isCaseWriter,
   isSelfExcludedOnCase,
+  laneExclusionNote,
   laneIsDecidable,
   laneKey,
   laneProjectionStatus,
@@ -514,5 +515,27 @@ test('Ready denies every offered mutation even when lane projections still say p
       latestKind: 'fixed_proposed',
     }),
     ['fixed', 'waived', 'not_applicable', 'fixed_confirmed'],
+  );
+});
+
+test('W3-F2: the page explains a missing decision panel only for a BU-SPOC conflict (ruling item 10)', () => {
+  // A DPO reviewer who is BU SPOC of this case's BU (CM): the note names the lanes and the BU.
+  assert.deepEqual(
+    laneExclusionNote({ roles: [dpo, spocCm], subjectId: 'fixture:fx-user-dpo', view: baseView() }),
+    {
+      lanes: ['dpo'],
+      businessUnit: 'CM',
+    },
+  );
+  // A reviewer with no conflict, and a reviewer who is the case owner (not ruled), get no note.
+  assert.equal(laneExclusionNote({ roles: [dpo], subjectId: 'fixture:fx-user-dpo', view: baseView() }), null);
+  assert.equal(
+    laneExclusionNote({ roles: [aiCoe], subjectId: 'fixture:fx-user-owner-cm', view: baseView() }),
+    null,
+  );
+  // A BU SPOC with no lane grant has no decision panel to explain.
+  assert.equal(
+    laneExclusionNote({ roles: [spocCm], subjectId: 'fixture:fx-user-spoc-cm', view: baseView() }),
+    null,
   );
 });

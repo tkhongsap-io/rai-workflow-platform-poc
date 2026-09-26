@@ -133,3 +133,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: reviewer verdicts and CI on the PR; on merge close #35 and epic #53 and mark W2-05 evidence-recorded. Ta's W3 package review and the Nakhun walkthrough are unchanged; the walkthrough script notes the new outage finding.
 - Author: operator=ta session=claude-code-w2-05-owning-lane model=claude-fable-5-1
 - Evidence: changes/2026-09-25-w2-05-owning-lane/review.md; PR on `codex/w2-05-owning-lane`
+
+## 2026-09-26 14:20 — CLAIM lane-b: W3-F2 BU-SPOC reviewer mail and page note (#164)
+- Author: operator=ta session=claude-code-w3-f2-spoc-reviewer-mail model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #164, human-review-required)
+- Scope: per changes/2026-09-26-w3-f2-spoc-reviewer-mail/. One PR.

@@ -176,6 +176,27 @@ export function isSelfExcludedOnCase(
 }
 
 /**
+ * W3-F2 (ruling item 10): why a lane reviewer sees no decision panel, when the reason is a BU-SPOC grant for the
+ * case's business unit. A conflict that is only case ownership is not covered by the ruling, so gets no note. Display
+ * only; the API answers 403 either way.
+ */
+export function laneExclusionNote(args: {
+  roles: readonly RoleScope[];
+  subjectId: string;
+  view: Pick<CaseView, 'businessOwner' | 'businessUnitId'>;
+}): { lanes: Lane[]; businessUnit: string } | null {
+  const lanes = reviewerLanesOf(args.roles);
+  if (lanes.length === 0) return null;
+  const spoc = args.roles.some(
+    (grant) =>
+      grant.role === 'bu_spoc' &&
+      grant.scope.kind === 'business_unit' &&
+      grant.scope.businessUnit === args.view.businessUnitId,
+  );
+  return spoc ? { lanes, businessUnit: args.view.businessUnitId } : null;
+}
+
+/**
  * The W0-05 write rows (edit and submit the draft, resubmit, propose fixed): an owner grant whose subject is the
  * case's business owner, or a bu_spoc grant for the case's BU — not subjectId alone. The API still decides.
  */

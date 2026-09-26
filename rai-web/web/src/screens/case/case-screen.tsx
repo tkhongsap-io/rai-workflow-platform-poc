@@ -29,6 +29,8 @@ import {
   applySlotChange,
   isCaseWriter,
   reviewerWorkspaceLanes,
+  laneExclusionNote,
+  laneKey,
   type Notice,
   type PendingSlots,
 } from './view-model.js';
@@ -417,6 +419,24 @@ function CaseScreenBody(props: BodyProps): JSX.Element {
                   {t(props.notice.key, props.notice.params)}
                 </p>
               ) : null}
+              {(() => {
+                // W3-F2: say why a lane reviewer has no decision panel when the reason is a BU-SPOC grant.
+                const note = versionState.version.isLatest
+                  ? laneExclusionNote({
+                      roles: props.session.principal.roles,
+                      subjectId: props.session.principal.subjectId,
+                      view: state.view,
+                    })
+                  : null;
+                return note === null ? null : (
+                  <p className={'notice'} role={'note'} data-lane-excluded={'bu_spoc'}>
+                    {t('review.excluded.bu_spoc', {
+                      businessUnit: note.businessUnit,
+                      lanes: note.lanes.map((lane) => t(laneKey(lane))).join(', '),
+                    })}
+                  </p>
+                );
+              })()}
               {reviewerWorkspaceLanes({
                 roles: props.session.principal.roles,
                 subjectId: props.session.principal.subjectId,

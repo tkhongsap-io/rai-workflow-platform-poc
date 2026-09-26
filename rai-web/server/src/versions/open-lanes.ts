@@ -46,6 +46,42 @@ export function laneOpenRecipientsFromIdentities(
   });
 }
 
+/** W3-F2: each lane reviewer's address, mapped to the business units where that reviewer holds a bu_spoc grant. */
+export type LaneReviewerSpocUnits = Readonly<Record<string, readonly string[]>>;
+
+export function laneReviewerSpocUnits(
+  users: readonly { email: string; roles: readonly RoleScope[] }[],
+): LaneReviewerSpocUnits {
+  const out: Record<string, string[]> = {};
+  for (const user of users) {
+    if (!user.roles.some((grant) => LANE_ROLES.has(grant.role))) continue;
+    const units = user.roles.flatMap((grant) =>
+      grant.role === 'bu_spoc' && grant.scope.kind === 'business_unit' ? [grant.scope.businessUnit] : [],
+    );
+    if (units.length > 0) out[user.email] = units;
+  }
+  return Object.freeze(out);
+}
+
+/**
+ * W3-F2 (register row "W3 deferred rulings", item 10; W0-05 3.3): a lane reviewer who is BU SPOC of the case's
+ * business unit cannot decide that lane (D05), so gets no lane-opened mail for it. A reviewer who is the case owner
+ * is not covered by the ruling. Without the SPOC map nobody is excluded.
+ */
+export function laneOpenRecipientsForCase(
+  all: LaneOpenRecipients,
+  spocUnits: LaneReviewerSpocUnits | undefined,
+  businessUnitId: string,
+): LaneOpenRecipients {
+  if (spocUnits === undefined) return all;
+  const keep = (email: string) => !(spocUnits[email] ?? []).includes(businessUnitId);
+  return Object.freeze({
+    ai_coe: Object.freeze(all.ai_coe.filter(keep)),
+    dpo: Object.freeze(all.dpo.filter(keep)),
+    it_security: Object.freeze(all.it_security.filter(keep)),
+  });
+}
+
 export type AuditWriter = (
   event: Omit<AuditEventInput, 'correlationId' | 'actorSubjectId' | 'actorRole'>,
 ) => Promise<void>;
