@@ -457,7 +457,12 @@ test('awaiting-disposition and review-complete cards follow real workflow respon
   }
   await page.goto('/queue?status=ready_for_launch');
   await expect(cards(page)).toHaveCount(1);
-  await expect(cards(page).getByText(th['queue.next.review_complete'], { exact: false })).toBeVisible();
+  // W3-F5: the badge now reads the same Thai term, so match the next-action line itself.
+  await expect(
+    cards(page).getByText(th['cases.next_action'].replace('{action}', th['queue.next.review_complete']), {
+      exact: true,
+    }),
+  ).toBeVisible();
   await expect(cards(page).getByTestId('latest-version')).toHaveText(
     th['version.nav_submitted'].replace('{number}', '1'),
   );

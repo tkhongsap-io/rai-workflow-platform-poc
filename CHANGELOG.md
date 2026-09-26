@@ -2,6 +2,7 @@
 
 ## 2026-09-26
 
+- W3-F5 (#167): one Thai term, "การตรวจทานในระบบเสร็จสิ้น", for desk completion, including the status badge and the Ready mail.
 - W3-F4 (#166): the send-back mail opens the case page, where the owner's successor draft is.
 - W3-F7 (#169): `BLOB_TMP_MAX_AGE_HOURS` must be at least 1; lower values are refused at start-up and by `store:cleanup`.
 - W3-F3 (#165): the lane-opened mail counts that lane's findings, QC outages included, "recorded so far".
