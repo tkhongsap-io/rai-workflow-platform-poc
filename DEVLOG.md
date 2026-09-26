@@ -1,5 +1,9 @@
 # Development log
 
+## W3-F3 lane-opened mail counts that lane's defects — 2026-09-26
+
+The lane-opened mail now counts only that lane's defects, recorded when the delivered mail is composed, and says "so far" in both languages (ruling item 11, ticket #165). Dispositioned defects still count; a QC-unavailable finding does not (it is a failed check, not a defect). [Review](changes/2026-09-26-w3-f3-lane-defect-count/review.md).
+
 ## W3-F6 remove unused scopedCases — 2026-09-26
 
 The unused `scopedCases` sub-select helper is gone (ruling item 5, ticket #168); W0-04, W0-05 and the performance targets now name `caseScopeWhere`, the predicate every list query actually uses. No behaviour change; full suite unchanged. [Review](changes/2026-09-26-w3-f6-remove-scoped-cases/review.md).

@@ -382,7 +382,7 @@ export interface RenderedMail {
   subject: string;                       // rendered from the locale template for recipient.locale; UTF-8; Thai-safe
   textBody: string;                      // plain text; contains every deep link; never document contents or finding evidence
   templateKey: string;                   // e.g. 'mail.lane_opened'; the D12 locale key
-  templateParams: Record<string, string | number>;   // scalar params: caseName, laneLabel, defectCount, dueDate (D06 timezone), feedback summary
+  templateParams: Record<string, string | number>;   // scalar params: caseName, laneLabel, defectCount (W3-F3: the lane's defects recorded so far, recomposed per attempt; may differ between a failed attempt and the delivered one), dueDate (D06 timezone), feedback summary
                                          // the digest's per-case list is `digestCases`, not a param; the template renders it as one line per case with its link
 }
 

@@ -722,3 +722,39 @@ test('request completion and response latency do not wait for a stalled notifica
     await app.close();
   }
 });
+
+test("W3-F3: each lane-opened mail counts only its own lane's defects recorded so far (ruling item 11)", async () => {
+  // No automatic worker, so the findings below exist before the one delivery that composes the mail.
+  await rebuildApp({ mailSink: null });
+  const { response, version } = await submit();
+  assert.equal(response.statusCode, 201, response.body);
+  const finding = async (lane: 'dpo' | 'it_security' | 'ai_coe', kind: 'defect' | 'unavailable') => {
+    const runId = randomUUID();
+    await db.app.execute(sql`
+      INSERT INTO qc_run (id, version_id, trigger, lane, engine_id, rule_revision, status, requested_at, completed_at, correlation_id)
+      VALUES (${runId}, ${version.versionId}, 'approve_attempt', ${lane}, 'substitute-scripted', 'rev-test',
+        ${kind === 'defect' ? 'completed' : 'unavailable'}, now(), now(), ${randomUUID()})
+    `);
+    await db.app.execute(sql`
+      INSERT INTO qc_finding (id, run_id, version_id, slot, kind, rule_id, rule_revision, severity, owning_lane,
+        evidence, metric, denominator, threshold, message_key, message_params, created_at)
+      VALUES (${randomUUID()}, ${runId}, ${version.versionId}, NULL, ${kind},
+        ${kind === 'defect' ? 'TEST-RULE' : 'QC-UNAVAILABLE'}, 'rev-test', 'medium', ${lane},
+        '[]'::jsonb, NULL, NULL, NULL, 'qc.finding.test', '{}'::jsonb, now())
+    `);
+  };
+  await finding('dpo', 'defect');
+  await finding('dpo', 'defect');
+  await finding('it_security', 'defect');
+  await finding('ai_coe', 'unavailable'); // a failed check, not a defect: not counted
+  await dispatcher().deliverPending();
+  const counts = (lane: string) => [
+    ...new Set(sink.sent.filter((r) => r.event.lane === lane).map((r) => r.mail.templateParams.defectCount)),
+  ];
+  assert.deepEqual(counts('dpo'), [2]);
+  assert.deepEqual(counts('it_security'), [1]);
+  assert.deepEqual(counts('ai_coe'), [0]);
+  // The label says the count is what was recorded so far, in both languages.
+  const dpoMail = sink.sent.find((r) => r.event.lane === 'dpo')!.mail;
+  assert.match(dpoMail.textBody, /so far|จนถึงขณะนี้/);
+});

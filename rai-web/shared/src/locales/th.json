@@ -123,7 +123,7 @@
   "lane.dpo": "ความเป็นส่วนตัว (DPO)",
   "lane.it_security": "IT/Security",
   "mail.lane_opened": "ช่องทางตรวจสอบเปิดแล้ว",
-  "mail.lane_opened.body": "เคส: {caseName}\nช่องทางตรวจสอบ: {laneLabel}\nข้อบกพร่องที่บันทึกไว้: {defectCount}\nวันครบกำหนด SLA (Asia/Bangkok): {dueDate}\nเปิดเคส (ต้องเข้าสู่ระบบ): {caseLink}",
+  "mail.lane_opened.body": "เคส: {caseName}\nช่องทางตรวจสอบ: {laneLabel}\nข้อบกพร่องที่บันทึกไว้จนถึงขณะนี้: {defectCount}\nวันครบกำหนด SLA (Asia/Bangkok): {dueDate}\nเปิดเคส (ต้องเข้าสู่ระบบ): {caseLink}",
   "mail.ready_for_launch": "การตรวจสอบของโต๊ะเสร็จสิ้น (Ready for launch)",
   "mail.ready_for_launch.body": "เคส: {caseName}\nการตรวจสอบของโต๊ะเสร็จสิ้น (Ready for launch) การพิจารณาของ Council และ ITSM ยังคงอยู่นอกระบบนี้\nเปิดเคส (ต้องเข้าสู่ระบบ): {caseLink}",
   "mail.sent_back": "ช่องทางตรวจสอบส่งกลับให้แก้ไข",

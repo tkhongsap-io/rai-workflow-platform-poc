@@ -120,7 +120,15 @@ export async function loadCommittedCaseRequest(
     const [total] = await tx
       .select({ value: count() })
       .from(qcFinding)
-      .where(and(eq(qcFinding.versionId, row.versionId), eq(qcFinding.kind, 'defect')));
+      // W3-F3 (ruling item 11): that lane's defects recorded when this attempt is composed; a QC-unavailable
+      // finding is a failed check, not a defect, and a dispositioned defect still counts as recorded.
+      .where(
+        and(
+          eq(qcFinding.versionId, row.versionId),
+          eq(qcFinding.kind, 'defect'),
+          eq(qcFinding.owningLane, lane as Lane),
+        ),
+      );
     content.defectCount = total?.value ?? 0;
     content.dueOn = (await laneDueDates(tx, row.versionId)).find((d) => d.lane === lane)!.dueOn;
   }
