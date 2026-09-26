@@ -217,5 +217,5 @@ A dated read; earlier sections stay as written.
 | Gate / package | Status on 2026-09-26 | Next evidence needed |
 |---|---|---|
 | W4a (deterministic metadata QC) | **Authorized**; W4-00a plan in review | W4-00a merged; W4a tickets through reviewed PRs; W4a exit record reviewed by Ta |
-| W4b (extraction, model rules, evaluation) | **Not authorized** | AI/COE lead and IT/Security owner named; D08 and D09 recorded; W4b gate entry |
+| W4b (extraction, model rules, evaluation) | **Not authorized** | AI/COE lead and IT/Security owner named; D08 and D09 recorded; W4b gate entry; then W4-00b and ADR-0006 before extraction or model code |
 | W5-W8 | **Not authorized** | D07 before W5; D10 before networked tests or W8 |

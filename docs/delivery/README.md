@@ -11,7 +11,7 @@ Status: **G0 and W0-W2 exits recorded; W3 accepted by Ta on 2026-09-26 (slice 1 
 5. [Design-to-build map](design-to-build-map.md): each designed screen to its tickets and server invariants; what in the demo is simulation only.
 6. [Agent task brief template](agent-task-brief-template.md): how to hand one ticket to an agent.
 7. [Later packages](later-packages-outline.md): W4-W8 outline and candidate backlog.
-8. [W4 decision briefs](w4-decision-briefs.md): D08 and D09 as they bear on W4, with a draft W4 gate entry for Ta. Draft; nothing decided; W4 not authorized.
+8. [W4 decision briefs](w4-decision-briefs.md): D08 and D09 as they bear on W4, with a draft W4 gate entry for Ta. W4a opened and related question 1 ruled on 2026-09-26; D08 and D09 undecided; W4b not authorized.
 9. [W4 work breakdown](w4-work-breakdown.md): W4 tickets. W4a authorized 2026-09-26 under the [W4-00a plan](../engineering/implementation-plan-w4a.md); W4b not authorized until D08, D09 and its gate entry.
 
 ## Path at a glance
