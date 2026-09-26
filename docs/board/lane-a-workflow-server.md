@@ -177,3 +177,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Takes over from: session=codex-w3-07a-observability-contract (reason: owner-authorized successor on d931cea; notification owners retain implementation)
 - What: Health/probes, operator queries, safe error capture and correlated QC diagnostics. Isolated DB 54368 and HTTP/SUB/WEB 18788/18789/15175; no publication before prerequisite merge and notification integration proof.
 - Evidence: [file-level plan](../../changes/2026-09-22-w3-07a-observability-api/plan.md)
+
+## 2026-09-26 09:40 — CLAIM lane-a: W3-07 desk-health owning lane
+- Author: operator=ta session=claude-code-desk-health-owning-lane model=claude-opus-5-5
+- Takes over from: session=none (reason: new; follow-up recorded by W2-05)
+- Scope: per changes/2026-09-26-desk-health-owning-lane/: the desk-health `unavailableQc` entries name the owning lane. One PR.
