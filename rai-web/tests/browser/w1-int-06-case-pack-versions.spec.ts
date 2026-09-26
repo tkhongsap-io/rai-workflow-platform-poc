@@ -457,7 +457,8 @@ test.describe(`W1-INT (W1-06) case flow on the real server (fx-case-missing-slot
     await expect(page.locator('.slot-row')).toHaveCount(9);
     await expect(page.getByRole('button', { name: t('th', 'pack.action.change') })).toHaveCount(0); // read-only
     await expect(page.getByRole('button', { name: t('th', 'pack.action.submit') })).toHaveCount(0);
-    await expect(page.getByText('fixture:fx-user-owner-cm').last()).toBeVisible(); // submittedBy as recorded
+    // W3-F1: submittedBy is shown as the display name; the subject id stays in the API body
+    await expect(page.getByText('ณัฐพร ส. (Nattaporn S.)').last()).toBeVisible();
     await expect(page.getByText('lane-mapping/v1')).toBeVisible();
     await expect(slotRow(page, 3)).toContainText(t('th', 'slot.na.reason.non_vendor_default'));
     await expect(slotRow(page, 1).getByRole('link')).toHaveText('RiskScreening_ChurnScoring.pdf');

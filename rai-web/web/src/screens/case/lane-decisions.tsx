@@ -36,7 +36,9 @@ export function LaneDecisions({
               {t(DECISION_KEY[decision.decision])}
             </p>
             <p className={'muted small'}>
-              {t('version.decisions.decided_by', { subject: decision.decidedBy })}
+              {t('version.decisions.decided_by', {
+                subject: decision.decidedByDisplayName ?? decision.decidedBy,
+              })}
               {' · '}
               <time dateTime={decision.decidedAt}>{formatDateTime(locale, decision.decidedAt)}</time>
             </p>

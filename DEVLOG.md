@@ -1,5 +1,9 @@
 # Development log
 
+## W3-F1 display names, part 2 — 2026-09-26
+
+The case header, the My cases card, the version list, the frozen version and the lane decisions (including the owner's send-back feedback) now show names instead of subject IDs such as `fixture:fx-user-owner-cm`, falling back to the ID when a read carries no name. This completes ticket #163. [Review](changes/2026-09-26-w3-f1-display-names/review.md).
+
 ## W3-F1 display names, part 1 — 2026-09-26
 
 Case, version and decision reads now carry display names beside the subject IDs (ruling item 8, ticket #163): the owner from the case's `business_owner` column, the submitter and decider from the server's subject directory. The submit 201, its replay and every read stay byte-identical (A07). No new endpoint, no names in logs, no scope change. The UI renders them in part 2. [Review](changes/2026-09-26-w3-f1-display-names/review.md).

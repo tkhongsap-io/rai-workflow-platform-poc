@@ -40,7 +40,7 @@ async function expectSendBackFeedback(page: Page, heading: string): Promise<void
   const decision = region.getByRole('listitem').filter({ hasText: t('th', 'lane.dpo') });
   await expect(decision).toContainText(t('th', 'projection.sent_back'));
   await expect(decision).toContainText(
-    t('th', 'version.decisions.decided_by', { subject: `fixture:${DPO}` }),
+    t('th', 'version.decisions.decided_by', { subject: 'Pimchanok R.' }), // W3-F1: the DPO reviewer's display name
   );
   const item = decision.getByRole('listitem');
   await expect(item).toHaveCount(1);

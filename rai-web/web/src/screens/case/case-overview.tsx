@@ -57,7 +57,7 @@ export function CaseOverview({ view }: { view: CaseView }): JSX.Element {
         </div>
         <div>
           <dt>{t('case.field.business_owner')}</dt>
-          <dd>{view.businessOwner}</dd>
+          <dd>{view.ownerDisplayName ?? view.businessOwner}</dd>
         </div>
         <div>
           <dt>{t('case.field.technical_owner')}</dt>

@@ -46,7 +46,7 @@ function CaseCard({ row }: { row: CaseRowModel }): JSX.Element {
           </div>
           <div>
             <dt>{t('cases.owner')}</dt>
-            <dd>{row.businessOwner}</dd>
+            <dd>{row.ownerLabel}</dd>
           </div>
           <div>
             <dt>{t('cases.submission')}</dt>
