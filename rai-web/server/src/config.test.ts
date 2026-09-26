@@ -129,6 +129,11 @@ test('an upload limit above the W0-08 section 3 default is refused at start in f
   assert.equal(parseConfig(withEnv({ UPLOAD_MAX_FILE_BYTES: '1024' })).upload.maxFileBytes, 1024);
 });
 
+test('W3-F7 (ruling item 7): BLOB_TMP_MAX_AGE_HOURS below 1 refuses to start; 1 is the floor', () => {
+  assert.equal(reasonOf(withEnv({ BLOB_TMP_MAX_AGE_HOURS: '0' })), 'invalid:BLOB_TMP_MAX_AGE_HOURS');
+  assert.equal(parseConfig(withEnv({ BLOB_TMP_MAX_AGE_HOURS: '1' })).blobTmpMaxAgeHours, 1);
+});
+
 test('parseDatabaseConfig needs only the three database variables', () => {
   const db = parseDatabaseConfig({
     DATABASE_URL: base.DATABASE_URL,

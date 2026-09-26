@@ -142,7 +142,8 @@ export function parseRetentionConfig(env: Env) {
   return {
     idempotencyTtlHours: integer(env, 'IDEMPOTENCY_TTL_HOURS', { min: 1 }),
     blobOrphanMinAgeHours: integer(env, 'BLOB_ORPHAN_MIN_AGE_HOURS', { min: 0 }),
-    blobTmpMaxAgeHours: integer(env, 'BLOB_TMP_MAX_AGE_HOURS', { min: 0 }),
+    // W3 deferred rulings item 7: never below one hour, so the sweep cannot take an in-flight upload.
+    blobTmpMaxAgeHours: integer(env, 'BLOB_TMP_MAX_AGE_HOURS', { min: 1 }),
   };
 }
 

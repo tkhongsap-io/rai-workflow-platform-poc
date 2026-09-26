@@ -14,6 +14,8 @@ const retention = {
 };
 const isMissing = (name: string) => (e: unknown) =>
   e instanceof ConfigError && e.reason === `missing:${name}`;
+const isInvalid = (name: string) => (e: unknown) =>
+  e instanceof ConfigError && e.reason === `invalid:${name}`;
 
 test('db:cleanup refuses an empty IDEMPOTENCY_TTL_HOURS before it connects, so no key is expired', async () => {
   // Port 9 has no Postgres: a command that got past the parse would fail with a connection error instead.
@@ -39,6 +41,24 @@ test('store:cleanup refuses an empty BLOB_TMP_MAX_AGE_HOURS and leaves an in-fli
       storeCleanup({ ...retention, BLOB_DIR: blobDir, BLOB_TMP_MAX_AGE_HOURS: '' }),
       isMissing('BLOB_TMP_MAX_AGE_HOURS'),
     );
+    assert.deepEqual(await readdir(tmp), ['in-flight']);
+  } finally {
+    await rm(blobDir, { recursive: true, force: true });
+  }
+});
+
+test('W3-F7 (ruling item 7): store:cleanup refuses BLOB_TMP_MAX_AGE_HOURS=0 and at 1 keeps an upload younger than an hour', async () => {
+  const blobDir = await mkdtemp(path.join(tmpdir(), 'rai-store-cleanup-'));
+  try {
+    const tmp = path.join(blobDir, 'tmp');
+    await mkdir(tmp);
+    await writeFile(path.join(tmp, 'in-flight'), 'x');
+    await assert.rejects(
+      storeCleanup({ ...retention, BLOB_DIR: blobDir, BLOB_TMP_MAX_AGE_HOURS: '0' }),
+      isInvalid('BLOB_TMP_MAX_AGE_HOURS'),
+    );
+    assert.deepEqual(await readdir(tmp), ['in-flight']);
+    assert.equal(await storeCleanup({ ...retention, BLOB_DIR: blobDir }), 0);
     assert.deepEqual(await readdir(tmp), ['in-flight']);
   } finally {
     await rm(blobDir, { recursive: true, force: true });
