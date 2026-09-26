@@ -1,5 +1,9 @@
 # Development log
 
+## W3-F2 BU-SPOC reviewer mail and page note — 2026-09-26
+
+A lane reviewer who is BU SPOC of a case's business unit no longer gets that case's lane-opened mail, and the case page tells them why they have no decision panel, in Thai and English (ruling item 10, ticket #164). On a case of another business unit the same reviewer still gets the mail. The owner case is not ruled and is unchanged. [Review](changes/2026-09-26-w3-f2-spoc-reviewer-mail/review.md).
+
 ## W3-F1 display names, part 2 — 2026-09-26
 
 The case header, the My cases card, the version list, the frozen version and the lane decisions (including the owner's send-back feedback) now show names instead of subject IDs such as `fixture:fx-user-owner-cm`, falling back to the ID when a read carries no name, in Thai and English, with a test pinning each surface. This completes ticket #163. Correction to part 1's entry below: its byte identity holds in fixture mode; with a sign-in directory a name can change over time (display only, a W7 follow-up), as W0-02 now says. [Review](changes/2026-09-26-w3-f1-display-names/review.md).

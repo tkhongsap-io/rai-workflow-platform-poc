@@ -380,6 +380,7 @@
   "review.disposition.status_label": "Status: {kind}",
   "review.disposition.waived": "Waive",
   "review.findings.empty": "This lane's QC run found no defects",
+  "review.excluded.bu_spoc": "You are BU SPOC for this case's business unit ({businessUnit}), so you cannot make lane decisions for {lanes} on this case.",
   "review.findings.heading": "Findings for {lane}",
   "review.findings.intro": "This lane's QC result appears before any decision. Approve only after you have seen it.",
   "review.findings.list_label": "Findings",
