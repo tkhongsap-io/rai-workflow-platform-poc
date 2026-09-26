@@ -173,6 +173,22 @@ async function submitterName(
   return name === undefined ? {} : { submittedByDisplayName: name };
 }
 
+/** W3-F1: names the current version's submitter on a view built without a lookup; unchanged when unknown. */
+export async function withCurrentSubmitterName(
+  view: CaseView,
+  names: (subjectId: string) => Promise<string | undefined>,
+): Promise<CaseView> {
+  const current = view.currentVersion;
+  if (current === null) return view;
+  const name = await names(current.submittedBy);
+  if (name === undefined) return view;
+  const { versionId, versionNumber, submittedBy, ...rest } = current;
+  return {
+    ...view,
+    currentVersion: { versionId, versionNumber, submittedBy, submittedByDisplayName: name, ...rest },
+  };
+}
+
 /** The 7.3 `CaseView` for one stored case: the row plus its open draft and latest submitted version. */
 export async function readCaseView(
   exec: Executor,

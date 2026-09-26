@@ -63,6 +63,8 @@ describe(`W3-F1 display names on reads — ${SET}`, () => {
     assert.equal((await post()).body, created.body, 'the replayed 201 is byte-identical (A07)');
     const byId = await get(spoc, `/api/cases/${NONVENDOR.caseId}/versions/${version.versionId}`);
     assert.equal(byId.body, created.body, 'a later read is byte-identical to the 201 (A07)');
+    const latest = await get(spoc, `/api/cases/${NONVENDOR.caseId}/versions/latest`);
+    assert.equal(latest.body, created.body, 'the latest read is byte-identical to the 201 (A07)');
 
     const owner = await signIn(OWNER.fixtureUserId);
     const list = (await get(owner, `/api/cases/${NONVENDOR.caseId}/versions`)).json<VersionListResponse>();

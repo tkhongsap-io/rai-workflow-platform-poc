@@ -33,6 +33,7 @@ import {
 } from './repository.js';
 import { toStoredSourceRecordId, validateSourceRecordId } from './source-record-id.js';
 import { readNames, type SubjectDirectory } from './subject-directory.js';
+import { withCurrentSubmitterName } from './repository.js';
 
 export interface CaseServiceDeps {
   db: Db;
@@ -146,7 +147,7 @@ export async function createCase(
       checklistTemplateVersion,
       now,
     });
-    const view = await caseViewFrom(tx, created.caseRow, readNames(deps.subjects));
+    const view = await caseViewFrom(tx, created.caseRow); // a new case has no submitted version to name
     await auditStore.append(tx, {
       actorSubjectId: ctx.actor.subjectId,
       actorRole: ctx.role,
@@ -224,7 +225,7 @@ export async function updateCase(
   columns: Partial<DraftEditableColumns>,
 ): Promise<CaseView> {
   const now = (deps.now ?? (() => new Date()))();
-  return withTransaction(deps.db, async (tx) => {
+  const view = await withTransaction(deps.db, async (tx) => {
     if (!(await lockCase(tx, caseId))) throw new NotFoundError('case');
     const before = (await readCaseRow(tx, caseId))!;
     await assertDraftOpen(tx, before, request.expectedCaseRevision);
@@ -265,8 +266,10 @@ export async function updateCase(
       correlationId: ctx.correlationId,
       occurredAt: now,
     });
-    return caseViewFrom(tx, after, readNames(deps.subjects));
+    return caseViewFrom(tx, after);
   });
+  // W3-F1: the submitter's name after the transaction, never on a second connection while the case row is locked.
+  return withCurrentSubmitterName(view, readNames(deps.subjects));
 }
 
 /** W0-06 5.2 for save draft (case fields): the open draft must exist and be the current version; the revision must match. */
