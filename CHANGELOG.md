@@ -2,6 +2,7 @@
 
 ## 2026-09-26
 
+- W3-F3 (#165): the lane-opened mail counts that lane's findings, QC outages included, "recorded so far".
 - W3-F3 (#165): the lane-opened mail counts that lane's defects, "recorded so far".
 - W3-F6 (#168): removed the unused `scopedCases` helper; specs name `caseScopeWhere`.
 - W3-F2 (#164): no lane-opened mail to a lane reviewer who is BU SPOC on the case; the case page says why the decision panel is absent.
