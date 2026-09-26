@@ -36,3 +36,10 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: Tech lead claims lane-lead-integration and takes #6 (W0-01 stack ADR).
 - Author: operator=ta session=planning-session model=claude-opus-5
 - Evidence: https://github.com/tkhongsap-io/rai-workflow-platform-poc/issues
+
+## 2026-09-26 10:30 — W3 deferred rulings recorded
+- What: Ta's rulings on the W3 hardening review section 5 items 2, 3, 5-12 and the walkthrough's status-name question, as one register row; W0-07 3.4 amended to the refusing behaviour for QC after a send-back; follow-up tickets #163-#169 opened under package W3.
+- Why: Ta accepted the recommendations presented after W3 acceptance, so the fix track can run as tickets.
+- Next: the tickets through the reviewed flow, #163 (display names) first.
+- Author: operator=ta session=claude-code-w3-deferred-rulings model=claude-opus-5-5
+- Evidence: PR on `codex/w3-deferred-rulings`

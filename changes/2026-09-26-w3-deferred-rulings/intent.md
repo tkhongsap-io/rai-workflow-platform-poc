@@ -1,0 +1,3 @@
+# Intent: record Ta's rulings on the W3 deferred questions
+
+On 2026-09-26, after accepting W3, Ta accepted the recommendations presented in the Claude Code session for the questions the [W3 hardening review](../2026-09-23-w3-hardening/review.md) section 5 had left open and the walkthrough script's status-name question. The script's other question, whether the queue is the list Nakhun would start his day with, was not ruled and stays open. This change records them (one register row), makes the one documentation-only consequence (W0-07 3.4 now states the refusing behaviour the code already has), and opens the code follow-ups as W3 tickets. No code here.

@@ -169,6 +169,20 @@ Entry: W2 exit. D06 and D11 are recorded. Requirements: R5, R6. Completes source
 
 ---
 
+## W3 follow-ups (after M3, 2026-09-26)
+
+W3 was accepted on 2026-09-26. These tickets implement Ta's rulings of the same day (register row "W3 deferred rulings"); they run under D03 as W3 work on synthetic data. The GitHub issue is the tracker; this table is the document of record.
+
+| ID | Outcome | Proves | Depends on | Decisions | Lane | Owner type | Done when |
+|---|---|---|---|---|---|---|---|
+| W3-F1 (#163) | Names, not subject IDs, in case, version and decision reads | A01 (scope kept) | — | Rulings item 8 | A+B | HRR | A W0-02 section 7 read-shape contract PR adds display names (subject IDs stay for audit; no new user-lookup endpoint; names never logged; no cross-BU leak per W0-05), then a UI PR renders them in both locales at three widths. |
+| W3-F2 (#164) | A lane reviewer who is BU SPOC on the case gets no lane-opened mail for that lane; the page says why the panel is absent | A05 | W0-02 read-shape change for the "why" note | Rulings item 10 | B | HRR | W0-05 3.3 table and T28 updated; recipient composition excludes BU-SPOC reviewers per case and lane, tested with `fx-user-dpo-spoc-hr` on the HR case; bilingual page note. |
+| W3-F3 (#165) | The lane-opened mail counts that lane's findings stored at send time, labelled "so far" | A05 | — | Rulings item 11 | B | Agent-eligible | W0-06 section 5 and W0-07 section 4 `defectCount` wording updated; the ticket states whether QC-unavailable and already-dispositioned findings count; a test with findings on two lanes shows per-lane counts. |
+| W3-F4 (#166) | The owner's send-back mail opens the successor draft | A05 | — | Rulings item 12 | B | Agent-eligible | W0-07 section 4 `SafeDeepLink` for `sent_back` names the draft; protected-link tests updated. |
+| W3-F5 (#167) | One Thai term, "การตรวจทานในระบบเสร็จสิ้น", for desk completion everywhere, including the status badge | A11 (D12 language) | — | Rulings, status name | B | Agent-eligible | Every Thai string for the state (queue, case page, badge, mail subject and body, next action, decided-Ready and stale-version messages) uses the term; a test asserts it; axe passes in th and en. English is unchanged. |
+| W3-F6 (#168) | The unused `scopedCases` helper is gone | — | — | Rulings item 5 | A | Agent-eligible | Code and the W0-04 and performance-targets references removed; full suite green; no behaviour change. |
+| W3-F7 (#169) | `BLOB_TMP_MAX_AGE_HOURS` below 1 is refused | A07 | — | Rulings item 7 | A | Agent-eligible | W0-02 section 5 says "Integer ≥ 1"; start-up and `store:cleanup` refuse lower values with a test; a temporary upload younger than one hour is not swept. |
+
 ## Traceability check
 
 Rows list every ticket whose Proves column names the ID, including Wx-INT and exit tickets. Tickets whose Proves column says "Feeds" or "Enables" (W1-00, W1-09 to W1-13, W2-10, W3-07, W3-08) are enabling work and are omitted.
