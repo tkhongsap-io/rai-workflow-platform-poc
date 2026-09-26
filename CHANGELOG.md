@@ -2,6 +2,7 @@
 
 ## 2026-09-26
 
+- W3-F1 part 2 (#163): the screens show names instead of subject IDs on the case header, My cases card, versions and lane decisions.
 - W3-F1 part 1 (#163): case, version and decision reads carry display names beside subject IDs.
 - Ta ruled on the W3 deferred questions (register row "W3 deferred rulings"); W0-07 amended for QC after a send-back; follow-up tickets #163-#169 opened.
 - W3-07 follow-up: the Admin desk-health list names the lane that owns each QC outage.

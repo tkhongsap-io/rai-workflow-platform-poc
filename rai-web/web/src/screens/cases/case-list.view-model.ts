@@ -36,6 +36,8 @@ export interface CaseRowModel {
   businessUnitLabel: string;
   useCaseGroup: string;
   businessOwner: string;
+  /** W3-F1: the owner's display name when the read carries one, else the subject id. */
+  ownerLabel: string;
   status: CaseStatus;
   versionNumber: number | null;
   nextActionKey: LocaleKey;
@@ -50,6 +52,7 @@ export function toRowModel(summary: CaseSummary): CaseRowModel {
     businessUnitLabel: `${summary.businessUnit} (${summary.businessUnitId})`,
     useCaseGroup: summary.useCaseGroup,
     businessOwner: summary.businessOwner,
+    ownerLabel: summary.ownerDisplayName ?? summary.businessOwner,
     status: summary.status,
     versionNumber: summary.currentVersionNumber,
     nextActionKey: NEXT_ACTION_KEY[summary.status],

@@ -128,3 +128,10 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w3-f1-display-names model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #163, lane A+B, human-review-required)
 - Scope: per changes/2026-09-26-w3-f1-display-names/: read shapes and server; the UI is part 2.
+
+## 2026-09-26 13:10 — W3-F1 display names, part 2 (UI)
+- What: the five surfaces render display names with a subject-ID fallback; browser specs updated; part 1 (#172, `a8d4ec5`) supplied the fields.
+- Why: ruling item 8 (register row "W3 deferred rulings"), ticket #163.
+- Next: two reviewers and CI on this PR; on merge, #163 closes with status evidence-recorded, then W3-F2 (#164).
+- Author: operator=ta session=claude-code-w3-f1-display-names model=claude-opus-5-5
+- Evidence: https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/173

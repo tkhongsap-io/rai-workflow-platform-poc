@@ -44,7 +44,7 @@ export function PackFrozen({
       <dl className={'facts'}>
         <div>
           <dt>{t('version.field.submitted_by')}</dt>
-          <dd>{version.submittedBy}</dd>
+          <dd>{version.submittedByDisplayName ?? version.submittedBy}</dd>
         </div>
         <div>
           <dt>{t('version.field.submitted_at')}</dt>

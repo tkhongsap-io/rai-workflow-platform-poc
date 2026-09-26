@@ -49,6 +49,8 @@ test('a list row carries identity, version and the next-action key for its statu
     updatedAt: '2026-09-21T00:00:00.000Z',
   });
   assert.equal(row.businessUnitLabel, 'Consumer Mobile (CM)');
+  // W3-F1: a read without a name still shows the subject id, never an empty cell
+  assert.equal(row.ownerLabel, 'fixture:fx-user-owner-cm');
   assert.equal(row.versionNumber, null);
   assert.equal(row.nextActionKey, 'next_action.draft');
   assert.equal(
@@ -66,6 +68,23 @@ test('a list row carries identity, version and the next-action key for its statu
     }).nextActionKey,
     'next_action.in_review',
   );
+});
+
+test('W3-F1: the owner cell shows the display name when the read carries one', () => {
+  const row = toRowModel({
+    caseId: 'c3',
+    registryId: 'RAI-2000-0003',
+    useCaseName: 'x',
+    businessUnitId: 'CM',
+    businessUnit: 'Consumer Mobile',
+    businessOwner: 'fixture:fx-user-owner-cm',
+    ownerDisplayName: 'ณัฐพร ส. (Nattaporn S.)',
+    useCaseGroup: 'field-operations',
+    status: 'draft',
+    currentVersionNumber: null,
+    updatedAt: '2026-09-26T00:00:00.000Z',
+  });
+  assert.equal(row.ownerLabel, 'ณัฐพร ส. (Nattaporn S.)');
 });
 
 test('page count never drops below one', () => {

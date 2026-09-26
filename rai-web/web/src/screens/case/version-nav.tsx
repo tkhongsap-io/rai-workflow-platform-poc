@@ -51,7 +51,9 @@ export function VersionNav({ caseId, draft, versions }: VersionNavProps): JSX.El
                 <Badge status={'latest'} tone={'info'} label={t('version.latest')} />
               ) : null}
               <span className={'muted small version-meta'}>
-                {t('version.submitted_by', { subject: version.submittedBy })}
+                {t('version.submitted_by', {
+                  subject: version.submittedByDisplayName ?? version.submittedBy,
+                })}
                 {' · '}
                 <time dateTime={version.submittedAt}>{formatDateTime(locale, version.submittedAt)}</time>
               </span>
