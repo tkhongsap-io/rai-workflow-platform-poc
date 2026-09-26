@@ -1,5 +1,9 @@
 # Development log
 
+## W3-F1 display names, part 1 — 2026-09-26
+
+Case, version and decision reads now carry display names beside the subject IDs (ruling item 8, ticket #163): the owner from the case's `business_owner` column, the submitter and decider from the server's subject directory. The submit 201, its replay and every read stay byte-identical (A07). No new endpoint, no names in logs, no scope change. The UI renders them in part 2. [Review](changes/2026-09-26-w3-f1-display-names/review.md).
+
 ## W3 deferred rulings — 2026-09-26
 
 Ta ruled on the questions the W3 hardening review had left open and on the walkthrough's status-name question (register row "W3 deferred rulings"); the "queue as a day-start list" question stays open. W0-07 now states the refusing behaviour for QC evidence after a send-back, which the code already had. Seven follow-up tickets are open under package W3 (#163-#169): display names, three notification fixes, one Thai term for desk completion, and two small clean-ups. [Review](changes/2026-09-26-w3-deferred-rulings/review.md).

@@ -41,6 +41,7 @@ export function composeAppDeps(inputs: ComposeInputs): AppDeps {
   const { config, db, fixtureUsers, qcRunner, mailSink } = inputs;
   // The fixture identities are the only directory in slice 1; AD resolution is W8.
   const knownIdentities = fixtureUsers ?? [];
+  const subjects = createSubjectDirectory(db, { known: knownIdentities }); // one directory for cases and versions
   const ownerRecipients = (ownerSubjectId: string) =>
     sendBackRecipientsFromIdentities(knownIdentities, ownerSubjectId);
   const { publicBaseUrl } = config;
@@ -61,14 +62,12 @@ export function composeAppDeps(inputs: ComposeInputs): AppDeps {
       facts: createScopeFactsSource(db),
       ...(fixtureUsers === undefined ? {} : { fixtureProvider: createFixtureIdentityProvider(fixtureUsers) }),
     },
-    cases: {
-      businessUnits: inputs.businessUnits,
-      subjects: createSubjectDirectory(db, { known: knownIdentities }),
-    },
+    cases: { businessUnits: inputs.businessUnits, subjects },
     artifacts: { store: inputs.store, limits: config.upload },
     // Upload-triggered QC is not implemented (W4), so the W0-07 upload hook stays a no-op.
     pack: { limits: config.upload, uploadTrigger: noopUploadTrigger },
     versions: {
+      subjects, // W3-F1: the same directory names submitters and deciders on reads
       laneOpenRecipients: laneOpenRecipientsFromIdentities(knownIdentities),
       qc: qcRunner === undefined ? {} : { runner: qcRunner },
     },

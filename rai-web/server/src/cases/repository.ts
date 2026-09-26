@@ -163,15 +163,49 @@ export async function readVersionRow(exec: Executor, versionId: string): Promise
   return row;
 }
 
+/** W3-F1: the submitter's display name as an optional spread; nothing when unknown or when no lookup is given. */
+async function submitterName(
+  subjectId: string | null,
+  names: ((subjectId: string) => Promise<string | undefined>) | undefined,
+): Promise<{ submittedByDisplayName?: string }> {
+  if (subjectId === null || names === undefined) return {};
+  const name = await names(subjectId);
+  return name === undefined ? {} : { submittedByDisplayName: name };
+}
+
+/** W3-F1: names the current version's submitter on a view built without a lookup; unchanged when unknown. */
+export async function withCurrentSubmitterName(
+  view: CaseView,
+  names: (subjectId: string) => Promise<string | undefined>,
+): Promise<CaseView> {
+  const current = view.currentVersion;
+  if (current === null) return view;
+  const name = await names(current.submittedBy);
+  if (name === undefined) return view;
+  const { versionId, versionNumber, submittedBy, ...rest } = current;
+  return {
+    ...view,
+    currentVersion: { versionId, versionNumber, submittedBy, submittedByDisplayName: name, ...rest },
+  };
+}
+
 /** The 7.3 `CaseView` for one stored case: the row plus its open draft and latest submitted version. */
-export async function readCaseView(exec: Executor, caseId: string): Promise<CaseView | undefined> {
+export async function readCaseView(
+  exec: Executor,
+  caseId: string,
+  names?: (subjectId: string) => Promise<string | undefined>,
+): Promise<CaseView | undefined> {
   const row = await readCaseRow(exec, caseId);
   if (row === undefined) return undefined;
-  return caseViewFrom(exec, row);
+  return caseViewFrom(exec, row, names);
 }
 
 /** Reads through `exec`, so inside the caller's write transaction it derives from the row just written. */
-export async function caseViewFrom(exec: Executor, row: CaseRow): Promise<CaseView> {
+export async function caseViewFrom(
+  exec: Executor,
+  row: CaseRow,
+  names?: (subjectId: string) => Promise<string | undefined>,
+): Promise<CaseView> {
   const currentAlias = alias(packVersion, 'current');
   const draftAlias = alias(packVersion, 'draft');
   const [joined] = await exec
@@ -188,6 +222,7 @@ export async function caseViewFrom(exec: Executor, row: CaseRow): Promise<CaseVi
     businessUnitId: row.businessUnitId,
     businessUnit: row.businessUnit,
     businessOwner: row.ownerSubjectId, // the SubjectId in owner_subject_id, not the descriptive text (W0-05 section 8)
+    ownerDisplayName: row.businessOwner, // W3-F1: the descriptive column, written at create and every owner change
     technicalOwner: row.technicalOwner,
     sourceRecordId: fromStoredSourceRecordId(row.sourceRecordId),
     useCaseGroup: row.useCaseGroup,
@@ -206,6 +241,7 @@ export async function caseViewFrom(exec: Executor, row: CaseRow): Promise<CaseVi
             versionId: current.id,
             versionNumber: current.versionNumber,
             submittedBy: current.submittedBy ?? '',
+            ...(await submitterName(current.submittedBy, names)),
             submittedAt: current.submittedAt.toISOString(),
             isLatest: true,
           },
@@ -257,6 +293,7 @@ export async function listCases(
     businessUnitId: r.c.businessUnitId,
     businessUnit: r.c.businessUnit,
     businessOwner: r.c.ownerSubjectId,
+    ownerDisplayName: r.c.businessOwner, // W3-F1, as CaseView
     useCaseGroup: r.c.useCaseGroup,
     status: r.status,
     currentVersionNumber: r.c.currentVersionId === null ? null : r.currentVersionNumber,

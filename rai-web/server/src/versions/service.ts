@@ -46,6 +46,8 @@ import {
   versionSummaryOf,
   type RevisionInForce,
 } from './freeze.js';
+import { readNames, type SubjectDirectory } from '../cases/subject-directory.js';
+import { withDeciderName, withSubmitterName } from './display-names.js';
 import { manifestHash } from './manifest.js';
 import { openLanesOnSubmit, EMPTY_LANE_OPEN_RECIPIENTS, type LaneOpenRecipients } from './open-lanes.js';
 import {
@@ -60,6 +62,8 @@ import { withWorkflowTransaction, type ActionContext, type WorkflowResult } from
 export interface VersionServiceDeps {
   db: Db;
   now?: () => Date;
+  /** W3-F1: names for display on reads; absent means reads carry subject IDs only. */
+  subjects?: SubjectDirectory;
   /** Slice-1: fixture reviewers who hold each lane (from identity data). Empty until W8 AD resolution otherwise. */
   laneOpenRecipients?: LaneOpenRecipients;
 }
@@ -122,6 +126,9 @@ export async function submitDraft(
   idempotencyKey: string,
 ): Promise<WorkflowResult<SubmittedVersion>> {
   const now = (deps.now ?? (() => new Date()))();
+  // W3-F1: resolved before the transaction opens, so the lookup never takes a second pool connection while the
+  // case lock is held. The same directory as the reads; the actor is only its fallback; no directory, no name.
+  const submitterName = (await deps.subjects?.resolve(ctx.actor.subjectId, ctx.actor))?.displayName;
   // Digest always uses case.submit so a replay after the draft is closed still matches (W2-04: do not derive
   // the digest from post-commit state). The stored action may be case.resubmit via storeAction.
   return withWorkflowTransaction<SubmittedVersion>(
@@ -163,7 +170,10 @@ export async function submitDraft(
           resetAiReadiness: isResubmit,
         });
         // A version just frozen has no decisions yet.
-        const body = submittedVersionView(version, frozenSlotsOf(slots.rows, slots.artifacts), true, []);
+        const body = withSubmitterName(
+          submittedVersionView(version, frozenSlotsOf(slots.rows, slots.artifacts), true, []),
+          submitterName,
+        );
         const slotRefs: AuditRefValue[] = slots.rows.map((r) => {
           const ref: Record<string, AuditRefValue> = { slot: r.slot, state: r.state };
           if (r.artifactId !== null) {
@@ -218,23 +228,36 @@ export async function submitDraft(
 }
 
 /** `GET /api/cases/{caseId}/versions`: ascending by versionNumber; empty while never submitted. */
-export async function listVersions(exec: Executor, caseId: string): Promise<VersionListResponse> {
+export async function listVersions(
+  exec: Executor,
+  caseId: string,
+  subjects?: SubjectDirectory,
+): Promise<VersionListResponse> {
   const row = await readCaseRow(exec, caseId);
   if (row === undefined) throw new NotFoundError('case');
   const rows = await listSubmittedVersions(exec, caseId);
-  return { items: rows.map((v) => versionSummaryOf(v, v.id === row.currentVersionId)) };
+  const names = readNames(subjects);
+  return {
+    items: await Promise.all(
+      rows.map(async (v) => {
+        const summary = versionSummaryOf(v, v.id === row.currentVersionId);
+        return withSubmitterName(summary, await names(summary.submittedBy));
+      }),
+    ),
+  };
 }
 
 /**
  * The 7.6 read of one submitted version (`pick` names it from the case row), in one read-only snapshot so its
  * slots, `isLatest` and decisions describe the same instant. 404 `version` also when the id belongs to another case.
  */
-function readView(
+async function readView(
   db: Db,
   caseId: string,
   pick: (caseRow: CaseRow) => string | null,
+  subjects?: SubjectDirectory,
 ): Promise<SubmittedVersion> {
-  return db.transaction(
+  const view = await db.transaction(
     async (tx) => {
       const row = await readCaseRow(tx, caseId);
       if (row === undefined) throw new NotFoundError('case');
@@ -251,11 +274,18 @@ function readView(
     },
     { isolationLevel: 'repeatable read', accessMode: 'read only' },
   );
+  // W3-F1: names after the snapshot closes, so no second pool connection is taken while it is open.
+  const names = readNames(subjects);
+  const decisions = await Promise.all(
+    view.decisions.map(async (d) => withDeciderName(d, await names(d.decidedBy))),
+  );
+  return withSubmitterName({ ...view, decisions }, await names(view.submittedBy));
 }
 
 /** `GET /api/cases/{caseId}/versions/{versionId}`. */
-export const readVersion = (db: Db, caseId: string, versionId: string) =>
-  readView(db, caseId, () => versionId);
+export const readVersion = (db: Db, caseId: string, versionId: string, subjects?: SubjectDirectory) =>
+  readView(db, caseId, () => versionId, subjects);
 
 /** `GET /api/cases/{caseId}/versions/latest`: 404 `version` when never submitted. */
-export const latestVersion = (db: Db, caseId: string) => readView(db, caseId, (row) => row.currentVersionId);
+export const latestVersion = (db: Db, caseId: string, subjects?: SubjectDirectory) =>
+  readView(db, caseId, (row) => row.currentVersionId, subjects);

@@ -123,3 +123,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: D08/D09 decision briefs and a draft W4 gate for Ta (lead, documentation only); the W3-07 desk-health follow-up (the outage finding's lane) as a ticket. W4-W8 remain unauthorized.
 - Author: operator=ta session=claude-code-w3-acceptance model=claude-opus-5-5
 - Evidence: PR on `codex/w3-acceptance`
+
+## 2026-09-26 11:40 — CLAIM lead-integration: W3-F1 display names, part 1 (contract and server)
+- Author: operator=ta session=claude-code-w3-f1-display-names model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #163, lane A+B, human-review-required)
+- Scope: per changes/2026-09-26-w3-f1-display-names/: read shapes and server; the UI is part 2.

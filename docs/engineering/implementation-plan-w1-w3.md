@@ -573,11 +573,12 @@ export interface CaseView extends CaseWritableFields {
   createdBy: SubjectId;
   createdAt: string;
   updatedAt: string;
+  ownerDisplayName?: string;             // W3-F1 (2026-09-26): display only, the W0-04 descriptive business_owner text (served right after businessOwner)
 }
 
 export interface CaseSummary {           // list row
   caseId: CaseId; registryId: RegistryId; useCaseName: string; businessUnitId: string; businessUnit: string;
-  businessOwner: SubjectId; useCaseGroup: string; status: CaseStatus;
+  businessOwner: SubjectId; ownerDisplayName?: string; useCaseGroup: string; status: CaseStatus;
   currentVersionNumber: number | null; updatedAt: string;
 }
 
@@ -702,6 +703,7 @@ export interface SubmittedVersion {
   versionNumber: number;
   parentVersionId: VersionId | null;
   submittedBy: SubjectId;                     // the actor; a BU SPOC submitting on the owner's behalf is recorded as itself
+  submittedByDisplayName?: string;            // W3-F1: display only; see the note after VersionSummary
   submittedAt: string;
   checklistTemplateVersion: string;
   stageContext: StageContext;
@@ -717,13 +719,23 @@ export interface LaneDecision {
   lane: Lane;
   decision: 'approve' | 'send_back';
   decidedBy: SubjectId;                       // same convention as submittedBy
+  decidedByDisplayName?: string;              // W3-F1: display only
   decidedAt: string;
   feedback: SendBackFeedback | null;          // the send-back feedback the owner revises against; null on approve
 }
 
 export interface VersionSummary {
-  versionId: VersionId; versionNumber: number; submittedBy: SubjectId; submittedAt: string; isLatest: boolean;
+  versionId: VersionId; versionNumber: number; submittedBy: SubjectId; submittedByDisplayName?: string; submittedAt: string; isLatest: boolean;
 }
+
+// W3-F1 (register row "W3 deferred rulings", item 8, 2026-09-26): the `...DisplayName` fields are display only.
+// The subject IDs stay the identity of record (audit, the SPA's own-subject checks). The owner's name is the W0-04
+// `business_owner` column; submitter and decider names come from the server's subject directory, the same one on
+// the submit 201 and on every read, resolved outside any transaction. In fixture mode the 201, its replay and every
+// read are byte-identical (A07). With a sign-in directory (local-google, later network), a name can change or drop
+// if the person's display name changes or their session rows are swept; the frozen fields are unaffected, and
+// pinning names for those modes is a W7 follow-up. A subject the directory does not know gets no name field. Names are not part of the frozen version record, are never logged, and need no new lookup
+// endpoint; the scope of every read is unchanged (W0-05).
 
 export interface ExpectedVersion { versionId: string; revision: number }   // W0-06 section 5.1, verbatim; versionId = draftId for draft actions
 export interface SubmitRequest { expectedVersion: ExpectedVersion }

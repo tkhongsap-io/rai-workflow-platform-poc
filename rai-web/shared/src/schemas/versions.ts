@@ -25,6 +25,7 @@ export const VersionSummarySchema = Type.Object({
   versionId: Type.String(),
   versionNumber: Type.Integer({ minimum: 1 }),
   submittedBy: Type.String(),
+  submittedByDisplayName: Type.Optional(Type.String()), // display only (W3-F1); absent when the subject is unknown
   submittedAt: Type.String(),
   isLatest: Type.Boolean(),
 });
@@ -36,6 +37,7 @@ export interface SubmittedVersion {
   versionNumber: number;
   parentVersionId: string | null;
   submittedBy: string; // the actor; a BU SPOC submitting on the owner's behalf is recorded as itself
+  submittedByDisplayName?: string; // display only (W3-F1); not part of the frozen record
   submittedAt: string;
   checklistTemplateVersion: string;
   stageContext: Static<typeof StageContextSchema>;

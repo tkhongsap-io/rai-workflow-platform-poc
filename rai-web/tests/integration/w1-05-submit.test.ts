@@ -71,6 +71,7 @@ const SPOC_B1 = 'fx-user-spoc-cm';
 const DPO = 'fx-user-dpo';
 const ADMIN = 'fx-user-admin';
 const subjectOf = (id: string) => findFixtureUser(id)!.subjectId;
+const nameOf = (id: string) => findFixtureUser(id)!.displayName;
 const NONVENDOR = findFixtureCase('fx-case-nonvendor')!; // owner-a, B1, vendorInvolved false, seven slots attached
 const MISSING_SLOT = findFixtureCase('fx-case-missing-slot')!; // owner-a, B1, a missing and a not-yet slot
 const HR_CASE = findFixtureCase('fx-case-hr-dualrole')!; // owner-a, B2
@@ -446,6 +447,8 @@ describe(`W1-05 submit freezes an immutable version (A07) — ${SET}, fx-case-no
       versionId: version.versionId,
       versionNumber: 1,
       submittedBy: subjectOf(OWNER_A),
+      // W3-F1: this suite gives the case routes a subject directory, so the case read names the submitter
+      submittedByDisplayName: nameOf(OWNER_A),
       submittedAt: version.submittedAt,
       isLatest: true,
     });
