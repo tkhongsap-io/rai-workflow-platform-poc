@@ -192,3 +192,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w3-f7-blob-tmp-min model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #169)
 - Scope: per changes/2026-09-26-w3-f7-blob-tmp-min/. One PR.
+
+## 2026-09-26 18:30 — CLAIM lane-a: W3-F8 case-query scope guard test (#180)
+- Author: operator=ta session=claude-code-w3-f8-case-query-scope-guard model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #180, Ta's ruling item 13)
+- Scope: per changes/2026-09-26-w3-f8-case-query-scope-guard/. One PR, test and docs only, no behaviour change.
