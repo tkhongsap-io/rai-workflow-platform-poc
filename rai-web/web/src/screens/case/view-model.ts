@@ -182,8 +182,7 @@ export function isSelfExcludedOnCase(
  */
 export function laneExclusionNote(args: {
   roles: readonly RoleScope[];
-  subjectId: string;
-  view: Pick<CaseView, 'businessOwner' | 'businessUnitId'>;
+  view: Pick<CaseView, 'businessUnitId'>;
 }): { lanes: Lane[]; businessUnit: string } | null {
   const lanes = reviewerLanesOf(args.roles);
   if (lanes.length === 0) return null;

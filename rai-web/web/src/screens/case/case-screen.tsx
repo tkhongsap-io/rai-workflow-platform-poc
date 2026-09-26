@@ -424,7 +424,6 @@ function CaseScreenBody(props: BodyProps): JSX.Element {
                 const note = versionState.version.isLatest
                   ? laneExclusionNote({
                       roles: props.session.principal.roles,
-                      subjectId: props.session.principal.subjectId,
                       view: state.view,
                     })
                   : null;

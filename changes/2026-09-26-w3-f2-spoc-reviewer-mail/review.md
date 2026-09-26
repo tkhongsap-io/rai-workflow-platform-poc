@@ -25,6 +25,14 @@ Worktree `/tmp/rai-names`, Postgres `rai-names` on 55372, one suite at a time.
 | `npm run test:browser:substitute` | 48 passed |
 | `node scripts/check-links.mjs` (root) | 0 broken |
 
+## Deviation from the document of record (for the lead or Ta to confirm)
+
+The W3-F2 row (written with #170) listed a W0-02 read-shape change before the page note. This PR derives the note in the SPA instead, from the session's own grants and `CaseView.businessUnitId`, which W0-05 section 6 allows for display: the API still answers 403, and the note reveals nothing the user cannot already read. The row now carries a dated note saying so, W0-05's "why" clause says the request is not needed for the BU-SPOC case, and #164 gets a correction after merge. **Please confirm on the PR that dropping the read-shape step is acceptable.**
+
 ## Reviewer verdicts
 
-On the PR.
+| Round | Head | Correctness | Contract and privacy |
+|---|---|---|---|
+| 1 | `b87d5bd` | PASS; note: whether a BU-SPOC reviewer should also leave the daily SLA digest is outside ruling 10 (a question for Ta, not acted on) | BLOCKING on records: the dropped read-shape step was not recorded; nits: English "the {lanes} lane" for several lanes; unused `subjectId` and owner inputs to `laneExclusionNote` |
+
+Round-1 changes: the deviation above is recorded (table note, W0-05 clause, this section); the English text reads "so you cannot make lane decisions for {lanes} on this case"; `laneExclusionNote` takes only the grants and the case's business unit. Re-run: view-model and shared unit tests 60/60; `w2-int-07-reviewer-workspace` 18 passed at three widths on a fresh build; typecheck and lint clean.
