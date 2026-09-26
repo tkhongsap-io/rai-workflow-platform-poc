@@ -30,6 +30,7 @@ const DUAL = 'fx-user-dpo-spoc-hr';
 const NONVENDOR = findFixtureCase('fx-case-nonvendor')!;
 const HR_DUAL = findFixtureCase('fx-case-hr-dualrole')!;
 const subjectOf = (id: string) => findFixtureUser(id)!.subjectId;
+const nameOf = (id: string) => findFixtureUser(id)!.displayName;
 const emailOf = (id: string) => findFixtureUser(id)!.email;
 
 let runner: ScriptedQcRunner;
@@ -452,6 +453,7 @@ describe(`W2-02 lane decision — ${SET}`, () => {
         lane: 'dpo',
         decision: 'approve',
         decidedBy: subjectOf(DPO),
+        decidedByDisplayName: nameOf(DPO), // W3-F1: reads name the decider (rulings item 8)
         decidedAt: approved.json<LaneDecisionResponse>().decidedAt,
         feedback: null,
       },
@@ -459,6 +461,7 @@ describe(`W2-02 lane decision — ${SET}`, () => {
         lane: 'ai_coe',
         decision: 'send_back',
         decidedBy: subjectOf(AI_COE),
+        decidedByDisplayName: nameOf(AI_COE),
         decidedAt: sentBack.json<LaneDecisionResponse>().decidedAt,
         feedback,
       },

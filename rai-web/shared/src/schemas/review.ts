@@ -67,6 +67,7 @@ export const LaneDecisionSchema = Type.Object({
   lane: LaneSchema,
   decision: LaneDecisionKindSchema,
   decidedBy: Type.String(), // subject id, as `SubmittedVersion.submittedBy`
+  decidedByDisplayName: Type.Optional(Type.String()), // display only (W3-F1)
   decidedAt: Type.String(),
   feedback: Type.Union([SendBackFeedbackSchema, Type.Null()]), // null on approve
 });

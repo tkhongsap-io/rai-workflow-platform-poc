@@ -34,6 +34,7 @@ const SubmittedVersionResponseSchema = Type.Object({
   versionNumber: Type.Integer(),
   parentVersionId: Type.Union([Type.String(), Type.Null()]),
   submittedBy: Type.String(),
+  submittedByDisplayName: Type.Optional(Type.String()), // W3-F1, display only
   submittedAt: Type.String(),
   checklistTemplateVersion: Type.String(),
   stageContext: StageContextSchema,
@@ -90,7 +91,7 @@ export function registerVersionRoutes(fastify: FastifyInstance, deps: VersionRou
       config: { auth: { kind: 'action', action: 'version.view', target: 'case' } },
       schema: { params: CaseParamsSchema, response: { 200: VersionListResponseSchema } },
     },
-    (request) => listVersions(deps.db, request.params.caseId),
+    (request) => listVersions(deps.db, request.params.caseId, deps.subjects),
   );
 
   // GET /api/cases/{caseId}/versions/latest → 200 SubmittedVersion; 404 when never submitted.
@@ -100,7 +101,7 @@ export function registerVersionRoutes(fastify: FastifyInstance, deps: VersionRou
       config: { auth: { kind: 'action', action: 'version.view', target: 'case' } },
       schema: { params: CaseParamsSchema, response: { 200: SubmittedVersionResponseSchema } },
     },
-    (request) => latestVersion(deps.db, request.params.caseId),
+    (request) => latestVersion(deps.db, request.params.caseId, deps.subjects),
   );
 
   // GET /api/cases/{caseId}/versions/{versionId} → 200 SubmittedVersion with the decisions recorded so far.
@@ -110,6 +111,6 @@ export function registerVersionRoutes(fastify: FastifyInstance, deps: VersionRou
       config: { auth: { kind: 'action', action: 'version.view', target: 'case' } },
       schema: { params: VersionParamsSchema, response: { 200: SubmittedVersionResponseSchema } },
     },
-    (request) => readVersion(deps.db, request.params.caseId, request.params.versionId),
+    (request) => readVersion(deps.db, request.params.caseId, request.params.versionId, deps.subjects),
   );
 }

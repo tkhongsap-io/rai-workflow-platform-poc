@@ -63,6 +63,8 @@ export interface CaseView extends CaseWritableFields {
   draft: Static<typeof DraftSummarySchema> | null;
   caseRevision: number; // W0-04 case.row_version
   createdBy: SubjectId;
+  /** Display only (W3-F1): the W0-04 descriptive `business_owner` text; `businessOwner` stays the SubjectId. */
+  ownerDisplayName?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -74,6 +76,7 @@ export interface CaseSummary {
   businessUnitId: string;
   businessUnit: string;
   businessOwner: SubjectId;
+  ownerDisplayName?: string; // display only (W3-F1), as CaseView
   useCaseGroup: string;
   status: CaseStatus;
   currentVersionNumber: number | null;

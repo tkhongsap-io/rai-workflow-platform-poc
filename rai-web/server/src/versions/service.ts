@@ -46,6 +46,7 @@ import {
   versionSummaryOf,
   type RevisionInForce,
 } from './freeze.js';
+import { readNames, type SubjectDirectory } from '../cases/subject-directory.js';
 import { manifestHash } from './manifest.js';
 import { openLanesOnSubmit, EMPTY_LANE_OPEN_RECIPIENTS, type LaneOpenRecipients } from './open-lanes.js';
 import {
@@ -60,6 +61,8 @@ import { withWorkflowTransaction, type ActionContext, type WorkflowResult } from
 export interface VersionServiceDeps {
   db: Db;
   now?: () => Date;
+  /** W3-F1: names for display on reads; absent means reads carry subject IDs only. */
+  subjects?: SubjectDirectory;
   /** Slice-1: fixture reviewers who hold each lane (from identity data). Empty until W8 AD resolution otherwise. */
   laneOpenRecipients?: LaneOpenRecipients;
 }
@@ -163,7 +166,13 @@ export async function submitDraft(
           resetAiReadiness: isResubmit,
         });
         // A version just frozen has no decisions yet.
-        const body = submittedVersionView(version, frozenSlotsOf(slots.rows, slots.artifacts), true, []);
+        // W3-F1: the same directory the reads use, so the 201, its replay and every read name the submitter
+        // identically (A07); the actor is only the directory's fallback, and no directory means no name.
+        const submitter = await deps.subjects?.resolve(ctx.actor.subjectId, ctx.actor);
+        const body = withSubmitterName(
+          submittedVersionView(version, frozenSlotsOf(slots.rows, slots.artifacts), true, []),
+          submitter?.displayName,
+        );
         const slotRefs: AuditRefValue[] = slots.rows.map((r) => {
           const ref: Record<string, AuditRefValue> = { slot: r.slot, state: r.state };
           if (r.artifactId !== null) {
@@ -218,11 +227,34 @@ export async function submitDraft(
 }
 
 /** `GET /api/cases/{caseId}/versions`: ascending by versionNumber; empty while never submitted. */
-export async function listVersions(exec: Executor, caseId: string): Promise<VersionListResponse> {
+export async function listVersions(
+  exec: Executor,
+  caseId: string,
+  subjects?: SubjectDirectory,
+): Promise<VersionListResponse> {
   const row = await readCaseRow(exec, caseId);
   if (row === undefined) throw new NotFoundError('case');
   const rows = await listSubmittedVersions(exec, caseId);
-  return { items: rows.map((v) => versionSummaryOf(v, v.id === row.currentVersionId)) };
+  const names = readNames(subjects);
+  return {
+    items: await Promise.all(
+      rows.map(async (v) => {
+        const summary = versionSummaryOf(v, v.id === row.currentVersionId);
+        return withSubmitterName(summary, await names(summary.submittedBy));
+      }),
+    ),
+  };
+}
+
+/** W3-F1: puts `submittedByDisplayName` right after `submittedBy`, or leaves the body as it is when unknown. */
+function withSubmitterName<T extends { submittedBy: string }>(body: T, name: string | undefined): T {
+  if (name === undefined) return body;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(body)) {
+    out[key] = value;
+    if (key === 'submittedBy') out.submittedByDisplayName = name;
+  }
+  return out as T;
 }
 
 /**
@@ -233,7 +265,9 @@ function readView(
   db: Db,
   caseId: string,
   pick: (caseRow: CaseRow) => string | null,
+  subjects?: SubjectDirectory,
 ): Promise<SubmittedVersion> {
+  const names = readNames(subjects);
   return db.transaction(
     async (tx) => {
       const row = await readCaseRow(tx, caseId);
@@ -242,20 +276,30 @@ function readView(
       const version = versionId === null ? undefined : await readSubmittedVersion(tx, caseId, versionId);
       if (version === undefined) throw new NotFoundError('version');
       const slots = await readSlotsWithArtifacts(tx, version.id);
-      return submittedVersionView(
+      const decisions = await Promise.all(
+        (await listLaneDecisions(tx, version.id)).map(async (d) => {
+          const name = await names(d.decidedBy);
+          if (name === undefined) return d;
+          const { lane, decision, decidedBy, ...rest } = d;
+          return { lane, decision, decidedBy, decidedByDisplayName: name, ...rest };
+        }),
+      );
+      const view = submittedVersionView(
         version,
         frozenSlotsOf(slots.rows, slots.artifacts),
         version.id === row.currentVersionId,
-        await listLaneDecisions(tx, version.id),
+        decisions,
       );
+      return withSubmitterName(view, await names(view.submittedBy));
     },
     { isolationLevel: 'repeatable read', accessMode: 'read only' },
   );
 }
 
 /** `GET /api/cases/{caseId}/versions/{versionId}`. */
-export const readVersion = (db: Db, caseId: string, versionId: string) =>
-  readView(db, caseId, () => versionId);
+export const readVersion = (db: Db, caseId: string, versionId: string, subjects?: SubjectDirectory) =>
+  readView(db, caseId, () => versionId, subjects);
 
 /** `GET /api/cases/{caseId}/versions/latest`: 404 `version` when never submitted. */
-export const latestVersion = (db: Db, caseId: string) => readView(db, caseId, (row) => row.currentVersionId);
+export const latestVersion = (db: Db, caseId: string, subjects?: SubjectDirectory) =>
+  readView(db, caseId, (row) => row.currentVersionId, subjects);

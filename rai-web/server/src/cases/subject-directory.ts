@@ -53,6 +53,25 @@ export function createSubjectDirectory(
   };
 }
 
+/**
+ * W3-F1: one read's name lookup. Each subject is resolved at most once per read; an unknown subject yields undefined,
+ * so the read omits the name rather than guessing. Names are display only and never decide access.
+ */
+export function readNames(
+  subjects: SubjectDirectory | undefined,
+): (subjectId: string) => Promise<string | undefined> {
+  const memo = new Map<string, Promise<string | undefined>>();
+  return (subjectId) => {
+    if (subjects === undefined) return Promise.resolve(undefined);
+    let hit = memo.get(subjectId);
+    if (hit === undefined) {
+      hit = subjects.resolve(subjectId).then((r) => r?.displayName);
+      memo.set(subjectId, hit);
+    }
+    return hit;
+  };
+}
+
 /** A directory over a fixed table only (unit tests, the W1-13 substitute). */
 export function createStaticSubjectDirectory(
   known: Iterable<Pick<Principal, 'subjectId' | 'displayName'>>,

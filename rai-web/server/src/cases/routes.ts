@@ -25,6 +25,7 @@ import type { Emitter } from '../observability/log.js';
 import { IDEMPOTENCY_HEADER, requireIdempotencyKey } from './idempotency.js';
 import { rejectProjectedFields } from './projected-fields.js';
 import { listCases, readCaseView } from './repository.js';
+import { readNames } from './subject-directory.js';
 import { createCase, updateCase, validateWritableFields, type CaseServiceDeps } from './service.js';
 
 export interface CaseRouteDeps extends CaseServiceDeps {
@@ -109,7 +110,7 @@ export function registerCaseRoutes(fastify: FastifyInstance, deps: CaseRouteDeps
       schema: { params: CaseParamsSchema },
     },
     async (request) => {
-      const view = await readCaseView(deps.db, request.params.caseId);
+      const view = await readCaseView(deps.db, request.params.caseId, readNames(deps.subjects));
       if (view === undefined) throw new NotFoundError('case');
       return view;
     },

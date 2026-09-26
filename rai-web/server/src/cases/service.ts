@@ -32,7 +32,7 @@ import {
   type DraftEditableColumns,
 } from './repository.js';
 import { toStoredSourceRecordId, validateSourceRecordId } from './source-record-id.js';
-import type { SubjectDirectory } from './subject-directory.js';
+import { readNames, type SubjectDirectory } from './subject-directory.js';
 
 export interface CaseServiceDeps {
   db: Db;
@@ -146,7 +146,7 @@ export async function createCase(
       checklistTemplateVersion,
       now,
     });
-    const view = await caseViewFrom(tx, created.caseRow);
+    const view = await caseViewFrom(tx, created.caseRow, readNames(deps.subjects));
     await auditStore.append(tx, {
       actorSubjectId: ctx.actor.subjectId,
       actorRole: ctx.role,
@@ -265,7 +265,7 @@ export async function updateCase(
       correlationId: ctx.correlationId,
       occurredAt: now,
     });
-    return caseViewFrom(tx, after);
+    return caseViewFrom(tx, after, readNames(deps.subjects));
   });
 }
 
