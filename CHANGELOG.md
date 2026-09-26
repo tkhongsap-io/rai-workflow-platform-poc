@@ -2,6 +2,7 @@
 
 ## 2026-09-26
 
+- W3-F6 (#168): removed the unused `scopedCases` helper; specs name `caseScopeWhere`.
 - W3-F2 (#164): no lane-opened mail to a lane reviewer who is BU SPOC on the case; the case page says why the decision panel is absent.
 - W3-F1 part 2 (#163): the screens show names instead of subject IDs on the case header, My cases card, versions and lane decisions.
 - W3-F1 part 1 (#163): case, version and decision reads carry display names beside subject IDs.

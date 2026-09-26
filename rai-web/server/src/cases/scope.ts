@@ -1,12 +1,11 @@
-// W0-05 "Query scope (W1-02, W3-01, Drizzle)" and W0-04 Interfaces `scopedCases(tx, actor)`: the one scope predicate
+// W0-05 "Query scope (W1-02, W3-01, Drizzle)" and W0-04 Interfaces: the one scope predicate
 // every list, search and count query starts from. It is built from the actor's grants that hold a `case.view`
 // policy row (never from the role list as a hint, never from the descriptive `business_unit` text) and applied
 // inside the SQL WHERE before any other filter, LIMIT or COUNT, so counts and pages are computed over in-scope
-// rows only (A06). W1-02 ships `caseScopeWhere` (the clause) and `scopedCases` (the sub-select) as one module.
+// rows only (A06). `caseScopeWhere` is that predicate; the unused `scopedCases` sub-select was removed (W3-F6).
 
 import { inArray, or, sql, type SQL } from 'drizzle-orm';
 import { rowsForAction, type Actor } from '../authz/policy.js';
-import type { Executor } from '../db/client.js';
 import { cases } from '../db/schema/case.js';
 
 /** The pure shape of the predicate, so the rule can be unit-tested without SQL. */
@@ -52,9 +51,4 @@ export function caseScopeWhere(actor: Actor): SQL {
       return parts.length === 1 ? parts[0]! : or(...parts)!;
     }
   }
-}
-
-/** The Drizzle sub-select every list query starts from (W0-04 Interfaces): the `case` rows in the actor's scope. */
-export function scopedCases(exec: Executor, actor: Actor) {
-  return exec.select().from(cases).where(caseScopeWhere(actor)).as('scoped_cases');
 }

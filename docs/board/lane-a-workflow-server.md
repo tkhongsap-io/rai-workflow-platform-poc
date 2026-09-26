@@ -182,3 +182,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-desk-health-owning-lane model=claude-opus-5-5
 - Takes over from: session=none (reason: new; follow-up recorded by W2-05)
 - Scope: per changes/2026-09-26-desk-health-owning-lane/: the desk-health `unavailableQc` entries name the owning lane. One PR.
+
+## 2026-09-26 15:00 — CLAIM lane-a: W3-F6 remove unused scopedCases (#168)
+- Author: operator=ta session=claude-code-w3-f6-remove-scoped-cases model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #168)
+- Scope: per changes/2026-09-26-w3-f6-remove-scoped-cases/. One PR, no behaviour change.

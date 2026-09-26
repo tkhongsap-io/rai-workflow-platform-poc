@@ -1,5 +1,9 @@
 # Development log
 
+## W3-F6 remove unused scopedCases — 2026-09-26
+
+The unused `scopedCases` sub-select helper is gone (ruling item 5, ticket #168); W0-04, W0-05 and the performance targets now name `caseScopeWhere`, the predicate every list query actually uses. No behaviour change; full suite unchanged. [Review](changes/2026-09-26-w3-f6-remove-scoped-cases/review.md).
+
 ## W3-F2 BU-SPOC reviewer mail and page note — 2026-09-26
 
 A lane reviewer who is BU SPOC of a case's business unit no longer gets that case's lane-opened mail, and the case page tells them why they have no decision panel, in Thai and English (ruling item 10, ticket #164). On a case of another business unit the same reviewer still gets the mail. The owner case is not ruled and is unchanged. [Review](changes/2026-09-26-w3-f2-spoc-reviewer-mail/review.md).
