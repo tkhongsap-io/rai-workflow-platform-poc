@@ -171,6 +171,8 @@ These are product or contract questions W4 will hit. Items 2, 3 and 4 were ruled
 
    Recommendation (proposal only): (a). Ta records it as a D05 refinement row, acting for the review leads as on 2026-09-25.
 
+   **Ruled by Ta on 2026-09-26: (a)** (register row "D05 refinement (upload slot 5 and 9)").
+
 2. **QC evidence arriving after a send-back** (W3 hardening review, section 5 item 2). **Ruled by Ta on 2026-09-26:** a version closed by a send-back takes no new QC evidence; the successor gets its own, and W0-07 3.4 was amended to match. Real extraction and model latency make the refused case more frequent, so W4-04 should expect it and test it.
 
 3. **In-memory API substitute** (hardening item 3). **Ruled by Ta on 2026-09-26:** kept; revisit at W4 kickoff. The W4-00 file-level plan carries that revisit.
@@ -181,7 +183,7 @@ These are product or contract questions W4 will hit. Items 2, 3 and 4 were ruled
 
 6. **Runtime operated elsewhere** (candidate backlog 2). Whether W4 fixtures include the attested-evidence scenario. Not in scope unless Ta adds it.
 
-7. **Deterministic checks as a separable, earlier sub-package.** BUILD_PLAN requires D08 and D09 only "before probabilistic QC". Metadata-only deterministic checks on synthetic data call no model and parse no document contents. Ta could authorize them as W4a ahead of D08 and D09. The [work breakdown](w4-work-breakdown.md#option-for-ta-one-package-or-w4a-then-w4b) sets out both shapes. This is an option for Ta, not a choice made here.
+7. **Deterministic checks as a separable, earlier sub-package.** BUILD_PLAN requires D08 and D09 only "before probabilistic QC". Metadata-only deterministic checks on synthetic data call no model and parse no document contents. Ta could authorize them as W4a ahead of D08 and D09. The [work breakdown](w4-work-breakdown.md#option-for-ta-one-package-or-w4a-then-w4b) sets out both shapes. This is an option for Ta, not a choice made here. **Chosen by Ta on 2026-09-26: W4a first** (register row "W4a gate entry"); W4b keeps every precondition.
 
 ---
 

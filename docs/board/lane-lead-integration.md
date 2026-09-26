@@ -142,3 +142,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: docs sync (this PR); then record Ta's W4 gate decisions in the register (Ta's choice of W4 shape and the slot-5/9 upload rule were given in the session of 2026-09-26 and are not recorded until that PR merges). W3-F8 (#180, PR #181) runs in a separate session.
 - Author: operator=ta session=claude-code-w3-followups-closeout model=claude-opus-5-5
 - Evidence: changes/2026-09-26-w3-f*/review.md; PRs #172-#179
+
+## 2026-09-26 19:00 — CLAIM lead: W4-00a file-level plan
+- Author: operator=ta session=claude-code-w4a-gate model=claude-opus-5-5
+- Takes over from: session=none (reason: new; W4a gate entry of 2026-09-26)
+- Scope: docs/engineering/implementation-plan-w4a.md and the gate records, one PR.

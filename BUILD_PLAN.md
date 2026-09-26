@@ -207,3 +207,15 @@ A dated read; the 2026-09-25 section above stays as written.
 W3 follow-ups W3-F1 to W3-F7 (#163-#169), which implement Ta's rulings of 2026-09-26, merged the same day through reviewed PRs #172-#179; each had two independent reviewer verdicts and green CI on the merged head (records under `changes/2026-09-26-w3-f*`). W3-F8 (#180, a guard test that every case-table read is scoped; PR #181) is in review in a separate session.
 
 Slice 1 (W1-W3) is complete on synthetic data. This is desk-completion acceptance of a synthetic build, not operator acceptance (W7) or release (W8), and it authorizes nothing beyond D03.
+
+## Status against this plan — 2026-09-26 (W4a gate entry)
+
+A dated read; earlier sections stay as written.
+
+**W4a gate entry (Ta, 2026-09-26; register row "W4a gate entry").** Ta authorizes W4a, the metadata-only deterministic part of W4 (version-aware soft QC), on synthetic data only, under the same branch, reviewed-PR and merge flow as D03 and its 2026-09-21 amendment, with tickets W4-00a, W4-02, W4-03, W4-04, W4-11a, W4-12, W4-13 and the W4a exit of the [W4 work breakdown](docs/delivery/w4-work-breakdown.md). Preconditions: (1) W3 accepted by Ta, 2026-09-26; (5) the slot-5 and slot-9 upload-unavailable owning lane recorded (register row "D05 refinement (upload slot 5 and 9)"); the [W4-00a file-level plan](docs/engineering/implementation-plan-w4a.md) merged before any W4a code. Its fixture labels are provisional until D09 is recorded. W4b keeps every precondition of the draft W4 gate entry in the [W4 decision briefs](docs/delivery/w4-decision-briefs.md#draft-w4-gate-entry-for-build_plan). Real data, networked access and external mail stay excluded.
+
+| Gate / package | Status on 2026-09-26 | Next evidence needed |
+|---|---|---|
+| W4a (deterministic metadata QC) | **Authorized**; W4-00a plan in review | W4-00a merged; W4a tickets through reviewed PRs; W4a exit record reviewed by Ta |
+| W4b (extraction, model rules, evaluation) | **Not authorized** | AI/COE lead and IT/Security owner named; D08 and D09 recorded; W4b gate entry |
+| W5-W8 | **Not authorized** | D07 before W5; D10 before networked tests or W8 |

@@ -1,0 +1,3 @@
+# Intent: open W4a and plan it (W4-00a)
+
+Slice 1 is accepted and its follow-ups are merged. D08 and D09 cannot be approved yet, because the AI/COE lead and IT/Security owner are unnamed. On 2026-09-26 Ta chose, from the options in the W4 decision briefs, to open **W4a** now: QC that reads only structured pack data, with no document parsing and no model. Ta also ruled the slot-5/9 upload-outage owner (option a), kept the in-memory API substitute through W4a, and accepted the provisional W4a rule set. This change records those decisions and adds the W4-00a file-level plan that must merge before any W4a code.
