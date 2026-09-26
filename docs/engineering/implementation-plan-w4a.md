@@ -31,7 +31,7 @@ Not in W4a: document parsing, a model or provider, the evaluation harness, findi
 
 - `.env.example` sets `QC_MODE=deterministic`. CI (`.github/workflows/ci.yml`) and the evidence browser configuration keep `QC_MODE=substitute` explicitly: the W2 and W3 journeys assert scripted `ACC-*` findings that only W4b's content rules will produce. The evidence Playwright configuration sets it for its web server so a developer's `.env` cannot change the evidence run.
 - Readiness `qc.kind` comes from the bound runner's identity: runner `deterministic` → `deterministic`; the W1-10 `substitute-scripted` → `substitute`. The schema already allows both. `start.ts` stops hard-coding `substitute`, and `qc.run.started` stops hard-coding `qcKind`.
-- The test override (`start.ts` `qcRunner`, integration harness) stays allowed only under `NODE_ENV=test`, whatever `QC_MODE` says.
+- The test override (`start.ts` `qcRunner`, integration harness) keeps today's guard unchanged (`NODE_ENV=test`, fixture identity mode, loopback host), whatever `QC_MODE` says.
 - `check:substitute-absent` must still pass: the deterministic runner is product code under `server/src/qc/deterministic/`, never under `fixtures/`.
 
 ## 3. Rule catalogue (W4-02)
@@ -73,6 +73,7 @@ type QcRulesBody = {
   - The draft's own `checklist_template_version` selects the template.
   - At submit, the version freezes whatever revision is then in force. If that differs from an earlier upload run's revision, each run keeps its own `rule_revision` and they stay distinguishable (W4-11a).
   - A historical version re-evaluated reads its own frozen revision, never the current one.
+- **No `qc_rules` revision in force** (versions frozen before W4-02, or a database whose configuration was published without the seed): the request carries no rules, and the deterministic runner answers `unavailable:not_configured`. That is an outage finding, never a clean pass. The substitute is unaffected.
 
 ## 4. Deterministic runner (W4-03)
 
@@ -99,9 +100,9 @@ Ta accepted these rules, with template isolation (section 3), as the provisional
 ## 5. Upload trigger (W4-04)
 
 - **Wiring.** `pack/qc-trigger.ts` gets a real implementation. It is wired in `app.ts`, where the shutdown drain lives, like the submit trigger, and bound through `compose-app-deps.ts`. `pack/service.ts` `fireUploadTriggers` is tracked by the drain; today it is an untracked promise.
-- **Target.** The orchestrator's target loader accepts an **open draft** for `trigger = 'upload'` only. The request uses the draft's `checklist_template_version`, the revision of section 3 and the current lane-mapping constant, because a draft has none frozen yet.
+- **Target.** A new loader, `loadUploadTarget`, accepts the open draft, or the version that draft became if it is still open (not Ready, not closed). The existing `loadOpenSubmittedTarget` is not loosened. The request uses the draft's `checklist_template_version`, the revision of section 3 and the current lane-mapping constant, because a draft has none frozen yet.
 - **Run fields.** An upload run records `slot` and has `lane = NULL`. W0-07 sets a run's `lane` only on approve attempts, and that is unchanged.
-  - The owning lane of an upload outage finding comes from `unavailableOwningLane({ trigger: 'upload', slot })`: the slot's single lane for slots 1-4 and 6-8, AI/COE for slot 5 (recorded rule). The function stops throwing for slot 5 and 9.
+  - The owning lane of an upload outage finding comes from `unavailableOwningLane({ trigger: 'upload', slot })`: the slot's single lane for slots 1-4 and 6-8, AI/COE for slot 5 (recorded rule). The function stops throwing for slot 5. For slot 9 it returns `null` ("no run"), and the upload trigger checks that before calling the orchestrator; a test shows a slot-9 attach writes no run row.
   - Slot 9 fires **no run** (recorded rule).
   - The operator view's owning-lane lookup (`observability/operator.ts`) handles the upload case the same way.
 - **Outage reuse key.** An upload outage finding is reused per version and owning lane: `QC-UNAVAILABLE:run:upload:<owningLane>`. Outages on slots of different lanes stay distinct, and a repeat on one lane reuses the open finding. This amends W0-07 3.6 for the upload trigger.
@@ -113,7 +114,7 @@ Ta accepted these rules, with template isolation (section 3), as the provisional
   - After a send-back closed the version, the run is refused with `version_closed` (W3 deferred rulings item 2).
   - An upload outage finding carried into a submitted version counts against Ready like any open finding (A08: an outage is never a clean pass). Tests cover each case.
 - **Nothing is evaluated yet.** No W4a metadata rule has the `upload` trigger. A completed deterministic upload run evaluates 0 rules and stores no defect; the QC log shows "0 rules evaluated", so it never reads as a clean pass.
-- **The substitute under CI.** CI binds the substitute, and its scripts carry `upload` entries (`fx-case-vendor.json`, `fx-case-nonvendor.json`). Once the trigger is bound, every suite that re-attaches a slot would start writing those scripted findings. W4-04 removes the `upload` entries from the bundled scripts: upload content rules are W4b's, and no current test asserts an upload finding. It also makes the substitute answer an unscripted upload with a completed, zero-finding result, not an outage. The full suite shows no other test changes behaviour.
+- **The substitute under CI.** CI binds the substitute, and its scripts carry `upload` entries (`fx-case-vendor.json`, `fx-case-nonvendor.json`). Once the trigger is bound, every suite that re-attaches a slot would start writing those scripted findings. W4-04 removes the `upload` entries from the bundled scripts: upload content rules are W4b's, and no current test asserts an upload finding. The substitute already answers an unscripted trigger with a completed, zero-finding result (`scripted-runner.ts`), and that stays unchanged. Two fixtures unit tests assert the scripted upload entries (`fixtures/src/substitutes/qc/scripted-runner.test.ts`, `scripts.test.ts`); W4-04 rewrites them. No integration or browser test asserts an upload finding.
 - **Who sees it.** The save-draft response never waits for QC. Draft runs are visible to whoever may read the draft (owner, BU SPOC). Reviewers see them once the version is submitted.
 
 ## 6. Run identity (W4-11a)
@@ -164,11 +165,11 @@ One ticket per branch `codex/<ticket-id>-<topic>` and per PR. Each merges only a
 
 | Order | Ticket | Owner type | Depends on | Main paths |
 |---|---|---|---|---|
-| 1 | W4-11a run identity | Agent-eligible | this plan | `server/drizzle/`, `db/schema/qc-run.ts`, `qc/orchestrator.ts`, `qc/repository.ts`, `observability/log.ts`, `observability/operator.ts`, the W0-10 catalogue |
+| 1 | W4-11a run identity | Agent-eligible | this plan | `server/drizzle/`, `db/schema/qc-run.ts`, `tests/integration/w3-07a-migration-contract.test.ts` (raw `qc_run` inserts), `qc/orchestrator.ts`, `qc/repository.ts`, `observability/log.ts`, `observability/operator.ts`, the W0-10 catalogue |
 | 2 | W4-02 rule catalogue | HRR | W4-11a | `shared/src/schemas/cases.ts`, `shared/src/qc/types.ts` (`request.rules`), `configuration/seed.ts`, `qc/select.ts`, `qc/orchestrator.ts` (load and pass rules), W0-02 7.3/7.6, W0-07 3.3 |
 | 3 | W4-03 deterministic runner | HRR | W4-02 | `qc/deterministic/runner.ts`, `qc/deterministic/rules/*`, locales, W0-07 3.5, `tests/integration/w4a-int-deterministic-server.test.ts` |
 | 4 | W4-13 runner selection | Agent-eligible | W4-03 | `config.ts`, `start.ts`, `compose-app-deps.ts`, `observability/health.ts`, `.env.example`, `.github/workflows/ci.yml`, `tests/browser/playwright.config.ts`, W0-02 section 5, W0-07 3.9 and section 6, TESTING |
-| 5 | W4-04 upload trigger | HRR | W4-03, W4-13 | `pack/qc-trigger.ts`, `pack/service.ts`, `app.ts`, `compose-app-deps.ts`, `qc/orchestrator.ts`, `shared/src/constants.ts` (`unavailableOwningLane`), `observability/operator.ts`, substitute scripts, W0-07 3.2/3.6 |
+| 5 | W4-04 upload trigger | HRR | W4-03, W4-13 | `pack/qc-trigger.ts`, `pack/service.ts`, `app.ts`, `compose-app-deps.ts`, `qc/orchestrator.ts`, `shared/src/constants.ts` (`unavailableOwningLane`), `observability/operator.ts`, substitute scripts and their two unit tests, W0-07 3.2/3.6/3.9 |
 | 6 | W4-12 API and UI | Agent-eligible (read shapes: contract) | W4-11a, W4-03 | `shared/src/schemas/review.ts`, `findings/routes.ts`, `web/src/screens/case/*`, locales, W0-02 section 7 |
 | 7 | W4a exit record | Lead | all above | `changes/<date>-w4a-exit/` |
 
@@ -205,7 +206,7 @@ Each amendment is dated and lands in the owning ticket's PR:
 - W0-07:
   - 3.3 (`request.rules`; the upload revision): W4-02.
   - 3.5 (W4a rule rows, `PACK-NA-VENDOR-DOC`): W4-03.
-  - 3.2 and 3.6 (upload run fields, the upload outage key): W4-04.
+  - 3.2, 3.6 and 3.9 (upload run fields, the upload outage key, the substitute's scripts without upload entries): W4-04.
   - 3.9 and section 6 (a real `QC_MODE` value arrives in W4a without ADR-0006, which stays W4b's; the production refusal): W4-13.
   - 3.4 step 6 (dedup deferred to W4b): W4-03.
 - W0-10 log catalogue: W4-11a.
