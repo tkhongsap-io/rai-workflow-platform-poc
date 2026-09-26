@@ -171,6 +171,8 @@ Entry: W2 exit. D06 and D11 are recorded. Requirements: R5, R6. Completes source
 
 ## W3 follow-ups (after M3, 2026-09-26)
 
+Status 2026-09-26: W3-F1 to W3-F7 are done and their issues closed with evidence (PRs #172-#179; records under `changes/2026-09-26-w3-f*`). W3-F4 and W3-F6 carry dated notes where the delivered form differs from the row text.
+
 W3 was accepted on 2026-09-26. These tickets implement Ta's rulings of the same day (register row "W3 deferred rulings"); they run under D03 as W3 work on synthetic data. The GitHub issue is the tracker; this table is the document of record.
 
 | ID | Outcome | Proves | Depends on | Decisions | Lane | Owner type | Done when |

@@ -135,3 +135,10 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: two reviewers and CI on this PR; on merge, #163 closes with status evidence-recorded, then W3-F2 (#164).
 - Author: operator=ta session=claude-code-w3-f1-display-names model=claude-opus-5-5
 - Evidence: https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/173
+
+## 2026-09-26 18:30 — W3 follow-ups closed (#163-#169)
+- What: W3-F1 to W3-F7 merged through PRs #172-#179; issues closed with status evidence-recorded; worktrees, test databases and branches removed.
+- Why: register row "W3 deferred rulings" (Ta, 2026-09-26).
+- Next: docs sync (this PR); then Ta's W4a gate entry and the W4-00a file-level plan. W3-F8 (#180, PR #181) runs in a separate session.
+- Author: operator=ta session=claude-code-w3-followups-closeout model=claude-opus-5-5
+- Evidence: changes/2026-09-26-w3-f*/review.md; PRs #172-#179

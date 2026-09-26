@@ -1,5 +1,9 @@
 # Development log
 
+## W3 follow-ups closed — 2026-09-26
+
+All seven follow-ups from Ta's W3 deferred rulings are merged: display names (F1, #163), no lane-opened mail to a BU-SPOC reviewer (F2, #164), per-lane finding count (F3, #165), send-back link to the case page (F4, #166), one Thai term for desk completion (F5, #167), `scopedCases` removed (F6, #168) and the one-hour temp-file floor (F7, #169). Each merged with two independent reviewer verdicts and green CI on its merged head. CI was blocked for part of the day by a GitHub Actions spending limit on the organization; nothing merged until it was raised and CI ran green. W3-F8 (#180, PR #181) is in review in a separate session. Open for Ta, not blocking: a Thai Ready card shows the term twice; the BU-SPOC reviewer in the SLA digest; the owner-as-reviewer mail case; the queue as a day-start list.
+
 ## W3-F5 one Thai term for desk completion — 2026-09-26
 
 Desk completion reads "การตรวจทานในระบบเสร็จสิ้น" on every Thai surface: the status badge, next action, decided-Ready message, stale-version guidance and the Ready mail (status-name ruling, ticket #167). English is unchanged. [Review](changes/2026-09-26-w3-f5-thai-desk-complete/review.md).

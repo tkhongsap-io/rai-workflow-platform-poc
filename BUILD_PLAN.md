@@ -204,4 +204,6 @@ A dated read; the 2026-09-25 section above stays as written.
 | M3 (W3, slice 1) | **Accepted by Ta, 2026-09-26** (package review after the synthetic walkthrough with Nakhun; no change requested) | changes/2026-09-23-w3-exit/review.md; changes/2026-09-23-w3-hardening/review.md; changes/2026-09-26-nakhun-walkthrough/notes.md | Not blocking: Ta/operator confirmation of the advisory workload and latency targets; Ta's manual `local-google` sign-in (W1) |
 | W4-W8 | **Not authorized** | — | D08 and D09 before W4 probabilistic QC, a W4 gate entry by Ta; D07 before W5; D10 before networked tests or W8 |
 
+W3 follow-ups W3-F1 to W3-F7 (#163-#169), which implement Ta's rulings of 2026-09-26, merged the same day through reviewed PRs #172-#179; each had two independent reviewer verdicts and green CI on the merged head (records under `changes/2026-09-26-w3-f*`). W3-F8 (#180, a guard test that every case-table read is scoped; PR #181) is in review in a separate session.
+
 Slice 1 (W1-W3) is complete on synthetic data. This is desk-completion acceptance of a synthetic build, not operator acceptance (W7) or release (W8), and it authorizes nothing beyond D03.
