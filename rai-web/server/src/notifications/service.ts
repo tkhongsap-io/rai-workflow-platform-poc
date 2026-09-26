@@ -120,8 +120,10 @@ export async function loadCommittedCaseRequest(
     const [total] = await tx
       .select({ value: count() })
       .from(qcFinding)
-      .where(and(eq(qcFinding.versionId, row.versionId), eq(qcFinding.kind, 'defect')));
-    content.defectCount = total?.value ?? 0;
+      // W3-F3 (ruling item 11): that lane's findings recorded when this attempt is composed, both kinds (a QC
+      // outage is a finding, so it never reads as 0: W0-07 3.6) and dispositioned ones (recorded, not open).
+      .where(and(eq(qcFinding.versionId, row.versionId), eq(qcFinding.owningLane, lane as Lane)));
+    content.findingCount = total?.value ?? 0;
     content.dueOn = (await laneDueDates(tx, row.versionId)).find((d) => d.lane === lane)!.dueOn;
   }
   if (kind === 'sent_back') {

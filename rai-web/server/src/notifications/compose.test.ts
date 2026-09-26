@@ -63,7 +63,7 @@ for (const locale of ['th', 'en'] as const) {
       const req = composeCaseMail(
         e,
         recipient,
-        { caseName: 'เคสสังเคราะห์', defectCount: 3, dueOn: '2026-09-25', feedback },
+        { caseName: 'เคสสังเคราะห์', findingCount: 3, dueOn: '2026-09-25', feedback },
         base,
       );
       assert.equal(req.mail.templateKey, `mail.${kind}`);
@@ -74,7 +74,7 @@ for (const locale of ['th', 'en'] as const) {
       assert.equal(new URL(req.deepLinks[0]!.url).search, '');
       if (locale === 'th') assert.match(req.mail.subject, /[ก-๙]/);
       if (kind === 'lane_opened') {
-        assert.equal(req.mail.templateParams.defectCount, 3);
+        assert.equal(req.mail.templateParams.findingCount, 3);
         assert.match(String(req.mail.templateParams.dueDate), /2026/);
         assert.doesNotMatch(String(req.mail.templateParams.dueDate), /2569/);
         if (locale === 'th') assert.equal(req.mail.templateParams.dueDate, '25 กันยายน ค.ศ. 2026');

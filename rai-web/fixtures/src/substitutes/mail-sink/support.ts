@@ -125,7 +125,7 @@ export function laneOpenedRequest(overrides: RequestOverrides = {}): DeliveryReq
       templateParams: {
         caseName: 'Synthetic case 101',
         laneLabel: 'AI CoE',
-        defectCount: 2,
+        findingCount: 2,
         dueDate: '2026-09-28',
       },
     },

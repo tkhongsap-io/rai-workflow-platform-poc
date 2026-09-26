@@ -23,7 +23,7 @@ export interface MailIdentity {
 }
 export interface CaseMailContent {
   caseName: string;
-  defectCount?: number;
+  findingCount?: number;
   dueOn?: string;
   feedback?: SendBackFeedback;
 }
@@ -130,12 +130,12 @@ export function composeCaseMail(
   if (event.lane !== null) params.laneLabel = t(recipient.locale, LANE_LABEL[event.lane]);
   if (event.kind === 'lane_opened') {
     if (
-      !Number.isInteger(content.defectCount) ||
-      content.defectCount! < 0 ||
+      !Number.isInteger(content.findingCount) ||
+      content.findingCount! < 0 ||
       !/^\d{4}-\d{2}-\d{2}$/.test(content.dueOn ?? '')
     )
       throw new CompositionError('malformed_request');
-    params.defectCount = content.defectCount!;
+    params.findingCount = content.findingCount!;
     // A date-only Bangkok SLA day; do not reinterpret it as the server's local timezone.
     params.dueDate = new Intl.DateTimeFormat(recipient.locale === 'th' ? 'th-TH' : 'en-GB', {
       timeZone: 'Asia/Bangkok',

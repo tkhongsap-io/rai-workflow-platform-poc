@@ -138,3 +138,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w3-f2-spoc-reviewer-mail model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #164, human-review-required)
 - Scope: per changes/2026-09-26-w3-f2-spoc-reviewer-mail/. One PR.
+
+## 2026-09-26 15:30 — CLAIM lane-b: W3-F3 lane-opened mail counts that lane's defects (#165)
+- Author: operator=ta session=claude-code-w3-f3-lane-defect-count model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #165)
+- Scope: per changes/2026-09-26-w3-f3-lane-defect-count/. One PR.

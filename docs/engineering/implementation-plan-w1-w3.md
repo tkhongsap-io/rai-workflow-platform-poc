@@ -923,7 +923,7 @@ Closed at W0 exit (W0-09), recorded here so the list stays honest: upload types 
 
 ### W3-03a notification template contract
 
-The W3-03a prerequisite adds `mail.lane_opened.body`, `mail.sent_back.body` and `mail.ready_for_launch.body` to both shared locale catalogues. Existing `mail.lane_opened`, `mail.sent_back`, `mail.ready_for_launch` remain the subject and persisted template keys. Body parameters are `caseName`, `caseLink`; lane-open additionally `laneLabel`, `defectCount`, `dueDate` (frozen SLA date in Asia/Bangkok); send-back additionally `laneLabel`, `feedback` (reviewer text bounded to 500 code units). Thai is the default. All rendering uses shared `t()`; no new HTTP, database, authorization or mail-interface shape. W3-03b digest and W3-04 retries remain separate.
+The W3-03a prerequisite adds `mail.lane_opened.body`, `mail.sent_back.body` and `mail.ready_for_launch.body` to both shared locale catalogues. Existing `mail.lane_opened`, `mail.sent_back`, `mail.ready_for_launch` remain the subject and persisted template keys. Body parameters are `caseName`, `caseLink`; lane-open additionally `laneLabel`, `findingCount` (the lane's findings recorded so far; W3-F3, 2026-09-26), `dueDate` (frozen SLA date in Asia/Bangkok); send-back additionally `laneLabel`, `feedback` (reviewer text bounded to 500 code units). Thai is the default. All rendering uses shared `t()`; no new HTTP, database, authorization or mail-interface shape. W3-03b digest and W3-04 retries remain separate.
 
 ## W3-07a prerequisite amendment — 2026-09-22
 

@@ -123,7 +123,7 @@
   "lane.dpo": "Privacy (DPO)",
   "lane.it_security": "IT/Security",
   "mail.lane_opened": "A review lane is open",
-  "mail.lane_opened.body": "Case: {caseName}\nReview lane: {laneLabel}\nRecorded defects: {defectCount}\nSLA due date (Asia/Bangkok): {dueDate}\nOpen the case (sign-in required): {caseLink}",
+  "mail.lane_opened.body": "Case: {caseName}\nReview lane: {laneLabel}\nFindings recorded so far: {findingCount}\nSLA due date (Asia/Bangkok): {dueDate}\nOpen the case (sign-in required): {caseLink}",
   "mail.ready_for_launch": "Desk review is complete (Ready for launch)",
   "mail.ready_for_launch.body": "Case: {caseName}\nDesk review is complete (Ready for launch). Council and ITSM decisions remain outside this desk.\nOpen the case (sign-in required): {caseLink}",
   "mail.sent_back": "A review lane sent the pack back",
