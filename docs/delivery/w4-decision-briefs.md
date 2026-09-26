@@ -175,7 +175,7 @@ These are product or contract questions W4 will hit. Items 2, 3 and 4 were ruled
 
 3. **In-memory API substitute** (hardening item 3). **Ruled by Ta on 2026-09-26:** kept; revisit at W4 kickoff. The W4-00 file-level plan carries that revisit.
 
-4. **Defect count in the lane-opened mail** (hardening item 11). **Ruled by Ta on 2026-09-26:** that lane's findings stored at send time, labelled as recorded so far (ticket #165, before W4). W4 changes when findings exist, not the rule.
+4. **Defect count in the lane-opened mail** (hardening item 11). **Ruled by Ta on 2026-09-26:** that lane's findings stored at send time, labelled as recorded so far (ticket #165, done 2026-09-26 in PR #176). W4 changes when findings exist, not the rule.
 
 5. **Checklist item anchoring** ([later packages](later-packages-outline.md), candidate backlog 1). Whether W4 findings carry checklist item IDs. Not in scope unless Ta adds it.
 
