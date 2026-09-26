@@ -521,7 +521,7 @@ Keys are the contract; the strings are initial values in the locale files that L
 | `error.stale_version.guidance.version_closed` | เวอร์ชันนี้ถูกส่งกลับแล้วและมีฉบับร่างใหม่เปิดอยู่ ช่องทางของคุณจะเปิดอีกครั้งเมื่อมีการส่งเวอร์ชันใหม่ | This version was sent back and a new draft is open. Your lane reopens when the new version is submitted. |
 | `error.stale_version.guidance.lane_already_decided` | ช่องทางนี้ได้ตัดสินเวอร์ชันนี้แล้ว | This lane has already decided this version. |
 | `error.stale_version.guidance.qc_run_superseded` | มีผลตรวจ QC ใหม่กว่า กรุณาตรวจสอบผลก่อนตัดสิน | A newer QC result exists. Review it before deciding. |
-| `error.stale_version.guidance.ready` | เคสนี้อยู่ในสถานะ Ready for launch แล้ว ไม่สามารถแก้ไขได้ | This case is Ready for launch and can no longer be changed. |
+| `error.stale_version.guidance.ready` | เคสนี้อยู่ในสถานะการตรวจทานในระบบเสร็จสิ้นแล้ว ไม่สามารถแก้ไขได้ (W3-F5, 2026-09-26) | This case is Ready for launch and can no longer be changed. |
 | `error.invalid_input` | ข้อมูลบางรายการไม่ถูกต้อง กรุณาตรวจสอบแล้วลองอีกครั้ง | Some fields are invalid. Check them and try again. |
 | `error.invalid_input.idempotency_key_reused` | คำขอนี้ซ้ำกับคำขอก่อนหน้าที่มีเนื้อหาต่างกัน | This request key was already used with different content. |
 | `error.invalid_input.projected_field` | ฟิลด์สถานะนี้เขียนโดยระบบเท่านั้น | This status field is written only by the workflow. |
@@ -534,7 +534,7 @@ Keys are the contract; the strings are initial values in the locale files that L
 | `status.in_review` | อยู่ระหว่างตรวจสอบ | In review |
 | `status.sent_back` | ส่งกลับแก้ไข | Sent back |
 | `status.awaiting_disposition` | รอการวินิจฉัยข้อบกพร่อง | Awaiting disposition |
-| `status.ready_for_launch` | Ready for launch | Ready for launch |
+| `status.ready_for_launch` | การตรวจทานในระบบเสร็จสิ้น (W3-F5, 2026-09-26) | Ready for launch |
 
 Finding and disposition messages carry their own keys under `finding.*` and `disposition.*` (W0-07, W2-05).
 

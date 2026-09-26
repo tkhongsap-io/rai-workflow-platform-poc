@@ -148,3 +148,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w3-f4-send-back-link model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #166)
 - Scope: per changes/2026-09-26-w3-f4-send-back-link/. One PR.
+
+## 2026-09-26 17:00 — CLAIM lane-b: W3-F5 one Thai term for desk completion (#167)
+- Author: operator=ta session=claude-code-w3-f5-thai-desk-complete model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #167)
+- Scope: per changes/2026-09-26-w3-f5-thai-desk-complete/. One PR.

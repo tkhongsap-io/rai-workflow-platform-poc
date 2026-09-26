@@ -1,5 +1,9 @@
 # Development log
 
+## W3-F5 one Thai term for desk completion — 2026-09-26
+
+Desk completion reads "การตรวจทานในระบบเสร็จสิ้น" on every Thai surface: the status badge, next action, decided-Ready message, stale-version guidance and the Ready mail (status-name ruling, ticket #167). English is unchanged. [Review](changes/2026-09-26-w3-f5-thai-desk-complete/review.md).
+
 ## W3-F4 send-back mail opens the successor draft — 2026-09-26
 
 The owner's send-back mail now links to the case page, which shows the open successor draft and its feedback, instead of the version that was sent back (ruling item 12, ticket #166). The committed outbox row stores the same path. The SPA has no draft-specific URL, so the link names the case, not the draft id; the W3-F4 row has a dated note. [Review](changes/2026-09-26-w3-f4-send-back-link/review.md).
