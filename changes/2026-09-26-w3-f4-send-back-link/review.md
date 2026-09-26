@@ -17,6 +17,10 @@ The W3-F4 row says the link "names the draft", and #166 says it is "built from t
 
 The first GREEN (compose only) failed the w3-03a send-back test. The worker refused the mail as `unsafe_link` because the outbox row still stored the version path. So the stored path moved too, which keeps the committed-link check intact.
 
+## Rows queued before this change
+
+A `send_back` outbox row committed before this change stores the version path. On a retry, the worker's agreement check refuses it as `unsafe_link`, so it fails safe: nothing is delivered. No such row exists outside local synthetic databases, because nothing is deployed before D10.
+
 ## Commands and results
 
 Worktree `/tmp/rai-names`, Postgres `rai-names` on 55372, one suite at a time.
@@ -34,4 +38,7 @@ Worktree `/tmp/rai-names`, Postgres `rai-names` on 55372, one suite at a time.
 
 ## Review verdicts
 
-Recorded on the PR.
+| Round | Head | Reviewer | Verdict | Notes acted on |
+|---|---|---|---|---|
+| 1 | 1f8058a | contract | PASS | #166 correction posted; row note cites PR #178; older queued rows recorded above. Deferred: a browser assertion that the feedback heading shows on arrival from the mail link. |
+| 1 | 1f8058a | correctness | PASS | older queued rows recorded above. Deferred: an `unsafe_link` test on a `send_back` row (same check as the lane-opened test). |
