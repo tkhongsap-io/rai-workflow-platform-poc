@@ -580,7 +580,7 @@ WHERE f.version_id = $1
 
 Ready iff the first query returns exactly the three lanes and the second returns no rows. Note that an `unavailable` finding is a `qc_finding` row and therefore blocks Ready until dispositioned by its owning lane (never treated as zero findings, W2-05).
 
-Queue and read queries (W1-02 list, W3-01 search) apply the W0-05 scope predicate **inside** the SQL `WHERE` clause (owner: `owner_subject_id = $actor`; SPOC: `business_unit_id = ANY($bus)`; reviewers and Admin: no case filter), so counts, pagination and filter options are computed over in-scope rows only (A06). A query helper `scopedCases(tx, actor)` returns the Drizzle sub-select every list query must start from; a list query that does not use it fails a lint rule W1-12 adds.
+Queue and read queries (W1-02 list, W3-01 search) apply the W0-05 scope predicate **inside** the SQL `WHERE` clause (owner: `owner_subject_id = $actor`; SPOC: `business_unit_id = ANY($bus)`; reviewers and Admin: no case filter), so counts, pagination and filter options are computed over in-scope rows only (A06). Every list, search and count query builds its `WHERE` from `caseScopeWhere(actor)` (`rai-web/server/src/cases/scope.ts`). The `scopedCases(tx, actor)` sub-select helper and the lint rule this section once promised were never used or added; the helper was removed on 2026-09-26 (register row "W3 deferred rulings", item 5; W3-F6).
 
 ## Error contract
 

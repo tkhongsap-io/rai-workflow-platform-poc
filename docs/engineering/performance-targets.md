@@ -30,7 +30,7 @@ W3-06 records per-surface synthetic p95 measurements using the W0-10 `request.co
 | Submit (`POST /api/cases/{caseId}/draft/submit`) | < 1 s | One transaction: freeze, three lanes, three outbox rows (W0-06 4.3); QC runs after commit and is not counted |
 | Upload (25 MiB file) | < 10 s end to end | Streaming hash and sniff (W0-08); bounded by disk, not CPU |
 | Download (25 MiB file) | < 5 s | Streamed from the blob store with `Content-Length` |
-| Queue search (W3-01) | < 300 ms at 1,000 cases | Scoped `WHERE` (W0-04 `scopedCases`), indexed status and BU columns |
+| Queue search (W3-01) | < 300 ms at 1,000 cases | Scoped `WHERE` (`caseScopeWhere`, W0-05), indexed status and BU columns |
 | Readiness (`GET /readyz`) | < 100 ms cached, < 2.5 s uncached | 2,000 ms probe ceiling, 5 s cache (W0-10 5.5) |
 
 ## 3. Time budgets carried from the specs
