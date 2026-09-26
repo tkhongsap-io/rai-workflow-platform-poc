@@ -81,6 +81,17 @@ for (const locale of ['th', 'en'] as const) {
         assert.ok(req.mail.templateParams.laneLabel);
       }
       if (kind === 'sent_back') assert.equal(req.mail.templateParams.feedback, feedback.summary);
+      // W3-F4 (ruling item 12): the owner's send-back link opens the case, where the successor draft and its
+      // feedback are; lane-opened and Ready links still open the decided version.
+      const url = new URL(req.deepLinks[0]!.url);
+      if (kind === 'sent_back') {
+        assert.equal(req.deepLinks[0]!.route, 'case');
+        assert.equal(url.pathname, `/cases/${e.caseId}`);
+      } else {
+        assert.equal(req.deepLinks[0]!.route, 'case_version');
+        assert.equal(url.pathname, `/cases/${e.caseId}/versions/${e.versionId}`);
+      }
+      assert.equal(req.mail.templateParams.caseLink, req.deepLinks[0]!.url);
       assert.equal(req.attempt, 1);
     });
   }

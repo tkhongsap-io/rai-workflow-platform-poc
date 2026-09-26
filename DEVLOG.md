@@ -1,5 +1,9 @@
 # Development log
 
+## W3-F4 send-back mail opens the successor draft — 2026-09-26
+
+The owner's send-back mail now links to the case page, which shows the open successor draft and its feedback, instead of the version that was sent back (ruling item 12, ticket #166). The committed outbox row stores the same path. The SPA has no draft-specific URL, so the link names the case, not the draft id; the W3-F4 row has a dated note. [Review](changes/2026-09-26-w3-f4-send-back-link/review.md).
+
 ## W3-F7 BLOB_TMP_MAX_AGE_HOURS minimum 1 — 2026-09-26
 
 `BLOB_TMP_MAX_AGE_HOURS` below 1 is refused at start-up and by `store:cleanup`, so the sweep cannot remove an upload younger than an hour (ruling item 7, ticket #169). W0-02 section 5 says "Integer ≥ 1"; W0-04 records the floor. [Review](changes/2026-09-26-w3-f7-blob-tmp-min/review.md).

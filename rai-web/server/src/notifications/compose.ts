@@ -91,6 +91,15 @@ export function versionLink(baseUrl: URL, caseId: string, versionId: string): Sa
   };
 }
 
+/**
+ * W3-F4 (register row "W3 deferred rulings", item 12): the case page, where the owner edits the successor draft
+ * and reads the send-back feedback (H27). There is no draft-specific URL: the case page shows the open draft.
+ */
+export function caseLink(baseUrl: URL, caseId: string): SafeDeepLink {
+  if (!safeBaseUrl(baseUrl) || !SAFE_ID.test(caseId)) throw new CompositionError('unsafe_link');
+  return { url: `${baseUrl.origin}/cases/${caseId}`, route: 'case', caseId, requiresSignIn: true };
+}
+
 const SUBJECT: Record<CaseMailKind, LocaleKey> = {
   lane_opened: 'mail.lane_opened',
   sent_back: 'mail.sent_back',
@@ -125,7 +134,10 @@ export function composeCaseMail(
     throw new CompositionError('malformed_request');
   if (event.kind === 'ready_for_launch' ? event.lane !== null : !LANES.includes(event.lane as Lane))
     throw new CompositionError('malformed_request');
-  const link = versionLink(publicBaseUrl, event.caseId, event.versionId);
+  const link =
+    event.kind === 'sent_back'
+      ? caseLink(publicBaseUrl, event.caseId)
+      : versionLink(publicBaseUrl, event.caseId, event.versionId);
   const params: Record<string, string | number> = { caseName: content.caseName, caseLink: link.url };
   if (event.lane !== null) params.laneLabel = t(recipient.locale, LANE_LABEL[event.lane]);
   if (event.kind === 'lane_opened') {

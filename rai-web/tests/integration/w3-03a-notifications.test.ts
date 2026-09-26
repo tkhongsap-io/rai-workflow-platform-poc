@@ -258,6 +258,16 @@ test('send-back mail goes only to owner, with deciding lane and bounded reviewer
   assert.equal(messages[0]!.recipient.address, emailOf(ownerId));
   assert.equal(messages[0]!.event.lane, 'dpo');
   assert.equal(String(messages[0]!.mail.templateParams.feedback).length, 500);
+  // W3-F4 (ruling item 12): the link opens the case page, where the successor draft is; the committed outbox row
+  // stores the same path, and a signed-out request for it is refused.
+  const link = new URL(messages[0]!.deepLinks[0]!.url);
+  assert.equal(link.pathname, `/cases/${caseId}`);
+  assert.equal(messages[0]!.deepLinks[0]!.route, 'case');
+  const stored = await db.owner.execute(
+    sql`SELECT deep_link_path FROM notification WHERE event = 'send_back' AND version_id = ${version.versionId}`,
+  );
+  assert.deepEqual(stored.rows, [{ deep_link_path: `/cases/${caseId}` }]);
+  assert.equal((await app.inject({ url: `/api${link.pathname}` })).statusCode, 401);
 });
 
 for (const fail of [false, true])

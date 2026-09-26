@@ -185,6 +185,8 @@ W3 was accepted on 2026-09-26. These tickets implement Ta's rulings of the same 
 
 W3-F2 note (2026-09-26, PR #174): the "why" note is derived in the SPA from the session's own grants and `CaseView.businessUnitId`, not from a new W0-02 read field. W0-05 section 6 allows a display-only client derivation; the API still answers 403, and the note reveals nothing the user cannot already read. The read-shape step this row first listed was therefore not needed; the lead or Ta confirms this on the PR.
 
+W3-F4 note (2026-09-26): the SPA has no draft-specific URL; the case page (`/cases/{caseId}`) shows the open successor draft and its send-back feedback. So the send-back link is the case page (route `case`), stored on the committed outbox row and checked against the composed mail, rather than a link that names the draft id. It opens the successor draft, as ruling 12 asks.
+
 ## Traceability check
 
 Rows list every ticket whose Proves column names the ID, including Wx-INT and exit tickets. Tickets whose Proves column says "Feeds" or "Enables" (W1-00, W1-09 to W1-13, W2-10, W3-07, W3-08) are enabling work and are omitted.
