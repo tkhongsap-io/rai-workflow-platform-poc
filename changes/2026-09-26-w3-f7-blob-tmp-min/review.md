@@ -21,8 +21,11 @@ Worktree `/tmp/rai-f7`, Postgres `rai-f3` on 55373, one suite at a time.
 | `node scripts/check-links.mjs` (root) | 0 broken |
 | `git diff --check` | clean |
 
-The browser suites are not affected (no UI or route change); see the PR for whether they were run.
+The browser suites were not run: the change is a server configuration bound and has no UI, route or API change. CI runs them on the reviewed head before merge.
 
 ## Review verdicts
 
-Recorded on the PR.
+| Round | Head | Reviewer | Verdict | Notes |
+|---|---|---|---|---|
+| 1 | fcab548 | contract | PASS | Browser-suite statement added above. Deferred: "below 1" wording in W0-02, and a direct exit-code test for `store:cleanup` (the wrapper exits 1 on any thrown error). |
+| 1 | fcab548 | correctness | PASS | Checked every consumer sets ≥ 1; reverting `min` fails both new tests. `db:cleanup` also refuses 0, since it reads the same retention config (fail closed; no caller passes 0). Deferred: 59/61-minute boundary files, a `startServer` exit case, a `-1` case. |
