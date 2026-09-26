@@ -32,10 +32,15 @@ Worktree `/tmp/rai-f5`, Postgres `rai-f3` on 55373, one suite at a time.
 | `npm run test:browser:server` (first run) | 193 passed, 3 failed: the queue review-complete test at all three widths, a strict-mode double match (see Change) |
 | queue spec rerun after the locator fix (`playwright test -c tests/browser/playwright.config.ts tests/browser/w3-int-02-queue.spec.ts`) | 33 passed, including the axe audits in th |
 | `npm run test:browser:substitute` | 48 passed |
+| `npm run test:browser:server` (full rerun at fd3ce94) | 196 passed (7.7m) |
 | `node scripts/check-links.mjs` (root) | 0 broken |
 
-The full browser suite was not rerun after the one-line locator fix; CI runs it on the reviewed head.
+
+Round 2 changes one Thai sentence (`review.decided.ready`) and the W0-06 8.5 table. Rerun after it: unit 592/592; build exit 0; the two specs that show the decided-Ready message (`w2-int-journey`, `w2-int-09-disposition`) 12 passed; links 0 broken.
 
 ## Review verdicts
 
-Recorded on the PR.
+| Round | Head | Reviewer | Verdict | Notes acted on |
+|---|---|---|---|---|
+| 1 | fd3ce94 | contract | PASS | `review.decided.ready` now reads "เคสนี้อยู่ในสถานะการตรวจทานในระบบเสร็จสิ้นแล้ว", matching the stale-version sentence. The W0-06 8.5 table shows the new Thai values. Not taken: quoting the term inside the sentence. |
+| 1 | fd3ce94 | correctness | PASS | Full browser rerun recorded above. Deferred: the English half of the new test restates four `en.json` values by design. |

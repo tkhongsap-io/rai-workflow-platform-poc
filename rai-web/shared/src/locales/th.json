@@ -362,7 +362,7 @@
   "review.action.approving": "กำลังอนุมัติ…",
   "review.action.send_back": "ส่งกลับให้แก้ไข",
   "review.decided.approve": "บันทึกการอนุมัติช่องทางแล้ว",
-  "review.decided.ready": "เคสนี้การตรวจทานในระบบเสร็จสิ้นแล้ว",
+  "review.decided.ready": "เคสนี้อยู่ในสถานะการตรวจทานในระบบเสร็จสิ้นแล้ว",
   "review.decided.send_back": "ส่งกลับให้แก้ไขแล้ว และเปิดฉบับร่างรุ่นถัดไป",
   "review.disposition.actions_label": "การจัดการข้อค้นพบ",
   "review.disposition.fixed": "แก้ไขแล้ว",
