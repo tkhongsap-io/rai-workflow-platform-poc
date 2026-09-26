@@ -155,7 +155,7 @@ npm run test:browser:substitute
 cd .. && node scripts/check-links.mjs && git diff --check
 ```
 
-- **Real-server evidence:** `rai-web/tests/integration/w4a-int-deterministic-server.test.ts`. It spawns the built server (`node server/dist/main.js`) with `QC_MODE=deterministic`, as `w1-int-negatives.test.ts` does, submits fixture cases over HTTP, and reads the stored `PACK-*` findings, runs, readiness `qc.kind` and the qc-runs endpoint. It is part of `npm run test:integration`, so CI runs it on every PR from W4-03 on. Run it alone with `NODE_ENV=test RAI_IDENTITY_MODE=fixture node --import tsx --conditions=rai-source --test --test-concurrency=1 tests/integration/w4a-int-deterministic-server.test.ts` from `rai-web/`.
+- **Real-server evidence:** `rai-web/tests/integration/w4a-int-deterministic-server.test.ts`. It spawns the real server process from source (`server/src/main.ts` through `tsx`, the test harness default that `w1-int-negatives.test.ts` uses; the CI integration job does not build) with `QC_MODE=deterministic`, submits fixture cases over HTTP, and reads the stored `PACK-*` findings, runs, readiness `qc.kind` and the qc-runs endpoint. It is part of `npm run test:integration`, so CI runs it on every PR from W4-03 on. Run it alone with `NODE_ENV=test RAI_IDENTITY_MODE=fixture node --import tsx --conditions=rai-source --test --test-concurrency=1 tests/integration/w4a-int-deterministic-server.test.ts` from `rai-web/`.
 - No new npm script is added. `TESTING.md` gains a W4a paragraph in the W4-13 PR.
 
 ## 9. Order, owner types, branches
