@@ -10,7 +10,7 @@ Framed in [intent](intent.md), [spec](spec.md) and [plan](plan.md). Source: [W4b
 - **Logs** (`observability/log.ts`): `qc.run.completed` and `qc.run.unavailable` register the seven engine fields (emitted only when recorded); `qc.run.unavailable` also `unavailableDetail` (emitted when not NULL); `qc.extract.failed` registered (`qcRunId`, `slot`, `reason`, `durationMs`, `extractorVersion`), level `warn`, for W4-05b / W4-13b to emit.
 - **Reads.** `QcRunSummarySchema` and `listQcRunsForVersion`: `extractorVersion`, `model`, `modelUsage`, `unavailableDetail` (cost not served). `DeskHealthReport.unavailableQc` rows: required `unavailableDetail: string | null`, bounded by the same pattern; `observability/operator.ts` reads it.
 - **Documents** (dated notes): W0-02 section 7 (`implementation-plan-w1-w3.md`, after the W4-12 `QcRunSummary` paragraph), W0-04 (`persistence-and-artifact-store.md`, `qc_run` paragraph), the data contract (QC run row), W0-07 section 7 (`qc-boundary-and-mail-sink.md`, one new row) and W0-10 (`observability-contract.md`: section 3.3 rows, the new `qc.extract.failed` row, section 7.2 shape, a dated "W4-11b" section).
-- **Tests.** New `tests/integration/w4-11b-run-extraction-identity.test.ts` (8 cases: completed run with identity on row, line and qc-runs read; run without identity; unavailable run with extractor version and detail on row, line, qc-runs read and desk health; `unspecified` and NULL detail; validator refusal keeps the violation and identity; invalid identity and a non-local provider → `engine_identity_invalid`; four runs differing only in extractor, model or prompt told apart from rows and lines; migration on a 0009 database with a row in it, NULL on the old row, the rai_app role writes every column, every CHECK refuses its bad value, the row stays append-only). New `server/src/qc/engine-identity.test.ts` (3). `shared/src/qc/validate.test.ts` (+2), `shared/src/schemas/observability.test.ts` (extended).
+- **Tests.** New `tests/integration/w4-11b-run-extraction-identity.test.ts` (8 cases: completed run with identity on row, line and qc-runs read; run without identity; unavailable run with extractor version and detail on row, line, qc-runs read and desk health; `unspecified` and NULL detail; validator refusal keeps the violation and identity; invalid identity and a non-local provider → `engine_identity_invalid`; four runs differing only in extractor, model or prompt told apart from rows and lines; migration on the database of the migration before it (0009 at first, 0010 after the rebase) with a row in it, NULL on the old row, the rai_app role writes every column, every CHECK refuses its bad value, the row stays append-only). New `server/src/qc/engine-identity.test.ts` (3). `shared/src/qc/validate.test.ts` (+2), `shared/src/schemas/observability.test.ts` (extended).
 
 ## Deviations
 
@@ -22,7 +22,23 @@ Framed in [intent](intent.md), [spec](spec.md) and [plan](plan.md). Source: [W4b
 - **`qc.extract.failed` level and optional fields.** The plan lists the fields but no level. `warn` was chosen (the run's own `qc.run.unavailable` is the `error` line); `qcRunId` and `slot` are optional because the start-up self-test has neither.
 - **`modelUsage` requires all three numbers** and `model` all three identities; a row with only some would be served as null. `recordRun` always writes the model block whole, so this does not arise from product code.
 - **Changed expectations in existing tests.** The plan widens `QcRunSummary` and the desk-health `unavailableQc` row, so `tests/integration/w4-12-qc-runs.test.ts` (its full-shape `deepEqual` gains the four fields, null except `unavailableDetail: 'unspecified'` on the simulated DPO outage), `web/src/screens/case/view-model.test.ts` `qcRun()`, `web/src/api/client.test.ts`, `tests/browser/support/operator-rehearsal.ts` and `shared/src/schemas/observability.test.ts` gained the fields. No assertion was removed or loosened.
+- **Invalid engine hides the unavailable reason** (round 1 note). `checkedResult` checks `engine` before it looks at `status`, so an unavailable result (for example `timeout`) that carries an invalid engine is recorded as `runner_error` / `engine_identity_invalid` and its original reason is not kept. Kept as is: it fails closed, the run is still unavailable either way, and a runner that sends a malformed identity is itself the defect worth surfacing.
+- **Migration renumbered at rebase (round 1).** W5-03 (#205) merged `0010_w5_03_risk` while this PR held 0010. The branch was rebased onto `origin/main` (`c5a267d`); main's `meta/_journal.json` and `0010_snapshot.json` were taken as they are, `npm run migrate:generate` produced idx 11 and `0011_snapshot.json`, and the generated SQL (byte-identical to the hand-reviewed body) was replaced by the hand-written file, now `0011_w4_11b_run_extraction_identity.sql`, with the journal tag renamed to match. `drizzle-kit generate` afterwards reports no drift. References to "migration 0010" for this ticket in the code comments, the change records, W0-02, W0-04, W0-10, DEVLOG and CHANGELOG now say 0011. The integration test finds its migration by tag, so it now runs on a 0010 database; only its title changed.
 - **MIGRATION-SLOT.** Claimed on `docs/board/lane-lead-integration.md` in this PR (plan section 15.2); released at merge.
+
+## Round 1 changes
+
+- Rebased onto `origin/main` `c5a267d` and regenerated the migration at 0011 by hand (see Deviations). Conflicts in CHANGELOG, DEVLOG, the lane A and lead-integration board streams and W0-10 were resolved by keeping both sides (append-only entries kept in order; this ticket's CHANGELOG line and DEVLOG entry on top).
+- `storedUnavailableDetail` checks `typeof detail === 'string'` before the pattern: a non-string detail was coerced by `RegExp.test` and returned unchanged (for example the number `42`), so it could reach the row as a non-code. It is now `unspecified`. Test first in `server/src/qc/engine-identity.test.ts` (failed with `actual: 42`).
+- `QcRunSummarySchema` bounds what it serves: `extractorVersion`, `model.provider`, `model.modelId` and `model.promptRevision` use the `QcEngineIdentitySchema` label pattern, and `unavailableDetail` the CHECK pattern, as the desk-health schema already did. New `shared/src/schemas/review.test.ts` (2 cases; failed before the change).
+- `rai-web/.env` regenerated from the new `.env.example` (W7-01 keys); `RAI_PG_TOOLS=docker-compose:rai-qc-core` for this lane's database. Not committed.
+
+Deferred (not changed here):
+
+- `qc.extract.failed` keeps `qcRunId?` and `slot?` optional; W4-05b and W4-13b should emit them whenever they exist.
+- The qc-runs read serves `model` / `modelUsage` as null when only some of their columns are set; W4-07b must keep writing the model block whole through `recordRun`.
+- The substitute's `simulated:<reason>` details are stored as `unspecified`, so W4-12b's UI will show `unspecified` for every substitute outage; W4-06a (substitute scripts) or W4-12b can switch to bounded codes.
+- W7-03 adds the `additive` class entry for `0011_w4_11b_run_extraction_identity` when it rebases (its class map is not on main).
 
 ## Commands and results
 
@@ -42,9 +58,24 @@ Worktree `/tmp/rai-w4-11b-run-identity-for-extraction`, Postgres project `rai-qc
 | `node scripts/check-links.mjs` (root) | 373 Markdown files, 1069 links, 0 broken |
 | `git diff --check` (root) | clean (also `git diff --cached --check` with the new files staged) |
 | `npx drizzle-kit generate --config server/drizzle.config.ts` (after the migration) | "No schema changes, nothing to migrate" |
+| **Round 1**, rebased head, fresh `rai-qc-core` database, `npm ci` exit 0 | |
+| RED: `engine-identity.test.ts`, new `shared/src/schemas/review.test.ts` | 1 failed (`actual: 42`, expected `unspecified`); 1 failed (free-text detail and identity accepted) |
+| `npm run migrate:generate` (after placing the hand-written 0011) | "No schema changes, nothing to migrate" |
+| `npm run lint` | exit 0 |
+| `npm run typecheck` | exit 0 |
+| `npm run test:unit` | 741/741 |
+| `npm run test:integration` | 391/391, 0 skipped |
+| `npm run build && npm run check:substitute-absent` | exit 0; 711 files scanned, 0 with the marker |
+| `npm run test:browser:server` | 202 passed |
+| `npm run test:browser:substitute` | 48 passed |
+| `node scripts/check-links.mjs` (root) | 394 Markdown files, 1141 links, 0 broken |
+| `git diff --check` (root) | clean |
 
 ## Review verdicts
 
 | Round | Head | Reviewer | Verdict | Notes |
 |---|---|---|---|---|
-| - | - | - | pending | Two independent reviewer verdicts on the PR head, and green CI on that head, are recorded here before merge (D03 ticket flow). |
+| 1 | `4d87003` | reviewer 1 | pass, notes | tsc, lint, unit 653/653 locally; CI unit and browser still pending at the verdict, the other jobs green. Notes: engine checked before status (now a Deviation), unbounded read-schema strings (fixed), optional `qc.extract.failed` fields (deferred), verdict table (this row). |
+| 1 | `4d87003` | reviewer 2 | pass, notes | tsc, lint, unit 653/653 locally; integration and browser relied on the recorded results. Notes: `typeof` check (fixed), partial model block reads as null (deferred), substitute `unspecified` (deferred), W7-03 class entry (deferred). |
+| 1 | `4d87003` | merge queue | conflict | Migration 0010 taken by W5-03 on main; rebased and regenerated at 0011 (Round 1 changes). |
+| 2 | rebased head | - | pending | Two independent reviewer verdicts on the new head, and green CI on that head, are recorded here before merge (D03 ticket flow). |

@@ -85,6 +85,9 @@ test('W4-11b: the stored detail is the code when bounded, unspecified otherwise,
     }),
     null,
   );
+  // A detail that is not a string (a runner outside the schema) is never coerced into a code (review round 1).
+  for (const odd of [42, true, { code: 'x' }, ['a']])
+    assert.equal(storedUnavailableDetail(unavailable(odd as unknown as string)), UNSPECIFIED_DETAIL);
   assert.match(UNSPECIFIED_DETAIL, /^[a-z0-9_]{1,64}$/);
   assert.match(ENGINE_IDENTITY_INVALID, /^[a-z0-9_]{1,64}$/);
 });

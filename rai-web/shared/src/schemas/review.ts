@@ -283,8 +283,12 @@ export type QcUnavailableReasonName = (typeof QC_UNAVAILABLE_REASONS)[number];
  * with that ID (null when it names none); `rulesEvaluated` is null on rows written before migration 0009. W4-11b
  * (W4b plan section 9): `extractorVersion`, `model` and `modelUsage` are what the run recorded (null without
  * extraction or model use, and on rows written before migration 0011); `unavailableDetail` is the stored detail of an
- * unavailable run (a bounded code or `unspecified`; null when none). The model cost is not served.
+ * unavailable run (a bounded code or `unspecified`; null when none). The model cost is not served. The identity
+ * labels use the `QcEngineIdentitySchema` label bound and the detail the qc_run CHECK pattern (review round 1).
  */
+const QC_RUN_ENGINE_LABEL = Type.String({ pattern: '^[A-Za-z0-9][A-Za-z0-9._+/@:-]{0,127}$' });
+const QC_RUN_UNAVAILABLE_DETAIL = Type.String({ pattern: '^[a-z0-9_]{1,64}$' });
+
 export const QcRunSummarySchema = Type.Object({
   runId: Type.String(),
   trigger: Type.Union([Type.Literal('upload'), Type.Literal('submit'), Type.Literal('approve_attempt')]),
@@ -306,9 +310,13 @@ export const QcRunSummarySchema = Type.Object({
   findingCount: Type.Integer({ minimum: 0 }),
   requestedAt: Type.String(),
   completedAt: Type.String(),
-  extractorVersion: Type.Union([Type.String(), Type.Null()]),
+  extractorVersion: Type.Union([QC_RUN_ENGINE_LABEL, Type.Null()]),
   model: Type.Union([
-    Type.Object({ provider: Type.String(), modelId: Type.String(), promptRevision: Type.String() }),
+    Type.Object({
+      provider: QC_RUN_ENGINE_LABEL,
+      modelId: QC_RUN_ENGINE_LABEL,
+      promptRevision: QC_RUN_ENGINE_LABEL,
+    }),
     Type.Null(),
   ]),
   modelUsage: Type.Union([
@@ -319,7 +327,7 @@ export const QcRunSummarySchema = Type.Object({
     }),
     Type.Null(),
   ]),
-  unavailableDetail: Type.Union([Type.String(), Type.Null()]),
+  unavailableDetail: Type.Union([QC_RUN_UNAVAILABLE_DETAIL, Type.Null()]),
 });
 export type QcRunSummary = Static<typeof QcRunSummarySchema>;
 

@@ -61,9 +61,11 @@ export function engineLogFields(columns: EngineColumns): EngineLogFields {
 
 /**
  * qc_run.unavailable_detail: the detail when it is a bounded code, `unspecified` when a detail was given that is not,
- * NULL when none was given or the run completed (plan section 7).
+ * NULL when none was given or the run completed (plan section 7). A non-string detail (a runner outside the schema)
+ * is never coerced into a code.
  */
 export function storedUnavailableDetail(result: QcRunResult): string | null {
   if (result.status !== 'unavailable' || result.detail === null) return null;
-  return UNAVAILABLE_DETAIL_PATTERN.test(result.detail) ? result.detail : UNSPECIFIED_DETAIL;
+  const detail: unknown = result.detail;
+  return typeof detail === 'string' && UNAVAILABLE_DETAIL_PATTERN.test(detail) ? detail : UNSPECIFIED_DETAIL;
 }
