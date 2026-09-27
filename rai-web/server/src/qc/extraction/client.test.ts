@@ -29,6 +29,7 @@ import {
   selfTestEntries,
   xlsxEntries,
 } from './worker/ooxml.test-helper.js';
+import { buildTestPdf, linesContent, textPdf } from './worker/pdf.test-helper.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const FAULT = (name: string) => path.join(HERE, 'test-workers', `${name}.mjs`);
@@ -82,7 +83,7 @@ test('limits outside the policy bounds are refused at creation', () => {
   assert.throws(() => extractor({ maxMemoryMb: 1024 }), /maxMemoryMb/);
 });
 
-test('the real worker, from source, answers every media type as unreadable until W4-05c and W4-05d', async () => {
+test('the real worker, from source, answers every media type as unreadable for bytes that are not a document', async () => {
   const worker = extractor();
   for (const mediaType of MEDIA_TYPES) {
     const result = await worker.extract({ mediaType, bytes: BYTES }, never());
@@ -388,4 +389,50 @@ test('W4-05c: selfTest extracts the embedded synthetic DOCX; a worker that answe
 
 test('W4-05c: the embedded self-test DOCX is the helper rebuild of its text, byte for byte', () => {
   assert.deepEqual(Buffer.from(SELF_TEST_DOCX), buildTestZip(selfTestEntries(SELF_TEST_TEXT)));
+});
+
+// ---- W4-05d: PDF through the real forked worker ----------------------------------------------------------------
+
+test('W4-05d: the real forked worker extracts a text PDF, one page segment per line', async () => {
+  const worker = extractor({ maxInputBytes: 64 * 1024 });
+  const bytes = textPdf(
+    [linesContent(['RAI-DESK-SYNTHETIC-FIXTURE client', 'answer: yes']), linesContent(['p2'])],
+    {
+      flate: true,
+    },
+  );
+  assert.deepEqual(await worker.extract({ mediaType: PDF, bytes }, never()), {
+    ok: true,
+    extractorVersion: worker.version,
+    segments: [
+      { locator: { kind: 'page', page: 1 }, text: 'RAI-DESK-SYNTHETIC-FIXTURE client' },
+      { locator: { kind: 'page', page: 1 }, text: 'answer: yes' },
+      { locator: { kind: 'page', page: 2 }, text: 'p2' },
+    ],
+  });
+});
+
+test('W4-05d: encrypted, image-only and broken PDFs, and images, end as a clean unreadable through the fork', async () => {
+  const worker = extractor({ maxInputBytes: 64 * 1024 });
+  const text = [linesContent(['would be text'])];
+  const scan = buildTestPdf([
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /Resources << /XObject << /Im1 5 0 R >> >> /Contents 4 0 R >>',
+    { dict: '', stream: 'q 400 0 0 400 96 300 cm /Im1 Do Q' },
+    {
+      dict: '/Type /XObject /Subtype /Image /Width 2 /Height 2 /ColorSpace /DeviceGray /BitsPerComponent 8',
+      stream: Buffer.alloc(4),
+    },
+  ]);
+  const cases: Array<[string, AllowedMediaType, Uint8Array]> = [
+    ['encrypted', PDF, textPdf(text, { trailerExtra: '/Encrypt << /Filter /Standard /V 1 >>' })],
+    ['image-only', PDF, scan],
+    ['broken xref', PDF, textPdf(text, { xrefShift: 13 })],
+    ['xref stream only', PDF, textPdf(text, { xrefStream: true })],
+    ['PNG', 'image/png', new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])],
+    ['JPEG', 'image/jpeg', new Uint8Array([0xff, 0xd8, 0xff, 0xe0])],
+  ];
+  for (const [name, mediaType, bytes] of cases)
+    assert.equal(failure(await worker.extract({ mediaType, bytes }, never())), 'unreadable', name);
 });

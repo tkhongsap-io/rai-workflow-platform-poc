@@ -2,13 +2,14 @@
 // process per artifact (decision 5, WA-D08) and imports only `node:buffer`, `node:zlib` and files under worker/
 // (module-graph.test.ts), so this file defines its own wire types rather than importing the host's.
 //
-// Formats register by media type: DOCX and XLSX since W4-05c; W4-05d adds PDF (PNG and JPEG stay unregistered: no OCR,
-// decision 8). The sink, the typed stop and the worker limits live in sink.ts (W4-05c). A format pushes segments into a
+// Formats register by media type: DOCX and XLSX since W4-05c, PDF since W4-05d (PNG and JPEG stay unregistered: no
+// OCR, decision 8). The sink, the typed stop and the worker limits live in sink.ts (W4-05c). A format pushes segments into a
 // `SegmentSink`, which enforces the text and segment caps, and signals `unreadable`, `limit_bytes` or `limit_output`
 // by throwing an `ExtractionStop`. Any other throw is a parser bug: it propagates, the worker dies, and the host
 // records `crash`. Extracted text exists only in this process and in the one reply; nothing here logs or writes.
 import { Buffer } from 'node:buffer';
 import { DOCX_MEDIA_TYPE, extractDocx } from './docx.js';
+import { PDF_MEDIA_TYPE, extractPdf } from './pdf.js';
 import {
   ExtractionStop,
   SegmentSink,
@@ -39,10 +40,11 @@ export interface WorkerRequest {
 }
 export type WorkerReply = { ok: true; segments: WorkerSegment[] } | { ok: false; reason: WorkerStopReason };
 
-/** Media type → format. W4-05c registered DOCX and XLSX; W4-05d registers PDF; nothing else does. */
+/** Media type → format: DOCX and XLSX (W4-05c) and PDF (W4-05d); nothing else, so images are unreadable. */
 export const FORMAT_EXTRACTORS: ReadonlyMap<string, FormatExtractor> = new Map<string, FormatExtractor>([
   [DOCX_MEDIA_TYPE, extractDocx],
   [XLSX_MEDIA_TYPE, extractXlsx],
+  [PDF_MEDIA_TYPE, extractPdf],
 ]);
 
 const LIMIT_KEYS = [
