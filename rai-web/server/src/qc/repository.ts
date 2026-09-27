@@ -5,6 +5,7 @@ import type { QcTrigger, QcUnavailableReason } from '@rai/shared/qc/types';
 import type { EvidenceLocatorView, FindingEvidence, StoredFindingSummary } from '@rai/shared/schemas/review';
 import type { PackVersionRow } from '../cases/repository.js';
 import type { Executor, Tx } from '../db/client.js';
+import type { EngineColumns } from './engine-identity.js';
 import { qcFinding } from '../db/schema/qc-finding.js';
 import { qcRun } from '../db/schema/qc-run.js';
 
@@ -22,6 +23,8 @@ export interface InsertRunInput {
   status: 'completed' | 'unavailable';
   unavailableReason: QcUnavailableReason | null;
   rulesEvaluated: number; // W4-11a: executed rules; 0 on an unavailable run
+  engine: EngineColumns; // W4-11b: extractor and model identity and usage; all NULL without extraction or model use
+  unavailableDetail: string | null; // W4-11b: a bounded code or 'unspecified'; NULL when none or completed
   requestedAt: Date;
   completedAt: Date;
   correlationId: string;
@@ -59,6 +62,8 @@ export async function insertQcRun(tx: Tx, input: InsertRunInput): Promise<void> 
     status: input.status,
     unavailableReason: input.unavailableReason,
     rulesEvaluated: input.rulesEvaluated,
+    ...input.engine,
+    unavailableDetail: input.unavailableDetail,
     requestedAt: input.requestedAt,
     completedAt: input.completedAt,
     correlationId: input.correlationId,

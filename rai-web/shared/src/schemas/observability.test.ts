@@ -51,6 +51,7 @@ test('operator report represents historical unknown reasons and durable late res
         reason: 'unknown',
         runner: 'substitute-scripted',
         runnerVersion: 'unrecorded',
+        unavailableDetail: null,
         requestedAt: at,
         correlationId: id,
       },
@@ -94,6 +95,27 @@ test('operator report represents historical unknown reasons and durable late res
         false,
         `${key}=${unsafe}`,
       );
+  // W4-11b: every unavailable row carries its stored detail, a bounded code or null, never free text.
+  const { unavailableDetail: _detail, ...undetailed } = report.unavailableQc[0]!;
+  assert.equal(Value.Check(DeskHealthReportSchema, { ...report, unavailableQc: [undetailed] }), false);
+  for (const detail of ['extract_limit_time', 'unspecified', 'engine_identity_invalid'])
+    assert.equal(
+      Value.Check(DeskHealthReportSchema, {
+        ...report,
+        unavailableQc: [{ ...report.unavailableQc[0], unavailableDetail: detail }],
+      }),
+      true,
+      detail,
+    );
+  for (const unsafe of ['', 'Extract crash', 'simulated:timeout', 'x'.repeat(65), 'a/b'])
+    assert.equal(
+      Value.Check(DeskHealthReportSchema, {
+        ...report,
+        unavailableQc: [{ ...report.unavailableQc[0], unavailableDetail: unsafe }],
+      }),
+      false,
+      `unavailableDetail=${unsafe}`,
+    );
 });
 test('safe errors reject values hidden in unknown paths, filenames, messages and stacks', () => {
   for (const payload of [

@@ -50,6 +50,7 @@ export const EVENT_CATALOGUE = Object.freeze({
       'ruleRevision',
     ],
   },
+  // W4-11b: the engine identity fields are present only when the run recorded them (extraction or model use).
   'qc.run.completed': {
     level: 'info',
     fields: [
@@ -60,6 +61,13 @@ export const EVENT_CATALOGUE = Object.freeze({
       'rulesEvaluated',
       'findingCount',
       'durationMs',
+      'extractorVersion',
+      'modelProvider',
+      'modelId',
+      'promptRevision',
+      'modelInputTokens',
+      'modelOutputTokens',
+      'modelLatencyMs',
     ],
   },
   'qc.run.unavailable': {
@@ -73,7 +81,20 @@ export const EVENT_CATALOGUE = Object.freeze({
       'runner',
       'runnerVersion',
       'ruleRevision',
+      'extractorVersion',
+      'modelProvider',
+      'modelId',
+      'promptRevision',
+      'modelInputTokens',
+      'modelOutputTokens',
+      'modelLatencyMs',
+      'unavailableDetail',
     ],
+  },
+  // W4-11b (W4b plan section 8): registered for the extraction worker (W4-05b) and its start-up self-test (W4-13b).
+  'qc.extract.failed': {
+    level: 'warn',
+    fields: ['qcRunId', 'slot', 'reason', 'durationMs', 'extractorVersion'],
   },
   'qc.run.late': {
     level: 'warn',

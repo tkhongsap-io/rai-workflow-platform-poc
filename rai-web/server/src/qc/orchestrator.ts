@@ -9,7 +9,9 @@
 // applies); an unknown template version is recorded as runner_error without calling the runner. W4-04: the
 // `upload` trigger (runAndPersistUploadQc) runs on the open draft, or the version it became while still open; its
 // run has lane NULL and its slot, never replays, shares in-flight work by runKey, and its outage finding is owned by
-// the slot's lane (slot 5: AI/COE; slot 9: no run) and reused per version and owning lane.
+// the slot's lane (slot 5: AI/COE; slot 9: no run) and reused per version and owning lane. W4-11b: a result's
+// `engine` identity (extractor version, model, prompt revision, usage) is checked at this boundary and recorded on the
+// run row and its completed / unavailable line, and an unavailable run keeps its bounded `detail`.
 
 import { createHash } from 'node:crypto';
 import { Value } from 'typebox/value';
@@ -34,7 +36,7 @@ import type {
   SelectedRule,
   SlotState,
 } from '@rai/shared/qc/types';
-import { checkOwningLane, validateQcFinding } from '@rai/shared/qc/validate';
+import { QcEngineIdentitySchema, checkOwningLane, validateQcFinding } from '@rai/shared/qc/validate';
 import type { StoredFindingSummary } from '@rai/shared/schemas/review';
 import type { CaseRow, PackVersionRow } from '../cases/repository.js';
 import { readCaseRow, readVersionRow } from '../cases/repository.js';
@@ -58,6 +60,13 @@ import {
   listFindingsForRun,
   ruleRevisionOf,
 } from './repository.js';
+import {
+  ENGINE_IDENTITY_INVALID,
+  engineColumnsOf,
+  engineLogFields,
+  storedUnavailableDetail,
+  type EngineLogFields,
+} from './engine-identity.js';
 import { qcKindOf } from './kind.js';
 import { requestRules, ruleContextOf } from './rules-revision.js';
 import { RuleSelectionError } from './select.js';
@@ -234,8 +243,14 @@ function unavailableResult(reason: QcUnavailableReason, detail: string | null, s
   return { status: 'unavailable', reason, detail, startedAt: at, finishedAt: at };
 }
 
-/** W0-07 3.4 steps 4-5: the first finding that fails validation or the owning-lane check fails the whole run. */
+/**
+ * W0-07 3.4 steps 4-5: the first finding that fails validation or the owning-lane check fails the whole run. W4-11b:
+ * an `engine` identity that is not identifiers and bounded numbers fails it too (`engine_identity_invalid`) and is
+ * not recorded; a valid one is kept on a run a finding refused, since that runner did use it.
+ */
 function checkedResult(result: QcRunResult, request: QcRunRequest, stamp: Date): QcRunResult {
+  if (result.engine !== undefined && !Value.Check(QcEngineIdentitySchema, result.engine))
+    return unavailableResult('runner_error', ENGINE_IDENTITY_INVALID, stamp);
   if (result.status === 'unavailable') return result;
   const mapping = LANE_MAPPINGS_BY_VERSION[request.laneMappingVersion];
   for (const finding of result.findings) {
@@ -243,21 +258,28 @@ function checkedResult(result: QcRunResult, request: QcRunRequest, stamp: Date):
     const violation =
       validateQcFinding(finding, request) ??
       (mapping === undefined ? 'owning_lane_mismatch' : checkOwningLane(finding, mapping, request.lane));
-    if (violation !== null) return unavailableResult('runner_error', violation, stamp);
+    if (violation !== null)
+      return {
+        ...unavailableResult('runner_error', violation, stamp),
+        ...(result.engine === undefined ? {} : { engine: result.engine }),
+      };
   }
   return result;
 }
 
-/** Inserts the immutable qc_run row and its audit event; findings follow under the same run id. */
+/**
+ * Inserts the immutable qc_run row and its audit event; findings follow under the same run id. The row records the
+ * (checked) result's status, reason, rule count (0 when unavailable), engine identity and stored detail (W4-11b).
+ */
 async function recordRun(
   tx: Tx,
   version: PackVersionRow,
   request: QcRunRequest,
   run: RunRecord,
-  unavailableReason: QcUnavailableReason | null,
+  result: QcRunResult,
   findingCount: number,
-  rulesEvaluated: number,
 ): Promise<void> {
+  const unavailableReason = result.status === 'unavailable' ? result.reason : null;
   await insertQcRun(tx, {
     id: run.id,
     versionId: version.id,
@@ -269,7 +291,9 @@ async function recordRun(
     ruleRevision: request.qcRulesRevision,
     status: unavailableReason === null ? 'completed' : 'unavailable',
     unavailableReason,
-    rulesEvaluated,
+    rulesEvaluated: result.status === 'completed' ? result.rulesEvaluated.length : 0,
+    engine: engineColumnsOf(result.engine),
+    unavailableDetail: storedUnavailableDetail(result),
     requestedAt: run.stamp,
     completedAt: run.stamp,
     correlationId: run.correlationId,
@@ -310,13 +334,13 @@ async function persistResult(
     );
     const reuse = prior !== undefined && prior.undispositioned;
     // The run row names the bound runner, not the orchestrator that builds the QC-UNAVAILABLE finding (W0-07 3.6).
-    await recordRun(tx, version, request, run, result.reason, reuse ? 0 : 1, 0);
+    await recordRun(tx, version, request, run, result, reuse ? 0 : 1);
     if (reuse)
       return { status: 'unavailable', reason: result.reason, runId: run.id, findings: [prior.summary] };
     const summary = await appendUnavailableFinding(tx, version, request, run, result.reason);
     return { status: 'unavailable', reason: result.reason, runId: run.id, findings: [summary] };
   }
-  await recordRun(tx, version, request, run, null, result.findings.length, result.rulesEvaluated.length);
+  await recordRun(tx, version, request, run, result, result.findings.length);
   const findings: StoredFindingSummary[] = [];
   for (const finding of result.findings) {
     const findingId = uuidv7(run.stamp.getTime());
@@ -511,18 +535,29 @@ async function replayPrior(
 
 type Settled =
   | { kind: 'replayed'; outcome: SubmitQcOutcome }
-  | { kind: 'recorded'; outcome: PersistQcOutcome; label: RunLabel; rulesEvaluated: number };
+  | {
+      kind: 'recorded';
+      outcome: PersistQcOutcome;
+      label: RunLabel;
+      rulesEvaluated: number;
+      engine: EngineLogFields; // W4-11b: what the row recorded, for the completion line
+      unavailableDetail: string | null; // W4-11b: the stored detail
+    };
 
 /** A replay emits nothing; a newly recorded run emits its W0-10 completion line. */
 function settle(deps: QcOrchestratorDeps, input: AnyQcInput, settled: Settled, startedAt: number) {
   if (settled.kind === 'recorded') {
     const { outcome, label } = settled;
     if (outcome.status === 'unavailable')
-      emitUnavailable(deps, input, outcome.runId, outcome.reason, label, outcome.findings[0]?.owningLane);
+      emitUnavailable(deps, input, outcome.runId, outcome.reason, label, outcome.findings[0]?.owningLane, {
+        ...settled.engine,
+        ...(settled.unavailableDetail === null ? {} : { unavailableDetail: settled.unavailableDetail }),
+      });
     else
       deps.emitter?.log('qc.run.completed', {
         qcRunId: outcome.runId,
         ...label,
+        ...settled.engine,
         rulesEvaluated: settled.rulesEvaluated,
         findingCount: outcome.findings.length,
         durationMs: Math.max(0, performance.now() - startedAt),
@@ -533,7 +568,14 @@ function settle(deps: QcOrchestratorDeps, input: AnyQcInput, settled: Settled, s
 
 function recorded(outcome: PersistQcOutcome, label: RunLabel, result: QcRunResult): Settled {
   const rulesEvaluated = result.status === 'completed' ? result.rulesEvaluated.length : 0;
-  return { kind: 'recorded', outcome, label, rulesEvaluated };
+  return {
+    kind: 'recorded',
+    outcome,
+    label,
+    rulesEvaluated,
+    engine: engineLogFields(engineColumnsOf(result.engine)),
+    unavailableDetail: storedUnavailableDetail(result),
+  };
 }
 
 async function callRunner(
@@ -701,14 +743,16 @@ function emitUnavailable(
   runId: string,
   reason: QcUnavailableReason,
   label: RunLabel,
-  owningLane?: Lane,
+  owningLane: Lane | undefined,
+  identity: EngineLogFields & { unavailableDetail?: string },
 ): void {
   const fields = { qcRunId: runId, caseId: input.caseId, versionId: input.versionId, reason };
   // W0-10 3.3: the log line names the QC-UNAVAILABLE finding's lane (W0-07 3.6) and, since W4-11a, the run's
-  // runner and rule revision; the error capture keeps its shape.
+  // runner and rule revision, since W4-11b its engine identity and stored detail; the error capture keeps its shape.
   deps.emitter?.log('qc.run.unavailable', {
     ...fields,
     ...label,
+    ...identity,
     ...(owningLane === undefined ? {} : { owningLane }),
   });
   deps.errors?.job({ category: 'qc_unavailable', ...fields });

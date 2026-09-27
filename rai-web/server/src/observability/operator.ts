@@ -95,6 +95,7 @@ export async function readDeskHealth(
           reason: qcRun.unavailableReason,
           runner: qcRun.engineId, // W4-11a: the runner label
           runnerVersion: qcRun.runnerVersion,
+          unavailableDetail: qcRun.unavailableDetail, // W4-11b: a bounded code, 'unspecified' or NULL
           requestedAt: qcRun.requestedAt,
           correlationId: qcRun.correlationId,
         })

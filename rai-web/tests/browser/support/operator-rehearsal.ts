@@ -57,6 +57,7 @@ export function report(populated = true): DeskHealthReport {
         reason: 'unknown',
         runner: 'substitute-scripted',
         runnerVersion: 'unrecorded',
+        unavailableDetail: null, // W4-11b
         requestedAt: at,
         correlationId: recordId,
       },

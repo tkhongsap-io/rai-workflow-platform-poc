@@ -146,6 +146,10 @@ describe(`W4-12 qc-runs read and finding evidence — ${SET}`, () => {
       runnerVersion: QC_SUBSTITUTE_RUNNER_VERSION,
       ruleRevision: version.configurationRevisionId,
       rulesLabel: 'w4a.1',
+      // W4-11b: the scripted substitute uses no extractor or model.
+      extractorVersion: null,
+      model: null,
+      modelUsage: null,
     };
     assert.deepEqual(
       runs.map(({ requestedAt: _r, completedAt: _c, ...rest }) => rest),
@@ -157,6 +161,7 @@ describe(`W4-12 qc-runs read and finding evidence — ${SET}`, () => {
           slot: null,
           status: 'completed',
           unavailableReason: null,
+          unavailableDetail: null,
           ...common,
           rulesEvaluated: 0,
           findingCount: 0,
@@ -168,6 +173,7 @@ describe(`W4-12 qc-runs read and finding evidence — ${SET}`, () => {
           slot: null,
           status: 'completed',
           unavailableReason: null,
+          unavailableDetail: null,
           ...common,
           rulesEvaluated: 2,
           findingCount: 2,
@@ -179,6 +185,9 @@ describe(`W4-12 qc-runs read and finding evidence — ${SET}`, () => {
           slot: null,
           status: 'unavailable',
           unavailableReason: 'runner_error',
+          // W4-11b: the substitute's detail `simulated:runner_error` is outside ^[a-z0-9_]{1,64}$, so it is stored
+          // as `unspecified` (plan section 7).
+          unavailableDetail: 'unspecified',
           ...common,
           rulesEvaluated: 0,
           findingCount: 1,

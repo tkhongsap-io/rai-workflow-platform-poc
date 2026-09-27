@@ -188,3 +188,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w7-06-subject-profile model=claude-opus-5-5 (implementation lane ops)
 - Takes over from: session=none (reason: new; W7 plan section 9.1 single `MIGRATION-SLOT` rule; other migration PRs are open at this time)
 - Scope: queued behind any earlier holder: the W7-06 PR opens for review with `server/drizzle/0013_w7_06_subject_profile.sql` and `meta/` (next free number on main now, class `additive`) and must not merge while another migration PR holds the slot; before merge it rebases onto main and regenerates its migration by hand at the next free number, keeping its hand-written SQL and its `MIGRATION_CLASSES` entry. Released at merge of the W7-06 PR.
+
+## 2026-09-27 19:39 — CLAIM lead-integration: MIGRATION-SLOT (W4-11b, #201)
+- Author: operator=ta session=claude-code-w4-11b-run-identity model=claude-opus-5-5
+- Takes over from: session=none (reason: new; W4b plan section 15.2 shared-file rule, first W4b migration)
+- Scope: the one migration-bearing PR in review across packages: `server/drizzle/00NN_w4_11b_run_extraction_identity.sql`, `meta/`, released at merge of the W4-11b PR.

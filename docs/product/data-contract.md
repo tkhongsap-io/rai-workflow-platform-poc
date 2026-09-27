@@ -16,7 +16,7 @@ The source record ID is a reference, not proof of external registration or a pro
 | Pack version | Immutable submission ID, parent version, submitting actor/time, checklist_template_version, QC/risk/SLA config revision, stage_context (idea / pre-build / pre-launch, D11; QC input only, never a lifecycle state) |
 | Artifact slot | Slot 1-9, disposition/reason, immutable blob reference and hash, filename/media metadata |
 | Lane decision | Version, lane, actor/role, decision, timestamp, feedback and observed QC run |
-| QC run/finding | Version, trigger, rule revision, evidence location, metric/denominator/threshold, owning lane (AI/COE, DPO or IT/Security, assigned by the W0-06 rule under D05), result or unavailable status |
+| QC run/finding | Version, trigger, rule revision, evidence location, metric/denominator/threshold, owning lane (AI/COE, DPO or IT/Security, assigned by the W0-06 rule under D05), result or unavailable status. W4-11b (2026-09-27): the run also records its runner, extractor and model identity, prompt revision and model usage (identifiers and numbers, never document or model text) and, when unavailable, a bounded detail code |
 | Disposition event | Finding, actor, fixed/waived/N/A, reason, evidence and timestamp; never overwrite prior finding |
 | Notification | Event/version/lane/recipient, case link, delivery status, retry and deduplication identity |
 | Configuration revision | Admin actor/time, template identity, rules/thresholds/SLA revision |
