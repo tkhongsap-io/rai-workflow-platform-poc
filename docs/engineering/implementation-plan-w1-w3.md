@@ -618,6 +618,12 @@ export interface ConfigurationView {     // the published revision that applies 
 
 **W4-02 amendment (2026-09-27).** `ConfigurationView.revisionId` is unchanged: the latest published revision among `use_case_groups`, `checklist_templates` and `sla` in force now. The configuration seed now also publishes `qc_rules` revision 1 (label `w4a.1`, [W4a plan](implementation-plan-w4a.md) section 3); the view does not expose it. So from W4-02 on a submitted version's `configurationRevisionId` (7.6) is the `qc_rules` revision, not the `revisionId` this view showed the submitter; the view's revision stays among the version's frozen kinds (W0-04 `frozen_configuration`).
 
+**W5-02 amendment (2026-09-27): the risk rubric read.** [W5 plan](implementation-plan-w5.md) sections 3 and 6. `risk_rubric` is a registered configuration kind (`RiskRubricBodySchema`, validated on publish together with `riskRubricBodyProblems`), and the seed publishes revision 1, label `synthetic-placeholder.1`: a **synthetic placeholder** for D07 (AI/COE), never the approved instrument (`provenance` accepts only `synthetic_placeholder`, R-2). Every new version's `frozen_configuration` therefore also names the `risk_rubric` revision in force; `configurationRevisionId` (7.6) stays the `qc_rules` revision. `ConfigurationView` does not expose the rubric. A new read:
+
+| Endpoint | Request | Success | Errors |
+|---|---|---|---|
+| `GET /api/configuration/risk-rubric/current` | — | `200 RiskRubricView { revisionId, label, provenance: 'synthetic_placeholder', publishedAt, body: RiskRubricBody }`, the `risk_rubric` revision in force now under the W1-00 activation rule; W0-05 action `config.read_effective` (every role) | `401`; `404 not_found` with `details.resource = 'risk_rubric'` when no revision is in force |
+
 ### 7.4 Artifact upload and download (W1-03a/b; consumed by W1-06)
 
 ```ts

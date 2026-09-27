@@ -1,6 +1,6 @@
 // W5-01 (W5 plan sections 2 and 3): what a `risk_rubric` body may contain. Structural limits are the schema's
-// (`RiskRubricBodySchema`); the checks a schema cannot express are `riskRubricBodyProblems`'. The body is not yet a
-// registered configuration kind (W5-02 registers it); publishing runs both, as it does for `qc_rules`.
+// (`RiskRubricBodySchema`); the checks a schema cannot express are `riskRubricBodyProblems`'. W5-02 registered the
+// kind in CONFIGURATION_BODY_SCHEMAS; publishing runs both, as it does for `qc_rules`.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,8 +22,8 @@ test('the synthetic test rubric is a valid body with no problems', () => {
   assert.deepEqual(refusals(testRubric()), []);
 });
 
-test('W5-01 defines the schema only: risk_rubric is not yet a registered configuration kind (W5-02)', () => {
-  assert.equal(Object.hasOwn(CONFIGURATION_BODY_SCHEMAS, 'risk_rubric'), false);
+test('W5-02 registers the schema: risk_rubric is a configuration kind validated by RiskRubricBodySchema', () => {
+  assert.equal(CONFIGURATION_BODY_SCHEMAS.risk_rubric, RiskRubricBodySchema);
 });
 
 test('provenance other than synthetic_placeholder is refused (R-2: nothing in W5 can call a rubric approved)', () => {

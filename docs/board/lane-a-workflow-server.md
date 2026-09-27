@@ -232,3 +232,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w7-03-migration-classes-ahead-readiness model=claude-opus-5-5 (implementation lane ops)
 - Takes over from: session=none (reason: new; ticket #208, W7 plan #199 merged)
 - Scope: per changes/2026-09-27-w7-03-migration-classes-ahead-readiness/: `MIGRATION_CLASSES` and the header test, migration `0011_w7_03_migration_class` (`schema_migration_class`, guard, grants), the conditional class writer in `runMigrations`, readiness `store.migrations: ahead`, `npm run release:check-rollback`, desk-health `ahead` with th/en keys, W0-04 and W0-10 amendments. Migration-bearing; one PR.
+
+## 2026-09-27 21:40 — CLAIM lane-a: W5-02 register risk_rubric, seed placeholder, rubric read (#213)
+- Author: operator=ta session=claude-code-w5-02-register-risk-rubric-seed model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #213)
+- Scope: per changes/2026-09-27-w5-02-register-risk-rubric-seed/: `risk_rubric` registered in `CONFIGURATION_BODY_SCHEMAS`/`ConfigurationBodies` with a `riskRubricBodyProblems` branch in `validateConfigurationBody`; the seed publishes revision 1 `synthetic-placeholder.1` (a labelled SYNTHETIC PLACEHOLDER for D07, not the approved instrument); `GET /api/configuration/risk-rubric/current` (200 / 404 `risk_rubric`, `config.read_effective`); seed and configuration tests updated; W0-02 section 7.3 amendment. No migration, no scoring, no UI. One PR.

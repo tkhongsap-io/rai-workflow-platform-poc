@@ -244,7 +244,7 @@ export function qcRulesBodyProblems(body: Static<typeof QcRulesBodySchema>): str
 }
 
 // W5-01 (W5 plan section 3): the `risk_rubric` body, the versioned questionnaire and its count rules. Defined here and
-// checked by `riskRubricBodyProblems`; W5-02 registers it in CONFIGURATION_BODY_SCHEMAS and seeds the placeholder.
+// checked by `riskRubricBodyProblems`; W5-02 registered it in CONFIGURATION_BODY_SCHEMAS and seeds the placeholder.
 // Every value W5 seeds is a SYNTHETIC PLACEHOLDER for D07 (AI/COE): `provenance` accepts only 'synthetic_placeholder'
 // (R-2), so no W5 code path can call a rubric approved; the D07 instrument needs its own schema change.
 const BilingualSchema = Type.Object(
@@ -366,6 +366,7 @@ export const CONFIGURATION_BODY_SCHEMAS = Object.freeze({
   operator_recipients: OperatorRecipientsBodySchema,
   use_case_groups: UseCaseGroupsBodySchema,
   qc_rules: QcRulesBodySchema,
+  risk_rubric: RiskRubricBodySchema, // W5-02; publishing also runs riskRubricBodyProblems
 }) satisfies Partial<Record<ConfigurationKind, unknown>>;
 
 export type ConfigurationBodies = {
@@ -375,5 +376,18 @@ export type ConfigurationBodies = {
   operator_recipients: Static<typeof OperatorRecipientsBodySchema>;
   use_case_groups: Static<typeof UseCaseGroupsBodySchema>;
   qc_rules: Static<typeof QcRulesBodySchema>;
+  risk_rubric: RiskRubricBody;
 };
 export type SeedableConfigurationKind = keyof ConfigurationBodies;
+
+/**
+ * W5-02 (W5 plan section 6): `GET /api/configuration/risk-rubric/current`, the `risk_rubric` revision in force now.
+ * `provenance` is always 'synthetic_placeholder' in W5 (R-2): the seeded rubric is a placeholder for D07 (AI/COE).
+ */
+export interface RiskRubricView {
+  revisionId: ConfigurationRevisionId;
+  label: string;
+  provenance: RiskRubricBody['provenance'];
+  publishedAt: string;
+  body: RiskRubricBody;
+}

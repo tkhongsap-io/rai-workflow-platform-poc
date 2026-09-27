@@ -75,6 +75,10 @@ test('the seed publishes one revision per kind with the recorded values (D01, D0
   assert.deepEqual(await currentBody(db.app, 'checklist_templates', new Date(T0.getTime() + 1)), {
     versions: ['v1.0 Sheet3', 'v2.0'],
   });
+  // W5-02: the risk_rubric placeholder (a SYNTHETIC PLACEHOLDER for D07, never the approved instrument).
+  const rubric = await currentBody(db.app, 'risk_rubric', new Date(T0.getTime() + 1));
+  assert.equal(rubric?.label, 'synthetic-placeholder.1');
+  assert.equal(rubric?.provenance, 'synthetic_placeholder');
   // one configuration.published audit event per kind, written in the same transaction
   const events = await auditStore.read(db.app, {});
   assert.deepEqual(
@@ -185,7 +189,7 @@ test('bodies are validated on write against the shared schema; a kind without a 
   await assert.rejects(
     withTransaction(db.app, (tx) =>
       publishRevision(tx, {
-        kind: 'risk_rubric' as never,
+        kind: 'group_role_mapping' as never, // W5-02 registered risk_rubric; this kind still has no schema
         body: {} as never,
         publishedBy: 'system',
         publishedRole: 'system',
@@ -194,7 +198,24 @@ test('bodies are validated on write against the shared schema; a kind without a 
     ),
     /no body schema registered/,
   );
+  // W5-02: risk_rubric is validated by its schema and by riskRubricBodyProblems (W5 plan section 2).
+  const duplicate = structuredClone(CONFIGURATION_SEED.risk_rubric);
+  duplicate.questions[1] = { ...duplicate.questions[1]!, questionId: 'RQ1' };
+  for (const body of [duplicate, { ...CONFIGURATION_SEED.risk_rubric, provenance: 'd07_recorded' }])
+    await assert.rejects(
+      withTransaction(db.app, (tx) =>
+        publishRevision(tx, {
+          kind: 'risk_rubric',
+          body: body as never,
+          publishedBy: 'system',
+          publishedRole: 'system',
+          correlationId: randomUUID(),
+        }),
+      ),
+      ConfigurationBodyInvalid,
+    );
   assert.deepEqual(await listRevisions(db.app, 'sla'), [], 'a rejected publish writes nothing');
+  assert.deepEqual(await listRevisions(db.app, 'risk_rubric'), []);
   assert.deepEqual(await auditStore.read(db.app, {}), [], 'and no audit event');
 });
 

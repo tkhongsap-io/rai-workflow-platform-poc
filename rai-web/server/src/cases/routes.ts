@@ -1,5 +1,6 @@
 // W0-02 section 7.3, verbatim: POST /api/cases, GET /api/cases/{caseId}, PATCH /api/cases/{caseId},
-// GET /api/cases?page&pageSize, GET /api/configuration/current. Every route declares its W0-05 action; the
+// GET /api/cases?page&pageSize, GET /api/configuration/current; W5-02 adds GET /api/configuration/risk-rubric/current
+// (W5 plan section 6). Every route declares its W0-05 action; the
 // middleware (authz/) runs session → authorization → existence before anything here. What the handlers add is the
 // W0-06 step 4 validation and the two W0-05 scope evaluations that need a validated body: the create scope step
 // (facts from the body) and the post-edit step of case.edit_draft (facts the case would have after the write).
@@ -20,7 +21,7 @@ import {
 } from '@rai/shared/schemas/cases';
 import { actorOf, authorizedActor, denyUnlessAllowed } from '../authz/middleware.js';
 import type { Action, CaseScopeFacts } from '../authz/policy.js';
-import { effectiveConfiguration } from '../configuration/store.js';
+import { currentRiskRubric, effectiveConfiguration } from '../configuration/store.js';
 import type { Emitter } from '../observability/log.js';
 import { IDEMPOTENCY_HEADER, requireIdempotencyKey } from './idempotency.js';
 import { rejectProjectedFields } from './projected-fields.js';
@@ -162,5 +163,18 @@ export function registerCaseRoutes(fastify: FastifyInstance, deps: CaseRouteDeps
     '/api/configuration/current',
     { config: { auth: { kind: 'action', action: 'config.read_effective', target: 'none' } } },
     () => effectiveConfiguration(deps.db, now()),
+  );
+
+  // GET /api/configuration/risk-rubric/current → 200 RiskRubricView (W5-02): the risk_rubric revision in force now,
+  // a SYNTHETIC PLACEHOLDER until D07; 404 not_found (risk_rubric) when none is. Every role (the body holds no
+  // addresses), like the configuration view.
+  app.get(
+    '/api/configuration/risk-rubric/current',
+    { config: { auth: { kind: 'action', action: 'config.read_effective', target: 'none' } } },
+    async () => {
+      const view = await currentRiskRubric(deps.db, now());
+      if (view === undefined) throw new NotFoundError('risk_rubric');
+      return view;
+    },
   );
 }
