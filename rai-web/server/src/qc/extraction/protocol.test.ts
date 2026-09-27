@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { FIXED_WORKER_LIMITS } from './limits.js';
 import { buildWorkerRequest, classifyReply } from './protocol.js';
-import type { WorkerLimits } from './worker/extract.js';
+import { MAX_LOCATOR_STRING_CHARS, type WorkerLimits } from './worker/extract.js';
 
 const LIMITS: WorkerLimits = { ...FIXED_WORKER_LIMITS, maxTextChars: 1000 };
 const PDF = 'application/pdf';
@@ -82,4 +82,63 @@ test('more segments than the cap is limit_output, and exactly the cap is not', (
     ok: false,
     reason: 'limit_output',
   });
+});
+
+test('a locator with a key outside its kind is a crash, on every kind and on the page region', () => {
+  const smuggled = 'x'.repeat(8);
+  const locators: unknown[] = [
+    { kind: 'absent', smuggled },
+    { kind: 'page', page: 1, smuggled },
+    { kind: 'page', page: 1, region: { x: 0, y: 0, w: 1, h: 1, smuggled } },
+    { kind: 'text_range', start: 0, end: 1, smuggled },
+    { kind: 'cell', sheet: 'S', cell: 'A1', smuggled },
+    { kind: 'section', heading: 'H', smuggled },
+  ];
+  for (const locator of locators)
+    assert.deepEqual(
+      classifyReply({ ok: true, segments: [{ locator, text: 'a' }] }, { ...LIMITS, maxTextChars: 10_000 }),
+      { ok: false, reason: 'crash' },
+      JSON.stringify(locator),
+    );
+});
+
+test('a smuggled locator key cannot slip past the text cap either', () => {
+  const reply = {
+    ok: true,
+    segments: [{ locator: { kind: 'absent', smuggled: 'x'.repeat(1000) }, text: 'a' }],
+  };
+  assert.equal(classifyReply(reply, { ...LIMITS, maxTextChars: 10 }).ok, false);
+});
+
+test('locator strings count toward the text cap', () => {
+  const limits: WorkerLimits = { ...LIMITS, maxTextChars: 10 };
+  const at = [{ locator: { kind: 'cell', sheet: 'Sheet', cell: 'A1' }, text: 'abc' }];
+  assert.equal(classifyReply({ ok: true, segments: at }, limits).ok, true);
+  const heading = [{ locator: { kind: 'section', heading: 'x'.repeat(1000) }, text: 'a' }];
+  assert.deepEqual(classifyReply({ ok: true, segments: heading }, limits), {
+    ok: false,
+    reason: 'limit_output',
+  });
+  const cell = [{ locator: { kind: 'cell', sheet: 'Sheet1', cell: 'A1' }, text: 'abc' }];
+  assert.deepEqual(classifyReply({ ok: true, segments: cell }, limits), {
+    ok: false,
+    reason: 'limit_output',
+  });
+});
+
+test('a locator string over the per-field bound is limit_output even under a large text cap', () => {
+  const limits: WorkerLimits = { ...LIMITS, maxTextChars: 2_000_000 };
+  const long = 'x'.repeat(MAX_LOCATOR_STRING_CHARS + 1);
+  for (const locator of [
+    { kind: 'section', heading: long },
+    { kind: 'cell', sheet: long, cell: 'A1' },
+    { kind: 'cell', sheet: 'S', cell: long },
+  ])
+    assert.deepEqual(
+      classifyReply({ ok: true, segments: [{ locator, text: 'a' }] }, limits),
+      { ok: false, reason: 'limit_output' },
+      locator.kind,
+    );
+  const atBound = [{ locator: { kind: 'section', heading: long.slice(1) }, text: 'a' }];
+  assert.equal(classifyReply({ ok: true, segments: atBound }, limits).ok, true);
 });

@@ -4,15 +4,43 @@
 // `limit_output`. The extractor version is the host's; a reply cannot carry one.
 import { Type } from 'typebox';
 import { Value } from 'typebox/value';
-import { EvidenceLocatorSchema } from '@rai/shared/schemas/review';
 import type { AllowedMediaType } from '@rai/shared/schemas/artifacts';
 import type { Segment } from './port.js';
-import type { WorkerLimits, WorkerRequest } from './worker/extract.js';
+import {
+  MAX_LOCATOR_STRING_CHARS,
+  locatorChars,
+  type WorkerLimits,
+  type WorkerRequest,
+} from './worker/extract.js';
 
 export type { WorkerLimits, WorkerReply, WorkerRequest } from './worker/extract.js';
 
+/**
+ * The shared `EvidenceLocator` shape as the wire accepts it: the same five kinds, but every variant and the page region
+ * refuse unknown keys (spec item 3), and each string field is bounded. The shared read schema stays open; this one is
+ * the untrusted boundary, so a worker cannot put document text into a stored, served locator (decisions 21 and 23).
+ */
+const WIRE_STRICT = { additionalProperties: false } as const;
+const WireLocatorString = Type.String({ maxLength: MAX_LOCATOR_STRING_CHARS });
+export const WireLocatorSchema = Type.Union([
+  Type.Object(
+    {
+      kind: Type.Literal('page'),
+      page: Type.Number(),
+      region: Type.Optional(
+        Type.Object({ x: Type.Number(), y: Type.Number(), w: Type.Number(), h: Type.Number() }, WIRE_STRICT),
+      ),
+    },
+    WIRE_STRICT,
+  ),
+  Type.Object({ kind: Type.Literal('text_range'), start: Type.Number(), end: Type.Number() }, WIRE_STRICT),
+  Type.Object({ kind: Type.Literal('cell'), sheet: WireLocatorString, cell: WireLocatorString }, WIRE_STRICT),
+  Type.Object({ kind: Type.Literal('section'), heading: WireLocatorString }, WIRE_STRICT),
+  Type.Object({ kind: Type.Literal('absent') }, WIRE_STRICT),
+]);
+
 const SegmentSchema = Type.Object(
-  { locator: EvidenceLocatorSchema, text: Type.String() },
+  { locator: WireLocatorSchema, text: Type.String() },
   { additionalProperties: false },
 );
 export const WorkerReplySchema = Type.Union([
@@ -44,7 +72,10 @@ export function buildWorkerRequest(
   return { mediaType: input.mediaType, bytes: input.bytes, limits };
 }
 
-/** Over the caps first (so an oversized but well-formed reply is `limit_output`), then the schema. */
+/**
+ * Over the caps first (so an oversized but well-formed reply is `limit_output`), then the strict schema. Locator
+ * strings count toward the text cap, and one over `MAX_LOCATOR_STRING_CHARS` is `limit_output`.
+ */
 export function classifyReply(value: unknown, limits: WorkerLimits): ClassifiedReply {
   if (typeof value === 'object' && value !== null && (value as { ok?: unknown }).ok === true) {
     const segments = (value as { segments?: unknown }).segments;
@@ -52,9 +83,12 @@ export function classifyReply(value: unknown, limits: WorkerLimits): ClassifiedR
       if (segments.length > limits.maxSegments) return { ok: false, reason: 'limit_output' };
       let chars = 0;
       for (const segment of segments as unknown[]) {
-        const text =
-          typeof segment === 'object' && segment !== null ? (segment as { text?: unknown }).text : undefined;
+        if (typeof segment !== 'object' || segment === null) continue;
+        const { text, locator } = segment as { text?: unknown; locator?: unknown };
         if (typeof text === 'string') chars += text.length;
+        const inLocator = locatorChars(locator);
+        if (inLocator < 0) return { ok: false, reason: 'limit_output' };
+        chars += inLocator;
       }
       if (chars > limits.maxTextChars) return { ok: false, reason: 'limit_output' };
     }

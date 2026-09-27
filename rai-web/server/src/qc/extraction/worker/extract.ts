@@ -23,6 +23,13 @@ export interface WorkerLimits {
   maxPdfObjects: number;
 }
 
+/**
+ * The most UTF-16 code units any one locator string field (`sheet`, `cell`, `heading`) may carry. Locators are stored
+ * and served (decisions 21 and 23), so their strings also count toward `maxTextChars`; this per-field bound keeps a
+ * heading from carrying a paragraph even under a large text cap. Over it is `limit_output`.
+ */
+export const MAX_LOCATOR_STRING_CHARS = 512;
+
 /** A locator as the worker emits it; the host checks it against the shared `EvidenceLocator` schema. */
 export interface WorkerLocator {
   readonly kind: string;
@@ -48,7 +55,25 @@ export class ExtractionStop extends Error {
   }
 }
 
-/** Collects segments and stops with `limit_output` at the text cap (UTF-16 code units) or the segment cap. */
+/**
+ * The UTF-16 code units in a locator's string fields, counted toward `maxTextChars`; -1 when any one field is over
+ * `MAX_LOCATOR_STRING_CHARS`. Every own string value counts, so an unexpected key cannot hide text from the cap.
+ */
+export function locatorChars(locator: unknown): number {
+  if (typeof locator !== 'object' || locator === null) return 0;
+  let chars = 0;
+  for (const [key, value] of Object.entries(locator)) {
+    if (key === 'kind' || typeof value !== 'string') continue;
+    if (value.length > MAX_LOCATOR_STRING_CHARS) return -1;
+    chars += value.length;
+  }
+  return chars;
+}
+
+/**
+ * Collects segments and stops with `limit_output` at the text cap (UTF-16 code units of text and locator strings), at
+ * the per-field locator bound, or at the segment cap.
+ */
 export class SegmentSink {
   readonly #segments: WorkerSegment[] = [];
   #chars = 0;
@@ -56,8 +81,9 @@ export class SegmentSink {
 
   add(locator: WorkerLocator, text: string): void {
     if (this.#segments.length >= this.limits.maxSegments) throw new ExtractionStop('limit_output');
-    if (this.#chars + text.length > this.limits.maxTextChars) throw new ExtractionStop('limit_output');
-    this.#chars += text.length;
+    const chars = text.length + locatorChars(locator);
+    if (chars < 0 || this.#chars + chars > this.limits.maxTextChars) throw new ExtractionStop('limit_output');
+    this.#chars += chars;
     this.#segments.push({ locator, text });
   }
 

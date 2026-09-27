@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import {
   ExtractionStop,
   FORMAT_EXTRACTORS,
+  MAX_LOCATOR_STRING_CHARS,
   SegmentSink,
   extractInWorker,
   isWorkerRequest,
@@ -136,4 +137,20 @@ test('the request guard accepts the host request and refuses anything else', () 
     { ...request(), limits: { ...LIMITS, maxTextChars: '10' } },
   ])
     assert.equal(isWorkerRequest(value), false, JSON.stringify(value));
+});
+
+test('the sink counts locator strings toward the text cap and stops at the per-field bound', () => {
+  const sink = new SegmentSink(LIMITS);
+  sink.add({ kind: 'cell', sheet: 'Sheet', cell: 'A1' }, 'abc');
+  assert.throws(
+    () => sink.add({ kind: 'section', heading: 'h' }, ''),
+    (e) => e instanceof ExtractionStop && e.reason === 'limit_output',
+  );
+  const bound = new SegmentSink({ maxTextChars: 2_000_000, maxSegments: 3 });
+  assert.throws(
+    () => bound.add({ kind: 'section', heading: 'x'.repeat(MAX_LOCATOR_STRING_CHARS + 1) }, ''),
+    (e) => e instanceof ExtractionStop && e.reason === 'limit_output',
+  );
+  bound.add({ kind: 'section', heading: 'x'.repeat(MAX_LOCATOR_STRING_CHARS) }, '');
+  assert.equal(bound.segments.length, 1);
 });
