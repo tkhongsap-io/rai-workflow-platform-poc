@@ -2,6 +2,7 @@
 
 ## 2026-09-27
 
+- W4-01 (#200): ADR-0006 QC engine and extraction, provisional (acceptance moves to W4-14): deterministic content rules plus a disabled-by-default model port that only proposes claim candidates; hand-written parsers on Node built-ins, no new dependency; one worker process per artifact; two run parts (metadata and content) per trigger; evaluation method as D09 working assumptions; no provider named. Threat-model rows, upload safety section 10 and W0-02 section 4 notes. No code change.
 - W4b-W7 plans (W4-00b, W5-00, W6-00, W7-00a): Ta's delegation of 2026-09-27 recorded (W4b, W5, W6 with a desk dashboard, and W7 authorized provisionally on synthetic data; W8 not authorized; D07-D10 stay open, with working assumptions only); one "delegated rulings (provisional)" register row per package; BUILD_PLAN gate section; four consolidated file-level plans and the merged ticket list (changes/2026-09-27-w4b-w7-plans/). No code change.
 - W4a-EXIT (#190): W4a engineering exit recorded (changes/2026-09-27-w4a-exit/review.md); awaiting Ta's package review. No code change.
 - W4-12 (#189): finding reads carry `evidence` (slot, artifact, locator; no hashes); `GET …/versions/{versionId}/qc-runs` lists a version's runs with runner, rule revision and label, rules evaluated and finding count, scoped like the findings read; the version view shows a QC log; a lane's workspace shows every unavailable run before the decision controls; a 0-rule run is never "no findings"; finding rows name rule, evidence location and owning lane.

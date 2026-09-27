@@ -159,3 +159,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: two reviewers and CI on this PR; then Ta's package review of the record (not accepted yet). Two deferred items are marked for Ta (no upload run when no runner is bound; locator heading/cell text served). W4b stays unauthorized; labels provisional until D09.
 - Author: operator=ta session=claude-code-w4a-exit model=claude-opus-5-5
 - Evidence: changes/2026-09-27-w4a-exit/review.md
+
+## 2026-09-27 19:39 — CLAIM lead-integration: ADR-0006 QC engine and extraction, provisional (W4-01)
+- Author: operator=ta session=claude-code-w4-01-adr-0006 model=claude-opus-5-5 (implementation lane qc-content)
+- Takes over from: session=none (reason: new; issue #200, W4b plan #199 merged)
+- Scope: `adr/0006-qc-engine-and-extraction.md`, `adr/README.md`, threat-model rows, upload-safety section 10 note, W0-02 section 4 note (W4b plan section 15 row 2, section 19); no application code, no dependency, no decision beyond the plan's recorded provisional rulings and working assumptions.
