@@ -40,7 +40,7 @@ export function registerPackRoutes(fastify: FastifyInstance, deps: PackRouteDeps
       config: { auth: { kind: 'action', action: 'case.view', target: 'case' } },
       schema: { params: CaseParamsSchema, response: { 200: PackDraftSchema } },
     },
-    (request) => readDraft(deps.db, request.params.caseId),
+    (request) => readDraft(deps.db, request.params.caseId, deps.subjects),
   );
 
   // PUT /api/cases/{caseId}/draft → 200 PackDraft, draftRevision + 1; audit draft.saved; upload trigger after commit.

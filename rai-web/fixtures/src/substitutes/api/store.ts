@@ -275,6 +275,7 @@ export class SubstituteStore {
         slots,
         draftRevision: 1,
         updatedAt: FIXTURE_LOADED_AT,
+        riskAnswers: {}, // W5-04: the substitute never stores answers (W5 plan section 7)
       },
       versions: [],
       readyAtByVersionId: new Map(),

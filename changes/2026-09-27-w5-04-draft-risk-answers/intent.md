@@ -1,0 +1,7 @@
+# Intent: draft risk answers (W5-04, #222)
+
+W5-01 gave the desk a scoring engine, W5-02 a seeded **SYNTHETIC PLACEHOLDER** rubric and W5-03 a `pack_version.risk_answers` column, but nobody can answer the questionnaire yet. This ticket lets the owner or BU SPOC answer it on the pack draft, through the existing save-draft request: each answer is an option value of the rubric in force (or `unknown`), stored with who gave it, in which role and when, cleared with `null`, recorded in the `draft.saved` audit event as question IDs and values only, and frozen with the version by the existing trigger. A send-back successor draft starts with the parent's answers and their original attribution, as it starts with the parent's slots.
+
+Nothing scores yet (W5-05 records the proposal at submit), and nothing shows the questionnaire yet (W5-07). The in-memory API substitute only gains `riskAnswers: {}` in its draft literals so it keeps type-checking.
+
+It is order 3 in section 9 of the [W5 plan](../../docs/engineering/implementation-plan-w5.md) and implements sections 2 (the two draft-save 422 rows), 4 ("Draft answers") and 6 (the `PackDraft` and `PackDraftUpdateRequest` rows) under the register rows "Ta's delegation (2026-09-27)" and "W5 delegated rulings (provisional)" (R-3, R-5's storage half, R-13). D07 (the questionnaire's content) stays open for AI/COE. Answers carry no free text (R-13). Synthetic data only; no network call; no deploy.

@@ -414,4 +414,67 @@ describe(`W2-03 successor draft concurrency and stale actions — ${SET}`, () =>
     });
     assert.equal(frozen.statusCode, 200, frozen.body);
   });
+
+  it("W5-04: the successor draft N+1 starts with the parent's risk answers and their original attribution", async () => {
+    const owner = await signIn(OWNER_A);
+    const draft = (
+      await app.inject({ method: 'GET', url: `/api/cases/${NONVENDOR.caseId}/draft`, headers: asUser(owner) })
+    ).json<PackDraft>();
+    const saveBody: PackDraftUpdateRequest = {
+      expectedVersion: { versionId: draft.draftId, revision: draft.draftRevision },
+      riskAnswers: { RQ1: 'public', RQ3: 'yes', RQ6: 'unknown' },
+    };
+    const saved = await app.inject({
+      method: 'PUT',
+      url: `/api/cases/${NONVENDOR.caseId}/draft`,
+      headers: { 'content-type': 'application/json', ...asUser(owner) },
+      payload: saveBody,
+    });
+    assert.equal(saved.statusCode, 200, saved.body);
+    const answers = saved.json<PackDraft>().riskAnswers;
+    const version = await submitOk(owner, NONVENDOR.caseId);
+    const dpo = await signIn(DPO);
+    const back = await sendBack(dpo, NONVENDOR.caseId, version.versionId, 'dpo', {
+      expectedVersion: { versionId: version.versionId, revision: await caseRevision(NONVENDOR.caseId) },
+      feedback: { items: [{ slot: 2, deficiency: 'DPIA incomplete on scope' }] },
+    });
+    assert.equal(back.statusCode, 201, back.body);
+    const successorId = back.json<LaneDecisionResponse>().successorDraftVersionId;
+    assert.ok(successorId);
+    const successor = (
+      await app.inject({ method: 'GET', url: `/api/cases/${NONVENDOR.caseId}/draft`, headers: asUser(owner) })
+    ).json<PackDraft>();
+    assert.equal(successor.draftId, successorId);
+    assert.deepEqual(successor.riskAnswers, answers, 'same values, answerer, role and instant');
+    assert.equal(successor.riskAnswers.RQ1?.answeredBy, findFixtureUser(OWNER_A)!.subjectId);
+    const rows = (
+      await db.owner.execute(
+        sql`SELECT id, risk_answers FROM pack_version WHERE id IN (${version.versionId}, ${successorId})`,
+      )
+    ).rows as Array<{ id: string; risk_answers: unknown }>;
+    const byId = new Map(rows.map((r) => [r.id, r.risk_answers]));
+    assert.deepEqual(byId.get(successorId), byId.get(version.versionId));
+    // A second send-back reuses the open draft and leaves its answers as the owner edited them.
+    const cleared = await app.inject({
+      method: 'PUT',
+      url: `/api/cases/${NONVENDOR.caseId}/draft`,
+      headers: { 'content-type': 'application/json', ...asUser(owner) },
+      payload: {
+        expectedVersion: { versionId: successor.draftId, revision: successor.draftRevision },
+        riskAnswers: { RQ6: null },
+      },
+    });
+    assert.equal(cleared.statusCode, 200, cleared.body);
+    const ai = await signIn(AI_COE);
+    const second = await sendBack(ai, NONVENDOR.caseId, version.versionId, 'ai_coe', {
+      expectedVersion: { versionId: version.versionId, revision: await caseRevision(NONVENDOR.caseId) },
+      feedback: { items: [{ slot: 1, deficiency: 'Use-case brief missing risk note' }] },
+    });
+    assert.equal(second.statusCode, 201, second.body);
+    const reused = (
+      await app.inject({ method: 'GET', url: `/api/cases/${NONVENDOR.caseId}/draft`, headers: asUser(owner) })
+    ).json<PackDraft>();
+    assert.equal(reused.draftId, successorId);
+    assert.deepEqual(Object.keys(reused.riskAnswers).sort(), ['RQ1', 'RQ3']);
+  });
 });

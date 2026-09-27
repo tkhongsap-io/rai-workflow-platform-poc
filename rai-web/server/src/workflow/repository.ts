@@ -124,7 +124,7 @@ export interface SuccessorDraftResult {
 
 /**
  * D05 / W0-06 4.5: if no open draft exists, create N+1 with parent = N, copy stage_context,
- * checklist_template_version and all nine slots (caller sets case.draft_version_id). If
+ * checklist_template_version, risk_answers (W5-04, attribution included) and all nine slots (caller sets case.draft_version_id). If
  * case.draft_version_id is already set, reuse that draft. Concurrent send-backs share one draft
  * because withWorkflowTransaction locks the case row before this runs.
  */
@@ -158,6 +158,7 @@ export async function ensureSuccessorDraft(
       createdAt: now,
       stageContext: parent.stageContext,
       checklistTemplateVersion: parent.checklistTemplateVersion,
+      riskAnswers: parent.riskAnswers, // W5-04: the answers and their original attribution, as the slots are copied
     })
     .returning();
   if (draft === undefined) throw new CaseRowChanged(before.id);

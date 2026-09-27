@@ -12,6 +12,7 @@ import { artifact } from '../db/schema/artifact.js';
 import { artifactSlot } from '../db/schema/artifact-slot.js';
 import { packVersion } from '../db/schema/pack-version.js';
 import { isUuid } from '../workflow/refs.js';
+import { storedRiskAnswers, type StoredRiskAnswers } from './risk-answers.js';
 import {
   SLOT_NUMBERS,
   carriesVendorDefault,
@@ -57,13 +58,22 @@ export function slotStatesOf(rows: Record<SlotNumber, ArtifactSlotRow>): Record<
   return out as Record<SlotNumber, SlotState>;
 }
 
-/** The 7.5 `PackDraft` for the case's open draft. */
+/** Resolves a subject's display name for a read (W3-F1); undefined omits `answeredByName`. */
+export type NameOf = (subjectId: string) => Promise<string | undefined>;
+
+/** The 7.5 `PackDraft` for the case's open draft; `nameOf` adds `answeredByName` to the risk answers (W5-04). */
 export async function packDraftView(
   exec: Executor,
   caseRow: CaseRow,
   draft: PackVersionRow,
+  nameOf: NameOf = () => Promise.resolve(undefined),
 ): Promise<PackDraft> {
   const rows = await readDraftSlots(exec, draft.id);
+  const riskAnswers: PackDraft['riskAnswers'] = {};
+  for (const [questionId, answer] of Object.entries(storedRiskAnswers(draft.riskAnswers))) {
+    const name = await nameOf(answer.answeredBy);
+    riskAnswers[questionId] = name === undefined ? answer : { ...answer, answeredByName: name };
+  }
   return {
     draftId: draft.id,
     caseId: caseRow.id,
@@ -74,6 +84,7 @@ export async function packDraftView(
     slots: slotStatesOf(rows),
     draftRevision: caseRow.rowVersion, // one counter per case (W0-04 case.row_version)
     updatedAt: caseRow.updatedAt.toISOString(),
+    riskAnswers,
   };
 }
 
@@ -129,6 +140,25 @@ export async function updateDraftContext(
     return row;
   }
   const [row] = await tx.update(packVersion).set(set).where(eq(packVersion.id, versionId)).returning();
+  if (row === undefined) throw new Error(`no pack_version ${versionId}`);
+  return row;
+}
+
+/**
+ * W5-04 `updateDraftRiskAnswers`: replaces the draft's `risk_answers` with the merged answers (service.ts merges and
+ * validates). The caller holds the case lock and has checked the version is the open draft; `pack_version_frozen`
+ * raises below this layer on a submitted version. Returns the written row.
+ */
+export async function updateDraftRiskAnswers(
+  tx: Tx,
+  versionId: string,
+  merged: StoredRiskAnswers,
+): Promise<PackVersionRow> {
+  const [row] = await tx
+    .update(packVersion)
+    .set({ riskAnswers: merged })
+    .where(eq(packVersion.id, versionId))
+    .returning();
   if (row === undefined) throw new Error(`no pack_version ${versionId}`);
   return row;
 }

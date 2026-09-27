@@ -65,7 +65,11 @@ export function composeAppDeps(inputs: ComposeInputs): AppDeps {
     artifacts: { store: inputs.store, limits: config.upload },
     // W4-04: the upload-triggered QC run, bound in app.ts with the drain, only when a runner is bound. Without one the
     // submit run records not_configured (A08), so upload runs would only stack identical outage rows.
-    pack: { limits: config.upload, ...(qcRunner === undefined ? {} : { qc: { runner: qcRunner } }) },
+    pack: {
+      limits: config.upload,
+      subjects, // W5-04: names the risk answerers on the draft read
+      ...(qcRunner === undefined ? {} : { qc: { runner: qcRunner } }),
+    },
     versions: {
       subjects, // W3-F1: the same directory names submitters and deciders on reads
       laneOpenRecipients: laneOpenRecipientsFromIdentities(knownIdentities),
