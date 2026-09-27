@@ -27,6 +27,7 @@ import {
 import {
   buildJournalTags,
   createScratchDatabase,
+  extendedMigrationFolder,
   prefixMigrationFolder,
   withClient,
   type ScratchDatabase,
@@ -205,9 +206,11 @@ test('rollback check: binary_only, restore_required with the matching backup, in
   const backups = path.join(root, 'backups');
   const restoreTarget = await prefixMigrationFolder(root, restorePrefix());
   const targetJournal = readMigrationJournal(restoreTarget);
+  const preW703Target = await prefixMigrationFolder(root, additivePrefix());
   for (const [id, journal] of [
     ['20260927T010000Z-before', targetJournal],
     ['20260927T020000Z-other', targetJournal.slice(0, 1)],
+    ['20260927T030000Z-before-w7-03', readMigrationJournal(preW703Target)],
   ] as const) {
     await mkdir(path.join(backups, id), { recursive: true });
     await writeFile(
@@ -232,10 +235,20 @@ test('rollback check: binary_only, restore_required with the matching backup, in
     return { code, fields: line.fields };
   };
 
+  // Every migration after the pre-W7-03 journal is additive, but that build (W7-01) answers readiness `unknown` for
+  // any longer journal: W7 plan section 3.3 and the W0-04 amendment allow binary-only rollback only to a build at or
+  // after W7-03, so the target that predates it needs a restore.
   const additive = additivePrefix();
-  assert.deepEqual(await run(await prefixMigrationFolder(root, additive)), {
-    code: 0,
-    fields: { verdict: 'binary_only', extraMigrations: tags.slice(additive) },
+  assert.equal(tags[additive]!.endsWith('_w7_03_migration_class'), true, 'the pre-W7-03 journal');
+  assert.deepEqual(await run(preW703Target), {
+    code: 3,
+    fields: {
+      verdict: 'restore_required',
+      extraMigrations: tags.slice(additive),
+      blockingMigration: tags[additive],
+      blockingReason: 'target_predates_ahead_readiness',
+      matchingBackups: ['20260927T030000Z-before-w7-03'],
+    },
   });
   assert.deepEqual(await run(MIGRATIONS_FOLDER), {
     code: 0,
@@ -249,6 +262,7 @@ test('rollback check: binary_only, restore_required with the matching backup, in
       verdict: 'restore_required',
       extraMigrations: tags.slice(restore),
       blockingMigration: tags[restore],
+      blockingReason: 'not_additive',
       matchingBackups: ['20260927T010000Z-before'],
     },
   });
@@ -258,4 +272,40 @@ test('rollback check: binary_only, restore_required with the matching backup, in
     code: 4,
     fields: { verdict: 'incompatible', extraMigrations: [] },
   });
+});
+
+test('rollback check and readiness: a newer release\'s additive migration rolls back binary-only to this build', async () => {
+  assert.ok(scratch, 'the scratch database tests ran first');
+  // A synthetic newer release: this build's journal plus one additive migration (a new table only).
+  const extraTag = `${String(tags.length).padStart(4, '0')}_synthetic_newer_release`;
+  const newer = await extendedMigrationFolder(root, {
+    tag: extraTag,
+    sql: '-- rollback expectation: additive; synthetic\nCREATE TABLE "synthetic_newer_release" ("id" integer PRIMARY KEY);\n',
+  });
+  // This build's map does not name the synthetic tag: migrate applies it and then fails closed on recording
+  // (readiness falls back from `ahead` to `unknown` until the newer release's migrate records its class).
+  await assert.rejects(
+    runMigrations(scratch.urls.owner, newer),
+    (err: unknown) => err instanceof MigrationClassError && err.code === 'migration_class_missing',
+  );
+  const unrecorded = await readinessWith(scratch.urls.app, MIGRATIONS_FOLDER);
+  assert.deepEqual([unrecorded.status, unrecorded.store.migrations], ['not_ready', 'unknown']);
+  await withClient(scratch.urls.owner, (client) =>
+    recordMigrationClasses(client, newer, { ...MIGRATION_CLASSES, [extraTag]: 'additive' }),
+  );
+
+  const lines: string[] = [];
+  const code = await rollbackCheck(
+    ['--target-migrations', MIGRATIONS_FOLDER],
+    { NODE_ENV: 'development', DATABASE_URL: scratch.urls.app, DATABASE_MIGRATE_URL: scratch.urls.owner },
+    (line) => void lines.push(line),
+  );
+  assert.equal(code, 0);
+  assert.deepEqual((JSON.parse(lines[0]!) as { fields: unknown }).fields, {
+    verdict: 'binary_only',
+    extraMigrations: [extraTag],
+  });
+  // The binary_only promise: this build (at or after W7-03) is ready with migrations `ahead` on that database.
+  const ahead = await readinessWith(scratch.urls.app, MIGRATIONS_FOLDER);
+  assert.deepEqual([ahead.status, ahead.store.migrations], ['ready', 'ahead']);
 });

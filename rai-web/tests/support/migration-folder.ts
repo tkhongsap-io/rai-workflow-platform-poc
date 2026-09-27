@@ -11,7 +11,7 @@ import { MIGRATIONS_FOLDER } from '@rai/server/db/migrate';
 import { observabilityDatabaseConfig } from './observability-database.js';
 
 interface Journal {
-  entries: { idx: number; tag: string }[];
+  entries: { idx: number; tag: string; when: number }[];
 }
 
 export async function buildJournalTags(): Promise<string[]> {
@@ -43,6 +43,25 @@ export async function prefixMigrationFolder(
     if (rewrite[tag] === undefined) await copyFile(path.join(MIGRATIONS_FOLDER, `${tag}.sql`), target);
     else await writeFile(target, rewrite[tag]);
   }
+  return folder;
+}
+
+/**
+ * A folder holding this build's whole journal plus one synthetic migration after it: what a newer release's
+ * server/drizzle looks like to this build, so a rollback from that release to this build can be proved.
+ */
+export async function extendedMigrationFolder(root: string, extra: { tag: string; sql: string }): Promise<string> {
+  const journal = JSON.parse(
+    await readFile(path.join(MIGRATIONS_FOLDER, 'meta/_journal.json'), 'utf8'),
+  ) as Journal;
+  const folder = await mkdtemp(path.join(root, 'drizzle-extended-'));
+  await mkdir(path.join(folder, 'meta'));
+  for (const { tag } of journal.entries)
+    await copyFile(path.join(MIGRATIONS_FOLDER, `${tag}.sql`), path.join(folder, `${tag}.sql`));
+  const last = journal.entries.at(-1)!;
+  journal.entries.push({ ...last, idx: last.idx + 1, when: last.when + 1000, tag: extra.tag });
+  await writeFile(path.join(folder, 'meta/_journal.json'), JSON.stringify(journal));
+  await writeFile(path.join(folder, `${extra.tag}.sql`), extra.sql);
   return folder;
 }
 

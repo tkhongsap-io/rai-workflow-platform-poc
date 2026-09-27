@@ -1,10 +1,13 @@
 // `npm run release:check-rollback -- --target-migrations <path to the target release's server/drizzle>` (W7-03;
 // W7 plan section 3.3, W7-D8): an operator command, never an HTTP route. It answers whether rolling this database
 // back to the target release needs only its binary or a restore:
-//   binary_only       the target's journal is a prefix of the database's and every newer applied migration is
-//                     recorded additive: the target build serves with readiness `ahead` (exit 0);
-//   restore_required  a newer applied migration is not recorded additive: names the first one and the backups under
-//                     BACKUP_DIR whose manifest journal equals the target's (exit 3);
+//   binary_only       the target's journal is a prefix of the database's, and it equals it or it carries the W7-03
+//                     migration and every newer applied migration is recorded additive: the target build serves
+//                     with readiness `ahead` or `current` (exit 0);
+//   restore_required  a newer applied migration is not recorded additive (blockingReason `not_additive`), or the
+//                     target predates W7-03 and so cannot answer `ahead` (`target_predates_ahead_readiness`): names
+//                     the blocking migration and the backups under BACKUP_DIR whose manifest journal equals the
+//                     target's (exit 3);
 //   incompatible      the target's journal is not a prefix of the database's (exit 4).
 // It reads the database (DATABASE_URL, rai_app: drizzle.__drizzle_migrations and schema_migration_class), the same
 // source readiness uses, so `binary_only` means the target build's /readyz answers `ahead` or `current`. Output:
@@ -23,7 +26,11 @@ import {
   type Env,
 } from '../config.js';
 import { MIGRATIONS_FOLDER, readMigrationJournal } from '../db/migrate.js';
-import { isRollbackClass, type RollbackClass } from '../db/migration-classes.js';
+import {
+  AHEAD_READINESS_TAG_SUFFIX,
+  isRollbackClass,
+  type RollbackClass,
+} from '../db/migration-classes.js';
 import { buildLogLine } from '../observability/log.js';
 
 export const EXIT_USAGE = 64;
@@ -41,28 +48,58 @@ export class RollbackCheckError extends Error {
   }
 }
 
+export type BlockingReason = 'not_additive' | 'target_predates_ahead_readiness';
+
 export type RollbackVerdict =
   | { verdict: 'binary_only'; extraMigrations: string[] }
-  | { verdict: 'restore_required'; extraMigrations: string[]; blockingMigration: string }
+  | {
+      verdict: 'restore_required';
+      extraMigrations: string[];
+      blockingMigration: string;
+      blockingReason: BlockingReason;
+    }
   | { verdict: 'incompatible'; extraMigrations: [] };
 
 /**
  * The verdict for rolling a database whose applied journal is `applied` back to a release whose journal is `target`
- * (hashes, in order). `classOf` is the recorded class of an applied hash; no class means not additive.
+ * (hashes, in order). `classOf` is the recorded class of an applied hash; no class means not additive. `aheadHash`
+ * is the hash of the W7-03 migration: a target without it answers readiness `unknown` (not ready) for any longer
+ * journal, so with extras that are all additive it still needs a restore, and the first extra blocks. A
+ * non-additive extra is reported first (`not_additive`): no build can roll back past it without a restore.
  */
 export function rollbackVerdict(
   target: readonly string[],
   applied: readonly { hash: string; tag: string }[],
   classOf: (hash: string) => RollbackClass | undefined,
+  aheadHash: string,
 ): RollbackVerdict {
   if (target.length > applied.length || target.some((hash, index) => applied[index]!.hash !== hash))
     return { verdict: 'incompatible', extraMigrations: [] };
   const extras = applied.slice(target.length);
   const extraMigrations = extras.map(({ tag }) => tag);
   const blocking = extras.find(({ hash }) => classOf(hash) !== 'additive');
-  return blocking === undefined
-    ? { verdict: 'binary_only', extraMigrations }
-    : { verdict: 'restore_required', extraMigrations, blockingMigration: blocking.tag };
+  if (blocking !== undefined)
+    return {
+      verdict: 'restore_required',
+      extraMigrations,
+      blockingMigration: blocking.tag,
+      blockingReason: 'not_additive',
+    };
+  if (extras.length > 0 && !target.includes(aheadHash))
+    return {
+      verdict: 'restore_required',
+      extraMigrations,
+      blockingMigration: extras[0]!.tag,
+      blockingReason: 'target_predates_ahead_readiness',
+    };
+  return { verdict: 'binary_only', extraMigrations };
+}
+
+/** The hash of the W7-03 migration in `journal` (this build's); a journal without exactly one is a broken build. */
+export function aheadReadinessHash(journal: readonly { tag: string; hash: string }[]): string {
+  const named = journal.filter(({ tag }) => tag.endsWith(AHEAD_READINESS_TAG_SUFFIX));
+  if (named.length !== 1) throw new RollbackCheckError('read', 'build_journal_invalid');
+  return named[0]!.hash;
 }
 
 export function parseRollbackArgs(argv: readonly string[]): { targetMigrations: string } {
@@ -175,9 +212,10 @@ export async function runRollbackCheck(config: {
   } catch {
     throw new RollbackCheckError('target', 'target_unreadable');
   }
+  const aheadHash = aheadReadinessHash(readMigrationJournal(MIGRATIONS_FOLDER));
   const applied = await readApplied(config.databaseUrl);
   const classes = new Map(applied.map(({ hash, rollbackClass }) => [hash, rollbackClass]));
-  const verdict = rollbackVerdict(target, applied, (hash) => classes.get(hash));
+  const verdict = rollbackVerdict(target, applied, (hash) => classes.get(hash), aheadHash);
   return {
     verdict,
     matchingBackups:
@@ -237,7 +275,11 @@ export async function main(
             verdict: verdict.verdict,
             extraMigrations: verdict.extraMigrations,
             ...(verdict.verdict === 'restore_required'
-              ? { blockingMigration: verdict.blockingMigration, matchingBackups }
+              ? {
+                  blockingMigration: verdict.blockingMigration,
+                  blockingReason: verdict.blockingReason,
+                  matchingBackups,
+                }
               : {}),
           },
           { strict: true, correlationId: null },
@@ -257,7 +299,7 @@ if (process.argv[1] !== undefined && path.resolve(process.argv[1]) === fileURLTo
     .then((code) => process.exit(code))
     .catch(() => {
       process.stdout.write(
-        `${JSON.stringify(buildLogLine('operator.rollback_check.failed', { stage: 'config', reason: 'internal_error' }, { strict: true, correlationId: null }))}\n`,
+        `${JSON.stringify(buildLogLine('operator.rollback_check.failed', { stage: 'read', reason: 'internal_error' }, { strict: true, correlationId: null }))}\n`,
       );
       process.exit(1);
     });

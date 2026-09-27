@@ -105,7 +105,7 @@ export const EVENT_CATALOGUE = Object.freeze({
   // W7-03 (W7 plan sections 3.3 and 8): `npm run release:check-rollback`. Tags and backup IDs only, never a path.
   'operator.rollback_check.completed': {
     level: 'info',
-    fields: ['verdict', 'extraMigrations', 'blockingMigration', 'matchingBackups'],
+    fields: ['verdict', 'extraMigrations', 'blockingMigration', 'blockingReason', 'matchingBackups'],
   },
   'operator.rollback_check.failed': { level: 'error', fields: ['stage', 'reason'] },
   'error.captured': {
