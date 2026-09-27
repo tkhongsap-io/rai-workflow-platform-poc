@@ -535,3 +535,93 @@ test('W7-06: the memory store refuses a profile in fixture mode, as the Postgres
   assert.equal(store.profiles.size, 0);
   assert.deepEqual(store.audit, []);
 });
+
+// W7-09 (W7 plan section 6): GET /auth/sign-in-method is public in every mode and answers the method only, so the
+// sign-in screen can label its provider button without learning any issuer, client, tenant or allow-list value.
+function assertMethodAnswer(
+  res: { statusCode: number; headers: Record<string, unknown>; body: string },
+  method: string,
+  secrets: readonly string[],
+): void {
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.headers['cache-control'], 'no-store');
+  assert.deepEqual(JSON.parse(res.body), { method });
+  for (const secret of secrets) assert.ok(!res.body.includes(secret), `the body never carries ${secret}`);
+}
+
+test('W7-09: GET /auth/sign-in-method in local-google mode is public and answers { method: "google" } only', async () => {
+  const h = await harness();
+  const res = await h.app.inject({ method: 'GET', url: '/auth/sign-in-method' });
+  assertMethodAnswer(res, 'google', [
+    google.RAI_IDENTITY_GOOGLE_CLIENT_ID,
+    google.RAI_IDENTITY_GOOGLE_CLIENT_SECRET,
+    GOOGLE_ISSUER,
+  ]);
+  assert.equal(h.store.rows.size, 0, 'no session is created or needed');
+});
+
+test('W7-09: GET /auth/sign-in-method in fixture mode answers { method: "fixture" }', async () => {
+  const adapter = createIdentityAdapter({
+    env: { RAI_IDENTITY_MODE: 'fixture' },
+    nodeEnv: 'test',
+    discovery: () => Promise.reject(new Error('never called in fixture mode')),
+    groupMappingSource: () => Promise.resolve(null),
+    fixtureUsers: [FX_ADMIN],
+  });
+  await adapter.start({ host: '127.0.0.1', port: 8787, publicBaseUrl, trustProxy: false });
+  const { fastify } = buildApp({
+    config,
+    identity: {
+      adapter,
+      sessionStore: createMemorySessionStore(),
+      facts,
+      fixtureProvider: createFixtureIdentityProvider([FX_ADMIN]),
+    },
+  });
+  await fastify.ready();
+  const res = await fastify.inject({ method: 'GET', url: '/auth/sign-in-method' });
+  assertMethodAnswer(res, 'fixture', [FX_ADMIN.email]);
+});
+
+test('W7-09: GET /auth/sign-in-method in network allow-list mode answers { method: "organization" } with no issuer, client or allow-list value', async () => {
+  const issuer = 'https://issuer.example.test';
+  const listedEmail = 'dpo@rai-desk.example';
+  const env = {
+    RAI_IDENTITY_MODE: 'network',
+    RAI_IDENTITY_NETWORK_SOURCE: 'allow-list',
+    RAI_IDENTITY_OIDC_ISSUER_URL: issuer,
+    RAI_IDENTITY_OIDC_CLIENT_ID: 'synthetic-oidc-client',
+    RAI_IDENTITY_OIDC_CLIENT_SECRET: 'synthetic-oidc-secret',
+    RAI_IDENTITY_ALLOW_LIST_JSON: JSON.stringify({
+      version: 1,
+      entries: [{ email: listedEmail, roles: [{ role: 'dpo', scope: { kind: 'all_cases', lane: 'dpo' } }] }],
+    }),
+  };
+  const httpsBase = new URL('https://desk.example.test');
+  const adapter = createIdentityAdapter({
+    env,
+    nodeEnv: 'test',
+    discovery: () =>
+      Promise.resolve({
+        issuer,
+        authorization_endpoint: `${issuer}/authorize`,
+        token_endpoint: `${issuer}/token`,
+      }),
+    groupMappingSource: () => Promise.resolve(null),
+  });
+  // Loopback bind (W7-D2): only the public base URL is https, as network mode requires.
+  await adapter.start({ host: '127.0.0.1', port: 8787, publicBaseUrl: httpsBase, trustProxy: false });
+  const { fastify } = buildApp({
+    config: { ...config, publicBaseUrl: httpsBase },
+    identity: { adapter, sessionStore: createMemorySessionStore(), facts },
+  });
+  await fastify.ready();
+  const res = await fastify.inject({ method: 'GET', url: '/auth/sign-in-method' });
+  assertMethodAnswer(res, 'organization', [
+    issuer,
+    'issuer.example.test',
+    env.RAI_IDENTITY_OIDC_CLIENT_ID,
+    env.RAI_IDENTITY_OIDC_CLIENT_SECRET,
+    listedEmail,
+  ]);
+});

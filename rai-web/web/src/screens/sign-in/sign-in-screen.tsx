@@ -1,44 +1,18 @@
 // W1-07 (Lane B): the sign-in screen of W0-02 7.2. It asks GET /auth/fixture/users: 200 shows the fixture picker
 // (the server runs in `fixture` mode), 404 shows the provider button (POST /auth/sign-in returns the redirect the
-// browser follows). After a successful fixture sign-in the viewer lands on `returnTo` (a same-origin path) or the
-// case list; whether that page is in scope is the server's answer, not this screen's (A05 "link alone grants
-// nothing"). Every string is a locale key (D12).
+// browser follows), labelled from GET /auth/sign-in-method for Google or the organisation (W7-09; the state lives
+// in sign-in.view-model.ts). After a successful fixture sign-in the viewer lands on `returnTo` (a same-origin
+// path) or the case list; whether that page is in scope is the server's answer, not this screen's (A05 "link
+// alone grants nothing"). Every string is a locale key (D12).
 
 import { useEffect, useId, useState, type FormEvent, type JSX } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import type { FixtureUsersResponse, RoleScope } from '@rai/shared/schemas/auth';
-import type { LocaleKey } from '@rai/shared/locales/keys';
 import { api } from '../../api/client.js';
 import { ErrorNotice } from '../../components/error-notice.js';
-import { useLocale, type Translate } from '../../i18n/locale-provider.js';
+import { useLocale } from '../../i18n/locale-provider.js';
 import { useSession } from '../../session/session-provider.js';
 import { RETURN_TO_PARAM, ROUTES, safeReturnTo } from '../../routes.js';
-
-type PickerState =
-  | { kind: 'loading' }
-  | { kind: 'fixture'; users: FixtureUsersResponse['users'] }
-  | { kind: 'provider' }
-  | { kind: 'failed'; error: unknown };
-
-const ROLE_KEY: Readonly<Record<RoleScope['role'], LocaleKey>> = Object.freeze({
-  owner: 'role.owner',
-  bu_spoc: 'role.bu_spoc',
-  ai_coe: 'role.ai_coe',
-  dpo: 'role.dpo',
-  it_security: 'role.it_security',
-  admin: 'role.admin',
-});
-
-/** "DPO, BU SPOC (HR)": the (role, scope) pairs the server listed, rendered for the picker only. */
-export function describeRoles(t: Translate, roles: readonly RoleScope[]): string {
-  return roles
-    .map((r) =>
-      r.scope.kind === 'business_unit'
-        ? `${t(ROLE_KEY[r.role])} (${r.scope.businessUnit})`
-        : t(ROLE_KEY[r.role]),
-    )
-    .join(', ');
-}
+import { PROVIDER_COPY, describeRoles, loadSignInPicker, type PickerState } from './sign-in.view-model.js';
 
 export function SignInScreen(): JSX.Element {
   const { t } = useLocale();
@@ -55,15 +29,9 @@ export function SignInScreen(): JSX.Element {
 
   useEffect(() => {
     let cancelled = false;
-    api
-      .getFixtureUsers()
-      .then((response) => {
-        if (cancelled) return;
-        setPicker(response === null ? { kind: 'provider' } : { kind: 'fixture', users: response.users });
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) setPicker({ kind: 'failed', error: err });
-      });
+    void loadSignInPicker(api).then((next) => {
+      if (!cancelled) setPicker(next);
+    });
     return () => {
       cancelled = true;
     };
@@ -160,7 +128,7 @@ export function SignInScreen(): JSX.Element {
         {picker.kind === 'provider' ? (
           <div>
             <h2 id={'sign-in-method'}>{t('auth.sign_in')}</h2>
-            <p className={'lede'}>{t('sign_in.google_note')}</p>
+            <p className={'lede'}>{t(PROVIDER_COPY[picker.method].note)}</p>
             <div className={'form-actions'} style={{ marginTop: 18 }}>
               <button
                 type={'button'}
@@ -168,7 +136,7 @@ export function SignInScreen(): JSX.Element {
                 onClick={() => void startProvider()}
                 disabled={busy}
               >
-                {t('auth.sign_in_with_google')}
+                {t(PROVIDER_COPY[picker.method].button)}
               </button>
             </div>
           </div>

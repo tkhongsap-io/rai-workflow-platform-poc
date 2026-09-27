@@ -79,6 +79,32 @@ export type SignInRequest = Static<typeof SignInRequestSchema>;
 export const SignInResponseSchema = Type.Object({ redirectUrl: Type.String() });
 export type SignInResponse = Static<typeof SignInResponseSchema>;
 
+/**
+ * W7-09 (W7 plan section 6): what `GET /auth/sign-in-method` announces, so the sign-in screen can label its provider
+ * button. The method only: never an issuer, client, tenant or allow-list value. `network` and `production` are both
+ * the organisation's sign-in to the viewer.
+ */
+export const SIGN_IN_METHODS = ['fixture', 'google', 'organization'] as const;
+export type SignInMethod = (typeof SIGN_IN_METHODS)[number];
+
+export const SignInMethodResponseSchema = Type.Object(
+  { method: Type.Union([Type.Literal('fixture'), Type.Literal('google'), Type.Literal('organization')]) },
+  { additionalProperties: false },
+);
+export type SignInMethodResponse = Static<typeof SignInMethodResponseSchema>;
+
+export function signInMethodOf(mode: IdentityMode): SignInMethod {
+  switch (mode) {
+    case 'fixture':
+      return 'fixture';
+    case 'local-google':
+      return 'google';
+    case 'network':
+    case 'production':
+      return 'organization';
+  }
+}
+
 export const FixtureUsersResponseSchema = Type.Object({
   users: Type.Array(
     Type.Object({

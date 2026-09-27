@@ -16,13 +16,15 @@ import {
   type FieldError,
 } from '@rai/shared/errors';
 import type { CorrelationId, LocaleKey } from '@rai/shared/ids';
-import type {
-  FixtureSignInRequest,
-  FixtureUsersResponse,
-  SessionInfo,
-  SessionLocaleRequest,
-  SignInRequest,
-  SignInResponse,
+import {
+  SignInMethodResponseSchema,
+  type FixtureSignInRequest,
+  type FixtureUsersResponse,
+  type SessionInfo,
+  type SessionLocaleRequest,
+  type SignInMethodResponse,
+  type SignInRequest,
+  type SignInResponse,
 } from '@rai/shared/schemas/auth';
 import type { ArtifactRef } from '@rai/shared/schemas/artifacts';
 import type {
@@ -53,6 +55,7 @@ export const API_PATHS = Object.freeze({
   session: '/api/session',
   sessionLocale: '/api/session/locale',
   signIn: '/auth/sign-in',
+  signInMethod: '/auth/sign-in-method',
   signOut: '/auth/sign-out',
   fixtureUsers: '/auth/fixture/users',
   fixtureSignIn: '/auth/fixture/sign-in',
@@ -169,6 +172,7 @@ export async function toApiError(response: Response): Promise<ApiError> {
 const SIGN_IN_FLOW_PATHS: ReadonlySet<string> = new Set([
   API_PATHS.session,
   API_PATHS.signIn,
+  API_PATHS.signInMethod,
   API_PATHS.signOut,
   API_PATHS.fixtureUsers,
   API_PATHS.fixtureSignIn,
@@ -237,6 +241,12 @@ export function createApiClient(fetchImpl: FetchLike = (input, init) => fetch(in
     },
     fixtureSignIn: (body: FixtureSignInRequest) =>
       request<SessionInfo>('POST', API_PATHS.fixtureSignIn, { body }),
+    /** W7-09: the method the provider button is labelled for; a body that does not match is refused, never guessed. */
+    getSignInMethod: async (): Promise<SignInMethodResponse> => {
+      const body = await request<unknown>('GET', API_PATHS.signInMethod);
+      if (!Value.Check(SignInMethodResponseSchema, body)) throw new InvalidResponseError();
+      return body;
+    },
     /** `local-google`, `network`, `production`: returns the provider redirect the browser must follow. */
     startSignIn: (body: SignInRequest) => request<SignInResponse>('POST', API_PATHS.signIn, { body }),
     signOut: () => request<undefined>('POST', API_PATHS.signOut),
