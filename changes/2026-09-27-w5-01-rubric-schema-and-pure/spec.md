@@ -1,0 +1,24 @@
+# Specification
+
+Source: W5 plan section 3 (body type and engine), section 2 (the publish refusals), section 11 (unit layer) and the W5-01 row of section 9. The plan wins over issue #204.
+
+Done when:
+
+1. **Body schema** (`shared/src/schemas/cases.ts`, `RiskRubricBodySchema`, exported with `type RiskRubricBody`; **not** added to `CONFIGURATION_BODY_SCHEMAS` or `ConfigurationBodies`, which is W5-02). Every object refuses unknown keys.
+   - `label` 1..100 characters; `provenance` exactly `'synthetic_placeholder'` (R-2).
+   - `questions`: exactly 7. Each `{ questionId: ^RQ[1-9]$, text: Bilingual, help?: Bilingual, evidenceSlot?: 1..9, options }`; `options` 2..5, each `{ value: ^[a-z][a-z0-9_]{0,39}$, label: Bilingual, level: low|medium|high, escalatesTo?: medium|high }`. `Bilingual = { th, en }`, both non-empty.
+   - `tierRules`: each `{ tier: high|medium, anyOf: [{ allOf: [{ level: high|medium, atLeast: 1..7 }] }] }`, both arrays non-empty; `defaultTier: 'low'`; `tierLabels` with `high`, `medium`, `low` and `unknown`, each Bilingual.
+2. **Body problems** (`riskRubricBodyProblems(body)`, called on a body that passed the schema): duplicate `questionId`; a duplicate option `value` within a question; the reserved option value `unknown`; a `medium` rule before a `high` rule. Returns problem strings, empty when valid (the `qcRulesBodyProblems` pattern).
+3. **Engine types** (`shared/src/risk/types.ts`): `RiskLevel`, the scored tier codes `high|medium|low|unknown` (R-9), the four unknown reasons, `RiskAnswerValues` (question ID → option value or `'unknown'`; values only, no attribution or text, R-13), `EvidenceSlotStates`, `RiskScore`, `ENGINE_VERSION = 'risk-engine/1'`.
+4. **`tierOf(rubric, levels)`** (`shared/src/risk/score.ts`): for one fully known answer set, counts each level exactly (a high answer is not also a medium one), returns the first matching rule's tier (a rule matches when any of its `anyOf` groups has every `allOf` condition `counts[level] >= atLeast`), else `defaultTier`, with `{ counts, matchedRule: { tier, index } | 'default' }`. Escalation is not applied by `tierOf`.
+5. **`scoreRisk(rubric, answers, slotStates)`**: resolves each rubric question in rubric order.
+   - Answered: the option exists and, when the question has `evidenceSlot`, that slot's state is `attached`: its level and `escalatesTo`.
+   - Unknown with a reason: `unanswered` (no answer), `explicit_unknown` (`'unknown'`), `not_in_rubric` (a value that is not one of the question's options), `evidence_not_attached` (a valid option, but the evidence slot is not `attached`, including a slot state that is absent).
+   - Answers keyed by a question ID the rubric does not have are ignored.
+   - The resolved tier of a full answer set is the higher of `tierOf` and the maximum `escalatesTo` of its options (escalation never lowers).
+   - Bounds (R-6): over every combination of options of the Unknown questions, the lowest and highest resolved tier, computed exactly. `tier` is that tier when they are equal, otherwise `'unknown'`.
+   - Returns `{ engineVersion, tier, bounds, counts, matchedRule, escalation, unknownCount, questions[] }`: `counts` over the answered questions; `matchedRule` the rule every combination matches, or `null` when combinations match different rules; `escalation` the highest `escalatesTo` among answered questions (first in rubric order on a tie) or `null`; each question `{ questionId, status, unknownReason?, value?, level?, escalatesTo?, evidence? { slot, state } }`.
+   - Deterministic and pure; it does not mutate its inputs; all seven questions Unknown with five options each is scored in well under 100 ms.
+6. **Inputs hash** (`shared/src/risk/inputs.ts`): `canonicalInputs(rubric, answers, slotStates)` is the canonical JSON of the rubric's question IDs (ascending), each with its answer value (or `null`), its evidence slot (or `null`) and that slot's state (or `null`); `inputsHash` is its lowercase hex SHA-256, computed by a pure-TypeScript SHA-256 (no `node:crypto`, no Web Crypto). Independent of key order, of attribution and of answers to questions the rubric does not have; changes with any value, evidence slot or slot state.
+7. **Unit tests**: each rule boundary below, at and above; escalation over counts (and never lowering); bounds enumeration, cross-checked against brute force on generated synthetic rubrics; determinate despite Unknown; all seven Unknown; every unknown reason; the section 7 summary shape expressible (labelled "expressiveness only, not the approved rubric"); schema refusals (count not 7, more than 5 options, reserved `unknown`, duplicate IDs, misordered rules, non-placeholder provenance); `inputsHash` stability and known SHA-256 vectors; no Node or DOM import in `shared/src/risk` (module graph).
+8. Full W5 plan section 10 gate green. No migration, no seed, no route, no UI.

@@ -212,3 +212,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w4-04-upload-trigger model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #188)
 - Scope: per changes/2026-09-27-w4-04-upload-trigger/: the W0-07 `upload` trigger bound on the save-draft attach (`loadUploadTarget`, `lane = NULL` with `slot`, runKey in-flight key, slot 5 outage to AI/COE, slot 9 no run, per-lane outage reuse), drain-tracked, substitute scripts without upload entries, W0-07 3.2/3.6/3.9 amendments. One PR.
+
+## 2026-09-27 19:40 — CLAIM lane-a: W5-01 rubric schema and pure scoring engine (#204)
+- Author: operator=ta session=claude-code-w5-01-rubric-schema-and-pure model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #204)
+- Scope: per changes/2026-09-27-w5-01-rubric-schema-and-pure/: `RiskRubricBodySchema` and `riskRubricBodyProblems` in `shared/src/schemas/cases.ts` (schema only, not registered), the pure engine `shared/src/risk/{types,score,inputs}.ts` (`tierOf`, `scoreRisk`, `canonicalInputs`, `inputsHash`, `ENGINE_VERSION`) with unit tests. No migration, no seed, no route. One PR.
