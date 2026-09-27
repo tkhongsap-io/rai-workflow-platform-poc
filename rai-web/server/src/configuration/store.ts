@@ -13,6 +13,7 @@ import {
   type ConfigurationKind,
   type ConfigurationView,
   type SeedableConfigurationKind,
+  qcRulesBodyProblems,
 } from '@rai/shared/schemas/cases';
 import { APP_TIMEZONE } from '@rai/shared/constants';
 import { auditStore } from '../audit/store.js';
@@ -66,6 +67,11 @@ export function validateConfigurationBody(
       (e) => `${e.instancePath || '/'} ${e.message}`,
     );
     throw new ConfigurationBodyInvalid(kind, problems);
+  }
+  if (kind === 'qc_rules') {
+    // W4-02: the catalogue checks the schema cannot express (a rule listed twice, params per rule ID).
+    const problems = qcRulesBodyProblems(body as ConfigurationBodies['qc_rules']);
+    if (problems.length > 0) throw new ConfigurationBodyInvalid(kind, problems);
   }
 }
 

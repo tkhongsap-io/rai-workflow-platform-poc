@@ -4,7 +4,9 @@
 // An unavailable result stores a qc_run with status unavailable plus the QC-UNAVAILABLE finding of W0-07 3.6,
 // owned per W0-06 7.3 part 4 and appended once per open scope. An unbound runner (production) persists engine_id
 // `unbound` and replays that row. W4-11a: every run row and qc.run.* line names the runner (engine_id,
-// runner_version) and the rule revision, and a recorded run stores how many rules it evaluated.
+// runner_version) and the rule revision, and a recorded run stores how many rules it evaluated. W4-02: the request
+// carries the rules the recorded qc_rules revision selects (`request.rules`, null when no qc_rules revision
+// applies); an unknown template version is recorded as runner_error without calling the runner.
 
 import { createHash } from 'node:crypto';
 import { Value } from 'typebox/value';
@@ -20,6 +22,7 @@ import type {
   QcRunner,
   QcTrigger,
   QcUnavailableReason,
+  SelectedRule,
   SlotState,
 } from '@rai/shared/qc/types';
 import { checkOwningLane, validateQcFinding } from '@rai/shared/qc/validate';
@@ -46,6 +49,8 @@ import {
   ruleRevisionOf,
 } from './repository.js';
 import { qcKindOf } from './kind.js';
+import { requestRules, ruleContextOf } from './rules-revision.js';
+import { RuleSelectionError } from './select.js';
 
 export const QC_TIMEOUT_MS = 10_000;
 export const UNBOUND_ENGINE_ID = 'unbound' as const;
@@ -124,6 +129,8 @@ async function buildRequest(
   lane: Lane | null,
   correlationId: string,
   deadlineMs: number,
+  ruleRevision: string,
+  rules: SelectedRule[] | null,
 ): Promise<QcRunRequest> {
   const { rows, artifacts: artifactMap } = await readSlotsWithArtifacts(tx, version.id);
   const slots: SlotState[] = rows.map((s) => ({
@@ -147,7 +154,6 @@ async function buildRequest(
       read: () => Promise.resolve(new ReadableStream()),
     });
   }
-  const ruleRevision = ruleRevisionOf(version);
   if (version.laneMappingVersion === null) throw new Error('submitted version has no lane_mapping_version');
   return {
     correlationId,
@@ -175,6 +181,7 @@ async function buildRequest(
     slots,
     artifacts,
     deadlineMs,
+    rules,
   };
 }
 
@@ -542,6 +549,21 @@ async function runQc(deps: QcOrchestratorDeps, input: RunQcInput): Promise<Submi
 
     const stamp = nextMonotonicStamp(clock);
     const run = { id: uuidv7(stamp.getTime()), stamp, correlationId: input.correlationId };
+    // W4-02: the rules of the recorded qc_rules revision for this template, trigger and model type (plan section 3).
+    const context = await ruleContextOf(tx, version, stamp);
+    let rules: SelectedRule[] | null = null;
+    let selectionError: RuleSelectionError | undefined;
+    try {
+      rules = requestRules(
+        context,
+        version.checklistTemplateVersion,
+        input.trigger,
+        caseRow.modelType as QcRunRequest['modelType'],
+      );
+    } catch (error) {
+      if (!(error instanceof RuleSelectionError)) throw error;
+      selectionError = error;
+    }
     const request = await buildRequest(
       tx,
       caseRow,
@@ -550,6 +572,8 @@ async function runQc(deps: QcOrchestratorDeps, input: RunQcInput): Promise<Submi
       input.lane,
       input.correlationId,
       stamp.getTime() + timeoutMs,
+      context.ruleRevision,
+      rules,
     );
     if (runner === undefined) {
       const notConfigured = unavailableResult('not_configured', null, stamp);
@@ -558,6 +582,13 @@ async function runQc(deps: QcOrchestratorDeps, input: RunQcInput): Promise<Submi
       return recorded(outcome, labelOf(unbound, request), notConfigured);
     }
     const bound = { ...run, engineId: runner.identity.runner, runnerVersion: runner.identity.runnerVersion };
+    if (selectionError !== undefined) {
+      // No trustworthy rule list (an unknown template version): an outage under the bound runner, never a clean
+      // pass, recorded without calling the runner.
+      const failed = unavailableResult('runner_error', selectionError.detail, stamp);
+      const outcome = await persistResult(tx, version, request, failed, bound);
+      return recorded(outcome, labelOf(bound, request), failed);
+    }
     return { kind: 'ready' as const, request, run: bound, runner };
   });
   if (prepared.kind !== 'ready') return settle(deps, input, prepared, performance.now());

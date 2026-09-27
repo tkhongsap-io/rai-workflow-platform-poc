@@ -197,3 +197,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w4-11a-run-identity model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #184)
 - Scope: per changes/2026-09-27-w4-11a-run-identity/: `qc_run.runner_version` and `rules_evaluated`, runner identity on `qc.run.*` lines and on desk-health `unavailableQc` rows. One PR.
+
+## 2026-09-27 10:27 — CLAIM lane-a: W4-02 rule catalogue (#185)
+- Author: operator=ta session=claude-code-w4-02-rule-catalogue model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #185)
+- Scope: per changes/2026-09-27-w4-02-rule-catalogue/: the `qc_rules` body, seed revision 1 (`w4a.1`), `selectRules`, `request.rules` from the orchestrator, the upload-instant revision, `not_configured` for versions without a `qc_rules` revision. One PR.

@@ -150,6 +150,7 @@ export interface BuildOptions {
   caseId?: string; // defaults to the fixture case id (the default resolver)
   versionId?: string;
   qcRulesRevision?: string;
+  rules?: QcRunRequest['rules']; // W4-02; defaults to null (no catalogue): the scripted runner ignores it
 }
 
 export function buildRequest(fixtureCaseId: string, options: BuildOptions): BuiltRequest {
@@ -206,6 +207,7 @@ export function buildRequest(fixtureCaseId: string, options: BuildOptions): Buil
     slots,
     artifacts,
     deadlineMs: 10_000,
+    rules: options.rules ?? null,
   };
   return { request, reads };
 }

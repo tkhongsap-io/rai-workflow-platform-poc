@@ -1,6 +1,7 @@
 // W0-02 section 7.3: case create/edit/read/list and configuration read (W1-02 serves; W1-07, W1-06 consume).
 
-import { Type, type Static } from 'typebox';
+import { Type, type Static, type TSchema } from 'typebox';
+import { Value } from 'typebox/value';
 import type { CaseId, ConfigurationRevisionId, RegistryId, SubjectId } from '../ids.js';
 import type { Lane } from './auth.js';
 import { type DraftSummarySchema } from './pack.js';
@@ -122,7 +123,7 @@ export interface ConfigurationView {
 // ---------------------------------------------------------------------------------------------------------------
 // Configuration revision bodies (W0-04 `configuration_revision.body`: "schema per kind in rai-web/shared, validated
 // on write"). One kind per revision. The W1-00 seed publishes checklist_templates, sla, calendar, operator_recipients
-// and use_case_groups; qc_rules arrives with the QC substitute (W1-10), risk_rubric with W5 (D07), group_role_mapping
+// and use_case_groups; W4-02 adds qc_rules (revision 1, 'w4a.1'); risk_rubric arrives with W5 (D07), group_role_mapping
 // with W6/W8. A kind without a registered schema cannot be published (deny by default).
 // ---------------------------------------------------------------------------------------------------------------
 
@@ -162,9 +163,84 @@ export const OperatorRecipientsBodySchema = Type.Object({
 export const UseCaseGroupsBodySchema = Type.Object({
   groups: Type.Array(Type.String({ minLength: 1, maxLength: 100 }), { minItems: 1 }), // D11 value list
 });
-export const QcRulesBodySchema = Type.Object({
-  rulesRevision: Type.String({ minLength: 1, maxLength: 100 }), // W0-04 qc_run.rule_revision; the substitute's script version in slice 1
+// W4-02 (W4a plan section 3): the rule catalogue, keyed by checklist_template_version (L12). The revision a run
+// records is this body's configuration_revision.id, never `label`. Rule lists and severities are provisional until
+// D09. Content rules are catalogued for W4b and not executed in W4a.
+export const QC_RULE_ENGINES = ['metadata', 'content'] as const;
+export type QcRuleEngine = (typeof QC_RULE_ENGINES)[number];
+const QC_RULE_ID = '^[A-Z]+(-[A-Z0-9]+)+$'; // QC_RULE_ID_PATTERN (shared/src/qc/types.ts)
+const SlotListSchema = Type.Array(Type.Integer({ minimum: 1, maximum: 9 }), { uniqueItems: true });
+const StageSlotsSchema = Type.Object(
+  {
+    idea: Type.Optional(SlotListSchema),
+    pre_build: Type.Optional(SlotListSchema),
+    pre_launch: Type.Optional(SlotListSchema),
+  },
+  { additionalProperties: false },
+);
+/** `PACK-STAGE-MISMATCH` (plan section 4): per stage, the slots that may not be attached / not yet at that stage. */
+export const StageMismatchParamsSchema = Type.Object(
+  { attachedForbiddenAt: StageSlotsSchema, notYetForbiddenAt: StageSlotsSchema },
+  { additionalProperties: false },
+);
+/** Rule-specific `params`, schema-checked per rule ID on write. A rule without an entry here carries no params. */
+export const QC_RULE_PARAMS_SCHEMAS = Object.freeze({
+  'PACK-STAGE-MISMATCH': StageMismatchParamsSchema,
 });
+export const QcRuleEntrySchema = Type.Object(
+  {
+    ruleId: Type.String({ pattern: QC_RULE_ID, maxLength: 100 }),
+    engine: Type.Union([Type.Literal('metadata'), Type.Literal('content')]), // W4a executes only 'metadata'
+    triggers: Type.Array(
+      Type.Union([Type.Literal('upload'), Type.Literal('submit'), Type.Literal('approve_attempt')]),
+      {
+        minItems: 1,
+        uniqueItems: true,
+      },
+    ),
+    severity: Type.Union([Type.Literal('high'), Type.Literal('medium'), Type.Literal('low')]), // W0-07 3.3 Severity
+    params: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
+  },
+  { additionalProperties: false },
+);
+export type QcRuleEntry = Static<typeof QcRuleEntrySchema>;
+export const QcRulesBodySchema = Type.Object(
+  {
+    label: Type.String({ minLength: 1, maxLength: 100 }), // human label, e.g. 'w4a.1'; never the recorded revision
+    templates: Type.Record(
+      Type.String({ minLength: 1, maxLength: 100 }), // checklist_template_version, e.g. 'v1.0 Sheet3', 'v2.0'
+      Type.Object({ rules: Type.Array(QcRuleEntrySchema) }, { additionalProperties: false }),
+    ),
+  },
+  { additionalProperties: false },
+);
+
+/**
+ * The checks a `qc_rules` body needs beyond its schema: `QC-UNAVAILABLE` is the orchestrator's alone (W0-07 3.6), a
+ * template lists a rule ID once, and `params` match the rule's registered schema (none when it has no schema).
+ * Returns problem strings; empty when the body is valid. Call only on a body that passed `QcRulesBodySchema`.
+ */
+export function qcRulesBodyProblems(body: Static<typeof QcRulesBodySchema>): string[] {
+  const problems: string[] = [];
+  const paramSchemas: Readonly<Record<string, TSchema>> = QC_RULE_PARAMS_SCHEMAS;
+  for (const [template, { rules }] of Object.entries(body.templates)) {
+    const seen = new Set<string>();
+    for (const rule of rules) {
+      const at = `/templates/${template}/${rule.ruleId}`;
+      if (rule.ruleId === 'QC-UNAVAILABLE')
+        problems.push(`${at} QC-UNAVAILABLE is built by the orchestrator only`);
+      if (seen.has(rule.ruleId)) problems.push(`${at} ${rule.ruleId} is listed twice`);
+      seen.add(rule.ruleId);
+      const schema = Object.hasOwn(paramSchemas, rule.ruleId) ? paramSchemas[rule.ruleId] : undefined;
+      if (schema === undefined) {
+        if (rule.params !== undefined) problems.push(`${at} ${rule.ruleId} takes no params`);
+      } else if (!Value.Check(schema, rule.params)) {
+        problems.push(`${at} ${rule.ruleId} params do not match its schema`);
+      }
+    }
+  }
+  return problems;
+}
 
 export const CONFIGURATION_BODY_SCHEMAS = Object.freeze({
   checklist_templates: ChecklistTemplatesBodySchema,

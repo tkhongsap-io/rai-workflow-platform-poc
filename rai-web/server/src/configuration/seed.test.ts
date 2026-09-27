@@ -8,6 +8,7 @@ test('the seed holds the ticket-named kinds with the recorded values (D01, D06, 
     'calendar',
     'checklist_templates',
     'operator_recipients',
+    'qc_rules',
     'sla',
     'use_case_groups',
   ]);
@@ -24,7 +25,39 @@ test('the seed holds the ticket-named kinds with the recorded values (D01, D06, 
     !('lane_mapping' in CONFIGURATION_SEED),
     'the lane mapping is a versioned constant, never configuration (D02)',
   );
-  assert.ok(!('qc_rules' in CONFIGURATION_SEED), 'qc_rules arrives with the QC substitute (W1-10)');
+});
+
+test('qc_rules revision 1 (w4a.1) catalogues both template versions; v2.0 has no v1.0 Sheet-3 bands (W4-02)', () => {
+  const qc = CONFIGURATION_SEED.qc_rules;
+  assert.equal(qc.label, 'w4a.1');
+  assert.deepEqual(
+    Object.keys(qc.templates).sort(),
+    [...CONFIGURATION_SEED.checklist_templates.versions].sort(),
+  );
+  const rows = (template: string) =>
+    qc.templates[template]!.rules.map((r) => [r.ruleId, r.engine, r.triggers.join('+'), r.severity]);
+  assert.deepEqual(rows('v1.0 Sheet3'), [
+    ['PACK-SLOT-MISSING', 'metadata', 'submit+approve_attempt', 'medium'],
+    ['PACK-STAGE-MISMATCH', 'metadata', 'submit', 'medium'],
+    ['PACK-NA-VENDOR-DOC', 'metadata', 'submit', 'medium'],
+    ['ACC-METRIC-CITED', 'content', 'approve_attempt+upload', 'medium'],
+    ['ACC-EXTRACTION-NOT-HALLUCINATION', 'content', 'approve_attempt', 'high'],
+    ['ACC-BAND-V1-SHEET3', 'content', 'approve_attempt', 'high'],
+    ['ACC-CLASSIC-ML-METRIC', 'content', 'approve_attempt', 'medium'],
+  ]);
+  assert.deepEqual(
+    rows('v2.0'),
+    rows('v1.0 Sheet3').filter(([ruleId]) => ruleId !== 'ACC-BAND-V1-SHEET3'),
+  );
+  // No W4a metadata rule has the upload trigger (plan section 5).
+  for (const template of Object.values(qc.templates))
+    for (const rule of template.rules)
+      if (rule.engine === 'metadata') assert.ok(!rule.triggers.includes('upload'), rule.ruleId);
+  const stage = qc.templates['v2.0']!.rules.find((r) => r.ruleId === 'PACK-STAGE-MISMATCH');
+  assert.deepEqual(stage?.params, {
+    attachedForbiddenAt: { idea: [8] },
+    notYetForbiddenAt: { pre_launch: [1, 2, 3, 4, 5, 6, 7, 8] },
+  });
 });
 
 test('every seed body validates against its shared schema', () => {
