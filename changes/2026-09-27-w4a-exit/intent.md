@@ -1,0 +1,5 @@
+# Intent: W4a exit record (W4a-EXIT, #190)
+
+All six W4a tickets have merged: W4-11a (#192), W4-02 (#193), W4-03 (#194), W4-13 (#195), W4-04 (#196) and W4-12 (#197), on the plan W4-00a (#183). The package needs one record that Ta can review: the exit evidence of the [W4a plan](../../docs/engineering/implementation-plan-w4a.md) section 10, run from a clean checkout of `main` on a fresh database, with the rule revision, runner version and fixture set identity beside each output, and the full section 8 gate.
+
+This ticket writes that record and moves the current-status text to "W4a engineering exit recorded; awaiting Ta's package review". It changes no application code, test or configuration; a failing check stops the ticket with the evidence instead of a fix here. It does not accept W4a (Ta does), does not open W4b and records no decision. Authority: register rows "W4a gate entry", "D05 refinement (upload slot 5 and 9)" and "W4a kickoff rulings" (Ta, 2026-09-26); plan section 9 row 7 (owner: Lead). Synthetic data only; no document parsing, model, provider or network call.
