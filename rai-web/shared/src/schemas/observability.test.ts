@@ -104,6 +104,8 @@ test('safe errors reject values hidden in unknown paths, filenames, messages and
       stackHash: 'a'.repeat(64),
       stack: [{ module: 'server/src/app.ts', line: 1, column: 2 }],
     },
+    { category: 'desk_frozen' }, // W6-01
+    { category: 'not_found', targetType: 'configuration' }, // W6-01
   ])
     assert.equal(Value.Check(SafeErrorFieldsSchema, payload), true);
   for (const payload of [
@@ -116,6 +118,8 @@ test('safe errors reject values hidden in unknown paths, filenames, messages and
       errorCode: 'recipient@example.test',
     },
     { category: 'internal_error', stackHash: 'a'.repeat(64), stack: 'Error: RAI-DESK-SYNTHETIC-FIXTURE' },
+    { category: 'desk_frozen', route: '/api/cases' }, // W6-01: nothing beyond the category
+    { category: 'desk_frozen', stackHash: 'a'.repeat(64) },
     {
       category: 'internal_error',
       stackHash: 'a'.repeat(64),

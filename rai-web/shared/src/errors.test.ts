@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   ContractError,
+  DeskFrozenError,
   ERROR_CODES,
   ForbiddenError,
   HTTP_STATUS_BY_CODE,
@@ -40,9 +41,10 @@ const EXPECTED_STATUS: Record<ErrorCode, number> = {
   qc_unavailable: 503,
   mail_delivery_failed: 502,
   not_found: 404,
+  desk_frozen: 503, // W6-01 (W6 plan section 4.2): writes refused while an Admin has frozen the desk
 };
 
-test('exactly the eight W0-06 codes exist, each mapped to its HTTP status (W0-06 8.1, 8.2)', () => {
+test('exactly the nine W0-06 codes exist, each mapped to its HTTP status (W0-06 8.1, 8.2)', () => {
   assert.deepEqual([...ERROR_CODES].sort(), Object.keys(EXPECTED_STATUS).sort());
   for (const code of ERROR_CODES) {
     assert.equal(HTTP_STATUS_BY_CODE[code], EXPECTED_STATUS[code], `status of ${code}`);
@@ -69,6 +71,14 @@ test('every code has its error.<code> message key in both locale catalogues (W0-
   for (const reason of UNSAFE_UPLOAD_REASONS) {
     assert.ok(isLocaleKey(`error.unsafe_upload.${reason}`), `unsafe_upload key for ${reason}`);
   }
+  // W6-01: the two keys the W6 plan (section 4.2) names, in both catalogues
+  for (const key of ['error.desk_frozen', 'error.stale_version.guidance.configuration_changed']) {
+    for (const locale of ['th', 'en'] as const) {
+      const catalogue = LOCALE_CATALOGUES[locale] as Record<string, string>;
+      assert.ok(catalogue[key] && catalogue[key].length > 0, `${locale} has ${key}`);
+    }
+  }
+  assert.ok((STALE_REASONS as readonly string[]).includes('configuration_changed'));
 });
 
 test('the envelope carries code, messageKey and correlationId; forbidden and unauthenticated never carry details', () => {
@@ -165,4 +175,36 @@ test('NotFoundError → 404 naming the resource', () => {
 test('isContractError rejects plain errors and non-errors', () => {
   assert.equal(isContractError(new Error('x')), false);
   assert.equal(isContractError({ code: 'forbidden' }), false);
+});
+
+// W6-01 (W6 plan section 4.2): the W6 additions to the contract.
+
+test('DeskFrozenError → 503 desk_frozen with no details', () => {
+  const err = new DeskFrozenError();
+  assert.ok(isContractError(err));
+  assert.equal(err.code, 'desk_frozen');
+  assert.equal(err.status, 503);
+  assert.equal(err.messageKey, 'error.desk_frozen');
+  assert.equal(err.details, undefined);
+  assert.equal(err.message, '');
+  assert.deepEqual(err.toResponse(correlationId), {
+    error: { code: 'desk_frozen', messageKey: 'error.desk_frozen', correlationId },
+  });
+});
+
+test('StaleVersionError configuration_changed carries the configuration reference, not a version', () => {
+  const details = {
+    reason: 'configuration_changed',
+    guidanceKey: 'error.stale_version.guidance.configuration_changed',
+    current: { kind: 'sla', revisionId: 'r-2', draftVersion: 3 },
+    refreshPath: '/admin/configuration/sla',
+  } as const;
+  const err = new StaleVersionError(details);
+  assert.equal(err.status, 409);
+  assert.deepEqual(err.toResponse(correlationId).error.details, details);
+  assert.ok(isLocaleKey(details.guidanceKey));
+});
+
+test('NotFoundError names the configuration resource', () => {
+  assert.deepEqual(new NotFoundError('configuration').details, { resource: 'configuration' });
 });

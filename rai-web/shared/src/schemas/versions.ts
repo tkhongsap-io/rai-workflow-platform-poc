@@ -2,6 +2,7 @@
 
 import { Type, type Static } from 'typebox';
 import type { ConfigurationRevisionId } from '../ids.js';
+import type { FrozenConfigurationEntry } from './configuration-admin.js';
 import { ArtifactRefSchema } from './artifacts.js';
 import type { LaneDecision } from './review.js';
 import { NotApplicableReasonSchema, type StageContextSchema, type SlotNumber } from './slots.js';
@@ -46,6 +47,11 @@ export interface SubmittedVersion {
   slots: Record<SlotNumber, FrozenSlot>;
   isLatest: boolean;
   decisions: LaneDecision[]; // the version's decided lanes as of the read, ascending by decidedAt then lane
+  /**
+   * W6 plan section 4.3: the configuration revisions frozen on this version ("configuration used"). Optional: W6-01
+   * declares it and W6-09 serves it; an idempotent submit replay stored before W6 has no such field.
+   */
+  frozenConfiguration?: FrozenConfigurationEntry[];
 }
 
 export const SubmitRequestSchema = Type.Object({ expectedVersion: ExpectedVersionSchema });

@@ -1,5 +1,15 @@
 # Development log
 
+## W6-01 W6 contract — 2026-09-27
+
+First W6 ticket (#206). Before Admin configuration editing, rechecks, desk controls and the dashboard are built, both halves of the desk now share one typed contract for them. Contract only: nothing a user can see changes yet.
+
+- **Shapes.** The Admin configuration API is fixed: revisions with change notes and restore links, drafts with their problems, the index, history, and the save, discard, publish and restore requests. So are the dashboard read (case counts by status, lanes with due-soon and breached, open findings by lane and severity, QC and risk counts, eight weeks of activity) and the queue drill-down filters. A submitted version can later list the configuration revisions it used.
+- **Permissions.** Only Admin may request a QC recheck. All six roles may view the dashboard, each seeing only their own cases, BU or lane scope. Configuration editing stays Admin only.
+- **Errors.** A new "desk frozen" refusal (503) exists for W6-17's freeze switch. It is recorded as an operator choice at info level, never as an internal error. A configuration draft that changed underneath the editor gets its own stale-version reason, and a missing configuration its own not-found resource. All messages are in Thai and English.
+
+Two choices differ from the plan's wording, both recorded in the review. The drill-down filters are declared but not yet accepted by the queue, so a filtered link can never show an unfiltered list before W6-14 applies them. The stale-version details for configuration name the configuration, not a version. [Review](changes/2026-09-27-w6-01-w6-contract-shared-shapes/review.md).
+
 ## W5-03 risk migration and database schema — 2026-09-27
 
 Second W5 implementation ticket (#205). The database now has a place for the risk questionnaire and its result, kept the same way as the rest of the review history. Each version gains its answers, which can be edited on the draft and are frozen with the version when it is submitted. A case's risk tier may now be Unknown as well as High, Medium or Low, so missing evidence never has to be recorded as Low; only the workflow may set it. A new table records each proposed tier with how it was reached; its rows can never be changed or deleted, and a version gets at most one proposal at submit. Rolling back past this change needs a backup restore, and the migration says so. Nothing writes these yet (W5-04 onwards). The migration is numbered 0010; another package's migration is in review first, so this one waits its turn and is renumbered if that one merges first. [Review](changes/2026-09-27-w5-03-risk-migration-and-drizzle/review.md).

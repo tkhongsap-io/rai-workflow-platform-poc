@@ -1,5 +1,6 @@
 import { Value } from 'typebox/value';
 import {
+  DeskFrozenError,
   ForbiddenError,
   InvalidInputError,
   NotFoundError,
@@ -27,10 +28,11 @@ const levels: Record<ErrorCategory, LogLevel> = {
   mail_delivery_failed: 'error',
   not_found: 'info',
   internal_error: 'error',
+  desk_frozen: 'info', // W6-01: a frozen desk is an operator choice, not a fault
 };
 type JobFields = Extract<SafeErrorFields, { category: 'qc_unavailable' | 'mail_delivery_failed' }>;
 
-/** One instance per app. Only nine bounded categories are retained; no raw errors or unbounded stack groups. */
+/** One instance per app. Only ten bounded categories are retained; no raw errors or unbounded stack groups. */
 export function createErrorCapture(emitter: Emitter, now: () => Date = () => new Date()) {
   const counters = new Map<ErrorCategory, { count: number; lastAt: string }>();
   function capture(fields: SafeErrorFields, route?: string) {
@@ -69,7 +71,10 @@ export function createErrorCapture(emitter: Emitter, now: () => Date = () => new
       else if (error instanceof StaleVersionError)
         fields = {
           category: 'stale_version',
-          ...(error.details === undefined ? {} : { currentVersionId: error.details.current.versionId }),
+          // A configuration 409 (W6-01 `configuration_changed`) names no version.
+          ...(error.details === undefined || !('versionId' in error.details.current)
+            ? {}
+            : { currentVersionId: error.details.current.versionId }),
         };
       else if (error instanceof UnsafeUploadError)
         fields = {
@@ -81,6 +86,7 @@ export function createErrorCapture(emitter: Emitter, now: () => Date = () => new
         };
       else if (error instanceof NotFoundError)
         fields = { category: 'not_found', targetType: error.details!.resource };
+      else if (error instanceof DeskFrozenError) fields = { category: 'desk_frozen' };
       else fields = sanitizeStack(error);
       return capture(fields, route);
     },

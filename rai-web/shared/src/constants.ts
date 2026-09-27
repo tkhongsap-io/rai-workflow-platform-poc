@@ -4,6 +4,13 @@
 
 export const APP_TIMEZONE = 'Asia/Bangkok' as const; // D06; a constant, not configuration
 
+/**
+ * W6 plan Q14 (provisional agent-team ruling under Ta's delegation of 2026-09-27): the dashboard counts a pending
+ * lane as "due soon" when it is not breached and due within this many working days. A display threshold, not a
+ * product rule; making it configuration later is one kind.
+ */
+export const DASHBOARD_DUE_SOON_WORKING_DAYS = 2;
+
 export type Lane = 'ai_coe' | 'dpo' | 'it_security';
 export type Slot = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 

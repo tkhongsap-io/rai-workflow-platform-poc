@@ -269,6 +269,14 @@ Every error that reaches the Fastify error handler goes through `captureError(er
 
 The user-facing message for every category is a locale key (D12) in `rai-web/shared`; the log never contains the rendered Thai or English text, only the `code`.
 
+**W6-01 amendment (2026-09-27): category `desk_frozen`.** [W6 plan](implementation-plan-w6.md) section 4.2; W0-06 8.1 amendment of the same date.
+
+| Category (`code`) | HTTP (ADR-0003) | Level | Logged fields (beyond the §3.2 envelope) | Stack | Counter | Notes |
+|---|---|---|---|---|---|---|
+| `desk_frozen` | 503 | info | `route` | no | yes | A write refused while an Admin has frozen the desk (W6-17 `desk_controls`). An operator choice, not a fault: never `internal_error`, and it does not count as an internal error on desk health. `ErrorCategorySchema` and `SafeErrorFieldsSchema` (`rai-web/shared/src/schemas/observability.ts`) carry it; `errors.ts` `http()` maps `DeskFrozenError` to it; the desk-health label is `operator.value.desk_frozen` |
+
+`not_found`'s `targetType` also admits `configuration` (the W0-06 8.3 resource of the same amendment). The W6 log events (`configuration.published`, `configuration.publish_refused`, `desk_controls.changed`, `desk.write_refused`, the `recheck` field on `qc.run.*`) are added to §3.3 by the tickets that emit them (W6 plan section 10).
+
 ### 6.2 Stack sanitization for `internal_error`
 
 Stacks are kept only for `internal_error`. Before logging, the stack is passed through `sanitizeStack`: frames only (file, line, function), the message line replaced by `err.name` plus a fixed message key, and any `openid-client`, `pg` or Fastify validation error unwrapped to its `code` so that a provider response body, a connection string or an echoed request body cannot ride along. `stackHash` (SHA-256 of the sanitized frames) lets the operator view group repeats without storing every stack.

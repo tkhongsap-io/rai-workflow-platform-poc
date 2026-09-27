@@ -111,7 +111,9 @@ type Action =
   | 'lane.approve' | 'lane.send_back' | 'case.resubmit'
   | 'finding.propose_fixed' | 'finding.mark_fixed' | 'finding.confirm_fixed' | 'finding.waive' | 'finding.mark_na'
   // W3 rows
-  | 'queue.search' | 'queue.count' | 'operator.view';
+  | 'queue.search' | 'queue.count' | 'operator.view'
+  // W6-01 rows (W6 plan section 4.1)
+  | 'qc.recheck' | 'dashboard.view';
 ```
 
 ## 3. The matrix
@@ -155,6 +157,17 @@ Cell values: **Own** = cases in the actor's `own_cases` scope; **BU** = cases wh
 | Operator view: failed mail, unavailable QC, breach report (`operator.view`) | — | — | — | — | — | Yes | W0-10 / W3-07; same reasoning as audit read |
 | Ready for launch | — | — | — | — | — | — | Not an action of any actor. The W2-06 predicate runs inside the transaction of the last approval or disposition (W0-06). No request can set it |
 | Write `privacy_status`, `security_status`, `rai_status`, `ai_readiness_status` | — | — | — | — | — | — | W0-04 fields projection rule; see [Section 5](#5-w0-04-fields-projection-rule) |
+
+**W6-01 amendment (2026-09-27).** [W6 plan](implementation-plan-w6.md) section 4.1; provisional agent-team rulings under Ta's delegation of 2026-09-27 (Q4, Q11, Q13).
+
+| Action | Owner | BU SPOC | AI/COE | DPO | IT/Sec | Admin | Rule |
+|---|---|---|---|---|---|---|---|
+| Publish a configuration revision (`config.publish`), now live | — | — | — | — | — | Yes | From W6-04 it covers every Admin configuration write: save draft, discard draft, publish and restore (`/api/admin/configuration/*`). One Admin publishes with a required change note (Q4); whether production needs a second Admin is D10's (provisional working assumption) |
+| Read configuration revisions (`config.read_revisions`) | — | — | — | — | — | Yes | Unchanged; covers every Admin configuration read (index, history, revision, draft) |
+| Request an explicit QC recheck of a submitted version (`qc.recheck`) | — | — | — | — | — | All | Target: the case (`kind: 'case'`). Admin only (Q11): the recheck exists because configuration changed; its findings are advisory and never gate (W6-09). Widening it later is one row |
+| View the desk dashboard (`dashboard.view`) | Own | BU | All | All | All | All | Target `none`; the rows are `VIEW_ROLES`, and every count is computed inside `caseScopeWhere(actor)` in SQL (Q13), as `queue.count` |
+
+No other row changes. Admin still holds no `lane.*` or `finding.*` row (T18). T40 below covers the new rows.
 
 ### 3.3 Notification recipients (D06; recipients are not authority)
 
@@ -336,6 +349,7 @@ How an Expected cell's `reason` (`403 role` / `scope` / `lane` / `self_approval`
 | T32 | `owner-b`, `spoc-b1` | `finding.propose_fixed` | owner-b: a finding on owner-a's case (B1); spoc-b1: a finding on a B2 case (`fx-case-hr-dualrole`) | 403 `scope` for both (the role has the row; the case is outside `own_cases` / the `business_unit` grant); finding state unchanged, no disposition event written, one `authz.denied` line (W0-10 3.3 fields, envelope `correlationId`), zero audit rows | W2-05 | A01, A09 |
 | T33 | `owner-b`, `spoc-b1`, `reviewer-dpo`, `admin` | `case.view`, `artifact.download`, `artifact.upload` | (i) a freshly generated random UUID that resolves to no case, as `:caseId` of `GET /api/cases/{caseId}` (`case.view`); (ii) a freshly generated random UUID that resolves to no artifact, as `:artifactId` of `GET /api/artifacts/{artifactId}` and `GET /api/artifacts/{artifactId}/meta` (`artifact.download`, W0-02 7.4); (iii) the random case UUID as `:caseId` of `POST /api/cases/{caseId}/artifacts` with a valid `file` part (`artifact.upload`) | owner-b and spoc-b1: 403 `scope` on (i), (ii) and (iii), W0-06 8.2 `forbidden` envelope with no `details`, one `authz.denied` line per request (W0-10 3.3 fields, `targetId` = the requested ID, envelope `correlationId`), byte-for-byte the same body shape as T3 / T11 (existing out-of-scope case or artifact), so existing and non-existent cannot be told apart on either key; reviewer-dpo and admin: 404 `not_found` with `details.resource = 'case'` on (i) and `details.resource = 'artifact'` on (ii), the W0-10 6.1 `not_found` capture (info, `route`, `targetType`) and **no** `authz.denied` line, and on (iii) 403 `role` (they hold no `artifact.upload` row, so the role step denies before existence is answered; no 404 for a non-existent case on an action they cannot perform); zero audit rows, no bytes streamed or stored for all four ([Section 4](#4-out-of-scope-references-403-with-non-guessable-identifiers) unresolvable-ID rule, [Downloads and deep links](#downloads-and-deep-links-w1-03-w3-03)) | W1-01, W1-02, W1-03 | A01 |
 | T34 | synthesised actor in the table-driven `authorize` unit test (no fixture identity needed): `{ subjectId: S, roles: [{ role: 'dpo', scope: { kind: 'all_cases', lane: 'dpo' } }, { role: 'owner', scope: { kind: 'own_cases' } }] }` | `lane.approve`, `lane.send_back`, `finding.mark_fixed`, `finding.waive`, `finding.mark_na`, `finding.confirm_fixed` | lane `dpo` / finding with `owningLane = 'dpo'` on `CaseScopeFacts` whose `ownerSubjectId === S` (a BU the actor holds no SPOC grant for); then the same targets on facts whose `ownerSubjectId` is another subject | own case: `{ allow: false, code: 'forbidden', reason: 'self_approval' }` on all six actions (lane rows by D05, disposition rows by the provisional default), which exercises the **owner branch** of `isOwnerOrSpocOnCase` that no fixture identity reaches (T19/T20/T25 cover the SPOC branch); other case: `{ allow: true, via: <the dpo row> }` on all six | W1-00 (table-driven test; the rows and cases land with the W2-02 contract PR), W2-02 | A09 (D05: "no one who is owner ... may approve") |
+| T40 | `owner-a`, `spoc-b1`, `reviewer-dpo` (and the AI/COE and IT/Security reviewers), dual-role; `admin` | `config.read_revisions`, `config.publish`, `qc.recheck`; `dashboard.view` | every `/api/admin/configuration` route (W6-04); the `qc-rechecks` route of any submitted version (W6-09); `GET /api/dashboard` (W6-13) | every non-Admin role 403 `role` on each Admin configuration route and on `qc.recheck` (a reviewer included), no row written; admin allowed. `dashboard.view`: all six roles allowed, counts scoped. Unit level (W6-01, `policy.test.ts`): each non-Admin role alone and combined is denied the three Admin actions with reason `role`; `dashboard.view` has exactly the six `VIEW_ROLES` rows; Admin holds no `lane.*` or `finding.*` row. API level: W6-04 (routes), W6-09 (recheck), W6-13 (dashboard) | W6-01, W6-04, W6-09, W6-13 | A10, A01 |
 
 The negative tests call the API directly, never through the UI (ADR-0003 risk table); the exit tickets W1-08, W2-08 and W3-06 record their output.
 

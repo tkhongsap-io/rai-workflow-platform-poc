@@ -3,7 +3,7 @@
 // throws (never a 403). Scope is enforced only here (W0-02 section 1.1); routes declare the action they need and
 // the W1-01b middleware calls `authorize`. W1-00 ships the view / list / create-edit-submit / download / config /
 // audit rows; the W2-02 contract PR adds lane.*, case.resubmit and finding.* with the D05 rules; W3-01/W3-03 add
-// queue.* and operator.view. Adding a row is a contract change and its own PR.
+// queue.* and operator.view; W6-01 adds qc.recheck and dashboard.view. Adding a row is a contract change and its own PR.
 
 import {
   ROLES,
@@ -43,6 +43,9 @@ export const ACTIONS = [
   'queue.search',
   'queue.count',
   'operator.view',
+  // W6-01 rows (W6 plan section 4.1)
+  'qc.recheck',
+  'dashboard.view',
 ] as const;
 export type Action = (typeof ACTIONS)[number];
 
@@ -64,8 +67,8 @@ export interface CaseScopeFacts {
 }
 
 export type Target =
-  | { kind: 'none' } // case.list, queue.*, config.*, audit.read, operator.view, and the role-only first call of case.create
-  | { kind: 'case'; facts: CaseScopeFacts } // view, edit, submit, download, version, history, create (facts from the body)
+  | { kind: 'none' } // case.list, queue.*, config.*, audit.read, operator.view, dashboard.view, and the role-only first call of case.create
+  | { kind: 'case'; facts: CaseScopeFacts } // view, edit, submit, download, version, history, qc.recheck, create (facts from the body)
   | { kind: 'lane'; facts: CaseScopeFacts; lane: Lane } // lane.approve, lane.send_back
   | { kind: 'finding'; facts: CaseScopeFacts; owningLane: Lane } // finding.*; owningLane is W0-04 qc_finding.owning_lane
   | { kind: 'unresolved' }; // :caseId / :artifactId resolved to no row: role and scope steps only
@@ -141,7 +144,7 @@ export const POLICY_ROWS: readonly PolicyRow[] = Object.freeze([
   ...rows('history.view', VIEW_ROLES),
   ...rows('config.read_effective', VIEW_ROLES), // value lists a screen needs; not operator_recipients
   ...rows('config.read_revisions', ADMIN_ONLY), // D06: operator_recipients holds addresses; Admin only
-  ...rows('config.publish', ADMIN_ONLY), // W6; exists so W1-00 can test that nobody else has it
+  ...rows('config.publish', ADMIN_ONLY), // W6-04: save and discard draft, publish, restore (W6 plan section 4.1)
   ...rows('operator.view', ADMIN_ONLY), // W3-07a: existing W0-05 T14/W0-10 Admin-only operator contract
   ...rows('audit.read', ADMIN_ONLY), // W0-04: Admin (the slice-1 operator audience, W0-05 section 8)
   // W2-02 contract: D05 lane decision, resubmit, disposition authority (W2-05 consumes finding.*)
@@ -153,6 +156,9 @@ export const POLICY_ROWS: readonly PolicyRow[] = Object.freeze([
   ...owningLaneFindingRows('finding.confirm_fixed'),
   ...owningLaneFindingRows('finding.waive'),
   ...owningLaneFindingRows('finding.mark_na'),
+  // W6-01 (W6 plan section 4.1, Q11 and Q13; provisional agent-team rulings under Ta's delegation of 2026-09-27)
+  ...rows('qc.recheck', ADMIN_ONLY), // target: the case; an explicit recheck exists because configuration changed
+  ...rows('dashboard.view', VIEW_ROLES), // target none; every count is scoped in SQL by caseScopeWhere
 ]);
 
 const ROLE_SET: ReadonlySet<string> = new Set(ROLES);
