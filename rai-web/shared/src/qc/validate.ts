@@ -6,7 +6,7 @@
 import { Type } from 'typebox';
 import { Value } from 'typebox/value';
 import { LANES, type Lane, type LaneMapping, owningLaneRule } from '../constants.js';
-import { QC_RULE_ID_PATTERN, type FindingScope, type QcFinding } from './types.js';
+import { QC_ENGINE_LABEL_PATTERN, QC_RULE_ID_PATTERN, type FindingScope, type QcFinding } from './types.js';
 
 const SlotSchema = Type.Union([1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => Type.Literal(n)));
 const LaneSchema = Type.Union(LANES.map((lane) => Type.Literal(lane)));
@@ -118,6 +118,33 @@ export const QcFindingSchema = Type.Object(
   { additionalProperties: false },
 );
 
+// W4-11b: an extractor, model or prompt identity is an identifier, never free text such as an exception message.
+const ENGINE_LABEL = Type.String({ pattern: QC_ENGINE_LABEL_PATTERN });
+const INT32 = Type.Integer({ minimum: 0, maximum: 2_147_483_647 }); // qc_run integer columns
+const MICROS = Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }); // qc_run bigint, read as a number
+
+/** W4-11b (W4b plan section 7): `QcRunResult.engine`, checked by the orchestrator before anything is recorded. */
+export const QcEngineIdentitySchema = Type.Object(
+  {
+    extractorVersion: Type.Optional(ENGINE_LABEL),
+    model: Type.Optional(
+      Type.Object(
+        {
+          provider: Type.Literal('local-fake'), // no external provider value exists (WA-D08, decision 6)
+          modelId: ENGINE_LABEL,
+          promptRevision: ENGINE_LABEL,
+          inputTokens: INT32,
+          outputTokens: INT32,
+          latencyMs: INT32,
+          costUsdMicros: MICROS,
+        },
+        { additionalProperties: false },
+      ),
+    ),
+  },
+  { additionalProperties: false },
+);
+
 export const QcRunResultSchema = Type.Union([
   Type.Object(
     {
@@ -126,6 +153,7 @@ export const QcRunResultSchema = Type.Union([
       rulesEvaluated: Type.Array(Type.String({ pattern: QC_RULE_ID_PATTERN.source })),
       startedAt: Type.String({ minLength: 1 }),
       finishedAt: Type.String({ minLength: 1 }),
+      engine: Type.Optional(QcEngineIdentitySchema),
     },
     { additionalProperties: false },
   ),
@@ -141,6 +169,7 @@ export const QcRunResultSchema = Type.Union([
       detail: Type.Union([Type.String(), Type.Null()]),
       startedAt: Type.String({ minLength: 1 }),
       finishedAt: Type.String({ minLength: 1 }),
+      engine: Type.Optional(QcEngineIdentitySchema),
     },
     { additionalProperties: false },
   ),

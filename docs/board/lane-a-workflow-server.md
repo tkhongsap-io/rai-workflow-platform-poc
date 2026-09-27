@@ -291,3 +291,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w7-06-subject-profile model=claude-opus-5-5 (implementation lane ops)
 - Takes over from: session=none (reason: new; ticket #217, W7-03 merged #287, W7-05 merged #291)
 - Scope: per changes/2026-09-27-w7-06-subject-profile/: one additive migration (`server/drizzle/0013_w7_06_subject_profile.sql`, renumbered by hand at rebase if another migration merges first) adding `subject_profile` (`SELECT, INSERT, UPDATE` to `rai_app`, no `DELETE`); `CreateSessionInput.profile` upserted inside the `SessionStore.create` transaction (Pg and memory); `establishSession` passes the profile on every non-fixture sign-in and calls the optional `profiles.recorded` hook (bound by W7-07); `createSubjectDirectory` reads `subject_profile` before `session`; W0-03 section 6 and W0-04 amended. No recipient directory (W7-07), no route, no UI. One PR.
+
+## 2026-09-27 19:39 — CLAIM lane-a: W4-11b run identity for extraction/model use (#201)
+- Author: operator=ta session=claude-code-w4-11b-run-identity model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #201, implementation lane qc-core)
+- Scope: per changes/2026-09-27-w4-11b-run-identity-for-extraction/: `qc_run` identity and usage columns plus `unavailable_detail` (one migration), `QcRunResult.engine`, `recordRun`, the qc-runs read, `qc.run.completed`/`qc.run.unavailable` fields, operator `unavailableQc.unavailableDetail`, W0-02 section 7, W0-04, data contract, W0-07 section 7 and W0-10 amendments. One PR.

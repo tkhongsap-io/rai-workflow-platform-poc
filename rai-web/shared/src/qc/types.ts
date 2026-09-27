@@ -116,7 +116,41 @@ export interface QcFinding {
 
 export const QC_RULE_ID_PATTERN = /^[A-Z]+(-[A-Z0-9]+)+$/;
 
+// W4-11b: the bounded identifier shape for engine identity labels (extractor version,
+// model provider, model ID, prompt revision). Shared by the runner-result check and the
+// qc-runs read schema so the two cannot drift apart.
+export const QC_ENGINE_LABEL_PATTERN = '^[A-Za-z0-9][A-Za-z0-9._+/@:-]{0,127}$';
+
+// W4-11b: the bounded code shape of qc_run.unavailable_detail (the migration CHECK uses the same literal), shared by
+// the server's stored-detail check, the qc-runs read and the log/operator schemas.
+export const QC_UNAVAILABLE_DETAIL_PATTERN = '^[a-z0-9_]{1,64}$';
+
 export type QcUnavailableReason = 'timeout' | 'runner_error' | 'not_configured' | 'artifact_unreadable';
+
+/** W4-11b (W4b plan section 5): the model a run used. No external provider value exists (WA-D08, decision 6). */
+export interface QcModelIdentity {
+  provider: 'local-fake';
+  modelId: string;
+}
+
+/** W4-11b: what one run's model use cost. Numbers only; no model input or output text. */
+export interface QcModelUsage {
+  inputTokens: number;
+  outputTokens: number;
+  latencyMs: number;
+  costUsdMicros: number;
+}
+
+/**
+ * W4-11b (W4b plan section 7): the extractor and model identity a run used, recorded on its qc_run row and its
+ * qc.run.* line so two runs that differ only in extractor, model or prompt revision can be told apart. Identifiers
+ * and numbers only; checked at the orchestrator boundary (`QcEngineIdentitySchema`). Absent when the run used no
+ * extraction and no model (the metadata and scripted runners).
+ */
+export interface QcEngineIdentity {
+  extractorVersion?: string;
+  model?: QcModelIdentity & { promptRevision: string } & QcModelUsage;
+}
 
 export type QcRunResult =
   | {
@@ -125,13 +159,17 @@ export type QcRunResult =
       rulesEvaluated: string[];
       startedAt: string;
       finishedAt: string;
+      engine?: QcEngineIdentity; // W4-11b
     }
   | {
       status: 'unavailable';
       reason: QcUnavailableReason;
-      detail: string | null; // no document content, no PII. Carries no lane (W0-06 7.4).
+      // No document content, no PII. Carries no lane (W0-06 7.4). W4-11b: stored in qc_run.unavailable_detail when
+      // it matches ^[a-z0-9_]{1,64}$, as `unspecified` otherwise.
+      detail: string | null;
       startedAt: string;
       finishedAt: string;
+      engine?: QcEngineIdentity; // W4-11b: e.g. the extractor version of a failed extraction
     };
 
 /** The port. Exactly one implementation is selected at startup (W0-07 section 6). */

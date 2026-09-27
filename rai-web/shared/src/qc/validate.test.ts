@@ -8,6 +8,7 @@ import { Value } from 'typebox/value';
 import { LANE_MAPPING_V1 } from '../constants.js';
 import type { QcFinding, QcRunResult } from './types.js';
 import {
+  QcEngineIdentitySchema,
   QcRunResultSchema,
   checkOwningLane,
   findingKeyOf,
@@ -167,4 +168,68 @@ test('QcRunResultSchema accepts both result shapes and rejects a lane or finding
   assert.ok(!Value.Check(QcRunResultSchema, { ...unavailable, findings: [] }));
   assert.ok(!Value.Check(QcRunResultSchema, { ...unavailable, reason: 'model_down' }));
   assert.ok(!Value.Check(QcRunResultSchema, { ...completed, approved: true }));
+});
+
+// W4-11b (W4b plan section 7): the optional engine identity a runner reports, validated at the boundary.
+const engine = {
+  extractorVersion: 'rai-extract/1+0.0.0',
+  model: {
+    provider: 'local-fake' as const,
+    modelId: 'fake-claims-1',
+    promptRevision: 'claims/v1@0123456789ab',
+    inputTokens: 10,
+    outputTokens: 2,
+    latencyMs: 5,
+    costUsdMicros: 0,
+  },
+};
+
+test('W4-11b: QcRunResultSchema accepts an engine identity on both statuses', () => {
+  const unavailable: QcRunResult = {
+    status: 'unavailable',
+    reason: 'artifact_unreadable',
+    detail: 'extract_limit_time',
+    startedAt: 't0',
+    finishedAt: 't1',
+    engine: { extractorVersion: engine.extractorVersion },
+  };
+  const completed: QcRunResult = {
+    status: 'completed',
+    findings: [],
+    rulesEvaluated: [],
+    startedAt: 't0',
+    finishedAt: 't1',
+    engine,
+  };
+  assert.ok(Value.Check(QcRunResultSchema, completed));
+  assert.ok(Value.Check(QcRunResultSchema, unavailable));
+  assert.ok(!Value.Check(QcRunResultSchema, { ...completed, engine: { ...engine, prompt: 'text' } }));
+});
+
+test('W4-11b: QcEngineIdentitySchema bounds identities to identifiers and usage to non-negative integers', () => {
+  assert.ok(Value.Check(QcEngineIdentitySchema, engine));
+  assert.ok(Value.Check(QcEngineIdentitySchema, {}));
+  assert.ok(Value.Check(QcEngineIdentitySchema, { extractorVersion: 'rai-extract/1' }));
+  assert.ok(Value.Check(QcEngineIdentitySchema, { model: engine.model }));
+  // no provider value exists besides the local fake (WA-D08, decision 6)
+  assert.ok(!Value.Check(QcEngineIdentitySchema, { model: { ...engine.model, provider: 'openai' } }));
+  for (const unsafe of ['', 'has spaces', 'x'.repeat(129), 'line\nbreak', '-leading', 'ข้อความ'])
+    for (const candidate of [
+      { extractorVersion: unsafe },
+      { model: { ...engine.model, modelId: unsafe } },
+      { model: { ...engine.model, promptRevision: unsafe } },
+    ])
+      assert.ok(!Value.Check(QcEngineIdentitySchema, candidate), JSON.stringify(candidate));
+  for (const key of ['inputTokens', 'outputTokens', 'latencyMs', 'costUsdMicros'] as const) {
+    for (const bad of [-1, 1.5, Number.NaN])
+      assert.ok(
+        !Value.Check(QcEngineIdentitySchema, { model: { ...engine.model, [key]: bad } }),
+        `${key}=${bad}`,
+      );
+    const { [key]: _omitted, ...missing } = engine.model;
+    assert.ok(!Value.Check(QcEngineIdentitySchema, { model: missing }), `${key} missing`);
+  }
+  assert.ok(!Value.Check(QcEngineIdentitySchema, { model: { ...engine.model, inputTokens: 2 ** 31 } }));
+  assert.ok(!Value.Check(QcEngineIdentitySchema, { extractorVersion: 'x', excerpt: 'text' }));
+  assert.ok(!Value.Check(QcEngineIdentitySchema, { model: { ...engine.model, output: 'text' } }));
 });

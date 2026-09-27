@@ -1,5 +1,9 @@
 # Development log
 
+## W4-11b run identity for extraction and model use — 2026-09-27
+
+First W4b code ticket (#201). A `qc_run` row can now record which extractor build, model and prompt revision a run used, with the model's token counts, latency and cost, and an unavailable run keeps its short detail code (for example `extract_limit_time`) instead of dropping it (migration 0014; every new column is NULL on older rows and on runs that use no extraction or model). The completed and unavailable log lines, the version's QC-run read and the Admin desk-health outage rows carry the same values. Identities are checked at the orchestrator: anything that is not an identifier fails the run as `engine_identity_invalid`, and a detail that is not a short code is stored as `unspecified`, so no document or model text can reach a row or a log line. No extractor or model exists yet (W4-05b, W4-07a); the columns wait for them. [Review](changes/2026-09-27-w4-11b-run-identity-for-extraction/review.md).
+
 ## W7-06 subject profile — 2026-09-28
 
 Sixth W7 ticket (#217). Outside the fixture mode, the desk now remembers who has signed in. Every sign-in through a real sign-in provider (local Google today, the organisation's sign-in later) writes or refreshes one row per person: their identifier, email, display name, current roles, when they were first seen and when they last signed in. The row is written in the same database step as the sign-in itself, so a sign-in that fails leaves no row and a row never exists without its sign-in. A test proves it by making the row fail and finding no session and no audit entry either.

@@ -123,6 +123,21 @@ export async function listQcRunsForVersion(
     findingCount: Number(count),
     requestedAt: run.requestedAt.toISOString(),
     completedAt: run.completedAt.toISOString(),
+    // W4-11b: the engine identity the run recorded, and the stored detail of an unavailable run.
+    extractorVersion: run.extractorVersion,
+    model:
+      run.modelProvider === null || run.modelId === null || run.promptRevision === null
+        ? null
+        : { provider: run.modelProvider, modelId: run.modelId, promptRevision: run.promptRevision },
+    modelUsage:
+      run.modelInputTokens === null || run.modelOutputTokens === null || run.modelLatencyMs === null
+        ? null
+        : {
+            inputTokens: run.modelInputTokens,
+            outputTokens: run.modelOutputTokens,
+            latencyMs: run.modelLatencyMs,
+          },
+    unavailableDetail: run.unavailableDetail,
   }));
 }
 

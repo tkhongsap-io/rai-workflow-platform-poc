@@ -559,6 +559,11 @@ function qcRun(overrides: Partial<QcRunSummary>): QcRunSummary {
     findingCount: 0,
     requestedAt: '2026-09-27T06:00:00.000Z',
     completedAt: '2026-09-27T06:00:01.000Z',
+    // W4-11b: no extraction or model use on these synthetic runs
+    extractorVersion: null,
+    model: null,
+    modelUsage: null,
+    unavailableDetail: null,
     ...overrides,
   };
 }

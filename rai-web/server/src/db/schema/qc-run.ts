@@ -1,6 +1,7 @@
 // W0-04 `qc_run`: immutable once inserted with final status. Written by the W2-05 orchestrator on behalf of QC.
 import { sql } from 'drizzle-orm';
 import {
+  bigint,
   check,
   index,
   integer,
@@ -35,6 +36,18 @@ export const qcRun = pgTable(
     unavailableReason: text('unavailable_reason'),
     // W4-11a: rules the runner executed; 0 on an unavailable run, NULL on rows written before migration 0009.
     rulesEvaluated: integer('rules_evaluated'),
+    // W4-11b: the extractor and model identity and usage the runner reported (QcRunResult.engine); NULL on rows
+    // written before migration 0014 and on runs without extraction or model use.
+    extractorVersion: text('extractor_version'),
+    modelProvider: text('model_provider'),
+    modelId: text('model_id'),
+    promptRevision: text('prompt_revision'),
+    modelInputTokens: integer('model_input_tokens'),
+    modelOutputTokens: integer('model_output_tokens'),
+    modelLatencyMs: integer('model_latency_ms'),
+    modelCostUsdMicros: bigint('model_cost_usd_micros', { mode: 'number' }),
+    // W4-11b: the unavailable result's detail when it is a bounded code, 'unspecified' otherwise; NULL when none.
+    unavailableDetail: text('unavailable_detail'),
     requestedAt: timestamp('requested_at', { withTimezone: true }).notNull(),
     completedAt: timestamp('completed_at', { withTimezone: true }).notNull(),
     correlationId: text('correlation_id').notNull(),
@@ -51,6 +64,23 @@ export const qcRun = pgTable(
     check('qc_run_lane_check', sql`${t.lane} IS NULL OR ${t.lane} IN ('ai_coe', 'dpo', 'it_security')`),
     check('qc_run_status_check', sql`${t.status} IN ('completed', 'unavailable')`),
     check('qc_run_rules_evaluated_check', sql`${t.rulesEvaluated} IS NULL OR ${t.rulesEvaluated} >= 0`),
+    check(
+      'qc_run_model_input_tokens_check',
+      sql`${t.modelInputTokens} IS NULL OR ${t.modelInputTokens} >= 0`,
+    ),
+    check(
+      'qc_run_model_output_tokens_check',
+      sql`${t.modelOutputTokens} IS NULL OR ${t.modelOutputTokens} >= 0`,
+    ),
+    check('qc_run_model_latency_ms_check', sql`${t.modelLatencyMs} IS NULL OR ${t.modelLatencyMs} >= 0`),
+    check(
+      'qc_run_model_cost_usd_micros_check',
+      sql`${t.modelCostUsdMicros} IS NULL OR ${t.modelCostUsdMicros} >= 0`,
+    ),
+    check(
+      'qc_run_unavailable_detail_check',
+      sql`${t.unavailableDetail} IS NULL OR (${t.status} = 'unavailable' AND ${t.unavailableDetail} ~ '^[a-z0-9_]{1,64}$')`,
+    ),
     check('qc_run_slot_check', sql`${t.slot} IS NULL OR (${t.slot} >= 1 AND ${t.slot} <= 9)`),
   ],
 );

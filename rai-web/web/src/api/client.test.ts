@@ -423,6 +423,7 @@ function deskHealthReport(): DeskHealthReport {
         reason: 'unknown',
         runner: 'substitute-scripted',
         runnerVersion: 'unrecorded',
+        unavailableDetail: null, // W4-11b
         requestedAt: operatorTime,
         correlationId: operatorId,
       },
