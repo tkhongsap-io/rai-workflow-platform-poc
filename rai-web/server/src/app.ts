@@ -19,6 +19,7 @@ import { registerArtifactRoutes, type ArtifactRouteDeps } from './artifacts/rout
 import { registerAuthorization, type ScopeFactsSource } from './authz/middleware.js';
 import { registerCaseRoutes, type CaseRouteDeps } from './cases/routes.js';
 import { registerQueueRoutes } from './queue/routes.js';
+import { registerDashboardRoutes } from './dashboard/routes.js';
 import { registerPackRoutes, type PackRouteDeps } from './pack/routes.js';
 import { registerVersionRoutes, type VersionRouteDeps } from './versions/routes.js';
 import { createSubmitTrigger } from './qc/submit-trigger.js';
@@ -284,6 +285,7 @@ export function buildApp(deps: AppDeps): App {
       void fastify.register((instance, _opts, done) => {
         registerCaseRoutes(instance, { ...caseDeps, ...dbAndClock(), emitter });
         registerQueueRoutes(instance, dbAndClock());
+        registerDashboardRoutes(instance, dbAndClock());
         done();
       });
     }

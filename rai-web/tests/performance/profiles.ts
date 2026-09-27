@@ -10,7 +10,18 @@ export const READS = {
   version: '/api/cases/:caseId/versions/:versionId',
   history: '/api/cases/:caseId/versions',
   operator: '/api/operator/desk-health',
+  dashboard: '/api/dashboard', // W6-13
 } as const;
+/** Advisory p95 per JSON read (performance-targets section 2): 300 ms, except the W6 dashboard (W6 plan 8.1). */
+export const READ_BUDGETS_MS: Record<keyof typeof READS, number> = {
+  session: 300,
+  case: 300,
+  draft: 300,
+  version: 300,
+  history: 300,
+  operator: 300,
+  dashboard: 500,
+};
 export const BYTES = 26_214_400;
 export const digest = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 export interface Plan {
