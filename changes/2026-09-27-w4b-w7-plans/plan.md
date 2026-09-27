@@ -33,7 +33,7 @@ Wave = the length of the longest dependency chain to the ticket. Tickets in the 
 | 2 | W4-05b | W4B | Extraction worker host, protocol and limits | A | HRR | W4-01 | no |
 | 2 | W5-02 | W5 | Register risk_rubric, seed synthetic placeholder, rubric read endpoint | A | Agent-eligible | W5-01 | no |
 | 2 | W6-02 | W6 | Configuration drafts, change note, restore, desk_controls kind (restore-required) | A | HRR | W6-01 | **yes** |
-| 2 | W6-13 | W6 | Dashboard API | A | HRR | W6-01 | no |
+| 2 | W6-13 | W6 | Dashboard API (advisory and recheck counts 0 until W6-09) | A | HRR | W6-01 | no |
 | 2 | W7-02 | W7 | Restore and verify | C | HRR | W7-01 | no |
 | 2 | W7-06 | W7 | subject_profile | A | HRR | W7-03, W7-05 | **yes** |
 | 2 | W7-09 | W7 | Sign-in method endpoint and UI | B | HRR | W7-05 | no |
@@ -60,36 +60,36 @@ Wave = the length of the longest dependency chain to the ticket. Tickets in the 
 | 5 | W5-09 | W5 | Tier on queue and case list | B | Agent-eligible | W5-05 | no |
 | 5 | W5-10 | W5 | RISK-TIER-UNKNOWN QC input; riskProposal on QcRunRequest | A | HRR | W5-05 | no |
 | 5 | W6-05 | W6 | Admin UI: index, history, diff, restore | B | Agent-eligible | W6-04 | no |
-| 5 | W6-08 | W6 | Activation and historical-evidence proof | C | HRR | W6-04 | no |
 | 5 | W6-16 | W6 | Dashboard risk tiers and riskTier filter | A+B | Agent-eligible | W6-15, W5-05 | no |
+| 6 | W6-08 | W6 | Activation and historical-evidence proof | C | HRR | W6-04, W5-10 | no |
 | 6 | W4-06d | W4B | PACK-CONTRADICTION (+ seed entry, registry entry if W6-03 merged) | A | HRR | W4-06c | no |
 | 6 | W4-13b | W4B | QC_MODE=content bound as two parts; extraction keys; readiness; operator label | C | HRR | W4-05a, W4-05d, W4-06a, W4-18 | no |
 | 6 | W4-09b | W4B | Held-out split, variants, freeze | C | Agent-eligible | W4-08a | no |
 | 6 | W4-12b | W4B | UI: measures, ordinal locators, detail codes, identities, run parts | B | Agent-eligible | W4-11b, W4-15, W4-16, W4-18 | no |
 | 6 | W5-08 | W5 | Proposal display: version, reviewer, overview | B | Agent-eligible | W5-06, W5-07 | no |
 | 6 | W6-06 | W6 | Admin UI: simple-kind editors, draft and publish | B | Agent-eligible | W6-05 | no |
-| 6 | W6-09 | W6 | Explicit QC recheck (advisory), desk_paused reason, frozenConfiguration (restore-required) | A | HRR | W6-02, W4-15, W4-17, W4-18 | **yes** |
-| 7 | W4-13c | W4B | Seed label w4b.1 and the content real-server test | C | Agent-eligible | W4-13b, W4-06d, W4-15 | no |
+| 6 | W6-09 | W6 | Explicit QC recheck (advisory), desk_paused reason, frozenConfiguration, recheck excluded from dashboard and queue counts (restore-required) | A | HRR | W6-02, W4-15, W4-17, W4-18, W6-13, W6-14 | **yes** |
+| 7 | W4-13c | W4B | Seed label w4b.1 and the content real-server test | C | Agent-eligible | W4-13b, W4-06d, W4-15, W5-10 | no |
 | 7 | W4-07a | W4B | Model port, prompt identity, output validation, local fake, QC_MODEL | A | HRR | W4-13b | no |
 | 7 | W5-11 | W5 | Reference cases and A03 evidence | C | Agent-eligible | W5-08, W5-10 | no |
 | 7 | W6-10 | W6 | Version configuration panel and recheck UI | B | Agent-eligible | W6-09 | no |
 | 7 | W6-11 | W6 | Identity-mapping configuration contract | A | Agent-eligible | W6-03, W6-06 | no |
 | 7 | W6-17 | W6 | Desk controls (freeze writes, pause mail, pause QC) | A | HRR | W6-04, W6-06, W6-09 | no |
-| 7 | W6-19 | W6 | Risk recheck (advisory) | A+B | HRR | W6-09, W5-05, W5-06 | no |
+| 7 | W6-19 | W6 | Risk recheck (advisory) | A+B | HRR | W6-09, W5-05, W5-06, W5-08 | no |
 | 8 | W4-07b | W4B | claimSource grammar+model in the runner | A | HRR | W4-07a, W4-11b | no |
 | 8 | W4-08b | W4B | Threshold gate, stale check, CI step | C | Agent-eligible | W4-09b, W4-13c | no |
 | 8 | W4-10b | W4B | Failure probes, server level | C | HRR | W4-13c | no |
 | 8 | W5-EXIT | W5 | W5 exit record (A03 partial pending D07) | docs | Lead | W5-09, W5-11 | no |
 | 8 | W6-07 | W6 | Admin UI: QC rule catalogue editor | B | Agent-eligible | W6-06, W4-13c | no |
-| 8 | W6-12 | W6 | Risk rubric editing (D07 badge) | B | Agent-eligible | W6-11, W5-02 | no |
+| 8 | W6-12 | W6 | Risk rubric editing (D07 badge) | B | Agent-eligible | W6-11, W5-02, W5-05, W5-06 | no |
 | 8 | W6-18 | W6 | Operator guide | C | Agent-eligible | W6-17, W6-15 | no |
-| 8 | W7-11 | W7 | Rehearsal case set and loader | C | Agent-eligible | W7-10, W5-05, W4-13c, W6-17 | no |
+| 8 | W7-11 | W7 | Rehearsal case set and loader | C | Agent-eligible | W7-10, W5-05, W4-13c, W4-09a, W6-17, W5-10 | no |
 | 9 | W4-10a | W4B | Critical probes, runner level | C | HRR | W4-07b, W4-09b | no |
-| 9 | W4-INT-a | W4B | Real-server W4b integration journeys | A | Agent-eligible (lead reviews) | W4-13c, W4-07b, W4-17, W4-10b | no |
+| 9 | W4-INT-a | W4B | Real-server W4b integration journeys | A | Agent-eligible (lead reviews) | W4-13c, W4-07b, W4-17, W4-10b, W5-10 | no |
 | 9 | W6-EXIT | W6 | W6 engineering exit record (qualified coverage statement) | Lead | Lead | W6-07, W6-08, W6-10, W6-12, W6-16, W6-18, W6-19 | no |
 | 9 | W7-04 | W7 | Backup/restore and rollback runbooks; operator guide W7 sections | C | Agent-eligible | W7-02, W7-03, W7-05, W6-18 | no |
-| 9 | W7-12 | W7 | Scripted dress rehearsal | C | HRR (CI) | W7-11, W6-18 | no |
-| 10 | W4-INT-b | W4B | Browser journey on QC_MODE=content | B | Agent-eligible (lead reviews) | W4-INT-a, W4-12b | no |
+| 9 | W7-12 | W7 | Scripted dress rehearsal | C | HRR (CI) | W7-11, W6-18, W5-08, W5-10 | no |
+| 10 | W4-INT-b | W4B | Browser journey on QC_MODE=content | B | Agent-eligible (lead reviews) | W4-INT-a, W4-12b, W5-10 | no |
 | 10 | W7-13 | W7 | W7-00 synthetic restore and rollback rehearsal record | Lead | Lead | W7-02, W7-03, W7-04, W7-06, W7-11 | no |
 | 11 | W4-14 | W4B | W4b exit record | Lead | HRR | W4-01, W4-08b, W4-10a, W4-INT-a, W4-INT-b | no |
 | 11 | W7-14 | W7 | Agent dress rehearsal and findings | Lead | Lead | W7-12, W7-13, W7-08, W6-EXIT | no |
@@ -119,17 +119,19 @@ Wave = the length of the longest dependency chain to the ticket. Tickets in the 
   - W7 directories (W7-03 → W7-06 → W7-07 → W7-08);
   - W7 kit (W7-10, W7-16 draft).
 - **Convergence points across packages:**
-  - W6-09 waits for W4-15, W4-17 and W4-18 (orchestrator);
+  - W6-09 waits for W4-15, W4-17 and W4-18 (orchestrator), and for W6-13 and W6-14, whose counts and filters it extends with the recheck predicate;
   - W6-07 waits for W4-13c (params schemas);
-  - W6-12, W6-16 and W6-19 wait for W5;
-  - W7-11 waits for W5-05, W4-13c and W6-17;
-  - W7-04 and W7-12 wait for W6-18;
+  - W6-08 waits for W5-10; W6-12 for W5-02, W5-05 and W5-06; W6-16 for W5-05; W6-19 for W5-05, W5-06 and W5-08;
+  - W4-13c, W4-INT-a, W4-INT-b, W6-08, W7-11 and W7-12 wait for W5-10 (declared merge order, below);
+  - W7-11 waits for W5-05, W4-09a, W4-13c and W6-17;
+  - W7-04 waits for W6-18; W7-12 for W6-18 and W5-08;
   - W7-14 waits for W6-EXIT.
+- **W5-10 merge order (consolidation round 2).** W5-10 adds `RISK-TIER-UNKNOWN`, a soft gating AI/COE finding that fires on every submit whose draft has no risk answers, and every fixture draft is answerless. Rather than giving the fixture drafts risk answers (which would change the fixture-set identity, contradict W5-05's intended `risk_tier = 'unknown'` assertion and still miss drafts that tests create), the order is declared: the six tickets above depend on W5-10 and are written with the finding present, and W5-10's done-when lists every existing test it changes (W5 plan section 9). Only W6-08 moves back one wave.
 - **A failed W4b exit** (a held-out threshold missed, W4b plan section 11.3) is recorded honestly. It does not stop W5-W7, which depend on W4b tickets, not on its exit verdict. W7-EXIT cites the W4-14 and W5-EXIT records as they stand.
 
 ## Migration queue (`MIGRATION-SLOT`)
 
-Only one migration-bearing PR across all packages is in review at a time. The holder takes the `MIGRATION-SLOT` claim on `docs/board/lane-lead-integration.md` and releases it at merge. The number is the next free one on `main` at rebase (today `0010`). `meta/_journal.json` and the snapshot are regenerated with `npm run migrate:generate`, and the lists in `tests/integration/w1-00-migrations.test.ts` are merged as a union. A merged migration is never renumbered or edited. The expected order, by readiness, with each migration's rollback class (W0-04 values; W7-03 class map):
+Only one migration-bearing PR across all packages is in review at a time. The holder takes the `MIGRATION-SLOT` claim on `docs/board/lane-lead-integration.md` and releases it at merge. The number is the next free one on `main` at rebase (today `0010`). `meta/_journal.json` and the snapshot are regenerated with `npm run migrate:generate`, and the lists in `tests/integration/w1-00-migrations.test.ts` are merged as a union. A merged migration is never renumbered or edited. **Migrations are never renumbered by a merge queue:** a ticket that adds a migration must, before asking to merge, rebase onto current `main` and regenerate its migration by hand at the next free number, keeping its hand-written SQL (grants, triggers, CHECK replacements, the class header), because `db/migrate.ts` refuses an unapplied migration whose `folderMillis` precedes the last one applied. The `MIGRATION-SLOT` holder does this before it enters the queue; the queue's automatic rebase is never the step that renumbers a migration. The expected order, by readiness, with each migration's rollback class (W0-04 values; W7-03 class map):
 
 | Order | Ticket | Migration | Class |
 |---|---|---|---|
@@ -147,15 +149,16 @@ Any of them merged before W7-03 gets its class entry when W7-03 rebases. Any mer
 
 | File or area | Tickets | Rule |
 |---|---|---|
-| `server/src/qc/orchestrator.ts`, `qc/repository.ts` | W4-11b, W4-05a, W4-15, W4-17, W4-18, W5-10, W6-09, W6-17 | One open PR at a time, in that order where the dependencies allow. W5-10 rebases after the W4b orchestrator ticket in flight |
+| `server/src/qc/orchestrator.ts`, `qc/repository.ts` | W4-11b, W4-05a, W4-06a, W4-08a, W4-15, W4-17, W4-18, W5-10, W6-09, W6-17 | One open PR at a time, in that order where the dependencies allow. W4-06a adds the run-level `duplicate_finding_key` check in `checkedResult`; W4-08a moves `checkedResult` and `buildRequest` out to `check-result.ts` and `request.ts`, and later tickets edit them there. W5-10 rebases after the W4b orchestrator ticket in flight |
 | `compose-app-deps.ts`, `app.ts`, `start.ts`, `config.ts`, `.env.example` | W4-05a, W4-17, W4-13b, W4-07a, W5-06, W6-04, W6-13, W6-17, W7-01, W7-02, W7-05, W7-07 | Rebase before review; never reorder another package's keys or routes |
 | `configuration/seed.ts`, `seed.test.ts`, `shared/src/schemas/cases.ts` | W4-06a-d, W4-13c, W5-02, W5-10, W6-02, W6-11 | Each adds its own block. The `qc_rules` label names the last ticket that changed the seeded body (W4b plan section 3.3). `UNSEEDED_KINDS` comes from W6-02 |
 | `shared/src/qc/rule-registry.ts` | W6-03, W4-06d, W5-10 | Whichever merges second adds the missing entry |
 | `shared/src/schemas/review.ts` | W4-11b, W4-15, W4-16, W4-18, W6-09 | Fields on shapes the API substitute builds stay `Type.Optional` |
 | `shared/src/schemas/observability.ts`, `web/src/i18n/operator-labels.ts`, `web/src/screens/case/view-model.ts` | W4-11b, W4-13b, W4-12b, W6-09, W6-10, W6-17, W7-03 | A widened enum gets its `operator.value.*` label in the same PR. Map entries only |
 | `versions/service.ts`, `notifications/service.ts`, `workflow/service.ts` | W5-05, W7-07; W6-17, W7-07; W4-18, W6-09 | One-line widenings or filters; the second PR rebases and keeps both |
-| `queue/repository.ts`, `shared/src/schemas/queue.ts` | W5-09, W6-14, W6-16 | W5-09 adds a column; W6 adds filters inside the scoped sub-select |
+| `queue/repository.ts`, `shared/src/schemas/queue.ts`, `dashboard/repository.ts` | W5-09, W6-13, W6-14, W6-16, W6-09 | W5-09 adds an optional column; W6 adds filters inside the scoped sub-select; W6-09 adds the `recheck = false` predicate to every finding and run count and wires `advisory` and `rechecks30d` |
+| W0-04 roles rule (`rai_app` `DELETE`) | W6-02, W7-02 | One rule in both plans (consolidation round 2): `rai_app` has no `DELETE` on any table except `configuration_draft`. W6-02 amends W0-04 and the `w1-00-migrations.test.ts` comment; W7-02's `grants` check asserts that `rai_app`'s `DELETE` tables are a subset of `{configuration_draft}`, which holds in either merge order |
 | `.github/workflows/ci.yml` | W4-08b, W7-01, W7-02, W7-12 | Lead-reviewed; one step or env line each |
 | `shared/src/locales/{th,en}.json`, `keys.ts` | every UI ticket | Keys only in existing namespaces or the package's own (`risk.*`, `dashboard.*`, `admin.config.*`, `desk_controls.*`); union on rebase; `locales.test.ts` guards parity |
 | `docs/operations/operator-guide.md` | W6-18, W7-04 | W6-18 owns it; W7-04 edits only its sign-in, incident and known-limits sections |
-| `fixtures/src/substitutes/api/*` | W5-07, W5-08 | The only additions to the frozen API substitute in W4b-W7 (W5 R-16) |
+| `fixtures/src/substitutes/api/*` | W5-04 (`store.ts`, `workflow.ts` draft literals: `riskAnswers: {}`), W5-07 and W5-08 (R-16's two read routes), W5-10 (`routes-review.ts`: `riskProposal: null`) | The only edits to the frozen API substitute in W4b-W7 (corrected in consolidation round 2). W5-09's `riskTier` is `Type.Optional`, so `workflow.ts` `caseSummary()` and `routes-queue.ts` stay unchanged |

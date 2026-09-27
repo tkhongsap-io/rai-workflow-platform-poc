@@ -55,7 +55,7 @@ The consolidator read the four plans together against the code (`rai-web` on `ma
 | 8 | The dashboard's severity union had `info`, but `Severity` is `high`, `medium` or `low`; its QC run counts were ambiguous under two run parts | W6 | It uses `Severity`; the counts are run rows, so a two-part trigger counts twice |
 | 9 | W6-07's `qc_rules` editor needs W4b's params schemas, but its dependencies did not say so | W4b, W6 | W6-07 depends on W4-13c |
 | 10 | W5-10 makes `QcRunRequest.riskProposal` required, and W4b adds new request builders (`qc/request.ts`, runner tests, the evaluation harness) | W4b, W5 | W4b builders are in W5-10's list, or set it themselves if written later. `RISK-TIER-UNKNOWN` runs in the metadata part |
-| 11 | The in-memory API substitute: W4b decision 19 froze it and deferred the question to the W6 kickoff; W5 R-16 adds two routes; W6 was silent | W4b, W5, W6 | The freeze binds W4b tickets only; W5 R-16's two reads are the only additions; W6 keeps it frozen (PR, W6 section 11.2) |
+| 11 | The in-memory API substitute: W4b decision 19 froze it and deferred the question to the W6 kickoff; W5 R-16 adds two routes; W6 was silent | W4b, W5, W6 | The freeze binds W4b tickets only; W5 R-16's two reads are the only added routes (W5-04 and W5-10 also edit literals: corrected in round 2, B3); W6 keeps it frozen (PR, W6 section 11.2) |
 | 12 | The W7 scripted rehearsal and deployment note used `QC_MODE=deterministic`, so R5's content finding could never appear. W7-11 depended on package exits that may honestly fail | W4b, W7 | The rehearsal and deployment note use `QC_MODE=content` with `QC_MODEL=disabled` once W4-13b merges (`deterministic` is the fallback). W7-11 depends on W5-05, W4-13c and W6-17 |
 | 13 | Register rows: each plan planned its own gate and ruling rows under different names, and W6 said it did not record the gate row | all | This change records "Ta's delegation (2026-09-27)" plus one "delegated rulings (provisional)" row per package; each plan's section on other documents points here |
 | 14 | W7-D12 waited on a possible W6 business-unit kind | W6, W7 | W6 ships none, so option A stands |
@@ -71,12 +71,41 @@ Checked and found consistent, with no change needed:
   - W6: `/api/admin/configuration/*`, `/api/dashboard`, `…/qc-rechecks` and `…/risk-rechecks`;
   - W7: `/auth/sign-in-method`.
 
+## Final reviews of this change and consolidation round 2
+
+Two independent final reviews of this documentation PR ran at `834c95c`, both checked against `rai-web` on `main` (`c8d64f2`):
+
+- **Contract review: PASS.** Register rows, authorization scope, open questions, hard limits and the round-3 fixes were all found faithful; append-only records untouched. Two non-blocking notes: stale register-row names in the W5 and W7 plan bodies, and CI still running at that head.
+- **Engineering review: BLOCK.** Three blockers, six missing or implicit cross-lane dependencies and several non-blocking notes.
+
+The consolidator resolved every point in the plan files, checked each against the code, and added a "Consolidation round 2" note to each plan's "Plan review" section.
+
+| # | Point (review) | Resolution |
+|---|---|---|
+| B1 | W6-02 grants `rai_app` `DELETE` on `configuration_draft`; W7-02's `grants` check required none anywhere (engineering) | One rule in both plans: no `DELETE` for `rai_app` on any table except `configuration_draft`. W6-02 amends W0-04 and the `w1-00-migrations.test.ts` comment; W7-02's check asserts a subset of `{configuration_draft}`, true in either merge order ([W6](../../docs/engineering/implementation-plan-w6.md) section 3, [W7](../../docs/engineering/implementation-plan-w7.md) section 3.2) |
+| B2 | No ticket excluded recheck findings from the dashboard and queue filters; `advisory` and `rechecks30d` unwired (engineering) | Moved into W6-09: its paths add `dashboard/repository.ts` and `queue/repository.ts`, its done-when proves the predicate and the two counts, and it depends on W6-13 and W6-14. W6-13 serves both counts as `0` until then. The dashboard lane stays off the W4b orchestrator chain (W6 section 5, W6-09/13/14 rows) |
+| B3 | W5-09's required `riskTier` breaks the API substitute's typecheck (engineering) | `riskTier` is `Type.Optional` on `QueueItem` and `CaseSummary`; `workflow.ts` `caseSummary()` and `routes-queue.ts` stay unchanged. The substitute statements now list every W5 edit: W5-04 (`store.ts`, `workflow.ts` draft literals), W5-07, W5-08 and W5-10 (`routes-review.ts`) ([W5](../../docs/engineering/implementation-plan-w5.md) sections 6-8; W4b decision 19; W6 section 11.2; plan) |
+| D1 | W6-12 needs W5-05 | W6-12 depends on W5-02, W5-05 and W5-06; its done-when reads the proposal over HTTP |
+| D2 | W6-19 needs W5-08 | Added |
+| D3 | W6-13/W6-14 need W6-09 | Resolved the other way (B2): W6-09 depends on W6-13 and W6-14 and owns the predicate |
+| D4 | W7-11 needs W4-09a and a stated QC mode | Added W4-09a; its test runs `QC_MODE=content`, `QC_MODEL=disabled` |
+| D5 | W7-12 needs W5-08 | Added; `QC_MODE=content` without a fallback |
+| D6 | W5-10's `RISK-TIER-UNKNOWN` makes every answerless submit's journey depend on its merge order | Option (a), recorded in W5 section 9: W4-13c, W4-INT-a, W4-INT-b, W6-08, W7-11 and W7-12 depend on W5-10, and W5-10's done-when lists every test it changes (the label in `seed.test.ts`, `w4-02`, `w4-12-qc-runs`, `w4a-int-deterministic-server` and `w4-12-qc-log.spec.ts`; the submit rule list in `w4-02`; `rules_evaluated` 3 → 4 and one extra finding per submit in `w4-03` and `w4a-int`; earlier W4b deterministic suites). Option (b), answers on fixture drafts, was rejected: it changes the fixture-set identity (W5 R-12), contradicts W5-05's `risk_tier = 'unknown'` assertion and misses drafts tests create. Only W6-08 moves back a wave (5 → 6) |
+| D7 | W4-06a and W4-08a edit `qc/orchestrator.ts` but were outside the one-open-PR rule | Both added to the rule in the plan and in W4b section 15.2; W4-06a's paths list the file |
+| N1 | W6-01 `desk_frozen`: locale keys, `errors.test.ts`, `observability/errors.ts` (engineering) | In W6-01's paths and done-when, with a `desk_frozen` error category at info (W6 section 4.2) |
+| N2 | W6-02 and `BUSINESS_TABLES` (engineering) | `configuration_draft` added to `tests/support/db.ts` in W6-02 |
+| N3 | Typed test literals (engineering) | Named in the paths of W4-11b, W4-13b, W6-17 (`view-model.test.ts`, `client.test.ts`, `operator-rehearsal.ts`), W4-16 (`view-model.test.ts`) and W4-06a (`qc-rules.test.ts`) |
+| N4 | Migrations and the merge queue (engineering) | Stated once in each plan and in the [plan](plan.md): a migration is never renumbered by a merge queue; its author rebases and regenerates it by hand at the next free number, keeping hand-written SQL, because `db/migrate.ts` refuses an unapplied migration older than the last one applied |
+| N5 | Stale register-row names in the W5 and W7 plans (contract) | W5 section 1 and the W5-00 row name "W5 delegated rulings (provisional)"; the W7 status line names "Ta's delegation (2026-09-27)" as Ta's gate entry and "W7 delegated rulings (provisional)" |
+
 ## Commands and results
 
 | Command | Result |
 |---|---|
 | `node scripts/check-links.mjs` | 0 broken (after the fixes below) |
 | `git diff --check` | clean |
+| `node scripts/check-links.mjs` (consolidation round 2) | 369 Markdown files, 1058 relative links, 0 broken |
+| `git diff --check` (consolidation round 2) | clean |
 
 No application code changed, so the `rai-web` gate is not run by this docs change. Each ticket runs it (plan section 16 of W4b, section 10 of W5 and W7, section 12 of W6).
 
