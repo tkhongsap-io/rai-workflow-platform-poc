@@ -43,6 +43,7 @@ import type {
   LaneQcRunResponse,
   SendBackLaneRequest,
   VersionFindingsResponse,
+  VersionQcRunsResponse,
 } from '@rai/shared/schemas/review';
 import type { Lane } from '@rai/shared/constants';
 import type { SubmitRequest, SubmittedVersion, VersionListResponse } from '@rai/shared/schemas/versions';
@@ -337,6 +338,12 @@ export function createApiClient(fetchImpl: FetchLike = (input, init) => fetch(in
       request<VersionFindingsResponse>(
         'GET',
         `${API_PATHS.cases}/${enc(caseId)}/versions/${enc(versionId)}/findings`,
+      ),
+    /** The version's QC runs in requested_at order, scoped like the findings read (W4-12; version.view). */
+    listQcRuns: (caseId: string, versionId: string) =>
+      request<VersionQcRunsResponse>(
+        'GET',
+        `${API_PATHS.cases}/${enc(caseId)}/versions/${enc(versionId)}/qc-runs`,
       ),
   };
 }

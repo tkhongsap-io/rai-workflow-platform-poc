@@ -563,3 +563,19 @@ test('operator client preserves HTTP and network failures instead of treating th
     NetworkError,
   );
 });
+
+test('W4-12: listQcRuns path is a GET under the version', async () => {
+  const calls: { input: string; init: RequestInit | undefined }[] = [];
+  const client = createApiClient((input, init) => {
+    calls.push({ input, init });
+    return Promise.resolve(
+      new Response(JSON.stringify({ runs: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+  });
+  await client.listQcRuns('c1', 'v/1');
+  assert.equal(calls[0]?.input, '/api/cases/c1/versions/v%2F1/qc-runs');
+  assert.equal(calls[0]?.init?.method ?? 'GET', 'GET');
+});

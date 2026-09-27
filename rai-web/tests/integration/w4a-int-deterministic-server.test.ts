@@ -6,7 +6,8 @@
 // the `qc.run.*` lines. Since W4-13, `deterministic` is valid in every environment and `.env.example` sets it; the
 // test harness (tests/support/process.ts) pins `substitute`, so this file overrides it. W4-04: an attach over HTTP
 // fires one upload run on the draft (lane NULL, slot set, 0 rules evaluated: no W4a metadata rule has the upload
-// trigger). W4-12 extends this file with the qc-runs endpoint. Slot and stage edits go through the
+// trigger). W4-12: the qc-runs read over HTTP lists that upload run, the submit run and an approve-attempt run with
+// the runner, its version, the revision and its label. Slot and stage edits go through the
 // save-draft route before submit; no document is parsed and nothing leaves the host.
 
 import { after, before, describe, it } from 'node:test';
@@ -23,7 +24,11 @@ import { fixtureSetLabel, readManifest } from '@rai/fixtures/manifest';
 import type { CaseView } from '@rai/shared/schemas/cases';
 import type { ReadinessReport } from '@rai/shared/schemas/observability';
 import type { PackDraft, PackDraftUpdateRequest } from '@rai/shared/schemas/pack';
-import type { LaneQcRunResponse, VersionFindingsResponse } from '@rai/shared/schemas/review';
+import type {
+  LaneQcRunResponse,
+  VersionFindingsResponse,
+  VersionQcRunsResponse,
+} from '@rai/shared/schemas/review';
 import type { SubmittedVersion } from '@rai/shared/schemas/versions';
 import { openTestDatabase, type TestDatabase } from '../support/db.js';
 import { RAI_WEB_ROOT, startTestServer, type TestServerProcess } from '../support/process.js';
@@ -284,5 +289,61 @@ describe(`W4a real server, QC_MODE=deterministic — ${SET}`, () => {
     assert.equal(stored.n, 0);
     const started = server.linesFor('qc.run.started').find((l) => l.correlationId === correlationId);
     assert.equal((started?.fields as Record<string, unknown> | undefined)?.trigger, 'upload');
+  });
+
+  it('qc-runs over HTTP (W4-12): the upload run carried from the draft, the submit run and an approve attempt, each naming the runner, its version, the revision and its label', async () => {
+    // Runs after the upload test: fx-case-vendor's draft already holds that upload run and becomes the version.
+    const target = await editAndSubmit(VENDOR.caseId);
+    assert.equal((await settledSubmitRun(target.versionId)).status, 'completed');
+    await laneQc(await signIn(DPO), VENDOR.caseId, target.versionId, 'dpo');
+    const owner = await signIn(OWNER);
+    const version = await call<SubmittedVersion>(
+      owner,
+      'GET',
+      `/api/cases/${VENDOR.caseId}/versions/${target.versionId}`,
+    );
+    assert.equal(version.status, 200, version.text);
+    const res = await call<VersionQcRunsResponse>(
+      owner,
+      'GET',
+      `/api/cases/${VENDOR.caseId}/versions/${target.versionId}/qc-runs`,
+    );
+    assert.equal(res.status, 200, res.text);
+    assert.deepEqual(
+      res.body.runs.map((r) => ({
+        trigger: r.trigger,
+        slot: r.slot,
+        lane: r.lane,
+        status: r.status,
+        runner: r.runner,
+        runnerVersion: r.runnerVersion,
+        ruleRevision: r.ruleRevision,
+        rulesLabel: r.rulesLabel,
+        rulesEvaluated: r.rulesEvaluated,
+        findingCount: r.findingCount,
+      })),
+      [
+        ['upload', 1, null, 0],
+        ['submit', null, null, 3],
+        ['approve_attempt', null, 'dpo', 1],
+      ].map(([trigger, slot, lane, rulesEvaluated]) => ({
+        trigger,
+        slot,
+        lane,
+        status: 'completed',
+        runner: 'deterministic',
+        runnerVersion: SERVER_VERSION,
+        ruleRevision: version.body.configurationRevisionId,
+        rulesLabel: 'w4a.1',
+        rulesEvaluated,
+        findingCount: 0,
+      })),
+    );
+    const outsider = await call(
+      await signIn('fx-user-owner-cm-2'),
+      'GET',
+      `/api/cases/${VENDOR.caseId}/versions/${target.versionId}/qc-runs`,
+    );
+    assert.equal(outsider.status, 403, outsider.text);
   });
 });

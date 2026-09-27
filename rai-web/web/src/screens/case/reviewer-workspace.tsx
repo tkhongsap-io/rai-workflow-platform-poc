@@ -1,7 +1,8 @@
 // One lane's review of the latest version, or the owner/BU-SPOC panel that proposes fixes. A lane shows every
 // stored finding the server assigned to it, whichever run produced it. While the lane can decide, the lane-QC run
 // comes first because approve must name the run the reviewer saw. The API decides every action; this only draws the
-// controls.
+// controls. W4-12: a lane's workspace also reads the version's QC runs and shows every unavailable run, whatever its
+// trigger, before the findings and the decision controls; if that read fails, no decision control is offered.
 
 import { useCallback, useEffect, useState, type JSX } from 'react';
 import type { CaseView } from '@rai/shared/schemas/cases';
@@ -11,6 +12,7 @@ import type {
   DispositionResponse,
   LaneDecisionResponse,
   LaneQcRunResponse,
+  QcRunSummary,
   StoredFindingSummary,
   VersionFindingsResponse,
 } from '@rai/shared/schemas/review';
@@ -21,13 +23,24 @@ import { ErrorNotice } from '../../components/error-notice.js';
 import { useLocale } from '../../i18n/locale-provider.js';
 import { FindingsList, QcUnavailableBlock } from './finding-list.js';
 import { LaneDecisionActions } from './lane-decision-actions.js';
-import { expectedVersionOf, laneKey, reviewerFindingsLoadMode } from './view-model.js';
+import {
+  expectedVersionOf,
+  laneKey,
+  laneRunEmptyStatus,
+  reviewerFindingsLoadMode,
+  unavailableRuns,
+} from './view-model.js';
 
 interface LaneFindings {
   findings: StoredFindingSummary[];
   latestKinds: ReadonlyMap<string, DispositionKind | null>;
 }
-type Loaded = { kind: 'ready'; run: LaneQcRunResponse | null } & LaneFindings;
+type Loaded = {
+  kind: 'ready';
+  run: LaneQcRunResponse | null;
+  /** The version's QC runs (W4-12); read for a lane's workspace only, empty for the proposal panel. */
+  runs: QcRunSummary[];
+} & LaneFindings;
 type LoadResult = { kind: 'error'; error: unknown } | Loaded;
 type LoadState = { kind: 'loading' } | LoadResult;
 
@@ -52,6 +65,8 @@ export interface ReviewerWorkspaceProps {
   lane: Lane | null;
   onDecided: (response: LaneDecisionResponse) => void;
   onDispositionRecorded: (response: DispositionResponse) => void;
+  /** Called after this workspace ran lane QC, which adds a run to the version's QC log. Must be stable. */
+  onQcRunRecorded?: () => void;
 }
 
 export function ReviewerWorkspace({
@@ -63,6 +78,7 @@ export function ReviewerWorkspace({
   lane,
   onDecided,
   onDispositionRecorded,
+  onQcRunRecorded,
 }: ReviewerWorkspaceProps): JSX.Element | null {
   const { t } = useLocale();
   const loadMode = reviewerFindingsLoadMode({ lane, view, hasOpenDraft });
@@ -83,12 +99,17 @@ export function ReviewerWorkspace({
               expectedVersion: expectedVersionOf(version),
             })
           : null;
-      const listed = await api.listVersionFindings(caseId, version.versionId);
-      return { kind: 'ready', run, ...laneFindings(listed, lane) };
+      // The runs are read after the lane run, so the list includes it.
+      const [listed, runs] = await Promise.all([
+        api.listVersionFindings(caseId, version.versionId),
+        lane === null ? Promise.resolve({ runs: [] }) : api.listQcRuns(caseId, version.versionId),
+      ]);
+      return { kind: 'ready', run, runs: runs.runs, ...laneFindings(listed, lane) };
     };
     void load()
       .then((result) => {
         if (!cancelled) setStored({ key, result });
+        if (result.kind === 'ready' && result.run !== null) onQcRunRecorded?.();
       })
       .catch((err: unknown) => {
         if (!cancelled) setStored({ key, result: { kind: 'error', error: err } });
@@ -96,7 +117,7 @@ export function ReviewerWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [caseId, version, lane, loadMode, loadKey, reloadToken]);
+  }, [caseId, version, lane, loadMode, loadKey, reloadToken, onQcRunRecorded]);
 
   const onDisposition = useCallback(
     (response: DispositionResponse): void => {
@@ -144,6 +165,22 @@ export function ReviewerWorkspace({
   const isReady = view.aiReadinessStatus === 'ready';
   const headingId = `reviewer-findings-heading-${lane ?? 'owner'}`;
   const unavailableRun = state.kind === 'ready' && state.run?.status === 'unavailable' ? state.run : null;
+  // Every unavailable run on the version (any trigger); the lane run shown is among them once recorded.
+  const unavailable: Array<Pick<QcRunSummary, 'runId' | 'trigger' | 'lane' | 'slot' | 'unavailableReason'>> =
+    state.kind === 'ready' && lane !== null ? unavailableRuns(state.runs) : [];
+  if (
+    unavailableRun?.runId != null &&
+    lane !== null &&
+    !unavailable.some((run) => run.runId === unavailableRun.runId)
+  ) {
+    unavailable.push({
+      runId: unavailableRun.runId,
+      trigger: 'approve_attempt',
+      lane,
+      slot: null,
+      unavailableReason: unavailableRun.reason ?? null,
+    });
+  }
   return (
     <section className={'card reviewer-workspace'} aria-labelledby={headingId}>
       <div className={'panel-head'}>
@@ -171,7 +208,7 @@ export function ReviewerWorkspace({
 
       {state.kind === 'ready' ? (
         <>
-          {unavailableRun !== null ? <QcUnavailableBlock run={unavailableRun} /> : null}
+          {unavailable.length > 0 ? <QcUnavailableBlock runs={unavailable} /> : null}
           {/* An unavailable run with nothing stored must not also read "no defects". */}
           {unavailableRun !== null && state.findings.length === 0 ? null : (
             <FindingsList
@@ -181,7 +218,7 @@ export function ReviewerWorkspace({
               expectedVersion={expectedVersion}
               session={session}
               view={view}
-              laneQcRan={state.run !== null}
+              emptyStatus={laneRunEmptyStatus(state.run, state.runs)}
               onDisposition={onDisposition}
             />
           )}

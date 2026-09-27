@@ -1,5 +1,7 @@
 // Finding rows with their disposition controls, the empty status, and the QC-unavailable block. The latest
-// disposition of each finding comes from GET …/findings.
+// disposition of each finding comes from GET …/findings. W4-12: a row also names its rule (label and ID), where its
+// evidence points (slot and locator kind) and its owning lane; the unavailable block lists every unavailable run on
+// the version, whatever its trigger; a lane run that evaluated 0 rules never reads as "no defects".
 
 import type { JSX } from 'react';
 import { isLocaleKey } from '@rai/shared/locales/keys';
@@ -7,7 +9,7 @@ import type { CaseView } from '@rai/shared/schemas/cases';
 import type {
   DispositionKind,
   DispositionResponse,
-  LaneQcRunResponse,
+  QcRunSummary,
   StoredFindingSummary,
 } from '@rai/shared/schemas/review';
 import type { ExpectedVersion } from '@rai/shared/schemas/versions';
@@ -15,10 +17,14 @@ import type { SessionInfo } from '@rai/shared/schemas/auth';
 import { Badge, type BadgeTone } from '../../components/status-badge.js';
 import { useLocale } from '../../i18n/locale-provider.js';
 import { DispositionControls } from './disposition-controls.js';
+import { useQcRunScope } from './qc-log.js';
 import {
+  evidenceLocations,
+  evidenceLocatorKey,
   findingMessageParams,
   laneKey,
   qcUnavailableReasonKey,
+  ruleLabelKey,
   severityKey,
   slotNameKey,
 } from './view-model.js';
@@ -37,8 +43,11 @@ export interface FindingsListProps {
   expectedVersion: ExpectedVersion;
   session: SessionInfo;
   view: CaseView;
-  /** Whether this view loaded a lane-QC run; only then may an empty list read as that run's result. */
-  laneQcRan: boolean;
+  /**
+   * The status of an empty list: `empty` only when a lane-QC run was loaded and evaluated rules; `no_rules` when it
+   * evaluated none (never a clean pass); `none_stored` when no run was loaded (see `laneRunEmptyStatus`).
+   */
+  emptyStatus: 'empty' | 'no_rules' | 'none_stored';
   onDisposition: (response: DispositionResponse) => void;
 }
 
@@ -50,16 +59,23 @@ export function FindingsList({
   expectedVersion,
   session,
   view,
-  laneQcRan,
+  emptyStatus,
   onDisposition,
 }: FindingsListProps): JSX.Element {
   const { t } = useLocale();
   if (findings.length === 0) {
     // Stored findings alone say nothing about a QC result: the run they came from may have been unavailable.
-    const status = laneQcRan ? 'empty' : 'none_stored';
+    if (emptyStatus === 'no_rules') {
+      return (
+        <div className={'review-qc-no-rules'} role={'status'} data-review-qc={'no_rules'}>
+          <Badge status={'qc-no_rules'} tone={'warn'} label={t('qc_log.outcome.no_rules')} />
+          <p>{t('review.findings.no_rules')}</p>
+        </div>
+      );
+    }
     return (
-      <p className={'muted'} role={'status'} data-review-qc={status}>
-        {t(`review.findings.${status}`)}
+      <p className={'muted'} role={'status'} data-review-qc={emptyStatus}>
+        {t(`review.findings.${emptyStatus}`)}
       </p>
     );
   }
@@ -81,19 +97,33 @@ export function FindingsList({
   );
 }
 
-export function QcUnavailableBlock({ run }: { run: LaneQcRunResponse }): JSX.Element {
+/**
+ * Every unavailable QC run on the version, whatever its trigger (W4a plan section 7), in one block before the
+ * findings and the decision controls. None of them is a clean pass.
+ */
+export function QcUnavailableBlock({
+  runs,
+}: {
+  runs: ReadonlyArray<Pick<QcRunSummary, 'runId' | 'trigger' | 'lane' | 'slot' | 'unavailableReason'>>;
+}): JSX.Element {
   const { t } = useLocale();
+  const scopeOf = useQcRunScope();
   return (
     <div className={'review-qc-unavailable'} data-review-qc={'unavailable'} role={'status'}>
       <Badge status={'unavailable'} tone={'warn'} label={t('review.qc.unavailable_badge')} />
-      <p>
-        {t('review.qc.unavailable_body', {
-          reason: t(qcUnavailableReasonKey(run.reason)),
-        })}
-      </p>
-      {run.runId !== null ? (
-        <p className={'muted small'}>{t('review.qc.run_id', { runId: run.runId })}</p>
-      ) : null}
+      <ul className={'unavailable-run-list'} aria-label={t('review.qc.unavailable_runs_label')}>
+        {runs.map((run) => (
+          <li key={run.runId} data-unavailable-run-id={run.runId}>
+            <strong>{scopeOf(run)}</strong>
+            <p>
+              {t('review.qc.unavailable_body', {
+                reason: t(qcUnavailableReasonKey(run.unavailableReason ?? undefined)),
+              })}
+            </p>
+            <p className={'muted small'}>{t('review.qc.run_id', { runId: run.runId })}</p>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -119,6 +149,8 @@ function FindingRow({
   const message = isLocaleKey(finding.messageKey)
     ? t(finding.messageKey, findingMessageParams(finding))
     : finding.messageKey;
+  const ruleLabel = ruleLabelKey(finding.ruleId);
+  const locations = evidenceLocations(finding.evidence);
   return (
     <li className={'finding-row'} data-finding-id={finding.findingId}>
       <Badge
@@ -128,6 +160,11 @@ function FindingRow({
       />
       <div className={'finding-body'}>
         <p className={'finding-message'}>{message}</p>
+        <p className={'muted small finding-rule'} data-finding-rule={finding.ruleId}>
+          {ruleLabel === null
+            ? t('review.findings.rule_unlabelled', { id: finding.ruleId })
+            : t('review.findings.rule', { label: t(ruleLabel), id: finding.ruleId })}
+        </p>
         <p className={'muted small finding-meta'}>
           {finding.slot === null
             ? t('review.findings.slot_none')
@@ -136,7 +173,26 @@ function FindingRow({
                 name: t(slotNameKey(finding.slot)),
               })}
           {' · '}
-          {t(laneKey(finding.owningLane))}
+          <span data-finding-owning-lane={finding.owningLane}>
+            {t('review.findings.owning_lane', { lane: t(laneKey(finding.owningLane)) })}
+          </span>
+        </p>
+        <p className={'muted small finding-evidence'} data-finding-evidence={locations.length}>
+          {locations.length === 0
+            ? t('review.evidence.none')
+            : t('review.evidence.label', {
+                locations: locations
+                  .map((location) =>
+                    t('review.evidence.location', {
+                      place:
+                        location.slot === null
+                          ? t('review.evidence.slot_none')
+                          : t('review.evidence.slot', { number: location.slot }),
+                      kind: t(evidenceLocatorKey(location.kind)),
+                    }),
+                  )
+                  .join(', '),
+              })}
         </p>
         <DispositionControls
           caseId={caseId}

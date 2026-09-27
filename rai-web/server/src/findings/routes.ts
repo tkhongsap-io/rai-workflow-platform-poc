@@ -15,6 +15,7 @@ import {
   LaneQcRunResponseSchema,
   LaneSchema,
   VersionFindingsResponseSchema,
+  VersionQcRunsResponseSchema,
   type DispositionKind,
 } from '@rai/shared/schemas/review';
 import { actorOf, denyUnlessAllowed } from '../authz/middleware.js';
@@ -25,7 +26,12 @@ import { IDEMPOTENCY_HEADER, requireIdempotencyKey } from '../cases/idempotency.
 import { createScopeFactsSource } from '../authz/facts.js';
 import { readVersionRow } from '../cases/repository.js';
 import { runAndPersistLaneQc, type QcOrchestratorDeps } from '../qc/orchestrator.js';
-import { listFindingsForVersion, owningLaneOf, readFindingForCase } from './repository.js';
+import {
+  listFindingsForVersion,
+  listQcRunsForVersion,
+  owningLaneOf,
+  readFindingForCase,
+} from './repository.js';
 import { recordDisposition, type DispositionServiceDeps } from './service.js';
 import { isUuid } from '../workflow/refs.js';
 
@@ -83,6 +89,27 @@ export function registerFindingsRoutes(fastify: FastifyInstance, deps: FindingsR
       return {
         findings: await listFindingsForVersion(deps.db, request.params.caseId, request.params.versionId),
       };
+    },
+  );
+
+  // GET …/versions/:versionId/qc-runs — W4-12: the version's QC runs, authorized exactly like the findings read above
+  // (version.view on the case, then 404 for a malformed, unknown or other-case version). Reads only.
+  app.get(
+    '/api/cases/:caseId/versions/:versionId/qc-runs',
+    {
+      config: { auth: { kind: 'action', action: 'version.view', target: 'case' } },
+      schema: {
+        params: VersionFindingsParams,
+        response: { 200: VersionQcRunsResponseSchema },
+      },
+    },
+    async (request) => {
+      if (!isUuid(request.params.versionId)) throw new NotFoundError('version');
+      const version = await readVersionRow(deps.db, request.params.versionId);
+      if (version === undefined || version.caseId !== request.params.caseId) {
+        throw new NotFoundError('version');
+      }
+      return { runs: await listQcRunsForVersion(deps.db, request.params.caseId, request.params.versionId) };
     },
   );
 

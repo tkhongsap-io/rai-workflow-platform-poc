@@ -397,3 +397,71 @@
 .feedback-text {
   white-space: pre-wrap;
 }
+
+/* W4-12: the QC log and the unavailable-run list. */
+.qc-log-list,
+.unavailable-run-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.qc-log-list {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.qc-run-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+}
+
+.qc-run-row:first-child {
+  border-top: none;
+}
+
+.qc-run-row:nth-child(even) {
+  background: var(--surface-page);
+}
+
+.qc-run-row p,
+.qc-run-body p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.qc-run-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.unavailable-run-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.unavailable-run-list li {
+  overflow-wrap: anywhere;
+}
+
+.review-qc-no-rules {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--surface-alt);
+  border-radius: 8px;
+}
+
+.review-qc-no-rules p,
+.finding-rule,
+.finding-evidence {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+}
