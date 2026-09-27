@@ -1,0 +1,146 @@
+{
+  "caseId": "ev-dev-19",
+  "split": "dev",
+  "labelledBy": "agent-team, provisional (Ta delegation 2026-09-27); lane-expert sign-off pending (D09)",
+  "runs": [
+    {
+      "trigger": "upload",
+      "slot": 1,
+      "lane": null,
+      "parts": {
+        "deterministic": {
+          "status": "completed",
+          "findings": []
+        },
+        "content": {
+          "status": "unavailable",
+          "unavailableReason": "artifact_unreadable",
+          "findings": []
+        }
+      }
+    },
+    {
+      "trigger": "upload",
+      "slot": 2,
+      "lane": null,
+      "parts": {
+        "deterministic": {
+          "status": "completed",
+          "findings": []
+        },
+        "content": {
+          "status": "completed",
+          "findings": []
+        }
+      }
+    },
+    {
+      "trigger": "submit",
+      "lane": null,
+      "parts": {
+        "deterministic": {
+          "status": "completed",
+          "findings": []
+        },
+        "content": {
+          "status": "completed",
+          "findings": []
+        }
+      }
+    },
+    {
+      "trigger": "approve_attempt",
+      "lane": "ai_coe",
+      "parts": {
+        "deterministic": {
+          "status": "completed",
+          "findings": [
+            {
+              "ruleId": "PACK-SLOT-MISSING",
+              "owningLane": "ai_coe",
+              "scope": {
+                "kind": "slot",
+                "slot": 5
+              },
+              "evidence": [
+                {
+                  "slot": 5,
+                  "locator": {
+                    "kind": "absent"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "content": {
+          "status": "unavailable",
+          "unavailableReason": "artifact_unreadable",
+          "findings": []
+        }
+      }
+    },
+    {
+      "trigger": "approve_attempt",
+      "lane": "dpo",
+      "parts": {
+        "deterministic": {
+          "status": "completed",
+          "findings": [
+            {
+              "ruleId": "PACK-SLOT-MISSING",
+              "owningLane": "dpo",
+              "scope": {
+                "kind": "slot",
+                "slot": 5
+              },
+              "evidence": [
+                {
+                  "slot": 5,
+                  "locator": {
+                    "kind": "absent"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "content": {
+          "status": "completed",
+          "findings": []
+        }
+      }
+    },
+    {
+      "trigger": "approve_attempt",
+      "lane": "it_security",
+      "parts": {
+        "deterministic": {
+          "status": "completed",
+          "findings": [
+            {
+              "ruleId": "PACK-SLOT-MISSING",
+              "owningLane": "it_security",
+              "scope": {
+                "kind": "slot",
+                "slot": 5
+              },
+              "evidence": [
+                {
+                  "slot": 5,
+                  "locator": {
+                    "kind": "absent"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "content": {
+          "status": "completed",
+          "findings": []
+        }
+      }
+    }
+  ]
+}

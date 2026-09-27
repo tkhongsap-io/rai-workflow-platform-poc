@@ -1,5 +1,9 @@
 # Development log
 
+## W4-09a evaluation set, dev split — 2026-09-27
+
+First Lane C ticket of W4b (#203). Before QC starts reading documents, the synthetic set it will be measured on now exists: 26 made-up review cases whose documents cover everything the evaluation plan asks for, in Thai and English, as Word, Excel and PDF files, scanned pages, a Thai PDF whose text cannot be decoded, and broken files. They include the checklist bands just below, on and above each tier, evidence that cites only extraction accuracy, a privacy checklist and a BRD that contradict each other, missing, not-yet and N/A documents at each stage, and documents that try to instruct the reviewer system. `npm run fixtures:eval:generate` writes the files locally (none are committed) and writes the same bytes every time. For each case, the expected result of every QC run is written down: each upload, the submit, and the approve attempt of each lane separately. A scanned risk screening makes only AI/COE's document check unavailable, while DPO's and IT/Security's still complete. The agent team wrote these expected results. They are marked provisional and unsigned until the lane experts are named (D09). A grep for real-looking names, ids and addresses covers every file and byte. The held-out half and the freeze come next (W4-09b). [Review](changes/2026-09-27-w4-09a-evaluation-set-generator-dev/review.md).
+
 ## W6-01 W6 contract — 2026-09-27
 
 First W6 ticket (#206). Before Admin configuration editing, rechecks, desk controls and the dashboard are built, both halves of the desk now share one typed contract for them. Contract only: nothing a user can see changes yet.

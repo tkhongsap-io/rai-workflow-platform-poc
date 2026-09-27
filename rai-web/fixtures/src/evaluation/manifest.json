@@ -1,0 +1,1708 @@
+{
+  "name": "qc-eval-synthetic",
+  "version": "1",
+  "sha256": "76e295b4a33d1b3b2c6492b10e941ddd3a0b49ffeff6aa4f7cf758f0a3f56b5e",
+  "split": ["dev"],
+  "documents": {
+    "ev-dev-01-s1": {
+      "caseId": "ev-dev-01",
+      "split": "dev",
+      "slot": 1,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV01_Riskscreening.docx",
+      "sha256": "009991982d5eb393eb93b67c8f71af84b889e828d8a5418cf243ca5a2043f23d",
+      "sizeBytes": 2072
+    },
+    "ev-dev-01-s2": {
+      "caseId": "ev-dev-01",
+      "split": "dev",
+      "slot": 2,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV01_Privacychecklist.docx",
+      "sha256": "facfd38619ac678f008184f162840861d906a4e51ae6b2d925fa14b2bd517490",
+      "sizeBytes": 1859
+    },
+    "ev-dev-01-s5": {
+      "caseId": "ev-dev-01",
+      "split": "dev",
+      "slot": 5,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV01_BRD.docx",
+      "sha256": "82ed7af44a0a9280973a6b94247cc0e56e6003fcbaa96b0082ee65e36e1c215f",
+      "sizeBytes": 1859
+    },
+    "ev-dev-01-s6": {
+      "caseId": "ev-dev-01",
+      "split": "dev",
+      "slot": 6,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV01_AIarchitecture.docx",
+      "sha256": "221b4e80004a6b01b356a004601d2da6fb523535c45402a80ab78133e7a26034",
+      "sizeBytes": 1642
+    },
+    "ev-dev-01-s7": {
+      "caseId": "ev-dev-01",
+      "split": "dev",
+      "slot": 7,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV01_Securityassessment.docx",
+      "sha256": "ed062659d5acf46a5e56b81f9a407930560aa6a4135c99a04bfcfa73a1320407",
+      "sizeBytes": 1646
+    },
+    "ev-dev-01-s8": {
+      "caseId": "ev-dev-01",
+      "split": "dev",
+      "slot": 8,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV01_RAIdeploymentchecklist.docx",
+      "sha256": "d2c847b4bb0153ffc0031481ee1312640eb443515733543c65432ab023a14681",
+      "sizeBytes": 1651
+    },
+    "ev-dev-01-s9": {
+      "caseId": "ev-dev-01",
+      "split": "dev",
+      "slot": 9,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV01_Othersupporting.docx",
+      "sha256": "d1bc1477e67eedb53d5da0b545135902b6c2dddb3348f898b72fc74a238ad09a",
+      "sizeBytes": 1643
+    },
+    "ev-dev-02-s1": {
+      "caseId": "ev-dev-02",
+      "split": "dev",
+      "slot": 1,
+      "format": "xlsx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "filename": "EV02_Riskscreening.xlsx",
+      "sha256": "fa268eab574dde066213c909604504d1be2dc86e2e96b2f19f91a987f7d3818c",
+      "sizeBytes": 5516
+    },
+    "ev-dev-02-s2": {
+      "caseId": "ev-dev-02",
+      "split": "dev",
+      "slot": 2,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV02_Privacychecklist.docx",
+      "sha256": "ba3126db59f9ee6c809b2b7558396279dcb605eaf2876e479ffd5f625a066ee9",
+      "sizeBytes": 1860
+    },
+    "ev-dev-02-s5": {
+      "caseId": "ev-dev-02",
+      "split": "dev",
+      "slot": 5,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV02_BRD.docx",
+      "sha256": "5cecc9782463bb893e29822e43ccef1d230607df01129a6f08a1dac473ac8f14",
+      "sizeBytes": 1860
+    },
+    "ev-dev-02-s6": {
+      "caseId": "ev-dev-02",
+      "split": "dev",
+      "slot": 6,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV02_AIarchitecture.docx",
+      "sha256": "405fdb6f9820690d560441d719050fd68c5e99e77b7fe9827b5d8fb160d33f93",
+      "sizeBytes": 1642
+    },
+    "ev-dev-02-s7": {
+      "caseId": "ev-dev-02",
+      "split": "dev",
+      "slot": 7,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV02_Securityassessment.docx",
+      "sha256": "725dcf2c14feb7ce17d744524578eb9303d5c515fddc9c143653d1edd3b3aa84",
+      "sizeBytes": 1646
+    },
+    "ev-dev-02-s8": {
+      "caseId": "ev-dev-02",
+      "split": "dev",
+      "slot": 8,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV02_RAIdeploymentchecklist.docx",
+      "sha256": "d7a5476b44ab7ede5dcf5183a445a669c07309d6e7d40823975581735cbbf10b",
+      "sizeBytes": 1651
+    },
+    "ev-dev-02-s9": {
+      "caseId": "ev-dev-02",
+      "split": "dev",
+      "slot": 9,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV02_Othersupporting.docx",
+      "sha256": "a0f549c2a1bca7d4c21a4608256bb44805a99268bcad535ad638007b9b61c4cc",
+      "sizeBytes": 1643
+    },
+    "ev-dev-03-s1": {
+      "caseId": "ev-dev-03",
+      "split": "dev",
+      "slot": 1,
+      "format": "pdf",
+      "mediaType": "application/pdf",
+      "filename": "EV03_Riskscreening.pdf",
+      "sha256": "deb2f2c379fa03550d261ef44d643dc5a3fb88d695bd6d503a5e35e27d9172db",
+      "sizeBytes": 1793
+    },
+    "ev-dev-03-s2": {
+      "caseId": "ev-dev-03",
+      "split": "dev",
+      "slot": 2,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV03_Privacychecklist.docx",
+      "sha256": "a3441040eff09a3c3de7eeb4c743d67fbc03596a6028a152ecf2d6f57aa6f9c9",
+      "sizeBytes": 1859
+    },
+    "ev-dev-03-s5": {
+      "caseId": "ev-dev-03",
+      "split": "dev",
+      "slot": 5,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV03_BRD.docx",
+      "sha256": "a5025deb2ef58b940fae43d1f3707122f23265b240d9f33974ccc56d3d3f9b9f",
+      "sizeBytes": 1859
+    },
+    "ev-dev-03-s6": {
+      "caseId": "ev-dev-03",
+      "split": "dev",
+      "slot": 6,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV03_AIarchitecture.docx",
+      "sha256": "54f20554f2bc218bfef2c8ca6a3e383be177cece04895ee210c51882f7b8598a",
+      "sizeBytes": 1642
+    },
+    "ev-dev-03-s7": {
+      "caseId": "ev-dev-03",
+      "split": "dev",
+      "slot": 7,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV03_Securityassessment.docx",
+      "sha256": "6dd292330f3b97f5274be4beb701dafc0706d89d1c2d688b5ebd9e915f911266",
+      "sizeBytes": 1646
+    },
+    "ev-dev-03-s8": {
+      "caseId": "ev-dev-03",
+      "split": "dev",
+      "slot": 8,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV03_RAIdeploymentchecklist.docx",
+      "sha256": "69f3cc6b1d98e76419f0d116556bc42fb5cfaf533bfc1bbbb7f8eb82de96a18f",
+      "sizeBytes": 1651
+    },
+    "ev-dev-03-s9": {
+      "caseId": "ev-dev-03",
+      "split": "dev",
+      "slot": 9,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV03_Othersupporting.docx",
+      "sha256": "e1b31f843063f4b40612083d1b21f21609018b24f60490a3295ed240743cb7ca",
+      "sizeBytes": 1643
+    },
+    "ev-dev-04-s1": {
+      "caseId": "ev-dev-04",
+      "split": "dev",
+      "slot": 1,
+      "format": "pdf_flate",
+      "mediaType": "application/pdf",
+      "filename": "EV04_Riskscreening.pdf",
+      "sha256": "df398f18f47b4118ce491fdf1a7bd0feac7b9ab9efa7a844728e5d9b455d9595",
+      "sizeBytes": 2955
+    },
+    "ev-dev-04-s2": {
+      "caseId": "ev-dev-04",
+      "split": "dev",
+      "slot": 2,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV04_Privacychecklist.docx",
+      "sha256": "88ae2639177457fbc4acd1e67dbda1b4324bedb53d9835d0190247f77a2b42eb",
+      "sizeBytes": 1859
+    },
+    "ev-dev-04-s5": {
+      "caseId": "ev-dev-04",
+      "split": "dev",
+      "slot": 5,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV04_BRD.docx",
+      "sha256": "be09bcac43df441b29d5330103de7c44bae69b5ca28cbd73625df6b7a57b2a09",
+      "sizeBytes": 1859
+    },
+    "ev-dev-04-s6": {
+      "caseId": "ev-dev-04",
+      "split": "dev",
+      "slot": 6,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV04_AIarchitecture.docx",
+      "sha256": "8cc959df0f15b77cde1924b3ffddeb1f07e59b6dce3c241f12364d5b8a08670b",
+      "sizeBytes": 1642
+    },
+    "ev-dev-04-s7": {
+      "caseId": "ev-dev-04",
+      "split": "dev",
+      "slot": 7,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV04_Securityassessment.docx",
+      "sha256": "31dcd33e069441ed0e7e25cc6bea210f4ea9c76245c836cefc0e3df0df890a39",
+      "sizeBytes": 1646
+    },
+    "ev-dev-04-s8": {
+      "caseId": "ev-dev-04",
+      "split": "dev",
+      "slot": 8,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV04_RAIdeploymentchecklist.docx",
+      "sha256": "dc87ad21b2dc99ef2d2024e3376d5a2089455205d52299aeccbb4d60e37d197e",
+      "sizeBytes": 1651
+    },
+    "ev-dev-04-s9": {
+      "caseId": "ev-dev-04",
+      "split": "dev",
+      "slot": 9,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV04_Othersupporting.docx",
+      "sha256": "7bf5332005107cbd2457eaf35ca9a3854abc6655f60b6456e4120af8f2b5752f",
+      "sizeBytes": 1643
+    },
+    "ev-dev-05-s1": {
+      "caseId": "ev-dev-05",
+      "split": "dev",
+      "slot": 1,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV05_Riskscreening.docx",
+      "sha256": "a4e062f644054b2ba2b67fd8d9870bf21f8360b8fceb290ebfb65f293459170d",
+      "sizeBytes": 2507
+    },
+    "ev-dev-05-s2": {
+      "caseId": "ev-dev-05",
+      "split": "dev",
+      "slot": 2,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV05_Privacychecklist.docx",
+      "sha256": "f322e282fc3f28c4988e9c9a81bf3d2de1a6278637bfb75b09f04454cd6af2cb",
+      "sizeBytes": 1859
+    },
+    "ev-dev-05-s5": {
+      "caseId": "ev-dev-05",
+      "split": "dev",
+      "slot": 5,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV05_BRD.docx",
+      "sha256": "dfbc48a5261d27ca6555bffbe0ab9b8d76dd1e6677be6e750f3fb23c57daf87e",
+      "sizeBytes": 1859
+    },
+    "ev-dev-05-s6": {
+      "caseId": "ev-dev-05",
+      "split": "dev",
+      "slot": 6,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV05_AIarchitecture.docx",
+      "sha256": "0fd2ddb63985f1e096f6c09ef05d540d2b820354659a7adbed456c6e751877d1",
+      "sizeBytes": 1642
+    },
+    "ev-dev-05-s7": {
+      "caseId": "ev-dev-05",
+      "split": "dev",
+      "slot": 7,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV05_Securityassessment.docx",
+      "sha256": "536b96f6f3a94ccb93d4020b0e01c84f803328f678fd379487e48599f90479ed",
+      "sizeBytes": 1646
+    },
+    "ev-dev-05-s8": {
+      "caseId": "ev-dev-05",
+      "split": "dev",
+      "slot": 8,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV05_RAIdeploymentchecklist.docx",
+      "sha256": "370d604864107f452ad6a44331786e9d25555d6e85833c650868fc4f3c1fd9f2",
+      "sizeBytes": 1651
+    },
+    "ev-dev-05-s9": {
+      "caseId": "ev-dev-05",
+      "split": "dev",
+      "slot": 9,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV05_Othersupporting.docx",
+      "sha256": "5f505cd3f184047e3d7f5df9abd777d591ce12a9f5c976d956401286c28d639e",
+      "sizeBytes": 1643
+    },
+    "ev-dev-06-s1": {
+      "caseId": "ev-dev-06",
+      "split": "dev",
+      "slot": 1,
+      "format": "xlsx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "filename": "EV06_Riskscreening.xlsx",
+      "sha256": "bd78630a91a8567d342e2480f8246ed1c95ae741283d2b54537d0d1546e78df5",
+      "sizeBytes": 6440
+    },
+    "ev-dev-06-s2": {
+      "caseId": "ev-dev-06",
+      "split": "dev",
+      "slot": 2,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV06_Privacychecklist.docx",
+      "sha256": "74c7d496512188d6167bfa42f94b166adf134ac6811dd3769effbf91553d5ac1",
+      "sizeBytes": 1859
+    },
+    "ev-dev-06-s5": {
+      "caseId": "ev-dev-06",
+      "split": "dev",
+      "slot": 5,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV06_BRD.docx",
+      "sha256": "d9d8810d2f0ca8b9900797606601e2e0a273b4cc09abd193a11e3c54875e53de",
+      "sizeBytes": 1859
+    },
+    "ev-dev-06-s6": {
+      "caseId": "ev-dev-06",
+      "split": "dev",
+      "slot": 6,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV06_AIarchitecture.docx",
+      "sha256": "ba3a6b84c48f05a8e953d821b6288180d305ea100a966ba3d1fce2d535512f0c",
+      "sizeBytes": 1642
+    },
+    "ev-dev-06-s7": {
+      "caseId": "ev-dev-06",
+      "split": "dev",
+      "slot": 7,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV06_Securityassessment.docx",
+      "sha256": "b1ac5ebc0ff5f589c38558cbddeb6ab344a4c4ea46634e897ca1e828eeefa831",
+      "sizeBytes": 1646
+    },
+    "ev-dev-06-s8": {
+      "caseId": "ev-dev-06",
+      "split": "dev",
+      "slot": 8,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV06_RAIdeploymentchecklist.docx",
+      "sha256": "5d88701d65587038ccda0e2e11fad1fd9f36faab8de2efc54f06eb50c112544e",
+      "sizeBytes": 1651
+    },
+    "ev-dev-06-s9": {
+      "caseId": "ev-dev-06",
+      "split": "dev",
+      "slot": 9,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV06_Othersupporting.docx",
+      "sha256": "d94c82e043b8db97f262f79251d438a648865ee8a5d2b5100364641edb603ca3",
+      "sizeBytes": 1643
+    },
+    "ev-dev-07-s1": {
+      "caseId": "ev-dev-07",
+      "split": "dev",
+      "slot": 1,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV07_Riskscreening.docx",
+      "sha256": "efe1b2514825a6d554361a852dc6e3470a67f2706c687130bf57eb8ad1739dcc",
+      "sizeBytes": 1847
+    },
+    "ev-dev-07-s2": {
+      "caseId": "ev-dev-07",
+      "split": "dev",
+      "slot": 2,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV07_Privacychecklist.docx",
+      "sha256": "7f77778a446562656c8286ae89c7eddfbcf4f970fc0a441110d55bb1014f841a",
+      "sizeBytes": 1859
+    },
+    "ev-dev-07-s5": {
+      "caseId": "ev-dev-07",
+      "split": "dev",
+      "slot": 5,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV07_BRD.docx",
+      "sha256": "7c4e7ec7e2809529c9bdcf2516ca408e593651324e0a52b0998b3dfdac6cdc1d",
+      "sizeBytes": 1859
+    },
+    "ev-dev-07-s6": {
+      "caseId": "ev-dev-07",
+      "split": "dev",
+      "slot": 6,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV07_AIarchitecture.docx",
+      "sha256": "d4fa885f46e93902f4a3b3fe771aa4838c32853cfe6cc96a9f912a5186f8f7a4",
+      "sizeBytes": 1642
+    },
+    "ev-dev-07-s7": {
+      "caseId": "ev-dev-07",
+      "split": "dev",
+      "slot": 7,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV07_Securityassessment.docx",
+      "sha256": "fa7cd9acee2c78c8de84c3dbcafdeef3e61f47dfd494dbc829a6c49e9eb288cd",
+      "sizeBytes": 1646
+    },
+    "ev-dev-07-s8": {
+      "caseId": "ev-dev-07",
+      "split": "dev",
+      "slot": 8,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV07_RAIdeploymentchecklist.docx",
+      "sha256": "33a6025cfe0ec2531a058c14816c6c70ca2d12b3aa78a871ee8cdf13063e067b",
+      "sizeBytes": 1651
+    },
+    "ev-dev-07-s9": {
+      "caseId": "ev-dev-07",
+      "split": "dev",
+      "slot": 9,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV07_Othersupporting.docx",
+      "sha256": "8bb140c10510e808738942b7d5e200603d96b122b1f45343cea3d601875b6e15",
+      "sizeBytes": 1643
+    },
+    "ev-dev-08-s1": {
+      "caseId": "ev-dev-08",
+      "split": "dev",
+      "slot": 1,
+      "format": "xlsx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "filename": "EV08_Riskscreening.xlsx",
+      "sha256": "bc3f8e48d10d8e818660276ade3a399c71134ac968961ae0c43273e6855a1e3d",
+      "sizeBytes": 4874
+    },
+    "ev-dev-08-s2": {
+      "caseId": "ev-dev-08",
+      "split": "dev",
+      "slot": 2,
+      "format": "xlsx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "filename": "EV08_Privacychecklist.xlsx",
+      "sha256": "e74711e5d3ed92964e23f2f8dd08d8739e88da3e1ab59b9af612c55a2238b207",
+      "sizeBytes": 4927
+    },
+    "ev-dev-08-s5": {
+      "caseId": "ev-dev-08",
+      "split": "dev",
+      "slot": 5,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV08_BRD.docx",
+      "sha256": "d73e7fee5e8b21c4a5adfccb3fe3e51b87808e271e526fa4f6cd61aa6d073dfa",
+      "sizeBytes": 1859
+    },
+    "ev-dev-08-s6": {
+      "caseId": "ev-dev-08",
+      "split": "dev",
+      "slot": 6,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV08_AIarchitecture.docx",
+      "sha256": "29de0820f8d8932d7392f0b93ecfc53e63c5327c0846fe1eddb6881db7263b74",
+      "sizeBytes": 1642
+    },
+    "ev-dev-08-s7": {
+      "caseId": "ev-dev-08",
+      "split": "dev",
+      "slot": 7,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV08_Securityassessment.docx",
+      "sha256": "0abb0228684facd5d7ebeae8134e2b255cfbab5bf62e16219fd743e4b11ce13b",
+      "sizeBytes": 1646
+    },
+    "ev-dev-08-s8": {
+      "caseId": "ev-dev-08",
+      "split": "dev",
+      "slot": 8,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV08_RAIdeploymentchecklist.docx",
+      "sha256": "0270e5148bfaee52a94f0d22d95db124be7310492bf78392b17f5555c4ffa0fb",
+      "sizeBytes": 1651
+    },
+    "ev-dev-08-s9": {
+      "caseId": "ev-dev-08",
+      "split": "dev",
+      "slot": 9,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV08_Othersupporting.docx",
+      "sha256": "61b67d548d35396433c53386db1af50e809fd7b6d0568aecfc27d3a627b280cc",
+      "sizeBytes": 1643
+    },
+    "ev-dev-09-s1": {
+      "caseId": "ev-dev-09",
+      "split": "dev",
+      "slot": 1,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV09_Riskscreening.docx",
+      "sha256": "9a17a849eadcd97afd7e75b68963bf273d29ab89024bb0984d78b81baed7cb85",
+      "sizeBytes": 1761
+    },
+    "ev-dev-09-s2": {
+      "caseId": "ev-dev-09",
+      "split": "dev",
+      "slot": 2,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV09_Privacychecklist.docx",
+      "sha256": "d3a197532d6016ba0c348a9d3dc39cf8c87d1fea7e24604c272ce6df4166e987",
+      "sizeBytes": 1859
+    },
+    "ev-dev-09-s5": {
+      "caseId": "ev-dev-09",
+      "split": "dev",
+      "slot": 5,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV09_BRD.docx",
+      "sha256": "f2b7bec43d83b9d173f8df25df5bc29d0214d8a7b58033a42e1f68d2f54f26a4",
+      "sizeBytes": 1859
+    },
+    "ev-dev-09-s6": {
+      "caseId": "ev-dev-09",
+      "split": "dev",
+      "slot": 6,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV09_AIarchitecture.docx",
+      "sha256": "50d7da2f8d88caa48c7f2b986d17139ded9b54330ee3ba4c96fa220af8ef4506",
+      "sizeBytes": 1642
+    },
+    "ev-dev-09-s7": {
+      "caseId": "ev-dev-09",
+      "split": "dev",
+      "slot": 7,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV09_Securityassessment.docx",
+      "sha256": "ce0ba99225c69b0919970e6d85ade29a285886fb908abff2d068496de295b151",
+      "sizeBytes": 1646
+    },
+    "ev-dev-09-s8": {
+      "caseId": "ev-dev-09",
+      "split": "dev",
+      "slot": 8,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV09_RAIdeploymentchecklist.docx",
+      "sha256": "97034133a47e5db5a5670bfa8e98de7fd3fa6fcc0370be5a4c87360ca1adda7c",
+      "sizeBytes": 1651
+    },
+    "ev-dev-09-s9": {
+      "caseId": "ev-dev-09",
+      "split": "dev",
+      "slot": 9,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV09_Othersupporting.docx",
+      "sha256": "a536f647b7a9a102192addc29c14077ba0a72e281b6c02abf5f404b1fa7d6238",
+      "sizeBytes": 1643
+    },
+    "ev-dev-10-s1": {
+      "caseId": "ev-dev-10",
+      "split": "dev",
+      "slot": 1,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV10_แบบคัดกรองความเสี่ยง.docx",
+      "sha256": "03065eeb73c0e5991abe19cb303583296ff5dd6c711d85f17e4c713bf3c9a494",
+      "sizeBytes": 2261
+    },
+    "ev-dev-10-s2": {
+      "caseId": "ev-dev-10",
+      "split": "dev",
+      "slot": 2,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV10_Privacychecklist.docx",
+      "sha256": "867b8f61097000615a4fd1da9b02b59bb6587080b3ab9fff54de5c392d945d48",
+      "sizeBytes": 2251
+    },
+    "ev-dev-10-s5": {
+      "caseId": "ev-dev-10",
+      "split": "dev",
+      "slot": 5,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV10_BRD.docx",
+      "sha256": "e72d705ed7698748bf74a36b4274346d25e55a36092b5b9b2eccc9854c68e59a",
+      "sizeBytes": 2251
+    },
+    "ev-dev-10-s6": {
+      "caseId": "ev-dev-10",
+      "split": "dev",
+      "slot": 6,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV10_AIarchitecture.docx",
+      "sha256": "3010e9a989736a56597ca9749c0d5ccb9b4eccc6684d72457f878f741d3d597f",
+      "sizeBytes": 1642
+    },
+    "ev-dev-10-s7": {
+      "caseId": "ev-dev-10",
+      "split": "dev",
+      "slot": 7,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV10_Securityassessment.docx",
+      "sha256": "ab78482fa39769e10aa371b1668027436327bd1faf3a97c3e7edebb5481e0d3b",
+      "sizeBytes": 1646
+    },
+    "ev-dev-10-s8": {
+      "caseId": "ev-dev-10",
+      "split": "dev",
+      "slot": 8,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV10_RAIdeploymentchecklist.docx",
+      "sha256": "31762ba30cf6bad0c7b9e033ad1b7453562c9f5cbe000028cfe6897fd5ecec24",
+      "sizeBytes": 1651
+    },
+    "ev-dev-10-s9": {
+      "caseId": "ev-dev-10",
+      "split": "dev",
+      "slot": 9,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV10_Othersupporting.docx",
+      "sha256": "1e5f660b33cbb38c2ff27f4b85b9e9496ccd9ed76ef4c866cf814c048e3c8e2d",
+      "sizeBytes": 1643
+    },
+    "ev-dev-11-s1": {
+      "caseId": "ev-dev-11",
+      "split": "dev",
+      "slot": 1,
+      "format": "pdf",
+      "mediaType": "application/pdf",
+      "filename": "EV11_Riskscreening.pdf",
+      "sha256": "d997079a4102ca80eef7d118052376784fb360490ca54f6348f814f57c6bf4fd",
+      "sizeBytes": 1613
+    },
+    "ev-dev-11-s2": {
+      "caseId": "ev-dev-11",
+      "split": "dev",
+      "slot": 2,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV11_Privacychecklist.docx",
+      "sha256": "763fdc0ba3f4e90bc18486b7b8b7dfa8958a960bd880031b61e0c24969448908",
+      "sizeBytes": 1859
+    },
+    "ev-dev-11-s5": {
+      "caseId": "ev-dev-11",
+      "split": "dev",
+      "slot": 5,
+      "format": "png",
+      "mediaType": "image/png",
+      "filename": "EV11_BRD.png",
+      "sha256": "718e859c1870a290e6e3b737e048755f0e48fee9137b0b515b732e804200cca5",
+      "sizeBytes": 12950
+    },
+    "ev-dev-11-s6": {
+      "caseId": "ev-dev-11",
+      "split": "dev",
+      "slot": 6,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV11_AIarchitecture.docx",
+      "sha256": "59bed45782c2918fc9924f79b6e01e9d19c500f5bf91ba1ecbe7c83f0b9a91b2",
+      "sizeBytes": 1642
+    },
+    "ev-dev-11-s7": {
+      "caseId": "ev-dev-11",
+      "split": "dev",
+      "slot": 7,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV11_Securityassessment.docx",
+      "sha256": "1c33a05fb257f3c767be593472b6e799cb723f15cd56f0da7a7f6824b99f7ac5",
+      "sizeBytes": 1646
+    },
+    "ev-dev-11-s8": {
+      "caseId": "ev-dev-11",
+      "split": "dev",
+      "slot": 8,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV11_RAIdeploymentchecklist.docx",
+      "sha256": "d2c079e7e76ee162121d2dd189a3b81199bf22f23278fa7961b0190eb1b71aab",
+      "sizeBytes": 1651
+    },
+    "ev-dev-11-s9": {
+      "caseId": "ev-dev-11",
+      "split": "dev",
+      "slot": 9,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV11_Othersupporting.docx",
+      "sha256": "f7e5f63d287609d19404d4cde0b8d638104e0905c05516e911c85afb03de6003",
+      "sizeBytes": 1643
+    },
+    "ev-dev-12-s2": {
+      "caseId": "ev-dev-12",
+      "split": "dev",
+      "slot": 2,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV12_Privacychecklist.docx",
+      "sha256": "42e0096208a3fc06153c39bd24f3caa17595bff26e9e628fa5693917623d6dd1",
+      "sizeBytes": 1859
+    },
+    "ev-dev-12-s5": {
+      "caseId": "ev-dev-12",
+      "split": "dev",
+      "slot": 5,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV12_BRD.docx",
+      "sha256": "72c9cc410259e87c96bacb14c9ecd61f32976ccc93b6dc2345f59dda956455be",
+      "sizeBytes": 1859
+    },
+    "ev-dev-12-s6": {
+      "caseId": "ev-dev-12",
+      "split": "dev",
+      "slot": 6,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV12_AIarchitecture.docx",
+      "sha256": "f5aa36aef6186245f27608ec3973046dcd420f6db623a2ea334af0ed213220d2",
+      "sizeBytes": 1642
+    },
+    "ev-dev-12-s7": {
+      "caseId": "ev-dev-12",
+      "split": "dev",
+      "slot": 7,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV12_Securityassessment.docx",
+      "sha256": "d63e6c1c5f8a0feea84a6a8c4a078b5e024bae6e42dfa2d78c2e9773217a32e2",
+      "sizeBytes": 1646
+    },
+    "ev-dev-12-s9": {
+      "caseId": "ev-dev-12",
+      "split": "dev",
+      "slot": 9,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV12_Othersupporting.docx",
+      "sha256": "b2a4bc1fb38a379509ae32f5ef39f93fb71c38911121d2295db130f8de2d877b",
+      "sizeBytes": 1643
+    },
+    "ev-dev-13-s1": {
+      "caseId": "ev-dev-13",
+      "split": "dev",
+      "slot": 1,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV13_Riskscreening.docx",
+      "sha256": "39c025afcbdc4ff955f91ecb4452264271a5904d69190fa0b4d0b318f1ace37c",
+      "sizeBytes": 2132
+    },
+    "ev-dev-13-s2": {
+      "caseId": "ev-dev-13",
+      "split": "dev",
+      "slot": 2,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV13_Privacychecklist.docx",
+      "sha256": "6f739e8ce899ba10e67540a33bf9a4d0103e5aa686e517b3a1fe9fa1114b01d2",
+      "sizeBytes": 2251
+    },
+    "ev-dev-13-s5": {
+      "caseId": "ev-dev-13",
+      "split": "dev",
+      "slot": 5,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV13_BRD.docx",
+      "sha256": "084ee7477ddd5fd03b337255284a613cee2fc9cf5061066905cc61cc9094878c",
+      "sizeBytes": 2251
+    },
+    "ev-dev-13-s6": {
+      "caseId": "ev-dev-13",
+      "split": "dev",
+      "slot": 6,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV13_AIarchitecture.docx",
+      "sha256": "7c282b0d9c148017518df04799c08c13f5c0947e581040bf2b64d0e5d7e611cd",
+      "sizeBytes": 1642
+    },
+    "ev-dev-13-s7": {
+      "caseId": "ev-dev-13",
+      "split": "dev",
+      "slot": 7,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV13_Securityassessment.docx",
+      "sha256": "f156907be70dead534df8ce81db429046450aa857a94433a543985702aed8ffb",
+      "sizeBytes": 1646
+    },
+    "ev-dev-13-s8": {
+      "caseId": "ev-dev-13",
+      "split": "dev",
+      "slot": 8,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV13_RAIdeploymentchecklist.docx",
+      "sha256": "5545328796b4d8b85d070e6576eb49ed791ab677d02fdcd88f4a7e2fca872bb8",
+      "sizeBytes": 1651
+    },
+    "ev-dev-13-s9": {
+      "caseId": "ev-dev-13",
+      "split": "dev",
+      "slot": 9,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV13_Othersupporting.docx",
+      "sha256": "72c104b17a22e7541be74238571b508913a3d66d8bab819342f4398b8c398813",
+      "sizeBytes": 1643
+    },
+    "ev-dev-14-s1": {
+      "caseId": "ev-dev-14",
+      "split": "dev",
+      "slot": 1,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV14_Riskscreening.docx",
+      "sha256": "a06f4f33633e4eb0c64cdb386bedf059b49dfd750b713a003bafda69ffa32fa0",
+      "sizeBytes": 2072
+    },
+    "ev-dev-14-s2": {
+      "caseId": "ev-dev-14",
+      "split": "dev",
+      "slot": 2,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV14_Privacychecklist.docx",
+      "sha256": "f148c710038bd52ac1a5760c3d70f90dc634ba35ff8759799412435f09e2af31",
+      "sizeBytes": 1860
+    },
+    "ev-dev-14-s3": {
+      "caseId": "ev-dev-14",
+      "split": "dev",
+      "slot": 3,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV14_DPA.docx",
+      "sha256": "ff04c579db7ccf310de5bf84d6bc28633a01a8158cc22dbab5cf06a8297857fe",
+      "sizeBytes": 1630
+    },
+    "ev-dev-14-s5": {
+      "caseId": "ev-dev-14",
+      "split": "dev",
+      "slot": 5,
+      "format": "xlsx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "filename": "EV14_BRD.xlsx",
+      "sha256": "77e45b7ee0f8804e9439118ea924d8b4fa4a907debf944e9062c669d57305eda",
+      "sizeBytes": 4928
+    },
+    "ev-dev-14-s6": {
+      "caseId": "ev-dev-14",
+      "split": "dev",
+      "slot": 6,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV14_AIarchitecture.docx",
+      "sha256": "20ca2e70f0a3bf6ca2c634fd3a10a779880bee7da12da3d69d2037e7d5d3de09",
+      "sizeBytes": 1642
+    },
+    "ev-dev-14-s7": {
+      "caseId": "ev-dev-14",
+      "split": "dev",
+      "slot": 7,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV14_Securityassessment.docx",
+      "sha256": "421130c0e8d375d165495b5863eb194dc479b562d1969dfd3bf2aa4b10173435",
+      "sizeBytes": 1646
+    },
+    "ev-dev-14-s8": {
+      "caseId": "ev-dev-14",
+      "split": "dev",
+      "slot": 8,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV14_RAIdeploymentchecklist.docx",
+      "sha256": "38eda6bbba5b28e5c88461663544aa8ab1293d3fc870881328766502fc9cd519",
+      "sizeBytes": 1651
+    },
+    "ev-dev-14-s9": {
+      "caseId": "ev-dev-14",
+      "split": "dev",
+      "slot": 9,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV14_Othersupporting.docx",
+      "sha256": "ca82f1aae40412dc1460d4e8ee66729fb5758f7eed7326f2d03d01b384a86984",
+      "sizeBytes": 1643
+    },
+    "ev-dev-15-s1": {
+      "caseId": "ev-dev-15",
+      "split": "dev",
+      "slot": 1,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV15_Riskscreening.docx",
+      "sha256": "92b47bd8897f6c8325e1de279de40e19f45bb252f07ceb496ff2e9a23674636f",
+      "sizeBytes": 2162
+    },
+    "ev-dev-15-s2": {
+      "caseId": "ev-dev-15",
+      "split": "dev",
+      "slot": 2,
+      "format": "xlsx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "filename": "EV15_Privacychecklist.xlsx",
+      "sha256": "cab2e294e5e84b1bec952c17966e32a5eae27bdf4739da6952d0b84d93f15ed8",
+      "sizeBytes": 5441
+    },
+    "ev-dev-15-s5": {
+      "caseId": "ev-dev-15",
+      "split": "dev",
+      "slot": 5,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV15_BRD.docx",
+      "sha256": "9d6df226fb54c99ce88639b31d6752c57f86b01f993a1f667e310de1923515ef",
+      "sizeBytes": 2242
+    },
+    "ev-dev-15-s6": {
+      "caseId": "ev-dev-15",
+      "split": "dev",
+      "slot": 6,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV15_AIarchitecture.docx",
+      "sha256": "7cbf742e2a6e284506906859fe3a64d7c22fa03b21ca5f99dcad76604d131329",
+      "sizeBytes": 1642
+    },
+    "ev-dev-15-s7": {
+      "caseId": "ev-dev-15",
+      "split": "dev",
+      "slot": 7,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV15_Securityassessment.docx",
+      "sha256": "c87b2389caa825f4034294353148b5bf24e903d00b2eb6a9cc709700904651af",
+      "sizeBytes": 1646
+    },
+    "ev-dev-15-s8": {
+      "caseId": "ev-dev-15",
+      "split": "dev",
+      "slot": 8,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV15_RAIdeploymentchecklist.docx",
+      "sha256": "cfbf1c4acd1d0e0e6ab37f8ca7a3b11ea4f3240f8629dfcbba032b04c987d002",
+      "sizeBytes": 1651
+    },
+    "ev-dev-15-s9": {
+      "caseId": "ev-dev-15",
+      "split": "dev",
+      "slot": 9,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV15_Othersupporting.docx",
+      "sha256": "baebb001d67c497d392d8a71e4de861abbcbd742d495662bb82fdd2f367860ee",
+      "sizeBytes": 1643
+    },
+    "ev-dev-16-s1": {
+      "caseId": "ev-dev-16",
+      "split": "dev",
+      "slot": 1,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV16_Riskscreening.docx",
+      "sha256": "e447e0fd8e80d2c26e5c4a01917d423f5d523c5de0a5e37c9c08aff260f013d5",
+      "sizeBytes": 2072
+    },
+    "ev-dev-16-s2": {
+      "caseId": "ev-dev-16",
+      "split": "dev",
+      "slot": 2,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV16_Privacychecklist.docx",
+      "sha256": "cfca11cef0883513d0df2e7fdd909f3b4851ccb5feb06fccd4947e26988b9aa6",
+      "sizeBytes": 1859
+    },
+    "ev-dev-16-s5": {
+      "caseId": "ev-dev-16",
+      "split": "dev",
+      "slot": 5,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV16_BRD.docx",
+      "sha256": "dfe9bb59d24a9545ca5d70670ad1d69789d3bc271a60f66e582fb7f2f70c4939",
+      "sizeBytes": 1859
+    },
+    "ev-dev-16-s8": {
+      "caseId": "ev-dev-16",
+      "split": "dev",
+      "slot": 8,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV16_RAIdeploymentchecklist.docx",
+      "sha256": "25c7cbfaecd92721467fc904ee1ad32fff83ed4e79c31ee2b3e31e3218469937",
+      "sizeBytes": 1651
+    },
+    "ev-dev-17-s1": {
+      "caseId": "ev-dev-17",
+      "split": "dev",
+      "slot": 1,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV17_Riskscreening.docx",
+      "sha256": "9eea98f6b58209b8537c37d7a4db4f2ca577a8415436ae753974f63160369254",
+      "sizeBytes": 2072
+    },
+    "ev-dev-17-s2": {
+      "caseId": "ev-dev-17",
+      "split": "dev",
+      "slot": 2,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV17_Privacychecklist.docx",
+      "sha256": "a818a9669eaa9808e80c799041cf8d604186a23a0afd487f9624fd48fddcd4dd",
+      "sizeBytes": 1859
+    },
+    "ev-dev-17-s5": {
+      "caseId": "ev-dev-17",
+      "split": "dev",
+      "slot": 5,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV17_BRD.docx",
+      "sha256": "56f6d6544be1971f68c21dc15b9fad31bdbaf95819e93361bd5ba49c74f595ce",
+      "sizeBytes": 1859
+    },
+    "ev-dev-17-s9": {
+      "caseId": "ev-dev-17",
+      "split": "dev",
+      "slot": 9,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV17_Othersupporting.docx",
+      "sha256": "854d4b9df1a77741f0b235076b6abd91b66ca554eeb4179f62b7b743525cd807",
+      "sizeBytes": 1643
+    },
+    "ev-dev-18-s1": {
+      "caseId": "ev-dev-18",
+      "split": "dev",
+      "slot": 1,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV18_Riskscreening.docx",
+      "sha256": "298da4d9627b1ef5c600bae8d3faba1c927853ce372aa8e4af55ccdb0e3b9680",
+      "sizeBytes": 2072
+    },
+    "ev-dev-18-s2": {
+      "caseId": "ev-dev-18",
+      "split": "dev",
+      "slot": 2,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV18_Privacychecklist.docx",
+      "sha256": "6231117384e4cad2c852556f308ef43c0c4fbd24ba79a4710916579ebed3abd6",
+      "sizeBytes": 1859
+    },
+    "ev-dev-18-s5": {
+      "caseId": "ev-dev-18",
+      "split": "dev",
+      "slot": 5,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV18_BRD.docx",
+      "sha256": "9423fb326a18b0f12481ae705612e8624e18e1e6a41a38b983ac03efac35227d",
+      "sizeBytes": 1859
+    },
+    "ev-dev-18-s8": {
+      "caseId": "ev-dev-18",
+      "split": "dev",
+      "slot": 8,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV18_RAIdeploymentchecklist.docx",
+      "sha256": "88ffc8f63b644cd46f8eb7280250fd6cc1b41431d572dfd973cd469f7eec755e",
+      "sizeBytes": 1651
+    },
+    "ev-dev-18-s9": {
+      "caseId": "ev-dev-18",
+      "split": "dev",
+      "slot": 9,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV18_Othersupporting.docx",
+      "sha256": "6244fd008a66cf4fc9e2c730776ce5e6de469c5eafbc904fc31dec05ddeb0223",
+      "sizeBytes": 1643
+    },
+    "ev-dev-19-s1": {
+      "caseId": "ev-dev-19",
+      "split": "dev",
+      "slot": 1,
+      "format": "png",
+      "mediaType": "image/png",
+      "filename": "EV19_Riskscreening.png",
+      "sha256": "1218debcd45bdbaae21bc0f362d546d3706d46e46dd6c5245178281f2e77b629",
+      "sizeBytes": 12970
+    },
+    "ev-dev-19-s2": {
+      "caseId": "ev-dev-19",
+      "split": "dev",
+      "slot": 2,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV19_Privacychecklist.docx",
+      "sha256": "594e9f4ba5743739e0d9cb924c6eab2d2016ac3130668666bf3184d48b2c91ad",
+      "sizeBytes": 1859
+    },
+    "ev-dev-19-s6": {
+      "caseId": "ev-dev-19",
+      "split": "dev",
+      "slot": 6,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV19_AIarchitecture.docx",
+      "sha256": "6a275c5ad124dc284fa273b371241daf91d4cafa24efac2c6baf0ed5e5a238cb",
+      "sizeBytes": 1642
+    },
+    "ev-dev-19-s7": {
+      "caseId": "ev-dev-19",
+      "split": "dev",
+      "slot": 7,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV19_Securityassessment.docx",
+      "sha256": "2b6de97fe6a5225d5494e1c8867af99d2b8f8418bd21f4456477a43aef533c4a",
+      "sizeBytes": 1646
+    },
+    "ev-dev-19-s8": {
+      "caseId": "ev-dev-19",
+      "split": "dev",
+      "slot": 8,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV19_RAIdeploymentchecklist.docx",
+      "sha256": "1b41bd76a576f4729debfb067650ed5b31e27c5d3b4bfa2762717b23b28a69fd",
+      "sizeBytes": 1651
+    },
+    "ev-dev-19-s9": {
+      "caseId": "ev-dev-19",
+      "split": "dev",
+      "slot": 9,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV19_Othersupporting.docx",
+      "sha256": "b5d4e61e01621390451e1e73fedce1d6d31c8c246906d4f50d1aa8af663a3533",
+      "sizeBytes": 1643
+    },
+    "ev-dev-20-s1": {
+      "caseId": "ev-dev-20",
+      "split": "dev",
+      "slot": 1,
+      "format": "pdf_image",
+      "mediaType": "application/pdf",
+      "filename": "EV20_Riskscreening.pdf",
+      "sha256": "17f9f0b7da6e48ca3d3101cd9a692cc97460ba06641d1bcdf7cc3824d674ec63",
+      "sizeBytes": 1380
+    },
+    "ev-dev-20-s2": {
+      "caseId": "ev-dev-20",
+      "split": "dev",
+      "slot": 2,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV20_Privacychecklist.docx",
+      "sha256": "cc8467023847b246bea1a0589fc43b692fffe469095d94d3e2d3b738aa9bb441",
+      "sizeBytes": 1859
+    },
+    "ev-dev-20-s5": {
+      "caseId": "ev-dev-20",
+      "split": "dev",
+      "slot": 5,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV20_BRD.docx",
+      "sha256": "8af627871ff1978cbbdca74448d4f302d391de389323edef397938f7b1b16d63",
+      "sizeBytes": 1935
+    },
+    "ev-dev-20-s6": {
+      "caseId": "ev-dev-20",
+      "split": "dev",
+      "slot": 6,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV20_AIarchitecture.docx",
+      "sha256": "218b54f30ab8acc614d2aa1cd9618cbb6cd927c1aa3c630da2787b093ddf74e8",
+      "sizeBytes": 1642
+    },
+    "ev-dev-20-s7": {
+      "caseId": "ev-dev-20",
+      "split": "dev",
+      "slot": 7,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV20_Securityassessment.docx",
+      "sha256": "5b4a7a8a96f48e8151bea50a9d03dbced560770b6cb4e1c54ee68daf6c32f374",
+      "sizeBytes": 1646
+    },
+    "ev-dev-20-s8": {
+      "caseId": "ev-dev-20",
+      "split": "dev",
+      "slot": 8,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV20_RAIdeploymentchecklist.docx",
+      "sha256": "d076a883552e908ec61beef36c0b8036b7e9bd558def101f3520c2c2d3cb290c",
+      "sizeBytes": 1651
+    },
+    "ev-dev-20-s9": {
+      "caseId": "ev-dev-20",
+      "split": "dev",
+      "slot": 9,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV20_Othersupporting.docx",
+      "sha256": "718b50d1b8953f39bcc56ea7dbcd9eee10bcd54289349a9dc2fdb863cd1e24c0",
+      "sizeBytes": 1643
+    },
+    "ev-dev-21-s1": {
+      "caseId": "ev-dev-21",
+      "split": "dev",
+      "slot": 1,
+      "format": "pdf_cid",
+      "mediaType": "application/pdf",
+      "filename": "EV21_Riskscreening.pdf",
+      "sha256": "02ee9bcee3d4d42ce131195faf614ed6674d00e78cddd420f90cd09eac66a444",
+      "sizeBytes": 3094
+    },
+    "ev-dev-21-s2": {
+      "caseId": "ev-dev-21",
+      "split": "dev",
+      "slot": 2,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV21_Privacychecklist.docx",
+      "sha256": "0d7543cd93960a0538ee679db7b60ae17254d912245da3f4b3626c790797b2aa",
+      "sizeBytes": 2251
+    },
+    "ev-dev-21-s5": {
+      "caseId": "ev-dev-21",
+      "split": "dev",
+      "slot": 5,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV21_BRD.docx",
+      "sha256": "455ecbc4eff52a8d167125c8503ca9f170787b07eea0a25d6d198f04a8f25b2e",
+      "sizeBytes": 2251
+    },
+    "ev-dev-21-s6": {
+      "caseId": "ev-dev-21",
+      "split": "dev",
+      "slot": 6,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV21_AIarchitecture.docx",
+      "sha256": "6a415ac3e16cb02677bdbdf34650f54e419dd9cc66489507561f150c8deff145",
+      "sizeBytes": 1642
+    },
+    "ev-dev-21-s7": {
+      "caseId": "ev-dev-21",
+      "split": "dev",
+      "slot": 7,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV21_Securityassessment.docx",
+      "sha256": "83e86f552fe54b8823c59df7ba26799b4d7fbe45ef7b27b0bd7c18c6e57f623e",
+      "sizeBytes": 1646
+    },
+    "ev-dev-21-s8": {
+      "caseId": "ev-dev-21",
+      "split": "dev",
+      "slot": 8,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV21_RAIdeploymentchecklist.docx",
+      "sha256": "333ff234d4e9754094283f531b3fe11eb72eed843ed36a1fd4626e40d2ddc9c6",
+      "sizeBytes": 1651
+    },
+    "ev-dev-21-s9": {
+      "caseId": "ev-dev-21",
+      "split": "dev",
+      "slot": 9,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV21_Othersupporting.docx",
+      "sha256": "2b5dcbd18a664ca02cea5ce24efcd05a1b11f5d57f235af3697cf5adedf9d7f1",
+      "sizeBytes": 1643
+    },
+    "ev-dev-22-s1": {
+      "caseId": "ev-dev-22",
+      "split": "dev",
+      "slot": 1,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV22_Riskscreening.docx",
+      "sha256": "2528219c98b7219bb74d8062008def3eab0c80f96b8ff3ee0d31ca5f165d7d15",
+      "sizeBytes": 2072
+    },
+    "ev-dev-22-s2": {
+      "caseId": "ev-dev-22",
+      "split": "dev",
+      "slot": 2,
+      "format": "png",
+      "mediaType": "image/png",
+      "filename": "EV22_Privacychecklist.png",
+      "sha256": "d6a9f1024a3e5bbbcc5bc01904b1c1a8db840d54c3e65e7f97016df1082a1c3a",
+      "sizeBytes": 12950
+    },
+    "ev-dev-22-s5": {
+      "caseId": "ev-dev-22",
+      "split": "dev",
+      "slot": 5,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV22_BRD.docx",
+      "sha256": "286df582f4aff273365c0c45e45cfe0339cdcb0e375fd044f179fc436e536a5f",
+      "sizeBytes": 1859
+    },
+    "ev-dev-22-s6": {
+      "caseId": "ev-dev-22",
+      "split": "dev",
+      "slot": 6,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV22_AIarchitecture.docx",
+      "sha256": "3e2b130a843489fb74b7af6fe12ccc55850c0755ef28000343f7adb029143377",
+      "sizeBytes": 1642
+    },
+    "ev-dev-22-s9": {
+      "caseId": "ev-dev-22",
+      "split": "dev",
+      "slot": 9,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV22_Othersupporting.docx",
+      "sha256": "bdfcd8e3b5b569de50e85d56c3e3a8aefe6582e5949dbdd87227555c325d115d",
+      "sizeBytes": 1643
+    },
+    "ev-dev-23-s1": {
+      "caseId": "ev-dev-23",
+      "split": "dev",
+      "slot": 1,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV23_Riskscreening.docx",
+      "sha256": "e6b5ded5e87ad373157dd98351b93d67abc3f60c545e47989e5e07e1e87b6bd5",
+      "sizeBytes": 2072
+    },
+    "ev-dev-23-s2": {
+      "caseId": "ev-dev-23",
+      "split": "dev",
+      "slot": 2,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV23_Privacychecklist.docx",
+      "sha256": "f6964a85d5a3f7c2d35c261bc63f6f30f2cf1a49b7302322e593a9ede2b413b3",
+      "sizeBytes": 1859
+    },
+    "ev-dev-23-s5": {
+      "caseId": "ev-dev-23",
+      "split": "dev",
+      "slot": 5,
+      "format": "docx_doctype",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV23_BRD.docx",
+      "sha256": "ebe0bfae8b02bf30e112c464dbf0d836b93907049b538e69cc6fca37f21f1033",
+      "sizeBytes": 1930
+    },
+    "ev-dev-23-s6": {
+      "caseId": "ev-dev-23",
+      "split": "dev",
+      "slot": 6,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV23_AIarchitecture.docx",
+      "sha256": "31fea52f321799fe589014e812a3c458945f1b95c3551930f9d7c43c497cbe71",
+      "sizeBytes": 1642
+    },
+    "ev-dev-23-s7": {
+      "caseId": "ev-dev-23",
+      "split": "dev",
+      "slot": 7,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV23_Securityassessment.docx",
+      "sha256": "1eea8877ccd2f3ad47bd63deebb0f111789758dd643a3c7b13b8a111540c81a2",
+      "sizeBytes": 1646
+    },
+    "ev-dev-23-s8": {
+      "caseId": "ev-dev-23",
+      "split": "dev",
+      "slot": 8,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV23_RAIdeploymentchecklist.docx",
+      "sha256": "7effe0c2f7bcdbf3483e44ad26fd252734862efd045b74b8ab9c8148deedbf36",
+      "sizeBytes": 1651
+    },
+    "ev-dev-23-s9": {
+      "caseId": "ev-dev-23",
+      "split": "dev",
+      "slot": 9,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV23_Othersupporting.docx",
+      "sha256": "0b3a6e1183de2d69dd5d72fdb65137056bf8c9ae9e7c0475b83f347c544025ac",
+      "sizeBytes": 1643
+    },
+    "ev-dev-24-s1": {
+      "caseId": "ev-dev-24",
+      "split": "dev",
+      "slot": 1,
+      "format": "pdf_broken_xref",
+      "mediaType": "application/pdf",
+      "filename": "EV24_Riskscreening.pdf",
+      "sha256": "0321985b90fc479b6302996b68dbad7acde2c620cacac8e6c4d9fed0383e010d",
+      "sizeBytes": 1791
+    },
+    "ev-dev-24-s2": {
+      "caseId": "ev-dev-24",
+      "split": "dev",
+      "slot": 2,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV24_Privacychecklist.docx",
+      "sha256": "8220d53de71160f92d74242c0f5e4a8aff0028da655408918f07f50fca3934ce",
+      "sizeBytes": 1859
+    },
+    "ev-dev-24-s5": {
+      "caseId": "ev-dev-24",
+      "split": "dev",
+      "slot": 5,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV24_BRD.docx",
+      "sha256": "2b8bc996f9612f9b8e1241e044d96f8c77ca819aeb8d1a98f188ab51ccbfc176",
+      "sizeBytes": 1859
+    },
+    "ev-dev-24-s6": {
+      "caseId": "ev-dev-24",
+      "split": "dev",
+      "slot": 6,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV24_AIarchitecture.docx",
+      "sha256": "74be160e9d5adfff649e270631ba99883454d5b90f751b28d3488d1fa607ae61",
+      "sizeBytes": 1642
+    },
+    "ev-dev-24-s7": {
+      "caseId": "ev-dev-24",
+      "split": "dev",
+      "slot": 7,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV24_Securityassessment.docx",
+      "sha256": "bf8fbe069f9e714ef945a8410cef844c5297730fe8f5c5256463853b4b98c710",
+      "sizeBytes": 1646
+    },
+    "ev-dev-24-s8": {
+      "caseId": "ev-dev-24",
+      "split": "dev",
+      "slot": 8,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV24_RAIdeploymentchecklist.docx",
+      "sha256": "4404167d2b8dd069158781aa1593345888298cada804052d094ada077c7e312a",
+      "sizeBytes": 1651
+    },
+    "ev-dev-24-s9": {
+      "caseId": "ev-dev-24",
+      "split": "dev",
+      "slot": 9,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV24_Othersupporting.docx",
+      "sha256": "24d3fa8c4e25b97eb1b3884f515995701b0834172dbd466066741955860b1bf5",
+      "sizeBytes": 1643
+    },
+    "ev-dev-25-s1": {
+      "caseId": "ev-dev-25",
+      "split": "dev",
+      "slot": 1,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV25_Riskscreening.docx",
+      "sha256": "7e7501dd292ef2fa5b28519471907b1e90e22a0f64d7ade4d0333ec49981fb00",
+      "sizeBytes": 2026
+    },
+    "ev-dev-25-s2": {
+      "caseId": "ev-dev-25",
+      "split": "dev",
+      "slot": 2,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV25_Privacychecklist.docx",
+      "sha256": "87f44ddaaee8c99c2737cf40fd614aca5dcb4f9319ed53778fadde636d138a6d",
+      "sizeBytes": 1859
+    },
+    "ev-dev-25-s5": {
+      "caseId": "ev-dev-25",
+      "split": "dev",
+      "slot": 5,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV25_BRD.docx",
+      "sha256": "f19ac3d0c86d321ca2bc14f094035e35595c3dbf8d1ced99d0e5089af85bf002",
+      "sizeBytes": 1859
+    },
+    "ev-dev-25-s6": {
+      "caseId": "ev-dev-25",
+      "split": "dev",
+      "slot": 6,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV25_AIarchitecture.docx",
+      "sha256": "da6f47ec5504fe3b8bd2470900138d58589f6d9247881ce3b2b576143d9d2a47",
+      "sizeBytes": 1642
+    },
+    "ev-dev-25-s7": {
+      "caseId": "ev-dev-25",
+      "split": "dev",
+      "slot": 7,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV25_Securityassessment.docx",
+      "sha256": "d331cf77933d817c057f04f9291e724bee60efb6b59aa314cdcadbecd8dbe8e8",
+      "sizeBytes": 1646
+    },
+    "ev-dev-25-s8": {
+      "caseId": "ev-dev-25",
+      "split": "dev",
+      "slot": 8,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV25_RAIdeploymentchecklist.docx",
+      "sha256": "3d47d841cacf5f37bbf76e75ec7919a4fd3e124aff59796e1b8922dcfe867327",
+      "sizeBytes": 1651
+    },
+    "ev-dev-25-s9": {
+      "caseId": "ev-dev-25",
+      "split": "dev",
+      "slot": 9,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV25_Othersupporting.docx",
+      "sha256": "3d18f149042945791e1ec4df36dd1bd9047df3c0d4c658a16850daf5f84837fc",
+      "sizeBytes": 1643
+    },
+    "ev-dev-26-s1": {
+      "caseId": "ev-dev-26",
+      "split": "dev",
+      "slot": 1,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV26_Riskscreening.docx",
+      "sha256": "6f694a393b3165bc6d137c7fa11d93c585d51cc2a142da70528578b3cd7fb304",
+      "sizeBytes": 1879
+    },
+    "ev-dev-26-s2": {
+      "caseId": "ev-dev-26",
+      "split": "dev",
+      "slot": 2,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV26_Privacychecklist.docx",
+      "sha256": "4eb9c67f32b79ddcdb3dcb431414e3f3c1584421403978b35afd0353c46ab9fe",
+      "sizeBytes": 1859
+    },
+    "ev-dev-26-s5": {
+      "caseId": "ev-dev-26",
+      "split": "dev",
+      "slot": 5,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV26_BRD.docx",
+      "sha256": "b3095b7818b540e2a80d81f2ca262a2abc692f32293b3d680ebce9d90f8b265a",
+      "sizeBytes": 2005
+    },
+    "ev-dev-26-s6": {
+      "caseId": "ev-dev-26",
+      "split": "dev",
+      "slot": 6,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV26_AIarchitecture.docx",
+      "sha256": "ed070da3776d339e7bb3c7a5d0370ad937312d1e63c495ce5f6c9b971c4d29bf",
+      "sizeBytes": 1642
+    },
+    "ev-dev-26-s7": {
+      "caseId": "ev-dev-26",
+      "split": "dev",
+      "slot": 7,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV26_Securityassessment.docx",
+      "sha256": "d2c20a03a7b5e7cdb8c11947e77edc21b4648743914c087f1021887dcd2ee9ee",
+      "sizeBytes": 1646
+    },
+    "ev-dev-26-s8": {
+      "caseId": "ev-dev-26",
+      "split": "dev",
+      "slot": 8,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV26_RAIdeploymentchecklist.docx",
+      "sha256": "44ebe7a92ab8fdf637bf8b3313fb544b3ee80b73a206d5eae4c070f49586c878",
+      "sizeBytes": 1651
+    },
+    "ev-dev-26-s9": {
+      "caseId": "ev-dev-26",
+      "split": "dev",
+      "slot": 9,
+      "format": "docx",
+      "mediaType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "filename": "EV26_Othersupporting.docx",
+      "sha256": "08e345ee8bea5cd5f05914b261b995a331ecd831639601fde1ecfd6911868a8a",
+      "sizeBytes": 1643
+    }
+  }
+}
