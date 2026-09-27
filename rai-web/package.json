@@ -25,6 +25,7 @@
     "db:cleanup": "tsx --conditions=rai-source server/src/operator/db-cleanup.ts",
     "store:verify": "tsx --conditions=rai-source server/src/operator/store-verify.ts",
     "store:cleanup": "tsx --conditions=rai-source server/src/operator/store-cleanup.ts",
+    "backup": "tsx --conditions=rai-source server/src/operator/backup.ts",
     "dev": "node scripts/dev.mjs",
     "build": "npm run build -w shared && npm run build -w web && npm run build -w server",
     "start": "node server/dist/main.js",

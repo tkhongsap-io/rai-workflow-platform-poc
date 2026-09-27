@@ -189,6 +189,9 @@ export async function rebuildApp({
 
 export const signIn = (fixtureUserId: string) => signInAsFixture(app, fixtureUserId);
 
+/** The suite's private BLOB_DIR (read-only use: W7-01 backs it up next to the database). */
+export const fixtureBlobDir = (): string => blobDir;
+
 /** Submits the case's draft at its current revision; asserts 201. */
 export async function submit(session: FixtureSession, caseId: string) {
   const draftRes = await app.inject({

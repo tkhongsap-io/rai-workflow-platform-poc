@@ -96,6 +96,12 @@ export const EVENT_CATALOGUE = Object.freeze({
   'sla.digest.completed': { level: 'info', fields: ['jobRunId', 'breachCount', 'notificationIds'] },
   'sla.digest.failed': { level: 'error', fields: ['jobRunId', 'stage', 'errorCode'] },
   'health.readiness': { level: 'info', fields: ['status', 'report'] },
+  // W7-01 (W7 plan section 8): operator command lines, printed through buildLogLine by `npm run backup`.
+  'operator.backup.completed': {
+    level: 'info',
+    fields: ['backupId', 'blobCount', 'tableCount', 'durationMs'],
+  },
+  'operator.backup.failed': { level: 'error', fields: ['stage', 'reason'] },
   'error.captured': {
     level: 'error',
     fields: [
