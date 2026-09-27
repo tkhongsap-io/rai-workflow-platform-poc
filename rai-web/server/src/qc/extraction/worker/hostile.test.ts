@@ -1,4 +1,4 @@
-// W4-05c (W4b plan section 4.3): the W0-08 hostile set is fed to the extractor. Every row ends as a clean reply,
+// W4-05c/W4-05d (W4b plan section 4.3): the W0-08 hostile set is fed to the extractor. Every row ends as a clean reply,
 // never a throw (a throw kills the worker: `crash`), and every row the upload refuses ends as `ok: false`. The rows
 // are also rebuilt over a package whose text would otherwise extract, so a refusal is the refusal, not an empty body.
 import { test } from 'node:test';
@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { hostileSet } from '../../../artifacts/sniff.test-bytes.js';
 import { FORMAT_EXTRACTORS, extractInWorker, type WorkerLimits, type WorkerReply } from './extract.js';
 import { FIXED_WORKER_LIMITS } from '../limits.js';
+import { PDF, linesContent, textPdf } from './pdf.test-helper.js';
 import {
   buildTestZip,
   docxEntries,
@@ -18,7 +19,7 @@ import {
 } from './ooxml.test-helper.js';
 
 const LIMITS: WorkerLimits = { maxTextChars: 1_000_000, ...FIXED_WORKER_LIMITS };
-const MEDIA_TYPES = [DOCX, XLSX, 'application/pdf', 'image/png', 'image/jpeg'];
+const MEDIA_TYPES = [DOCX, XLSX, PDF, 'image/png', 'image/jpeg'];
 const run = (mediaType: string, bytes: Buffer): WorkerReply =>
   extractInWorker({ mediaType, bytes, limits: LIMITS });
 
@@ -85,6 +86,25 @@ test('a DOCX declared as XLSX, or the reverse, is unreadable', () => {
   assert.deepEqual(run(DOCX, xlsx), { ok: false, reason: 'unreadable' });
 });
 
-test('the registry holds DOCX and XLSX only; PDF and images stay unreadable until W4-05d', () => {
-  assert.deepEqual([...FORMAT_EXTRACTORS.keys()].sort(), [DOCX, XLSX].sort());
+test('the registry holds DOCX, XLSX and PDF; PNG and JPEG stay unreadable (no OCR)', () => {
+  assert.deepEqual([...FORMAT_EXTRACTORS.keys()].sort(), [DOCX, XLSX, PDF].sort());
+  for (const row of hostileSet())
+    for (const mediaType of ['image/png', 'image/jpeg'])
+      assert.deepEqual(run(mediaType, row.bytes), { ok: false, reason: 'unreadable' }, row.name);
+});
+
+test('W4-05d: the hostile PDF rows are refused even when the PDF has a text layer', () => {
+  const control = textPdf([linesContent(['RAI-DESK-SYNTHETIC-FIXTURE hostile'])]);
+  assert.equal(run(PDF, control).ok, true, 'the control extracts');
+  const withObject = (body: string) =>
+    textPdf([linesContent(['RAI-DESK-SYNTHETIC-FIXTURE hostile'])], { extra: [body] });
+  const rows: Array<[string, Buffer]> = [
+    ['PDF with JS', withObject('<< /OpenAction << /S /JavaScript /JS (1) >> >>')],
+    ['PDF with embedded file', withObject('<< /Type /EmbeddedFile /Length 0 >>')],
+    ['PDF without EOF', control.subarray(0, control.lastIndexOf('%%EOF'))],
+    ['renamed PNG', hostileSet().find((r) => r.name === 'Renamed PNG')!.bytes],
+    ['a DOCX declared as PDF', buildTestZip(docxEntries(para('text')))],
+  ];
+  for (const [name, bytes] of rows)
+    assert.deepEqual(run(PDF, bytes), { ok: false, reason: 'unreadable' }, name);
 });

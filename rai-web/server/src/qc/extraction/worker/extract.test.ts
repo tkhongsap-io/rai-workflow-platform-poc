@@ -1,5 +1,5 @@
-// W4-05b (W4b plan section 4.2): the worker's dispatch. The format registry is empty until W4-05c and W4-05d, so every
-// input is unreadable; the sink and the typed stops are what those parsers build on.
+// W4-05b (W4b plan section 4.2): the worker's dispatch. The format registry was empty until W4-05c and W4-05d; the
+// sink and the typed stops are what those parsers build on.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -36,14 +36,15 @@ const request = (mediaType = 'application/pdf'): WorkerRequest => ({
 });
 const registry = (format: FormatExtractor) => new Map([['application/pdf', format]]);
 
-test('DOCX and XLSX are registered (W4-05c); PDF waits for W4-05d; bytes that are not a package are unreadable', () => {
+test('DOCX and XLSX (W4-05c) and PDF (W4-05d) are registered; bytes that are not a document are unreadable', () => {
   assert.deepEqual(
     [...FORMAT_EXTRACTORS.keys()].sort(),
     [
+      'application/pdf',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     ],
-    'W4-05d registers PDF; PNG and JPEG stay unregistered (no OCR)',
+    'PNG and JPEG stay unregistered (no OCR, decision 8)',
   );
   for (const mediaType of MEDIA_TYPES)
     assert.deepEqual(extractInWorker(request(mediaType)), { ok: false, reason: 'unreadable' });
