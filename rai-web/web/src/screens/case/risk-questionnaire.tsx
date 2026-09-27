@@ -121,27 +121,31 @@ function RubricForm(props: RiskQuestionnaireProps & { rubric: RiskRubricView }):
         const hintId = `risk-${id}-hint`;
         const error = props.fieldErrors.get(id);
         const evidenceSlot = question.evidenceSlot;
+        // Point aria-describedby at the hint only when it has content (help text or an evidence slot).
+        const hasHint = question.help !== undefined || evidenceSlot !== undefined;
         return (
           <fieldset
             key={id}
             className={'risk-question'}
             data-risk-question={id}
-            aria-describedby={hintId}
+            aria-describedby={hasHint ? hintId : undefined}
             disabled={!canEdit || disabled}
           >
             <legend>{question.text[locale]}</legend>
-            <div id={hintId}>
-              {question.help !== undefined ? <p className={'field-hint'}>{question.help[locale]}</p> : null}
-              {evidenceSlot !== undefined ? (
-                <p className={'field-hint'} data-risk-evidence={props.slots[evidenceSlot].state}>
-                  {t('risk.evidence.hint', {
-                    slot: evidenceSlot,
-                    name: t(slotNameKey(evidenceSlot)),
-                    state: t(slotStateKey(props.slots[evidenceSlot].state)),
-                  })}
-                </p>
-              ) : null}
-            </div>
+            {hasHint ? (
+              <div id={hintId}>
+                {question.help !== undefined ? <p className={'field-hint'}>{question.help[locale]}</p> : null}
+                {evidenceSlot !== undefined ? (
+                  <p className={'field-hint'} data-risk-evidence={props.slots[evidenceSlot].state}>
+                    {t('risk.evidence.hint', {
+                      slot: evidenceSlot,
+                      name: t(slotNameKey(evidenceSlot)),
+                      state: t(slotStateKey(props.slots[evidenceSlot].state)),
+                    })}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
             <div className={'risk-choices'}>
               {riskAnswerChoices(question).map((choice) => (
                 <label key={choice.value} className={'choice'}>

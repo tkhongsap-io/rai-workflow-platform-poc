@@ -69,6 +69,41 @@ After rebasing onto `origin/main` `ce87a4a` (W4-05d; only DEVLOG and CHANGELOG c
 | `node scripts/check-links.mjs` (root) | exit 0; 449 Markdown files, 1267 relative links, 0 broken |
 | `git diff --check origin/main...HEAD` (root) | exit 0 |
 
+## Round 1 (2026-09-28)
+
+Rebased onto `origin/main` `75c9b92` (W6-03, after W7-02 and W5-05); only DEVLOG and CHANGELOG conflicted, resolved as a union with W5-07 on top. No migration on this branch.
+
+Fixes taken from the round-1 review:
+
+- **Rebase gate, environment only**: W7-02 (#216) added `DATABASE_ADMIN_URL`; this worktree's local `.env` lacked it, so `tests/integration/w7-02-backup-restore.test.ts` exited 78 (`missing:DATABASE_ADMIN_URL`). The local `.env` now sets it to this lane's Postgres (`127.0.0.1:55383/postgres`). No code change; `.env` is not committed.
+- **Empty `aria-describedby` target**: a question with neither help text nor an evidence slot pointed `aria-describedby` at an empty hint. The fieldset now carries `aria-describedby` and the hint only when there is something to say. RED first: a new browser test (the real rubric with RQ1's `evidenceSlot` and `help` removed through a Playwright route) failed on `aria-describedby="risk-RQ1-hint"`, then passed after the fix. The seeded rubric gives every question slot 1, so the shipped page is unchanged.
+- **spec.md drift**: now names `rubricStateFromValue` / `rubricStateFromError`, lists `risk.preview.tier` (not `risk.preview.unknown_count`, which was never added) and gives `riskTierLabel` its `t` parameter.
+- **plan.md step 5**: no W0-02 note is needed; the rubric route is already in W0-02 (added by W5-02) with the same shape.
+
+Deferred (non-blocking, recorded for a later ticket):
+
+- The rubric is read once per mounted editor; if a new revision is published mid-session the options can be stale. The server still rejects a stale option inline at `body.riskAnswers.RQn`.
+- The substitute accepts `riskAnswers` on save but does not store them (drift listed in its README); no substitute test covers a save carrying `riskAnswers`.
+
 ## Review verdicts
 
-To be recorded by the independent reviewers on the PR head.
+| Round | Reviewer | Head | Verdict | Notes |
+| --- | --- | --- | --- | --- |
+| 1 | independent reviewer A | `2f3a560` | pass with polish | tsc, lint, unit (1001) green; spec.md drift and plan.md step 5 note (fixed in round 1) |
+| 1 | independent reviewer B | `2f3a560` | pass, non-blocking notes | stale rubric mid-session and substitute not storing answers (deferred); empty `aria-describedby` hint (fixed in round 1) |
+| 1 | rebase check | `ec9f697` | rebase broke the gate (environment) | `w7-02-backup-restore` exited 78 on the missing local `DATABASE_ADMIN_URL` (fixed in the local `.env`) |
+
+Round-1 gate, one suite at a time on the round-1 head (rebased onto `75c9b92`, with the fixes above), logs `r2-*.log`:
+
+| Command (from `rai-web/` unless noted) | Result |
+| --- | --- |
+| RED: `npm run test:browser:server -- w5-07 --project=desktop-1440 -g dangling` before the fix | 1 failed: `aria-describedby` was `risk-RQ1-hint` |
+| `npm run lint` | exit 0 |
+| `npm run typecheck` | exit 0 |
+| `npm run test:unit` | exit 0, 1032 pass, 0 fail |
+| `npm run test:integration` | exit 0, 437 pass, 0 fail, 0 skipped |
+| `npm run build && npm run check:substitute-absent` | exit 0; 907 files scanned, 0 with the marker |
+| `npm run test:browser:server` | exit 0, 217 passed (the new test × 3 widths) |
+| `npm run test:browser:substitute` | exit 0, 48 passed |
+| `node scripts/check-links.mjs` (root) | exit 0; 457 Markdown files, 1287 relative links, 0 broken |
+| `git diff --check` (root) | exit 0 |

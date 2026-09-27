@@ -183,6 +183,29 @@ test.describe(`W5-07 risk questionnaire in the pack editor on the real server ($
     expect((await readDraft(page, caseId)).riskAnswers.RQ1?.value).toBe('many');
   });
 
+  test('a question with neither help nor an evidence slot has no dangling aria-describedby', async ({
+    page,
+  }) => {
+    await signInAsFixture(page, OWNER);
+    const caseId = await caseIdOf(page, CASE);
+    // Serve the real rubric with RQ1's evidence slot removed (the seed gives every question slot 1 and no help).
+    await page.route(RUBRIC_ROUTE, async (route) => {
+      const response = await route.fetch();
+      const view = (await response.json()) as { body: { questions: Array<Record<string, unknown>> } };
+      const first = view.body.questions[0];
+      if (first !== undefined) {
+        delete first.evidenceSlot;
+        delete first.help;
+      }
+      await route.fulfill({ response, json: view });
+    });
+    await openEditor(page, caseId);
+    await expect(question(page, 'RQ1')).not.toHaveAttribute('aria-describedby', /.*/);
+    await expect(question(page, 'RQ1').locator('[data-risk-evidence]')).toHaveCount(0);
+    await expect(question(page, 'RQ2')).toHaveAttribute('aria-describedby', 'risk-RQ2-hint');
+    await expect(page.locator('#risk-RQ2-hint')).not.toBeEmpty();
+  });
+
   test('a 404 on the rubric read shows "not configured" and leaves save and submit working (R-16)', async ({
     page,
   }) => {
