@@ -580,3 +580,24 @@ test('W4-12: listQcRuns path is a GET under the version', async () => {
   assert.equal(calls[0]?.input, '/api/cases/c1/versions/v%2F1/qc-runs');
   assert.equal(calls[0]?.init?.method ?? 'GET', 'GET');
 });
+
+test('W5-07: the risk rubric read answers the view, and a 404 means "not configured" (null), not an error', async () => {
+  const seen: string[] = [];
+  const view = { revisionId: 'r-1', label: 'synthetic-placeholder.1', provenance: 'synthetic_placeholder' };
+  const ok = createApiClient((input) => {
+    seen.push(input);
+    return Promise.resolve(new Response(JSON.stringify(view), { status: 200 }));
+  });
+  assert.deepEqual(await ok.getRiskRubric(), view);
+  assert.deepEqual(seen, ['/api/configuration/risk-rubric/current']);
+  const missing = createApiClient(
+    fetchAnswering(404, { error: { code: 'not_found', messageKey: 'error.not_found', correlationId: 'c' } }),
+  );
+  assert.equal(await missing.getRiskRubric(), null);
+  const broken = createApiClient(
+    fetchAnswering(500, {
+      error: { code: 'internal_error', messageKey: 'error.internal_error', correlationId: 'c' },
+    }),
+  );
+  await assert.rejects(broken.getRiskRubric(), ApiError);
+});

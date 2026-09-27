@@ -6,7 +6,13 @@ import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { REGISTRY_ID_PATTERN } from '@rai/shared/ids';
-import type { CaseListResponse, CaseView, ConfigurationView } from '@rai/shared/schemas/cases';
+import { CONFIGURATION_SEED } from '@rai/server/configuration/seed';
+import type {
+  CaseListResponse,
+  CaseView,
+  ConfigurationView,
+  RiskRubricView,
+} from '@rai/shared/schemas/cases';
 import type { PackDraft } from '@rai/shared/schemas/pack';
 import { FIXTURE_CASES, findFixtureCase } from '../../data/cases/index.js';
 import { createApiSubstitute, type ApiSubstitute } from './handler.js';
@@ -68,6 +74,22 @@ describe('W1-13 substitute: cases (7.3)', () => {
     assert.equal(view.timezone, 'Asia/Bangkok');
     assert.match(view.revisionId, /^[0-9a-f-]{36}$/);
     assert.equal((await call(substitute, 'GET', '/api/configuration/current')).status, 401);
+  });
+
+  it('GET /api/configuration/risk-rubric/current answers the seeded SYNTHETIC PLACEHOLDER rubric (W5-07, R-16); 401 without a session', async () => {
+    for (const user of ['fx-user-owner-cm', 'fx-user-dpo', 'fx-user-admin']) {
+      const response = await call(substitute, 'GET', '/api/configuration/risk-rubric/current', {
+        cookie: users[user],
+      });
+      assert.equal(response.status, 200);
+      const view = response.json<RiskRubricView>();
+      assert.deepEqual(view.body, CONFIGURATION_SEED.risk_rubric);
+      assert.equal(view.label, 'synthetic-placeholder.1');
+      assert.equal(view.provenance, 'synthetic_placeholder');
+      assert.match(view.revisionId, /^[0-9a-f-]{36}$/);
+      assert.equal(Number.isNaN(Date.parse(view.publishedAt)), false);
+    }
+    assert.equal((await call(substitute, 'GET', '/api/configuration/risk-rubric/current')).status, 401);
   });
 
   it('GET /api/cases is scoped: own cases, the BU, or all (T8); total counts only in-scope cases', async () => {

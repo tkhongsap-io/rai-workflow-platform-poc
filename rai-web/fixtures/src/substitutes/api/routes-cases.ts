@@ -3,6 +3,7 @@
 // W0-06 4.1/4.2 rules. Scope for the list is the W0-05 `caseScopeWhere` predicate over the actor's grants.
 
 import { InvalidInputError, NotFoundError } from '@rai/shared/errors';
+import { CONFIGURATION_SEED } from '@rai/server/configuration/seed';
 import type { CaseId } from '@rai/shared/ids';
 import {
   CASE_LIST_DEFAULTS,
@@ -12,9 +13,11 @@ import {
   type CaseCreateRequest,
   type CaseListResponse,
   type CaseUpdateRequest,
+  type RiskRubricView,
 } from '@rai/shared/schemas/cases';
+import { fixtureUuid } from '../../data/ids.js';
 import type { RouteContext, RouteDefinition } from './handler.js';
-import type { StoredCase } from './store.js';
+import { FIXTURE_CONFIGURATION_PUBLISHED_AT, type StoredCase } from './store.js';
 import { assertValid, fieldErrorsFor, json, parseJsonBody } from './support.js';
 import {
   actorOf,
@@ -55,6 +58,15 @@ function listQuery(ctx: RouteContext): { page: number; pageSize: number } {
   };
 }
 
+/** The substitute's `risk_rubric` view: the W5-02 seed body under a fixed synthetic revision ID. */
+const SUBSTITUTE_RISK_RUBRIC: RiskRubricView = Object.freeze({
+  revisionId: fixtureUuid('configuration/risk_rubric/1'),
+  label: CONFIGURATION_SEED.risk_rubric.label,
+  provenance: CONFIGURATION_SEED.risk_rubric.provenance,
+  publishedAt: FIXTURE_CONFIGURATION_PUBLISHED_AT,
+  body: CONFIGURATION_SEED.risk_rubric,
+});
+
 export function caseRoutes(): RouteDefinition[] {
   return [
     {
@@ -62,6 +74,14 @@ export function caseRoutes(): RouteDefinition[] {
       path: '/api/configuration/current',
       auth: { kind: 'action', action: 'config.read_effective', target: 'none' },
       handler: (ctx) => json(200, ctx.correlationId, ctx.store.configuration),
+    },
+    {
+      // W5-07 (W5 plan R-16): the seeded SYNTHETIC PLACEHOLDER rubric, as the server's W5-02 route answers it, so
+      // the substitute shows the questionnaire. The substitute never stores answers and never scores (W5-04, W5-05).
+      method: 'GET',
+      path: '/api/configuration/risk-rubric/current',
+      auth: { kind: 'action', action: 'config.read_effective', target: 'none' },
+      handler: (ctx) => json(200, ctx.correlationId, SUBSTITUTE_RISK_RUBRIC),
     },
     {
       method: 'GET',
