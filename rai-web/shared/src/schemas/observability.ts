@@ -81,7 +81,7 @@ export const ReadinessReportSchema = object({
   }),
   store: object({
     db: values(['ok', 'unreachable', 'timeout'] as const),
-    migrations: values(['current', 'pending', 'unknown'] as const),
+    migrations: values(['current', 'pending', 'ahead', 'unknown'] as const), // ahead: W7-03, additive only
     blob: values(['ok', 'unreachable', 'not_writable'] as const),
   }),
   mailSink: object({

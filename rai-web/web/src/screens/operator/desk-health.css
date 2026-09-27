@@ -44,3 +44,7 @@
 .operator-health button[aria-disabled='true'] {
   cursor: wait;
 }
+/* W7-03: the note beside a migrations `ahead` warning badge. */
+.operator-note {
+  margin: 0.25rem 0 0;
+}

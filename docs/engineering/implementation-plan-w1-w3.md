@@ -207,6 +207,7 @@ npm run db:cleanup         # operator command (rai_operator, W0-04): expires ide
 npm run store:verify       # operator command: re-hashes every blob an artifact row references; non-zero exit on any mismatch (W0-04; W1-12 migration tests, W7-00)
 npm run store:cleanup      # operator command: removes stale temp files under BLOB_DIR/tmp; orphan-blob removal only after D08
 npm run backup             # operator command (W7-01): pg_dump of the database (session rows excluded), the referenced blobs and a manifest under BACKUP_DIR; see the W7-01 amendment in section 5
+npm run release:check-rollback -- --target-migrations <dir>  # operator command (W7-03): binary_only / restore_required / incompatible for rolling back to the release whose server/drizzle is <dir>; W0-04 "W7-03 migration classes"
 ```
 
 W0-09: the three operator commands are carried from W0-04 "Configuration and commands handed to W0-02" under this plan's naming (`migrate` and `reset` replace W0-04's proposed `db:migrate` and `db:reset`; `fixtures:generate` is W0-08's name, kept).

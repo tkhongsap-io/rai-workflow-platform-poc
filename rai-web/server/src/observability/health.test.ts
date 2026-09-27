@@ -104,3 +104,26 @@ test('readiness cache coalesces concurrent requests, expires, and isolates calle
   await read();
   assert.equal(calls, 2);
 });
+test('W7-03 migrations ahead (additive only) is kept by the bounded probe and is ready', async () => {
+  const report = await computeReadiness(config, { ...probes, migrations: () => Promise.resolve('ahead') });
+  assert.equal(report.store.migrations, 'ahead');
+  assert.equal(report.status, 'ready');
+  assert.equal(Value.Check(ReadinessReportSchema, report), true);
+  for (const changed of [
+    { db: () => Promise.resolve('unreachable' as const) },
+    { blob: () => Promise.resolve('not_writable' as const) },
+    { mailSink: () => Promise.resolve('unavailable' as const) },
+  ])
+    assert.equal(
+      (
+        await computeReadiness(config, {
+          ...probes,
+          migrations: () => Promise.resolve('ahead'),
+          ...changed,
+        })
+      ).status,
+      'not_ready',
+    );
+  const unknown = await computeReadiness(config, { ...probes, migrations: () => Promise.resolve('unknown') });
+  assert.equal(unknown.status, 'not_ready');
+});

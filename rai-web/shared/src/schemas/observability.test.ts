@@ -210,3 +210,13 @@ test('queued initial failure may remain unscheduled until W3-04 owns retry sched
   assert.equal(Value.Check(FailureReportSchema, { ...unscheduled, nextAttemptAt: at }), true);
   assert.equal(Value.Check(FailureReportSchema, { ...unscheduled, nextAttemptAt: 'unknown' }), false);
 });
+test('W7-03 readiness store.migrations accepts ahead and still rejects free text', () => {
+  assert.equal(
+    Value.Check(ReadinessReportSchema, { ...readiness, store: { ...readiness.store, migrations: 'ahead' } }),
+    true,
+  );
+  assert.equal(
+    Value.Check(ReadinessReportSchema, { ...readiness, store: { ...readiness.store, migrations: 'behind' } }),
+    false,
+  );
+});

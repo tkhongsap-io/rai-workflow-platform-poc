@@ -227,3 +227,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w6-01-w6-contract-shared-shapes model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #206)
 - Scope: per changes/2026-09-27-w6-01-w6-contract-shared-shapes/: shared shapes (`configuration-admin.ts`, `dashboard.ts`, `QueueQuerySchema` filters, optional `SubmittedVersion.frozenConfiguration`), policy rows (`qc.recheck`, `dashboard.view`, `config.publish` scope), error codes (`desk_frozen` 503, `configuration_changed`, `configuration` resource) with capture at info, locale keys, and the W0-02/W0-05/W0-06/W0-10 amendments. One PR, no migration.
+
+## 2026-09-27 21:13 — CLAIM lane-a: W7-03 migration classes, ahead readiness, rollback check (#208)
+- Author: operator=ta session=claude-code-w7-03-migration-classes-ahead-readiness model=claude-opus-5-5 (implementation lane ops)
+- Takes over from: session=none (reason: new; ticket #208, W7 plan #199 merged)
+- Scope: per changes/2026-09-27-w7-03-migration-classes-ahead-readiness/: `MIGRATION_CLASSES` and the header test, migration `0011_w7_03_migration_class` (`schema_migration_class`, guard, grants), the conditional class writer in `runMigrations`, readiness `store.migrations: ahead`, `npm run release:check-rollback`, desk-health `ahead` with th/en keys, W0-04 and W0-10 amendments. Migration-bearing; one PR.

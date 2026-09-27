@@ -25,3 +25,32 @@ test('blob probe is read only and does not create missing directories or probe f
     await rm(root, { recursive: true, force: true });
   }
 });
+
+// W7-03 (W7 plan section 3.3; W0-04 "if ahead by an additive migration, it serves"): `ahead` only when the build's
+// journal is a strict prefix of the database's and every extra hash is recorded as additive.
+test('W7-03 migrationStatus table: current, pending, ahead-additive and every other ahead is unknown', () => {
+  const classes: Record<string, 'additive' | 'restore-required' | 'copy-forward'> = {
+    c: 'additive',
+    d: 'additive',
+    r: 'restore-required',
+    f: 'copy-forward',
+  };
+  const classOf = (hash: string) => classes[hash];
+  assert.equal(migrationStatus(['a', 'b'], ['a', 'b'], classOf), 'current');
+  assert.equal(migrationStatus(['a', 'b'], ['a'], classOf), 'pending');
+  assert.equal(migrationStatus(['a', 'b'], ['a', 'b', 'c'], classOf), 'ahead');
+  assert.equal(migrationStatus(['a', 'b'], ['a', 'b', 'c', 'd'], classOf), 'ahead');
+  assert.equal(migrationStatus([], ['c'], classOf), 'ahead');
+  assert.equal(migrationStatus(['a', 'b'], ['a', 'b', 'r'], classOf), 'unknown', 'restore-required extra');
+  assert.equal(
+    migrationStatus(['a', 'b'], ['a', 'b', 'c', 'r'], classOf),
+    'unknown',
+    'one non-additive extra',
+  );
+  assert.equal(migrationStatus(['a', 'b'], ['a', 'b', 'f'], classOf), 'unknown', 'copy-forward extra');
+  assert.equal(migrationStatus(['a', 'b'], ['a', 'b', 'x'], classOf), 'unknown', 'extra with no class row');
+  assert.equal(migrationStatus(['a', 'b'], ['a', 'x', 'c'], classOf), 'unknown', 'divergent then additive');
+  assert.equal(migrationStatus(['a', 'b'], ['b', 'a', 'c'], classOf), 'unknown', 'reordered');
+  // Without a class source nothing is additive: the pre-W7-03 answer.
+  assert.equal(migrationStatus(['a'], ['a', 'c']), 'unknown');
+});
