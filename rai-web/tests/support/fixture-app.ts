@@ -20,6 +20,7 @@ import { migrationFileCount } from '@rai/server/db/migrate';
 import { createIdentityAdapter } from '@rai/server/identity/adapter';
 import { computeReadiness, createReadinessReader } from '@rai/server/observability/health';
 import { createStoreProbes } from '@rai/server/observability/probes';
+import { qcKindOf } from '@rai/server/qc/kind';
 import type { LaneOpenRecipients } from '@rai/server/versions/open-lanes';
 import { FIXTURE_USERS } from '@rai/fixtures/data/users';
 import { loadFixtures } from '@rai/fixtures/load';
@@ -135,7 +136,7 @@ export async function rebuildApp({
         identity: () => adapter.health(),
         loopbackBind: true,
         mailKind: 'memory',
-        qcKind: 'substitute',
+        qcKind: qcRunner === null ? 'substitute' : qcKindOf(qcRunner.identity), // W4a plan section 2
         build: { commit: 'dev', schemaVersion: String(migrationFileCount()) },
       },
       {

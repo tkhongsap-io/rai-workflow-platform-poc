@@ -205,7 +205,8 @@ describe('W1-INT static.ts through start.ts', () => {
     RAI_IDENTITY_MODE: nodeEnv === 'test' ? 'fixture' : 'production',
     MAIL_MODE: 'sink-memory',
     MAIL_SINK_DIR: path.join(tmpdir(), 'rai-w1-int-static-mail'),
-    QC_MODE: 'substitute',
+    // W4-13: `substitute` is refused under NODE_ENV=production (W4a plan section 2), so production binds the W4a runner.
+    QC_MODE: nodeEnv === 'test' ? 'substitute' : 'deterministic',
     LOG_LEVEL: 'error',
     LOG_PRETTY: 'false',
     BUILD_COMMIT: 'test',

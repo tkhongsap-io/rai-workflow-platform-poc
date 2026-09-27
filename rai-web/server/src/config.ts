@@ -12,8 +12,8 @@ export const EXIT_CONFIG = 78;
 
 export type NodeEnv = 'development' | 'test' | 'production';
 export type MailMode = 'sink-file' | 'sink-memory';
-// `deterministic` is accepted only under NODE_ENV=test until W4-13 makes it the runner of every environment (W4a
-// plan section 2); W4-03 introduces it for the real-server evidence test (plan section 8, issue #186).
+// W4a plan section 2 (W4-13): `deterministic` binds the W4a runner in every environment; `substitute` binds the
+// scripted W1-10 runner and is a local value only (see parseQcMode).
 export type QcMode = 'substitute' | 'deterministic';
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
@@ -103,9 +103,17 @@ function oneOf<T extends string>(env: Env, name: string, values: readonly T[]): 
   return value as T;
 }
 
-function parseQcMode(env: Env, nodeEnv: NodeEnv): QcMode {
+/** The identity modes in which the scripted substitute may run (W4a plan section 2). */
+const QC_LOCAL_IDENTITY_MODES: readonly IdentityMode[] = ['fixture', 'local-google'];
+
+/**
+ * W4a plan section 2: unset → missing, any other value → invalid; `substitute` is refused under NODE_ENV=production
+ * or a non-local identity mode (W0-07 3.9). No mode ever falls back to the other runner.
+ */
+function parseQcMode(env: Env, nodeEnv: NodeEnv, identityMode: IdentityMode): QcMode {
   const mode = oneOf(env, 'QC_MODE', ['substitute', 'deterministic'] as const);
-  if (mode === 'deterministic' && nodeEnv !== 'test') throw new ConfigError('invalid:QC_MODE');
+  if (mode === 'substitute' && (nodeEnv === 'production' || !QC_LOCAL_IDENTITY_MODES.includes(identityMode)))
+    throw new ConfigError('invalid:QC_MODE');
   return mode;
 }
 
@@ -226,7 +234,7 @@ export function parseConfig(env: Env): AppConfig {
       mode: oneOf(env, 'MAIL_MODE', ['sink-file', 'sink-memory'] as const),
       sinkDir: required(env, 'MAIL_SINK_DIR'),
     },
-    qc: { mode: parseQcMode(env, nodeEnv) },
+    qc: { mode: parseQcMode(env, nodeEnv, mode) },
     log: { level: oneOf(env, 'LOG_LEVEL', ['debug', 'info', 'warn', 'error'] as const), pretty: logPretty },
     buildCommit: required(env, 'BUILD_COMMIT'),
   };

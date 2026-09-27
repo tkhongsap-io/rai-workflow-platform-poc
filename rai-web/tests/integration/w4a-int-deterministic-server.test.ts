@@ -3,8 +3,9 @@
 // mode against this suite's Postgres with fixture set slice1-synthetic@1 loaded. Every request goes over HTTP with a
 // session cookie from POST /auth/fixture/sign-in. It reads readiness `qc.kind`, the stored `PACK-*` findings of the
 // three W4a metadata rules through the findings endpoint, the `qc_run` rows (runner identity, `rules_evaluated`) and
-// the `qc.run.*` lines. Until W4-13 lands, `deterministic` is accepted only under NODE_ENV=test (config.ts); W4-13
-// makes it the default and W4-12 extends this file with the qc-runs endpoint. Slot and stage edits go through the
+// the `qc.run.*` lines. Since W4-13, `deterministic` is valid in every environment and `.env.example` sets it; the
+// test harness (tests/support/process.ts) pins `substitute`, so this file overrides it. W4-12 extends this file with
+// the qc-runs endpoint. Slot and stage edits go through the
 // save-draft route before submit; no document is parsed and nothing leaves the host.
 
 import { after, before, describe, it } from 'node:test';
