@@ -6,12 +6,21 @@
 // `unbound` and replays that row. W4-11a: every run row and qc.run.* line names the runner (engine_id,
 // runner_version) and the rule revision, and a recorded run stores how many rules it evaluated. W4-02: the request
 // carries the rules the recorded qc_rules revision selects (`request.rules`, null when no qc_rules revision
-// applies); an unknown template version is recorded as runner_error without calling the runner.
+// applies); an unknown template version is recorded as runner_error without calling the runner. W4-04: the
+// `upload` trigger (runAndPersistUploadQc) runs on the open draft, or the version it became while still open; its
+// run has lane NULL and its slot, never replays, shares in-flight work by runKey, and its outage finding is owned by
+// the slot's lane (slot 5: AI/COE; slot 9: no run) and reused per version and owning lane.
 
 import { createHash } from 'node:crypto';
 import { Value } from 'typebox/value';
 import { QcUnavailableReasonSchema } from '@rai/shared/schemas/observability';
-import { LANE_MAPPINGS_BY_VERSION, type Lane, type Slot, unavailableOwningLane } from '@rai/shared/constants';
+import {
+  CURRENT_LANE_MAPPING,
+  LANE_MAPPINGS_BY_VERSION,
+  type Lane,
+  type Slot,
+  unavailableOwningLane,
+} from '@rai/shared/constants';
 import { NotFoundError, StaleVersionError } from '@rai/shared/errors';
 import { uuidv7 } from '@rai/shared/ids';
 import type {
@@ -77,6 +86,14 @@ export type RunSubmitQcInput = Omit<RunLaneQcInput, 'lane'>;
 type RunQcInput = RunSubmitQcInput &
   ({ trigger: 'submit'; lane: null } | { trigger: 'approve_attempt'; lane: Lane });
 
+/** W4-04: one changed attach. `versionId` is the draft the save wrote (the row that becomes the version at submit). */
+export interface RunUploadQcInput extends RunSubmitQcInput {
+  slot: Slot;
+}
+type UploadQcInput = RunUploadQcInput & { trigger: 'upload'; lane: null };
+/** Any run's input, for the helpers every trigger shares (logging, late results). */
+type AnyQcInput = RunQcInput | UploadQcInput;
+
 export type PersistQcOutcome =
   | { status: 'completed'; runId: string; findings: StoredFindingSummary[] }
   | {
@@ -131,8 +148,12 @@ async function buildRequest(
   deadlineMs: number,
   ruleRevision: string,
   rules: SelectedRule[] | null,
+  uploadSlot: Slot | null = null,
 ): Promise<QcRunRequest> {
-  const { rows, artifacts: artifactMap } = await readSlotsWithArtifacts(tx, version.id);
+  const read = await readSlotsWithArtifacts(tx, version.id);
+  const artifactMap = read.artifacts;
+  // W0-07 3.3: an upload request carries the one uploaded slot and its artifact; runKey follows (3.7).
+  const rows = uploadSlot === null ? read.rows : read.rows.filter((s) => s.slot === uploadSlot);
   const slots: SlotState[] = rows.map((s) => ({
     slot: s.slot as SlotState['slot'],
     disposition: s.state as SlotState['disposition'],
@@ -154,7 +175,10 @@ async function buildRequest(
       read: () => Promise.resolve(new ReadableStream()),
     });
   }
-  if (version.laneMappingVersion === null) throw new Error('submitted version has no lane_mapping_version');
+  // A draft has no mapping frozen yet; its upload run uses the current constant (W4a plan section 5).
+  const laneMappingVersion =
+    version.laneMappingVersion ?? (version.submittedAt === null ? CURRENT_LANE_MAPPING.version : null);
+  if (laneMappingVersion === null) throw new Error('submitted version has no lane_mapping_version');
   return {
     correlationId,
     runKey: runKeyOf(
@@ -174,7 +198,7 @@ async function buildRequest(
     },
     checklistTemplateVersion: version.checklistTemplateVersion,
     qcRulesRevision: ruleRevision,
-    laneMappingVersion: version.laneMappingVersion,
+    laneMappingVersion,
     stageContext: version.stageContext as QcRunRequest['stageContext'],
     modelType: caseRow.modelType as QcRunRequest['modelType'],
     vendorInvolved: caseRow.vendorInvolved,
@@ -237,7 +261,7 @@ async function recordRun(
     id: run.id,
     versionId: version.id,
     trigger: request.trigger,
-    slot: null,
+    slot: uploadSlotOf(request),
     lane: request.lane,
     engineId: run.engineId,
     runnerVersion: run.runnerVersion,
@@ -260,6 +284,7 @@ async function recordRun(
       trigger: request.trigger,
       finding_count: findingCount,
       ...(request.lane === null ? {} : { lane: request.lane }),
+      ...(request.trigger === 'upload' ? { slot: uploadSlotOf(request) } : {}),
     },
     correlationId: run.correlationId,
     occurredAt: run.stamp,
@@ -274,7 +299,14 @@ async function persistResult(
   run: RunRecord,
 ): Promise<PersistQcOutcome> {
   if (result.status === 'unavailable') {
-    const prior = await findLatestUnavailableFinding(tx, version.id, request.trigger, request.lane);
+    // W0-07 3.6: one open outage finding per scope; for upload the scope is the owning lane (W4-04 amendment).
+    const prior = await findLatestUnavailableFinding(
+      tx,
+      version.id,
+      request.trigger,
+      request.lane,
+      request.trigger === 'upload' ? outageOwningLane(request) : undefined,
+    );
     const reuse = prior !== undefined && prior.undispositioned;
     // The run row names the bound runner, not the orchestrator that builds the QC-UNAVAILABLE finding (W0-07 3.6).
     await recordRun(tx, version, request, run, result.reason, reuse ? 0 : 1, 0);
@@ -319,6 +351,32 @@ async function persistResult(
   return { status: 'completed', runId: run.id, findings };
 }
 
+/** The slot an upload run is scoped to (its request carries exactly that one slot); null for other triggers. */
+function uploadSlotOf(request: QcRunRequest): Slot | null {
+  if (request.trigger !== 'upload') return null;
+  const [only] = request.slots;
+  if (only === undefined || request.slots.length !== 1) throw new Error('an upload request carries one slot');
+  return only.slot;
+}
+
+/**
+ * The lane of a QC-UNAVAILABLE finding (W0-06 7.3 part 4). Submit and approve attempts need no mapping, so an
+ * outage is recorded whatever the version's mapping version is. Upload (W4-04): the slot's lane under the request's
+ * mapping; slot 5 → AI/COE (register row "D05 refinement (upload slot 5 and 9)"); slot 9 never reaches a run.
+ */
+function outageOwningLane(request: QcRunRequest): Lane {
+  if (request.trigger === 'approve_attempt') {
+    if (request.lane === null) throw new Error('an approve-attempt run names its lane'); // unreachable (RunQcInput)
+    return unavailableOwningLane({ trigger: 'approve_attempt', lane: request.lane });
+  }
+  if (request.trigger === 'submit') return unavailableOwningLane({ trigger: 'submit', lane: null });
+  const mapping = LANE_MAPPINGS_BY_VERSION[request.laneMappingVersion];
+  if (mapping === undefined) throw new Error('an upload run needs a known lane mapping');
+  const lane = unavailableOwningLane({ trigger: 'upload', slot: uploadSlotOf(request)! }, mapping);
+  if (lane === null) throw new Error('slot 9 has no upload run'); // the trigger never calls the orchestrator for it
+  return lane;
+}
+
 /** W0-07 3.6: the one finding the orchestrator builds itself. Its lane follows the run (W0-06 7.3 part 4). */
 async function appendUnavailableFinding(
   tx: Tx,
@@ -327,15 +385,7 @@ async function appendUnavailableFinding(
   run: RunRecord,
   reason: QcUnavailableReason,
 ): Promise<StoredFindingSummary> {
-  // The orchestrator runs submit and approve_attempt only (RunQcInput); upload QC arrives with W4. Neither needs
-  // the mapping, so an outage is recorded whatever the version's mapping version is.
-  if (request.trigger === 'approve_attempt' && request.lane === null)
-    throw new Error('an approve-attempt run names its lane'); // unreachable by construction (RunQcInput)
-  const owningLane = unavailableOwningLane(
-    request.trigger === 'approve_attempt'
-      ? { trigger: 'approve_attempt', lane: request.lane as Lane }
-      : { trigger: 'submit', lane: null },
-  );
+  const owningLane = outageOwningLane(request);
   const findingId = uuidv7(run.stamp.getTime());
   const messageParams = { reason, trigger: request.trigger, rulesEvaluated: 0 };
   await insertQcFinding(tx, {
@@ -400,6 +450,26 @@ async function loadOpenSubmittedTarget(
 }
 
 /**
+ * W4-04 (W4a plan section 5): case lock plus the upload target: the case's open draft, or the version that draft
+ * became while that version is still open, which {@link loadOpenSubmittedTarget} checks unchanged (Ready →
+ * `version_closed`, a send-back → `version_closed`, a later version → `version_superseded`).
+ */
+async function loadUploadTarget(
+  tx: Tx,
+  input: RunUploadQcInput,
+): Promise<{ caseRow: CaseRow; version: PackVersionRow }> {
+  if (!(await lockCase(tx, input.caseId))) throw new NotFoundError('case');
+  const caseRow = await readCaseRow(tx, input.caseId);
+  if (caseRow === undefined) throw new NotFoundError('case');
+  const version = await readVersionRow(tx, input.versionId);
+  if (version === undefined || version.caseId !== input.caseId) throw new NotFoundError('version');
+  if (version.submittedAt !== null) return loadOpenSubmittedTarget(tx, input);
+  if (caseRow.draftVersionId === version.id) return { caseRow, version };
+  // A draft row that is no longer the case's open draft: never written to.
+  throw staleAt('version_superseded', 'error.stale_version.guidance.version_superseded', version, caseRow);
+}
+
+/**
  * W0-07 3.7: the recorded run a call returns instead of running QC. A completed run always replays. For submit,
  * an unavailable run replays with its stored reason. For approve_attempt an unavailable run is retried, except
  * that an unbound runner replays its own `unbound` row rather than stacking identical not_configured rows.
@@ -439,7 +509,7 @@ type Settled =
   | { kind: 'recorded'; outcome: PersistQcOutcome; label: RunLabel; rulesEvaluated: number };
 
 /** A replay emits nothing; a newly recorded run emits its W0-10 completion line. */
-function settle(deps: QcOrchestratorDeps, input: RunQcInput, settled: Settled, startedAt: number) {
+function settle(deps: QcOrchestratorDeps, input: AnyQcInput, settled: Settled, startedAt: number) {
   if (settled.kind === 'recorded') {
     const { outcome, label } = settled;
     if (outcome.status === 'unavailable')
@@ -485,7 +555,7 @@ async function callRunner(
  */
 async function recordLate(
   deps: QcOrchestratorDeps,
-  input: RunQcInput,
+  input: AnyQcInput,
   qcRunId: string,
   result: QcRunResult,
   clock: () => Date,
@@ -650,20 +720,35 @@ function shareFlight<T>(
   input: RunQcInput,
   run: () => Promise<T>,
 ): Promise<T> {
-  let flights = table.get(deps.db);
-  if (flights === undefined) {
-    flights = new Map();
-    table.set(deps.db, flights);
-  }
-  const key = `${input.caseId}:${input.versionId}:${input.lane ?? input.trigger}`;
-  const current = flights.get(key);
-  if (current !== undefined) return current;
-  const context = {
+  return runWithContext(contextOf(input), () =>
+    inFlight(table, deps.db, `${input.caseId}:${input.versionId}:${input.lane ?? input.trigger}`, run),
+  );
+}
+
+/** The run keeps the originating correlation even for callers outside an HTTP handler. */
+function contextOf(input: AnyQcInput) {
+  return {
     ...maybeContext(),
     correlationId: input.correlationId,
     startedAt: maybeContext()?.startedAt ?? performance.now(),
   };
-  const tracked = runWithContext(context, run).finally(() => {
+}
+
+/** The in-flight table: one promise per key and database while it is pending. */
+function inFlight<T>(
+  table: WeakMap<Db, Map<string, Promise<T>>>,
+  db: Db,
+  key: string,
+  run: () => Promise<T>,
+): Promise<T> {
+  let flights = table.get(db);
+  if (flights === undefined) {
+    flights = new Map();
+    table.set(db, flights);
+  }
+  const current = flights.get(key);
+  if (current !== undefined) return current;
+  const tracked = run().finally(() => {
     flights.delete(key);
   });
   flights.set(key, tracked);
@@ -686,6 +771,109 @@ export function runAndPersistSubmitQc(
 ): Promise<SubmitQcOutcome> {
   const submit = { ...input, trigger: 'submit' as const, lane: null };
   return shareFlight(submitFlights, deps, submit, () => runQc(deps, submit));
+}
+
+const uploadFlights = new WeakMap<Db, Map<string, Promise<PersistQcOutcome>>>();
+
+/**
+ * W4-04 (W4a plan section 5, W0-07 3.2): the QC run for one changed attach on a save-draft, fired after the save
+ * committed. Slot 9 has no upload run (register row "D05 refinement (upload slot 5 and 9)"): `undefined`, nothing
+ * written. Otherwise the run is recorded on the draft row, or on the version it became while that version is still
+ * open; after Ready it is late (nothing written, `qc.run.late`), and a version closed by a send-back refuses it
+ * (`version_closed`, nothing written). Upload never replays (every trigger is a new input, W0-07 3.7); two calls
+ * for the same runKey in this process share one in-flight run, so two attaches in one save run separately.
+ */
+export function runAndPersistUploadQc(
+  deps: QcOrchestratorDeps,
+  input: RunUploadQcInput,
+): Promise<PersistQcOutcome | undefined> {
+  if (unavailableOwningLane({ trigger: 'upload', slot: input.slot }, CURRENT_LANE_MAPPING) === null)
+    return Promise.resolve(undefined);
+  const upload: UploadQcInput = { ...input, trigger: 'upload', lane: null };
+  return runWithContext(contextOf(upload), () => runUploadQc(deps, upload));
+}
+
+async function runUploadQc(deps: QcOrchestratorDeps, input: UploadQcInput): Promise<PersistQcOutcome> {
+  const clock = deps.now ?? (() => new Date());
+  const timeoutMs = deps.timeoutMs ?? QC_TIMEOUT_MS;
+  const { runner } = deps;
+
+  // Read only: the request (and its runKey) for the row as it is now; nothing is written before the runner answers.
+  const prepared = await withTransaction(deps.db, async (tx) => {
+    const { caseRow, version } = await loadUploadTarget(tx, input);
+    const stamp = nextMonotonicStamp(clock);
+    // Plan section 3: a draft reads the qc_rules revision in force at the upload instant; a submitted row its own.
+    const context = await ruleContextOf(tx, version, stamp);
+    let rules: SelectedRule[] | null = null;
+    let selectionError: RuleSelectionError | undefined;
+    try {
+      rules = requestRules(
+        context,
+        version.checklistTemplateVersion,
+        'upload',
+        caseRow.modelType as QcRunRequest['modelType'],
+      );
+    } catch (error) {
+      if (!(error instanceof RuleSelectionError)) throw error;
+      selectionError = error;
+    }
+    const request = await buildRequest(
+      tx,
+      caseRow,
+      version,
+      'upload',
+      null,
+      input.correlationId,
+      stamp.getTime() + timeoutMs,
+      context.ruleRevision,
+      rules,
+      input.slot,
+    );
+    return { request, stamp, selectionError };
+  });
+  const { request, stamp, selectionError } = prepared;
+
+  return inFlight(uploadFlights, deps.db, request.runKey, async () => {
+    const base = { id: uuidv7(stamp.getTime()), stamp, correlationId: input.correlationId };
+    let run: RunRecord;
+    let result: QcRunResult;
+    let startedAt = performance.now();
+    if (runner === undefined) {
+      run = { ...base, engineId: UNBOUND_ENGINE_ID, runnerVersion: UNBOUND_RUNNER_VERSION };
+      result = unavailableResult('not_configured', null, stamp);
+    } else {
+      run = { ...base, engineId: runner.identity.runner, runnerVersion: runner.identity.runnerVersion };
+      if (selectionError !== undefined) {
+        // No trustworthy rule list: an outage under the bound runner, never a clean pass (plan section 3).
+        result = unavailableResult('runner_error', selectionError.detail, stamp);
+      } else {
+        deps.emitter?.log('qc.run.started', {
+          qcRunId: run.id,
+          caseId: input.caseId,
+          versionId: input.versionId,
+          trigger: 'upload',
+          qcKind: qcKindOf(runner.identity),
+          ...labelOf(run, request),
+        });
+        startedAt = performance.now();
+        result = await callRunner(runner, request, stamp, timeoutMs);
+      }
+    }
+    try {
+      const stored = await withTransaction(deps.db, async (tx): Promise<Settled> => {
+        const { version } = await loadUploadTarget(tx, input); // re-checked under the lock: Ready or closed refuses
+        return recorded(
+          await persistResult(tx, version, request, result, run),
+          labelOf(run, request),
+          result,
+        );
+      });
+      return settle(deps, input, stored, startedAt) as PersistQcOutcome;
+    } catch (error) {
+      if (error instanceof StaleVersionError) await recordLate(deps, input, run.id, result, clock);
+      throw error;
+    }
+  });
 }
 
 /** Test/helper: case row type re-export so callers need not dig into cases/. */

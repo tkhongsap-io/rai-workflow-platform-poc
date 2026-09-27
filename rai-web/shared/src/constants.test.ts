@@ -75,7 +75,27 @@ test('unavailableOwningLane follows the run (7.3 part 4): approve attempt → it
   assert.equal(unavailableOwningLane({ trigger: 'approve_attempt', lane: 'it_security' }), 'it_security');
   assert.equal(unavailableOwningLane({ trigger: 'submit', lane: null }), 'ai_coe');
   assert.throws(() => unavailableOwningLane({ trigger: 'upload', slot: 7 }), /mapping/);
-  // Upload on slot 5 or 9 is defined with upload QC (W4); until then it is a thrown error, never a guess.
-  assert.throws(() => unavailableOwningLane({ trigger: 'upload', slot: 5 }, LANE_MAPPING_V1), /upload QC/);
-  assert.throws(() => unavailableOwningLane({ trigger: 'upload', slot: 9 }, LANE_MAPPING_V1), /upload QC/);
+});
+
+test('unavailableOwningLane for upload (register row "D05 refinement (upload slot 5 and 9)", W4-04): slot 5 → AI/COE; slot 9 → no run', () => {
+  const expected: Record<number, string | null> = {
+    1: 'ai_coe',
+    2: 'dpo',
+    3: 'dpo',
+    4: 'dpo',
+    5: 'ai_coe', // recorded rule: as on submit and for the pack
+    6: 'it_security',
+    7: 'it_security',
+    8: 'it_security',
+    9: null, // no upload rules run on slot 9, so there is no run and no finding
+  };
+  for (const slot of [1, 2, 3, 4, 5, 6, 7, 8, 9] as const)
+    assert.equal(
+      unavailableOwningLane({ trigger: 'upload', slot }, LANE_MAPPING_V1),
+      expected[slot],
+      `slot ${slot}`,
+    );
+  // The submit and approve-attempt overload keeps its non-null return type (a compile-time check).
+  const lane: 'ai_coe' | 'dpo' | 'it_security' = unavailableOwningLane({ trigger: 'submit', lane: null });
+  assert.equal(lane, 'ai_coe');
 });

@@ -9,7 +9,13 @@ import { fileURLToPath } from 'node:url';
 import { findingKeyOf, validateQcFinding } from '@rai/shared/qc/validate';
 import type { QcRunRequest, QcRunResult, QcRunner, QcTrigger } from '@rai/shared/qc/types';
 import { ScriptedQcRunner, materializeFindings } from './scripted-runner.js';
-import { BUNDLED_QC_SCRIPTS, QcScriptError, selectorKey } from './scripts.js';
+import {
+  BUNDLED_QC_SCRIPTS,
+  QcScriptError,
+  RAW_BUNDLED_QC_SCRIPTS,
+  selectorKey,
+  validateScript,
+} from './scripts.js';
 import { QC_SUBSTITUTE_RUNNER, QC_SUBSTITUTE_RUNNER_VERSION } from './version.js';
 import { buildRequest, deepFreeze, syntheticArtifactId, syntheticHash } from './test-support.js';
 
@@ -112,8 +118,55 @@ test('returns the slot-scoped PACK-SLOT-MISSING finding on submit of fx-case-mis
   assert.equal(finding.message.key, 'qc.finding.pack_slot_missing');
 });
 
-test('upload trigger returns only the findings on the uploaded slot', async () => {
+test('no bundled script answers the upload trigger (W4-04): an upload run on a scripted fixture case is completed with zero findings', async () => {
+  // Upload content rules are W4b's (W4a plan section 5); the bundled scripts carry no `upload` entry, so the bound
+  // upload trigger never writes scripted findings when a suite re-attaches a slot.
+  for (const script of BUNDLED_QC_SCRIPTS)
+    assert.deepEqual(
+      script.entries.filter((e) => e.trigger === 'upload'),
+      [],
+      `${script.fixtureCaseId} has an upload entry`,
+    );
   const runner = new ScriptedQcRunner();
+  for (const fixtureCaseId of [
+    'fx-case-nonvendor',
+    'fx-case-vendor',
+    'fx-case-missing-slot',
+    'fx-case-na-reasons',
+  ])
+    for (const uploadSlot of [1, 5, 6] as const) {
+      const { request } = buildRequest(fixtureCaseId, { trigger: 'upload', uploadSlot });
+      const result = completed(await runner.run(request, new AbortController().signal));
+      assert.deepEqual(result.findings, [], `${fixtureCaseId} slot ${uploadSlot}`);
+      assert.deepEqual(result.rulesEvaluated, []);
+    }
+});
+
+test('an upload entry returns only the findings on the uploaded slot (inline script)', async () => {
+  const nonvendor = RAW_BUNDLED_QC_SCRIPTS.find(
+    (s) => (s as { fixtureCaseId: string }).fixtureCaseId === 'fx-case-nonvendor',
+  ) as { entries: unknown[] };
+  const script = validateScript({
+    ...nonvendor,
+    entries: [
+      ...nonvendor.entries,
+      {
+        trigger: 'upload',
+        findings: [
+          {
+            ruleId: 'ACC-METRIC-CITED',
+            scope: { kind: 'artifact', slot: 1, fixtureArtifactId: 'fx-doc-0001-01' },
+            severity: 'medium',
+            owningLane: 'ai_coe',
+            evidence: [{ fixtureArtifactId: 'fx-doc-0001-01', slot: 1, locator: { kind: 'page', page: 2 } }],
+            measure: null,
+            message: { key: 'qc.finding.acc_metric_cited', params: { slot: 1 } },
+          },
+        ],
+      },
+    ],
+  });
+  const runner = new ScriptedQcRunner({ scripts: [script] });
   const slotOne = buildRequest('fx-case-nonvendor', { trigger: 'upload', uploadSlot: 1 });
   const one = completed(await runner.run(slotOne.request, new AbortController().signal));
   assert.deepEqual(

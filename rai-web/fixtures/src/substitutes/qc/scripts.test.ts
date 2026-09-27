@@ -84,12 +84,12 @@ test('schema conformance: every materialised bundled finding passes the shared v
       const built = buildRequest(script.fixtureCaseId, {
         trigger: entry.trigger,
         ...(entry.lane === undefined ? {} : { lane: entry.lane }),
-        uploadSlot: 1,
       });
       const result = await runner.run(built.request, new AbortController().signal);
       assert.equal(result.status, 'completed');
       if (result.status !== 'completed') return;
-      // For `upload` the run is scoped to one slot; every entry's findings are on slot 1 in the bundled scripts.
+      // No bundled entry has the `upload` trigger (W4-04); every entry here is submit or approve_attempt.
+      assert.notEqual(entry.trigger, 'upload', `${script.fixtureCaseId} has an upload entry`);
       assert.equal(result.findings.length, entry.findings.length, `${script.fixtureCaseId}/${entry.trigger}`);
       for (const finding of result.findings) {
         assert.equal(validateQcFinding(finding, built.request), null, finding.findingKey);
@@ -182,7 +182,7 @@ test('owning lane follows W0-06 section 7 as recorded: every script finding sati
       }
     }
   }
-  assert.ok(count >= 8);
+  assert.ok(count >= 7); // 9 before W4-04 removed the two `upload` entries (W4a plan section 5)
   assert.equal(shared, 1, 'one slot-5 finding is scripted (fx-case-missing-slot, dpo approve attempt)');
   const all = BUNDLED_QC_SCRIPTS.flatMap((s) => s.entries.flatMap((e) => e.findings));
   assert.ok(

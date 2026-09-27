@@ -65,22 +65,30 @@ export function owningLaneRule(
 }
 
 /**
+ * Register row "D05 refinement (upload slot 5 and 9)" (Ta, 2026-09-26): an upload QC outage on slot 5, which three
+ * lanes review, is owned by AI/COE, as on submit and for the pack.
+ */
+export const UPLOAD_SLOT5_OUTAGE_LANE: Lane = 'ai_coe';
+
+/** A run for which {@link unavailableOwningLane} always names a lane. */
+export type LaneRun = { trigger: 'approve_attempt'; lane: Lane } | { trigger: 'submit'; lane: null };
+/** An upload-trigger run on one slot (W0-07 3.2); `lane` is never set on it. */
+export type UploadRun = { trigger: 'upload'; slot: Slot };
+
+/**
  * W0-06 7.3 part 4: a QC-unavailable finding follows the run that saw the outage. Only an upload run needs the
  * mapping (the slot's lane), so an unknown mapping never turns a submit or approve-attempt outage into an error.
+ * Upload (W4-04, register row "D05 refinement (upload slot 5 and 9)"): slots 1-4 and 6-8 → the slot's single lane;
+ * slot 5 → AI/COE; slot 9 → `null`: no upload rules run there, so the trigger fires no run and no finding exists.
  */
-export function unavailableOwningLane(
-  run:
-    | { trigger: 'approve_attempt'; lane: Lane }
-    | { trigger: 'submit'; lane: null }
-    | { trigger: 'upload'; slot: Slot },
-  mapping?: LaneMapping,
-): Lane {
+export function unavailableOwningLane(run: LaneRun, mapping?: LaneMapping): Lane;
+export function unavailableOwningLane(run: UploadRun, mapping?: LaneMapping): Lane | null;
+export function unavailableOwningLane(run: LaneRun | UploadRun, mapping?: LaneMapping): Lane | null {
   if (run.trigger === 'approve_attempt') return run.lane;
   if (run.trigger === 'submit') return PACK_OWNING_LANE;
   if (mapping === undefined) throw new Error("an unavailable upload run needs the version's lane mapping");
   const rule = owningLaneRule({ kind: 'slot', slot: run.slot }, mapping);
   if (rule.kind === 'lane') return rule.lane;
-  throw new Error(
-    `owning lane for an unavailable upload run on slot ${run.slot} is defined with upload QC (W4)`,
-  );
+  if (rule.kind === 'raising_lane') return UPLOAD_SLOT5_OUTAGE_LANE;
+  return null; // no_defects: slot 9
 }
