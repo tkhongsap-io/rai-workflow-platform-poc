@@ -39,6 +39,7 @@ Uploads run W0-08 section 4 checks 1-8 and 10 (session, scope, open draft, filen
 
 - Approve checks only that `qcRunId` is a well-formed UUID. The server also refuses an approve when the version and lane have no lane-QC run (422 `lane_qc_not_run`) or when a newer run exists (409 `qc_run_superseded`). The substitute does neither.
 - Version reads always carry `decisions: []`. The server serves the version's lane decisions there, send-back feedback included (W0-02 7.6).
+- Risk (W5-07, W5 plan R-16): `GET /api/configuration/risk-rubric/current` answers the seeded synthetic placeholder rubric so the questionnaire shows, but a draft save accepts `riskAnswers` and never stores them (W5-04), and nothing is scored at submit (W5-05). Answers given in the substitute demo are gone after the save.
 - The substitute keeps its own UUID check (`requireQcRunId` in `workflow.ts`) and its own undispositioned-finding predicate for Ready (`applyReadyIfHeld`). Neither is the server's code.
 
 Deleting the substitute is Ta's decision and is on the W3 hardening deferred list. Until then this drift is documented here and is not fixed.

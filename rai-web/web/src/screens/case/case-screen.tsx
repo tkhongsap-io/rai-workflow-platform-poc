@@ -192,6 +192,7 @@ export function CaseScreen(): JSX.Element {
     if (pendingSettings.checklistTemplateVersion !== undefined)
       body.checklistTemplateVersion = pendingSettings.checklistTemplateVersion;
     if (pendingSettings.stageContext !== undefined) body.stageContext = pendingSettings.stageContext;
+    if (pendingSettings.riskAnswers !== undefined) body.riskAnswers = { ...pendingSettings.riskAnswers }; // W5-07
     setBusy('saving');
     setEditorError(null);
     setNotice(null);

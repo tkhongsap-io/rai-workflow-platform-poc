@@ -4,6 +4,8 @@
 // action is a button or a native control, so the whole editor is keyboard-operable (section 9, item 5).
 // Only a case writer is offered the controls; anyone else reads the draft. The API still answers every save and
 // submit, and its envelope is rendered as received.
+// W5-07: the risk questionnaire sits under the slot table; its pending answers travel with the pending settings, count
+// as unsaved changes and are sent in the same save (W5 plan section 7).
 
 import { useCallback, useState, type JSX } from 'react';
 import { CURRENT_LANE_MAPPING } from '@rai/shared/constants';
@@ -19,6 +21,12 @@ import {
 import { ErrorNotice, describeError } from '../../components/error-notice.js';
 import { translateApiKey, useLocale } from '../../i18n/locale-provider.js';
 import { SlotDialog } from './slot-dialog.js';
+import { RiskQuestionnaire } from './risk-questionnaire.js';
+import {
+  riskPendingCount,
+  riskQuestionOfFieldPath,
+  type PendingRiskAnswers,
+} from './risk-questionnaire.view-model.js';
 import { SlotRows, type ArtifactLookup, type SlotRowData } from './slot-rows.js';
 import {
   SLOT_NUMBERS,
@@ -35,6 +43,8 @@ import {
 export interface PendingSettings {
   checklistTemplateVersion?: string;
   stageContext?: StageContext;
+  /** W5-07: changed risk answers only (question ID → value, or null to clear). */
+  riskAnswers?: PendingRiskAnswers;
 }
 
 export interface PackEditorProps {
@@ -65,12 +75,20 @@ export function PackEditor(props: PackEditorProps): JSX.Element {
   const closeDialog = useCallback(() => setDialogSlot(null), []);
 
   const slots = mergedSlots(draft.slots, pendingSlots);
-  const unsaved = pendingCount(pendingSlots) + Object.keys(pendingSettings).length;
+  const unsaved =
+    pendingCount(pendingSlots) +
+    (pendingSettings.checklistTemplateVersion !== undefined ? 1 : 0) +
+    (pendingSettings.stageContext !== undefined ? 1 : 0) +
+    riskPendingCount(pendingSettings.riskAnswers);
   const error = props.error === null || props.error === undefined ? null : describeError(props.error);
   const fieldErrorBySlot = new Map<SlotNumber, string>();
+  const fieldErrorByQuestion = new Map<string, string>();
   for (const field of error?.fields ?? []) {
     const slot = slotOfFieldPath(field.path);
     if (slot !== null) fieldErrorBySlot.set(slot, translateApiKey(t, field.messageKey, field.params));
+    const question = riskQuestionOfFieldPath(field.path);
+    if (question !== null)
+      fieldErrorByQuestion.set(question, translateApiKey(t, field.messageKey, field.params));
   }
   const rows: SlotRowData[] = SLOT_NUMBERS.map((slot) => {
     const state = slots[slot];
@@ -176,6 +194,21 @@ export function PackEditor(props: PackEditorProps): JSX.Element {
         }
       />
       {canEdit ? null : <p className={'muted'}>{t('pack.read_only')}</p>}
+
+      <RiskQuestionnaire
+        draft={draft}
+        slots={slots}
+        pending={pendingSettings.riskAnswers}
+        canEdit={canEdit}
+        disabled={busy !== 'idle'}
+        fieldErrors={fieldErrorByQuestion}
+        onChange={(next) => {
+          const settings = { ...pendingSettings };
+          if (Object.keys(next).length === 0) delete settings.riskAnswers;
+          else settings.riskAnswers = next;
+          props.onSettingsChange(settings);
+        }}
+      />
 
       {error !== null ? (
         <ErrorNotice error={props.error}>

@@ -158,3 +158,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w4-12-qc-log-ui model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #189)
 - Scope: per changes/2026-09-27-w4-12-qc-log-ui/: finding read shapes gain `evidence` (locators only), `GET …/versions/{versionId}/qc-runs` scoped like the findings read, the QC log on the version view, every unavailable run before the decision controls, rule label, rule ID, evidence location and owning lane on a finding row, W0-02 section 7 amendment. One PR.
+
+## 2026-09-28 02:41 — CLAIM lane-b: W5-07 Questionnaire UI in the pack editor (#230)
+- Author: operator=ta session=claude-code-w5-07-questionnaire-ui model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #230)
+- Scope: per changes/2026-09-27-w5-07-questionnaire-ui-in-the/: the risk questionnaire in the pack editor (seven radio groups, Unknown, clear, evidence hint, live non-recorded preview), the placeholder rubric banner, the rubric read in the API client (404 renders "not configured"), the in-memory substitute's rubric read (R-16), `risk.*` locale keys. One PR.

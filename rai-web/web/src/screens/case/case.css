@@ -465,3 +465,52 @@
   margin: 4px 0 0;
   overflow-wrap: anywhere;
 }
+
+/* W5-07: the risk questionnaire in the pack editor (W5 plan section 7). */
+.risk-questionnaire {
+  border-top: 1px solid var(--border);
+  margin-top: 18px;
+  padding-top: 14px;
+}
+
+.risk-question {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  min-width: 0;
+}
+
+.risk-question legend {
+  font-weight: 600;
+  padding: 0 4px;
+  overflow-wrap: anywhere;
+}
+
+.risk-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 20px;
+}
+
+.risk-question-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+}
+
+.risk-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.risk-preview-tier {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}

@@ -31,6 +31,7 @@ import type {
   CaseListResponse,
   CaseView,
   ConfigurationView,
+  RiskRubricView,
 } from '@rai/shared/schemas/cases';
 import type { QueueQuery, QueueResponse } from '@rai/shared/schemas/queue';
 import type { PackDraft, PackDraftUpdateRequest } from '@rai/shared/schemas/pack';
@@ -59,6 +60,7 @@ export const API_PATHS = Object.freeze({
   queue: '/api/queue',
   operatorDeskHealth: '/api/operator/desk-health',
   configuration: '/api/configuration/current',
+  riskRubric: '/api/configuration/risk-rubric/current', // W5-07 (W5-02 route)
   artifacts: '/api/artifacts',
 });
 
@@ -265,6 +267,18 @@ export function createApiClient(fetchImpl: FetchLike = (input, init) => fetch(in
     createCase: (body: CaseCreateRequest, idempotencyKey: string) =>
       request<CaseView>('POST', API_PATHS.cases, { body, idempotencyKey }),
     getConfiguration: () => request<ConfigurationView>('GET', API_PATHS.configuration),
+    /**
+     * W5-07: the `risk_rubric` revision in force (W5-02), or `null` when the route answers 404 (none in force, or a
+     * server or substitute without the route). The questionnaire is optional to the screen (W5 plan R-16).
+     */
+    getRiskRubric: async (): Promise<RiskRubricView | null> => {
+      try {
+        return await request<RiskRubricView>('GET', API_PATHS.riskRubric);
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 404) return null;
+        throw err;
+      }
+    },
     /** The open draft of a case (W0-02 7.5); 404 when the case has none. */
     getDraft: (caseId: string) => request<PackDraft>('GET', `${API_PATHS.cases}/${enc(caseId)}/draft`),
     /** One PUT with the draft's ExpectedVersion (W0-06 5.1); the answer replaces the draft. */

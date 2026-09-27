@@ -674,3 +674,11 @@ dialog.dialog-wide {
   font-size: 12.5px;
   color: var(--color-muted);
 }
+
+/* W5-07: the synthetic placeholder rubric banner (W5 plan section 7). Text first; the tone only supports it. */
+.placeholder-rubric-banner {
+  background: var(--warn-bg);
+  border-color: transparent;
+  color: var(--warn-ink);
+  margin: 0 0 12px;
+}
