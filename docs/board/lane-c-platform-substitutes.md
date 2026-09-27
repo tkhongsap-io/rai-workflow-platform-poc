@@ -106,3 +106,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w4-09a-eval-set model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #203)
 - Scope: per changes/2026-09-27-w4-09a-evaluation-set-generator-dev/: `fixtures/src/evaluation/*` (cases, renderers, provisional per-lane labels, manifest), additive `fixtures/src/generate/{pdf,ooxml}.ts` builders, `npm run fixtures:eval:generate`. Dev split of `qc-eval-synthetic@1` only; held-out and freeze are W4-09b. One PR.
+
+## 2026-09-28 — CLAIM lane-c: W7-10 rehearsal templates and timing capture (#210)
+- Author: operator=ta session=claude-code-w7-10-rehearsal-templates-and-timing model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #210)
+- Scope: per changes/2026-09-27-w7-10-rehearsal-templates-and-timing/: `docs/operations/rehearsal/{rehearsal-plan,deficiency-log,timing-sheet,acceptance-report}-template.md`, `rai-web/tests/rehearsal/timing.ts` (`createStepTimer(runId)` writing `timings.json` and `timings.csv` under `REHEARSAL_OUT_DIR`, refused outside `rai-web/.local/`) with its unit test. One PR; no migration, no product code.
