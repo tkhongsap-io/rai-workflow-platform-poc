@@ -53,8 +53,15 @@ These are choices made under Ta's delegation of 2026-09-27 where the plan is sil
 - **Strict container.** A classic xref table is required and each offset must hold its own object header. Nothing reconstructs a damaged xref by scanning for `obj`. A lenient reader would read more broken files, but the plan lists a broken xref as unreadable, and reconstruction is more attack surface.
 - **Filters.** `/FlateDecode` with a PNG or TIFF predictor is treated as an unsupported filter, since content streams do not use predictors. Undecoded streams count toward the 20 MiB and 100 MiB byte caps too, so an oversized plain stream is `limit_bytes` like a compressed one.
 - **Form XObjects are not read.** Text drawn inside a form XObject (`Do` of a `/Form`) is not extracted. The plan names only page content streams; reading forms adds recursion for no current case (the W4-09a set draws text in page content only).
-- **Changed test expectations (plan-driven).** `worker/extract.test.ts` "DOCX and XLSX are registered (W4-05c); PDF waits for W4-05d" and `worker/hostile.test.ts` "the registry holds DOCX and XLSX only; PDF and images stay unreadable until W4-05d" asserted a registry without PDF, which was true only until this ticket by their own messages. They now assert DOCX, XLSX and PDF, and that PNG and JPEG stay unreadable (the hostile test checks every row under both image types). Every media type is still `unreadable` for bytes that are not a document. The W4-05b client test "answers every media type as unreadable until W4-05c and W4-05d" is unchanged and still passes, because its five bytes are not a PDF. No other existing test changed.
+- **Changed test expectations (plan-driven).** `worker/extract.test.ts` "DOCX and XLSX are registered (W4-05c); PDF waits for W4-05d" and `worker/hostile.test.ts` "the registry holds DOCX and XLSX only; PDF and images stay unreadable until W4-05d" asserted a registry without PDF, which was true only until this ticket by their own messages. They now assert DOCX, XLSX and PDF, and that PNG and JPEG stay unreadable (the hostile test checks every row under both image types). Every media type is still `unreadable` for bytes that are not a document. The W4-05b client test "answers every media type as unreadable until W4-05c and W4-05d" still passes unchanged in body, because its five bytes are not a PDF; in round 1 only its out-of-date title became "answers every media type as unreadable for bytes that are not a document". No other existing test changed.
 - No runner, config key, orchestrator change, migration or UI (W4-06a, W4-13b). No spec amendment is assigned to W4-05d.
+
+### Deferred reviewer notes (round 1)
+
+- `hasActiveContent` scans raw bytes, so it misses `#`-escaped names and names inside Flate bodies. Kept: defence in depth only; the upload sniff is the gate.
+- `decodeText` drops 0x80-0x9F, so WinAnsi curly quotes, dashes and the euro sign are lost. Consistent with the Latin-1 rule; recorded for W4-08a.
+- A content stream shared by several pages is inflated again and counted against `maxTotalBytes` once per page. Bounded and fails closed; left as is.
+- A grammar error in a font dictionary met during content reading makes the whole file unreadable, as the stated rule says. Remark only.
 
 ## Commands and results
 
@@ -82,9 +89,23 @@ Worktree `/tmp/rai-w4-05d-pdf-text-layer-images`, Postgres project `rai-qc-conte
 | rebased: `npm run test:browser:substitute` | 48 passed |
 | rebased: `node scripts/check-links.mjs` (root) | 428 Markdown files, 1208 relative links, 0 broken |
 | rebased: `git diff --cached --check origin/main` (root, all files staged) | clean |
+| round 1 RED: `npx tsx --test server/src/qc/extraction/worker/pdf.test.ts` with the 3000-deep `/Length` chain case added, before the fix | fails: `RangeError: Maximum call stack size exceeded` out of `extractInWorker` |
+| round 1: same, after bounding nested object reads at 64 | 22/22 |
+| round 1: reviewer probe (scratch, outside the repo), chains of 3 000 and 60 000 stream objects | both `{ ok: false, reason: 'unreadable' }` |
+| round 1: `npm run lint` | exit 0 (first run flagged prettier on the new test lines; `prettier --write` on `pdf.test.ts` only) |
+| round 1: `npm run typecheck` | exit 0 |
+| round 1: `npm run test:unit` | 962/962, 0 skipped |
+| round 1: `npm run migrate` then `npm run test:integration` | 413/413, 0 skipped |
+| round 1: `npm run build && npm run check:substitute-absent` | exit 0; 851 files scanned, 0 with the marker |
+| round 1: `npm run test:browser:server` | 205 passed |
+| round 1: `npm run test:browser:substitute` | 48 passed |
+| round 1: `node scripts/check-links.mjs` (root) | 428 Markdown files, 1208 relative links, 0 broken |
+| round 1: `git diff --check` (root) | clean |
 
 ## Review verdicts
 
 | Round | Head | Reviewer | Verdict | Notes |
 | --- | --- | --- | --- | --- |
+| 1 | 00f8658 | correctness reviewer | changes requested | A 3000-object chain of stream `/Length` references overflowed the stack in `PdfDocument.object` (a worker crash, not `unreadable`). Fixed: `object()` refuses a nested read once 64 objects are being read (`MAX_DEPTH`), and the deep-nesting test now carries the 3000-deep chain. |
+| 1 | 00f8658 | second reviewer | pass with notes | Same stack overflow at 60 000 objects (note 1, fixed as above). Note 2 fixed: the DEVLOG now says CID-font text is skipped and a PDF with no other text is unreadable. The out-of-date `client.test.ts` title is fixed. Other notes deferred below. |
 | - | - | - | pending | Two independent reviewer verdicts on the PR head, and green CI on that head, are recorded here before merge (D03 ticket flow). |

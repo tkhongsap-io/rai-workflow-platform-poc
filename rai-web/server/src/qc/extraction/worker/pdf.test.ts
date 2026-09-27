@@ -288,6 +288,16 @@ test('cycles and deep nesting end as unreadable, never a hang or a stack overflo
     '5 0 R',
   ]);
   refused(run(lengthCycle));
+  // Round 1 (W4-05d): a /Length that names a stream whose /Length names the next stream, 3000 deep, is a nested read
+  // chain with no cycle; it must end as unreadable, not as a RangeError out of the worker.
+  const chain: TestObject[] = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /Contents 4 0 R >>',
+  ];
+  for (let n = 4; n < 3004; n += 1) chain.push({ dict: `/Length ${n + 1} 0 R`, stream: '' });
+  chain.push('0');
+  refused(run(buildTestPdf(chain)), 'unreadable', 'a 3000-deep /Length chain');
   const deep = buildTestPdf([
     '<< /Type /Catalog /Pages 2 0 R >>',
     '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',

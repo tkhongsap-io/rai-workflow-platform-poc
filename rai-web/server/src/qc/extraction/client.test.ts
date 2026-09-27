@@ -83,7 +83,7 @@ test('limits outside the policy bounds are refused at creation', () => {
   assert.throws(() => extractor({ maxMemoryMb: 1024 }), /maxMemoryMb/);
 });
 
-test('the real worker, from source, answers every media type as unreadable until W4-05c and W4-05d', async () => {
+test('the real worker, from source, answers every media type as unreadable for bytes that are not a document', async () => {
   const worker = extractor();
   for (const mediaType of MEDIA_TYPES) {
     const result = await worker.extract({ mediaType, bytes: BYTES }, never());

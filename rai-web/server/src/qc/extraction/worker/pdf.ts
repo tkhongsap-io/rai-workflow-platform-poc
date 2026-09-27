@@ -369,7 +369,9 @@ class PdfDocument {
     if (entry === undefined || entry === null || entry.generation !== ref.g) return null;
     const cached = this.#cache.get(ref.n);
     if (cached !== undefined) return cached;
-    if (this.#reading.has(ref.n)) return unreadable();
+    // A cycle, or a chain of nested reads (a /Length naming a stream whose /Length names the next), is a broken file;
+    // bounding the depth keeps a long acyclic chain from overflowing the worker's stack (W4-05d round 1).
+    if (this.#reading.has(ref.n) || this.#reading.size >= MAX_DEPTH) return unreadable();
     this.#reading.add(ref.n);
     try {
       const object = this.#readObject(ref, entry.offset);
