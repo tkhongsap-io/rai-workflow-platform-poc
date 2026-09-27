@@ -12,7 +12,9 @@ export const EXIT_CONFIG = 78;
 
 export type NodeEnv = 'development' | 'test' | 'production';
 export type MailMode = 'sink-file' | 'sink-memory';
-export type QcMode = 'substitute';
+// `deterministic` is accepted only under NODE_ENV=test until W4-13 makes it the runner of every environment (W4a
+// plan section 2); W4-03 introduces it for the real-server evidence test (plan section 8, issue #186).
+export type QcMode = 'substitute' | 'deterministic';
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 export interface DatabaseConfig {
@@ -99,6 +101,12 @@ function oneOf<T extends string>(env: Env, name: string, values: readonly T[]): 
   const value = required(env, name);
   if (!(values as readonly string[]).includes(value)) throw new ConfigError(`invalid:${name}`);
   return value as T;
+}
+
+function parseQcMode(env: Env, nodeEnv: NodeEnv): QcMode {
+  const mode = oneOf(env, 'QC_MODE', ['substitute', 'deterministic'] as const);
+  if (mode === 'deterministic' && nodeEnv !== 'test') throw new ConfigError('invalid:QC_MODE');
+  return mode;
 }
 
 function integer(env: Env, name: string, { min, max }: { min: number; max?: number }): number {
@@ -218,7 +226,7 @@ export function parseConfig(env: Env): AppConfig {
       mode: oneOf(env, 'MAIL_MODE', ['sink-file', 'sink-memory'] as const),
       sinkDir: required(env, 'MAIL_SINK_DIR'),
     },
-    qc: { mode: oneOf(env, 'QC_MODE', ['substitute'] as const) },
+    qc: { mode: parseQcMode(env, nodeEnv) },
     log: { level: oneOf(env, 'LOG_LEVEL', ['debug', 'info', 'warn', 'error'] as const), pretty: logPretty },
     buildCommit: required(env, 'BUILD_COMMIT'),
   };
