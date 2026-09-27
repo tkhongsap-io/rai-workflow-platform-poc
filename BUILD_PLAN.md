@@ -219,3 +219,15 @@ A dated read; earlier sections stay as written.
 | W4a (deterministic metadata QC) | **Authorized**; W4-00a plan in review | W4-00a merged; W4a tickets through reviewed PRs; W4a exit record reviewed by Ta |
 | W4b (extraction, model rules, evaluation) | **Not authorized** | AI/COE lead and IT/Security owner named; D08 and D09 recorded; W4b gate entry; then W4-00b and ADR-0006 before extraction or model code |
 | W5-W8 | **Not authorized** | D07 before W5; D10 before networked tests or W8 |
+
+## Status against this plan — 2026-09-27 (W4a engineering exit)
+
+A dated read; earlier sections stay as written.
+
+| Gate / package | Status on 2026-09-27 | Evidence | Next evidence needed |
+|---|---|---|---|
+| W4a (deterministic metadata QC) | **Engineering exit recorded; awaiting Ta's package review.** W4-11a, W4-02, W4-03, W4-13, W4-04 and W4-12 merged through reviewed PRs #192-#197 on the W4-00a plan (#183) | [changes/2026-09-27-w4a-exit/review.md](changes/2026-09-27-w4a-exit/review.md): from a clean checkout of `da3d815`, the W4-03 (6/6) and W4-04 (10/10) fixture tests, the real-server test (6/6), the W4-12 journeys on the real server (6 passed), readiness `qc.kind` `deterministic`, `check:substitute-absent`, and the full section 8 gate (648 unit, 374 integration, 202 real-server browser, 48 substitute browser); rule revision `w4a.1`, runner `deterministic` `0.0.0`, fixture set `slice1-synthetic@1 7c80ccd43663` | Ta's review of the W4a exit record. Rule outcomes stay provisional until D09 |
+| W4b (extraction, model rules, evaluation) | **Not authorized** (unchanged) | — | AI/COE lead and IT/Security owner named; D08 and D09 recorded; W4b gate entry; then W4-00b and ADR-0006 before extraction or model code |
+| W5-W8 | **Not authorized** (unchanged) | — | D07 before W5; D10 before networked tests or W8 |
+
+W4a is not accepted until Ta reviews the exit record. It reads only structured pack data; content rules, extraction, the model, the evaluation harness and dedup remain W4b's.

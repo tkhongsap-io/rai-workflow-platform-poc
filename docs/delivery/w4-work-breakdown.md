@@ -2,6 +2,8 @@
 
 **W4a authorized 2026-09-26 (register row "W4a gate entry", Option B below); W4a tickets become Ready when the [W4-00a plan](../engineering/implementation-plan-w4a.md) merges. W4b stays a draft: not authorized until D08, D09 and its own gate entry.**
 
+**Status 2026-09-27: W4a engineering exit recorded; awaiting Ta's package review.** W4-11a, W4-02, W4-03, W4-13, W4-04 and W4-12 merged through reviewed PRs #192-#197; the [W4a exit record](../../changes/2026-09-27-w4a-exit/review.md) holds the exit evidence. W4b is unchanged: not authorized.
+
 Status: agent draft prepared 2026-09-26 on Ta's instruction, for the owners to review. D03 covers W0-W3 only. No issue exists for any ticket below, and none should be opened until the gate entry is recorded. Packages, entry criteria and exit evidence come from [BUILD_PLAN](../../BUILD_PLAN.md) W4. Acceptance IDs come from [acceptance.md](../acceptance.md). The decisions each ticket waits for are argued in the [W4 decision briefs](w4-decision-briefs.md). Ticket paths and commands come from the W4 file-level plan (W4-00), so none are named here. Owner types, lanes and the PR size rule are as in the [slice 1 work breakdown](slice-1-work-breakdown.md) and [team and roles](team-and-roles.md).
 
 W4 is done when a synthetic case runs real QC, not the scripted substitute, on upload, submit and approve attempt. Its findings must cite grounded evidence, respect the template version and show unavailable results. The frozen evaluation suite must pass the D09 thresholds. Submit and review stay available with defects; only Ready stays gated. This is **not** real-data use and not PoC acceptance.

@@ -147,3 +147,15 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w4a-gate model=claude-opus-5-5
 - Takes over from: session=none (reason: new; W4a gate entry of 2026-09-26)
 - Scope: docs/engineering/implementation-plan-w4a.md and the gate records, one PR.
+
+## 2026-09-27 14:58 — CLAIM lead-integration: W4a exit record (W4a-EXIT)
+- Author: operator=ta session=claude-code-w4a-exit model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #190, all six W4a tickets merged #192-#197)
+- Scope: changes/2026-09-27-w4a-exit/ and status text only (plan section 10 exit evidence, section 8 gate); no application code, no decision.
+
+## 2026-09-27 15:19 — W4a engineering exit recorded (W4a-EXIT)
+- What: all six W4a tickets merged (W4-11a #192, W4-02 #193, W4-03 #194, W4-13 #195, W4-04 #196, W4-12 #197; plan #183). From a clean checkout of `da3d815` and a fresh database: W4-03 fixture tests 6/6, W4-04 fixture tests 10/10, real-server test 6/6, W4-12 journeys on the real server 6 passed, readiness `qc.kind` `deterministic` under `QC_MODE=deterministic`, `check:substitute-absent` 0 of 675 files; section 8 gate: 648 unit, 374 integration, 202 real-server browser, 48 substitute browser, lint and typecheck clean. Rule revision `w4a.1` (revision 1), runner `deterministic` `0.0.0`, fixture set `slice1-synthetic@1 7c80ccd43663`. Status text updated in BUILD_PLAN, README, the delivery README and the W4 work breakdown.
+- Why: W4a plan section 10; ticket #190; register rows "W4a gate entry", "D05 refinement (upload slot 5 and 9)", "W4a kickoff rulings".
+- Next: two reviewers and CI on this PR; then Ta's package review of the record (not accepted yet). Two deferred items are marked for Ta (no upload run when no runner is bound; locator heading/cell text served). W4b stays unauthorized; labels provisional until D09.
+- Author: operator=ta session=claude-code-w4a-exit model=claude-opus-5-5
+- Evidence: changes/2026-09-27-w4a-exit/review.md
