@@ -203,6 +203,8 @@ The orchestrator wraps the runner and is the only code that touches the store fo
 
 The orchestrator never mails, never changes a slot, a version, a lane decision or a disposition, and never reads runner output as an instruction.
 
+**W4-03 amendment (2026-09-27): step 6 dedup deferred to W4b.** [W4a plan](implementation-plan-w4a.md) section 4. W4a stores no `alreadyRecorded` dedup: the orchestrator does not implement step 6's "not appended again" rule, and W4a needs none. A completed submit or approve-attempt run already replays (3.7, `replayPrior`), so a deterministic rule is not re-raised for the same input, and a new run after an unavailable one has no earlier defect to duplicate. The dedup moves to W4b, where content rules on upload and submit can overlap; its scope key must then include the owning lane for slot 5, because each lane's approve attempt raises its own slot-5 finding under the same `(ruleId, ruleRevision, scopeKey)`. The once-per-open-scope reuse of the QC-unavailable finding (3.6) is unchanged.
+
 ### 3.5 Rule families the substitute scripts (from the source spec; not a rule catalogue)
 
 The real catalogue is Admin configuration keyed to `checklist_template_version` (L12) and is W4/W6 work. Slice 1 needs synthetic findings that look like the real ones, so the substitute's scripts use these families with these IDs. IDs are stable so W2-05, W2-07 and W2-09 tests can name them. Under W0-06 section 7.4 the scripts may carry a `defect` finding only on a single-lane slot; the rows marked *reserved* are IDs W1-10 does not script until the review leads record the slot-5, slot-9 and pack-level rule.
@@ -219,6 +221,19 @@ The real catalogue is Admin configuration keyed to `checklist_template_version` 
 | `QC-UNAVAILABLE` | any | run | null | QC failure is an explicit finding, never a clean pass | never scripted: built by the orchestrator only (3.6); a runner that returns it fails validation (3.4 step 4) |
 
 Severity: `high` for `ACC-BAND-V1-SHEET3` and `ACC-EXTRACTION-NOT-HALLUCINATION` in scripts and for `QC-UNAVAILABLE` in the orchestrator; `medium` for the rest. These are fixture values, not thresholds of record.
+
+**W4-03 amendment (2026-09-27): the W4a metadata rules.** [W4a plan](implementation-plan-w4a.md) sections 3 and 4; register rows "W4a gate entry", "D05 refinement (upload slot 5 and 9)" and "W4a kickoff rulings" (Ta, 2026-09-26). The table above stays the substitute's script families. From W4a the product catalogue is the `qc_rules` configuration revision (W4-02, 3.3 amendment), and the `deterministic` runner (`server/src/qc/deterministic/`) executes its `metadata` rules from structured pack data only: no document bytes, no parser, no model. All three are provisional until D09, which confirms or replaces them.
+
+| `ruleId` | Trigger | Scope, owning lane | Fires when (W4a provisional) | Severity (seed `w4a.1`) | Message key |
+|---|---|---|---|---|---|
+| `PACK-SLOT-MISSING` | submit | slot; the single lane of slots 1-4, 6-8 | a single-lane slot is `missing`; slot 5 is not raised on submit, so no lane is invented | medium | `qc.finding.pack_slot_missing` |
+| `PACK-SLOT-MISSING` | approve_attempt | slot 5; the run's lane | slot 5 is `missing`; each lane's approve attempt raises its own finding, owned and dispositionable only by that lane (W0-06 7.3 part 1) | medium | `qc.finding.pack_slot_missing` |
+| `PACK-STAGE-MISMATCH` | submit | pack; AI/COE | a slot listed for the version's `stage_context` in `params.attachedForbiddenAt` is `attached`, or in `params.notYetForbiddenAt` is `not_yet`. Seed: slot 8 attached at `idea`; any of slots 1-8 not yet at `pre_launch`. One finding, one evidence entry per offending slot | medium | `qc.finding.pack_stage_mismatch` |
+| `PACK-NA-VENDOR-DOC` (new) | submit | slot 3 or 4; DPO | `vendor_involved` is true and the slot is `not_applicable`, with any reason. A soft finding: the DPO confirms the reason by waiving it, or the owner fixes the slot | medium | `qc.finding.pack_na_vendor_doc` |
+
+- No rule raises a `defect` on slot 9, and slot 9 is never evidence of one. Evidence is a slot reference with locator `absent` (the rule reads a state, not a place in a document), plus the artifact reference when the slot is attached.
+- `content` rules (`ACC-*`) are selected but not executed in W4a; `rulesEvaluated` counts only the executed metadata rules. `request.rules === null` is `unavailable:not_configured`. A metadata rule the runner does not implement, one selected on a trigger it is not defined for, `params` that fail the rule's schema, an unknown lane mapping or an approve attempt without a lane make the run `unavailable:runner_error`, never a shorter clean pass.
+- Every rule ID has a th/en label key `qc.rule.<rule_id>` for the QC log (W4-12), including the content rules and `QC-UNAVAILABLE`.
 
 ### 3.6 Owning lane and the QC-unavailable finding
 

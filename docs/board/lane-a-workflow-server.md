@@ -202,3 +202,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w4-02-rule-catalogue model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #185)
 - Scope: per changes/2026-09-27-w4-02-rule-catalogue/: the `qc_rules` body, seed revision 1 (`w4a.1`), `selectRules`, `request.rules` from the orchestrator, the upload-instant revision, `not_configured` for versions without a `qc_rules` revision. One PR.
+
+## 2026-09-27 11:13 — CLAIM lane-a: W4-03 deterministic runner (#186)
+- Author: operator=ta session=claude-code-w4-03-deterministic-runner model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #186)
+- Scope: per changes/2026-09-27-w4-03-deterministic-runner/: the `deterministic` QcRunner under `server/src/qc/deterministic/` with `PACK-SLOT-MISSING`, `PACK-STAGE-MISMATCH` and `PACK-NA-VENDOR-DOC`, the no-`read()` and module-graph tests, th/en keys, W0-07 3.5 rows and the 3.4 step-6 deferral. One PR.
