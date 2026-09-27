@@ -49,7 +49,7 @@ Worktree `/tmp/rai-w4-03-deterministic-runner`, Postgres project `rai-w4a` on 55
 | `npm run build && npm run check:substitute-absent`                                                                        | exit 0; 675 files scanned, 0 with the marker; the built runner reports `{ runner: 'deterministic', runnerVersion: '0.0.0' }`     |
 | `npm run test:browser:server`                                                                                             | 196 passed                                                                                                                       |
 | `npm run test:browser:substitute`                                                                                         | 48 passed                                                                                                                        |
-| `node scripts/check-links.mjs` (root)                                                                                     | 344 files, 932 links, 0 broken                                                                                                   |
+| `node scripts/check-links.mjs` (root)                                                                                     | 345 files, 937 links, 0 broken (with the records added)                                                                          |
 | `git diff --check` (root)                                                                                                 | clean                                                                                                                            |
 
 ## Review verdicts
