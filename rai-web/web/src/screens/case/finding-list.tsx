@@ -1,6 +1,6 @@
 // Finding rows with their disposition controls, the empty status, and the QC-unavailable block. The latest
 // disposition of each finding comes from GET …/findings. W4-12: a row also names its rule (label and ID), where its
-// evidence points (slot and locator kind) and its owning lane; the unavailable block lists every unavailable run on
+// evidence points (slot and locator ordinals, W4-16) and its owning lane; the unavailable block lists every unavailable run on
 // the version, whatever its trigger; a lane run that evaluated 0 rules never reads as "no defects".
 
 import type { JSX } from 'react';
@@ -20,7 +20,6 @@ import { DispositionControls } from './disposition-controls.js';
 import { useQcRunScope } from './qc-log.js';
 import {
   evidenceLocations,
-  evidenceLocatorKey,
   findingMessageParams,
   laneKey,
   qcUnavailableReasonKey,
@@ -188,7 +187,7 @@ function FindingRow({
                         location.slot === null
                           ? t('review.evidence.slot_none')
                           : t('review.evidence.slot', { number: location.slot }),
-                      kind: t(evidenceLocatorKey(location.kind)),
+                      kind: t(location.label.key, location.label.params),
                     }),
                   )
                   .join(', '),

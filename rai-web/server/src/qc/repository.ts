@@ -1,7 +1,7 @@
 // W2-05 store helpers for qc_run / qc_finding (append-only inserts).
 import { and, asc, desc, eq, isNull } from 'drizzle-orm';
 import type { Lane } from '@rai/shared/constants';
-import type { QcTrigger, QcUnavailableReason } from '@rai/shared/qc/types';
+import { CELL_REFERENCE_PATTERN, type QcTrigger, type QcUnavailableReason } from '@rai/shared/qc/types';
 import type { EvidenceLocatorView, FindingEvidence, StoredFindingSummary } from '@rai/shared/schemas/review';
 import type { PackVersionRow } from '../cases/repository.js';
 import type { Executor, Tx } from '../db/client.js';
@@ -175,6 +175,8 @@ const SLOTS: ReadonlySet<unknown> = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9]);
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 const isNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+const isOrdinal = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) >= 1;
+const CELL_REFERENCE = new RegExp(CELL_REFERENCE_PATTERN);
 
 /** A stored locator in the read shape, or undefined when it is not one of the W0-07 3.3 kinds. Copies known fields only. */
 function locatorView(value: unknown): EvidenceLocatorView | undefined {
@@ -191,12 +193,19 @@ function locatorView(value: unknown): EvidenceLocatorView | undefined {
       return isNumber(value.start) && isNumber(value.end)
         ? { kind: 'text_range', start: value.start, end: value.end }
         : undefined;
-    case 'cell':
-      return typeof value.sheet === 'string' && typeof value.cell === 'string'
-        ? { kind: 'cell', sheet: value.sheet, cell: value.cell }
-        : undefined;
+    // W4-16 (decision 21): no document text is served. A row stored with a legacy `sheet` name or `heading` is
+    // served as its kind only; otherwise a well-formed ordinal and A1 reference are copied and anything else dropped.
+    case 'cell': {
+      if ('sheet' in value) return { kind: 'cell' };
+      return {
+        kind: 'cell',
+        ...(isOrdinal(value.sheetIndex) ? { sheetIndex: value.sheetIndex } : {}),
+        ...(typeof value.cell === 'string' && CELL_REFERENCE.test(value.cell) ? { cell: value.cell } : {}),
+      };
+    }
     case 'section':
-      return typeof value.heading === 'string' ? { kind: 'section', heading: value.heading } : undefined;
+      if ('heading' in value) return { kind: 'section' };
+      return isOrdinal(value.index) ? { kind: 'section', index: value.index } : { kind: 'section' };
     case 'absent':
       return { kind: 'absent' };
     default:

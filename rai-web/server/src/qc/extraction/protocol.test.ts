@@ -112,8 +112,14 @@ test('a smuggled locator key cannot slip past the text cap either', () => {
 
 test('locator strings count toward the text cap', () => {
   const limits: WorkerLimits = { ...LIMITS, maxTextChars: 10 };
-  const at = [{ locator: { kind: 'cell', sheet: 'Sheet', cell: 'A1' }, text: 'abc' }];
+  // W4-16: the cell reference is the only locator string left; 'A1' (2) + 8 characters of text is exactly the cap.
+  const at = [{ locator: { kind: 'cell', sheetIndex: 1, cell: 'A1' }, text: 'abcdefgh' }];
   assert.equal(classifyReply({ ok: true, segments: at }, limits).ok, true);
+  const over = [{ locator: { kind: 'cell', sheetIndex: 1, cell: 'A1' }, text: 'abcdefghi' }];
+  assert.deepEqual(classifyReply({ ok: true, segments: over }, limits), {
+    ok: false,
+    reason: 'limit_output',
+  });
   const heading = [{ locator: { kind: 'section', heading: 'x'.repeat(1000) }, text: 'a' }];
   assert.deepEqual(classifyReply({ ok: true, segments: heading }, limits), {
     ok: false,
@@ -139,8 +145,22 @@ test('a locator string over the per-field bound is limit_output even under a lar
       { ok: false, reason: 'limit_output' },
       locator.kind,
     );
+  // W4-16: at the bound the caps pass, and the schema then refuses the text shape (decision 21).
   const atBound = [{ locator: { kind: 'section', heading: long.slice(1) }, text: 'a' }];
-  assert.equal(classifyReply({ ok: true, segments: atBound }, limits).ok, true);
+  assert.deepEqual(classifyReply({ ok: true, segments: atBound }, limits), { ok: false, reason: 'crash' });
+});
+
+test('W4-16: a heading or a sheet name in a locator is document text; inside the caps the reply is a crash', () => {
+  const limits: WorkerLimits = { ...LIMITS, maxTextChars: 10_000 };
+  for (const locator of [
+    { kind: 'section', heading: 'H' },
+    { kind: 'cell', sheet: 'Sheet1', cell: 'A1' },
+  ])
+    assert.deepEqual(
+      classifyReply({ ok: true, segments: [{ locator, text: 'a' }] }, limits),
+      { ok: false, reason: 'crash' },
+      JSON.stringify(locator),
+    );
 });
 
 test('W4-05c: the text-free ordinal locators are accepted, closed to extra keys and checked by pattern', () => {

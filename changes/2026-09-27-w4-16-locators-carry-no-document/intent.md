@@ -1,0 +1,7 @@
+# Intent: locators carry no document text (W4-16, #202)
+
+A finding's evidence points at where a rule looked: a page, a text range, a spreadsheet cell or a document section. Until now the shared `EvidenceLocator` named a `section` by its `heading` and a `cell` by its `sheet` name. Both are document text (W0-07 3.1): a heading or a sheet name typed by a case owner would be stored in `qc_finding.evidence` and served to every reader of the findings, although the platform promises that no document text leaves the runner.
+
+Decision 21 of the W4b delegated rulings chose option (b): change the contract so a locator carries no document text. A `section` is located by its ordinal and a `cell` by its sheet ordinal plus an A1 reference checked by pattern. Rows already stored with a heading or a sheet name are served as their kind only. This ticket makes that change end to end: the shared type and runner-side schema, the extraction wire, the stored-row read, the substitute scripts and the evidence line in the reviewer UI, which now shows the ordinals ("slot 1 (section 4)", "slot 1 (page 3)", "slot 1 (sheet 2, cell B7)").
+
+It is W4b ticket 8 (serial track T3, contract) and implements [W4b plan](../../docs/engineering/implementation-plan-w4b.md) section 15 row W4-16 and section 9 "Evidence locators" under the register rows "Ta's delegation (2026-09-27)" and "W4b delegated rulings (provisional)". D07-D10 stay open. No migration, no rule, no model; synthetic data only.

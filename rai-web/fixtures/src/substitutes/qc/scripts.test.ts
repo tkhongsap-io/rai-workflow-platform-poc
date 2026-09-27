@@ -339,3 +339,39 @@ test('every script message key exists in both locale catalogues with a Thai defa
   // The orchestrator's own finding key (W0-07 3.6) is also in the catalogues, ready for W2-05.
   assert.ok(isLocaleKey('qc.finding.unavailable'));
 });
+
+test('W4-16: no bundled locator carries document text, and a script with a heading or sheet name is refused', () => {
+  let sections = 0;
+  for (const script of RAW_BUNDLED_QC_SCRIPTS)
+    for (const entry of (script as { entries: Array<{ findings: Array<{ evidence: unknown[] }> }> }).entries)
+      for (const finding of entry.findings)
+        for (const evidence of finding.evidence as Array<{ locator: Record<string, unknown> }>) {
+          assert.ok(!('heading' in evidence.locator), JSON.stringify(evidence.locator));
+          assert.ok(!('sheet' in evidence.locator), JSON.stringify(evidence.locator));
+          if (evidence.locator['kind'] === 'section') {
+            sections += 1;
+            assert.ok(Number.isInteger(evidence.locator['index']), JSON.stringify(evidence.locator));
+          }
+        }
+  assert.ok(sections >= 2, `${sections} section locators`);
+  for (const locator of [
+    { kind: 'section', heading: '4. Hallucination and accuracy' },
+    { kind: 'cell', sheet: 'Checklist', cell: 'B7' },
+  ]) {
+    const finding = { ...goodSlotFinding, evidence: [{ slot: 7, locator }] };
+    assert.equal(
+      codeOf(() => validateScript(baseScript(finding))),
+      'evidence_locator_invalid',
+      JSON.stringify(locator),
+    );
+  }
+  const ordinal = {
+    ...goodSlotFinding,
+    evidence: [{ slot: 7, locator: { kind: 'cell', sheetIndex: 2, cell: 'B7' } }],
+  };
+  assert.deepEqual(validateScript(baseScript(ordinal)).entries[0]!.findings[0]!.evidence[0]!.locator, {
+    kind: 'cell',
+    sheetIndex: 2,
+    cell: 'B7',
+  });
+});

@@ -247,7 +247,7 @@ describe(`W4-12 qc-runs read and finding evidence — ${SET}`, () => {
         {
           slot: 1,
           artifactId: metricArtifact,
-          locator: { kind: 'section', heading: '4. Hallucination and accuracy' },
+          locator: { kind: 'section', index: 4 }, // W4-16: an ordinal, never the heading text (decision 21)
         },
       ],
       'ACC-EXTRACTION-NOT-HALLUCINATION': [

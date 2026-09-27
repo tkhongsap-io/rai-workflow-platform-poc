@@ -12,9 +12,11 @@ import {
   QcRunResultSchema,
   checkOwningLane,
   findingKeyOf,
+  isEvidenceLocator,
   scopeKeyOf,
   validateQcFinding,
 } from './validate.js';
+import { CELL_REFERENCE_PATTERN } from './types.js';
 
 const hash = 'a'.repeat(64);
 const context = {
@@ -232,4 +234,57 @@ test('W4-11b: QcEngineIdentitySchema bounds identities to identifiers and usage 
   assert.ok(!Value.Check(QcEngineIdentitySchema, { model: { ...engine.model, inputTokens: 2 ** 31 } }));
   assert.ok(!Value.Check(QcEngineIdentitySchema, { extractorVersion: 'x', excerpt: 'text' }));
   assert.ok(!Value.Check(QcEngineIdentitySchema, { model: { ...engine.model, output: 'text' } }));
+});
+
+test('W4-16: a locator carries no document text; section by ordinal, cell by sheet ordinal and A1 reference', () => {
+  const withLocator = (locator: unknown): unknown => ({
+    ...finding,
+    evidence: [{ artifactId: 'a-1', contentHash: hash, slot: 7, locator }],
+  });
+  for (const locator of [
+    { kind: 'section', index: 1 },
+    { kind: 'section', index: 12 },
+    { kind: 'section' },
+    { kind: 'cell', sheetIndex: 2, cell: 'B7' },
+    { kind: 'cell', sheetIndex: 1, cell: 'XFD1048576' },
+    { kind: 'cell', sheetIndex: 3 },
+    { kind: 'cell', cell: 'A1' },
+    { kind: 'cell' },
+    { kind: 'page', page: 3 },
+    { kind: 'text_range', start: 0, end: 4 },
+  ]) {
+    assert.ok(isEvidenceLocator(locator), JSON.stringify(locator));
+    assert.equal(validateQcFinding(withLocator(locator), context), null, JSON.stringify(locator));
+  }
+  // The pre-W4-16 text shapes are refused: a heading or a sheet name is document text (W0-07 3.1, decision 21).
+  for (const locator of [
+    { kind: 'section', heading: '4. Hallucination and accuracy' },
+    { kind: 'section', index: 4, heading: '4. Hallucination and accuracy' },
+    { kind: 'cell', sheet: 'Checklist', cell: 'B7' },
+    { kind: 'cell', sheetIndex: 1, sheet: 'Checklist', cell: 'B7' },
+    { kind: 'section', index: 1, note: 'x' },
+  ]) {
+    assert.ok(!isEvidenceLocator(locator), JSON.stringify(locator));
+    assert.equal(validateQcFinding(withLocator(locator), context), 'unknown_field', JSON.stringify(locator));
+  }
+  for (const locator of [
+    { kind: 'section', index: 0 },
+    { kind: 'section', index: 1.5 },
+    { kind: 'section', index: '4' },
+    { kind: 'cell', sheetIndex: 0, cell: 'A1' },
+    { kind: 'cell', sheetIndex: 1, cell: 'a1' },
+    { kind: 'cell', sheetIndex: 1, cell: 'A0' },
+    { kind: 'cell', sheetIndex: 1, cell: 'Checklist!B7' },
+    { kind: 'cell', sheetIndex: 1, cell: 'total revenue' },
+  ]) {
+    assert.ok(!isEvidenceLocator(locator), JSON.stringify(locator));
+    // A union reports the other kinds' closed shapes too, so the violation name may be either schema failure.
+    assert.ok(
+      ['schema_violation', 'unknown_field'].includes(
+        validateQcFinding(withLocator(locator), context) ?? 'null',
+      ),
+      JSON.stringify(locator),
+    );
+  }
+  assert.equal(CELL_REFERENCE_PATTERN, '^[A-Z]{1,3}[1-9][0-9]{0,6}$');
 });

@@ -16,7 +16,7 @@
             {
               "fixtureArtifactId": "fx-doc-0001-01",
               "slot": 1,
-              "locator": { "kind": "section", "heading": "3. Model performance" }
+              "locator": { "kind": "section", "index": 3 }
             }
           ],
           "measure": {

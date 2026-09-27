@@ -578,13 +578,14 @@ test('W4-12: a finding rule label comes from its qc.rule.* key; an unknown rule 
 
 test('W4-12: evidence locations are slot and locator kind, one per distinct pair, every kind has a label', () => {
   for (const kind of EVIDENCE_LOCATOR_KINDS) assert.ok(isLocaleKey(evidenceLocatorKey(kind)), kind);
+  // W4-16: section locators carry an ordinal, never a heading (decision 21); two ordinals are two locations.
   assert.deepEqual(
     evidenceLocations([
-      { slot: 1, artifactId: 'a-1', locator: { kind: 'section', heading: '4. Hallucination and accuracy' } },
-      { slot: 1, artifactId: 'a-1', locator: { kind: 'section', heading: 'another heading' } },
+      { slot: 1, artifactId: 'a-1', locator: { kind: 'section', index: 4 } },
+      { slot: 1, artifactId: 'a-1', locator: { kind: 'section', index: 4 } },
       { slot: 1, artifactId: 'a-1', locator: { kind: 'page', page: 3 } },
       { slot: null, artifactId: null, locator: { kind: 'absent' } },
-    ]),
+    ]).map(({ slot, kind }) => ({ slot, kind })),
     [
       { slot: 1, kind: 'section' },
       { slot: 1, kind: 'page' },
@@ -592,6 +593,40 @@ test('W4-12: evidence locations are slot and locator kind, one per distinct pair
     ],
   );
   assert.deepEqual(evidenceLocations(undefined), []);
+});
+
+test('W4-16: an evidence location renders its ordinals: page, section, sheet and cell; a bare kind its label', () => {
+  const places = evidenceLocations([
+    { slot: 1, artifactId: 'a-1', locator: { kind: 'page', page: 3 } },
+    { slot: 1, artifactId: 'a-1', locator: { kind: 'section', index: 12 } },
+    { slot: 1, artifactId: 'a-1', locator: { kind: 'section', index: 13 } },
+    { slot: 3, artifactId: 'a-3', locator: { kind: 'cell', sheetIndex: 2, cell: 'B7' } },
+    { slot: 3, artifactId: 'a-3', locator: { kind: 'cell', sheetIndex: 2 } },
+    { slot: 3, artifactId: 'a-3', locator: { kind: 'cell', cell: 'C9' } },
+    { slot: 1, artifactId: 'a-1', locator: { kind: 'section' } }, // a legacy row served as its kind only
+    { slot: 3, artifactId: 'a-3', locator: { kind: 'cell' } },
+    { slot: 1, artifactId: 'a-1', locator: { kind: 'text_range', start: 0, end: 4 } },
+    { slot: null, artifactId: null, locator: { kind: 'absent' } },
+  ]);
+  assert.deepEqual(
+    places.map((p) => [p.slot, p.label.key, p.label.params]),
+    [
+      [1, 'review.evidence.ordinal.page', { page: 3 }],
+      [1, 'review.evidence.ordinal.section', { index: 12 }],
+      [1, 'review.evidence.ordinal.section', { index: 13 }],
+      [3, 'review.evidence.ordinal.cell', { sheet: 2, cell: 'B7' }],
+      [3, 'review.evidence.ordinal.sheet', { sheet: 2 }],
+      [3, 'review.evidence.ordinal.cell_ref', { cell: 'C9' }],
+      [1, 'review.evidence.locator.section', {}],
+      [3, 'review.evidence.locator.cell', {}],
+      [1, 'review.evidence.locator.text_range', {}],
+      [null, 'review.evidence.locator.absent', {}],
+    ],
+  );
+  for (const place of places) assert.ok(isLocaleKey(place.label.key), place.label.key);
+  assert.equal(t('en', places[0]!.label.key, places[0]!.label.params), 'page 3');
+  assert.equal(t('en', places[3]!.label.key, places[3]!.label.params), 'sheet 2, cell B7');
+  assert.equal(t('th', places[1]!.label.key, places[1]!.label.params), 'หัวข้อที่ 12');
 });
 
 test('W4-12: a run reads unavailable, 0 rules evaluated, findings or no findings; the first two are never a clean pass', () => {

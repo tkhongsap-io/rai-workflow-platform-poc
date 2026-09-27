@@ -7,7 +7,11 @@ import { Type, type Static } from 'typebox';
 import type { Lane } from '../constants.js';
 import { ExpectedVersionSchema } from './versions.js';
 import { SlotNumberSchema } from './slots.js';
-import { QC_ENGINE_LABEL_PATTERN, QC_UNAVAILABLE_DETAIL_PATTERN } from '../qc/types.js';
+import {
+  CELL_REFERENCE_PATTERN,
+  QC_ENGINE_LABEL_PATTERN,
+  QC_UNAVAILABLE_DETAIL_PATTERN,
+} from '../qc/types.js';
 
 // Explicit literals (not LANES[i]): noUncheckedIndexedAccess makes indexed access `Lane | undefined`.
 export const LaneSchema = Type.Union([
@@ -155,8 +159,13 @@ export const EvidenceLocatorSchema = Type.Union([
     ),
   }),
   Type.Object({ kind: Type.Literal('text_range'), start: Type.Number(), end: Type.Number() }),
-  Type.Object({ kind: Type.Literal('cell'), sheet: Type.String(), cell: Type.String() }),
-  Type.Object({ kind: Type.Literal('section'), heading: Type.String() }),
+  // W4-16 (decision 21): ordinals and an A1 reference only; a legacy row's heading or sheet name is never served.
+  Type.Object({
+    kind: Type.Literal('cell'),
+    sheetIndex: Type.Optional(Type.Integer({ minimum: 1 })),
+    cell: Type.Optional(Type.String({ pattern: CELL_REFERENCE_PATTERN })),
+  }),
+  Type.Object({ kind: Type.Literal('section'), index: Type.Optional(Type.Integer({ minimum: 1 })) }),
   Type.Object({ kind: Type.Literal('absent') }),
 ]);
 export type EvidenceLocatorView = Static<typeof EvidenceLocatorSchema>;

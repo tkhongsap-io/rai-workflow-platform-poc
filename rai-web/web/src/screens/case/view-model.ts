@@ -12,6 +12,7 @@ import type { NotApplicableReason, SlotNumber, SlotState } from '@rai/shared/sch
 import type {
   DispositionKind,
   EvidenceLocatorKind,
+  EvidenceLocatorView,
   FindingEvidence,
   LaneQcRunResponse,
   QcRunSummary,
@@ -380,14 +381,56 @@ export function evidenceLocatorKey(kind: EvidenceLocatorKind): LocaleKey {
   return `review.evidence.locator.${kind}` as LocaleKey;
 }
 
-/** Where a finding's evidence points, as slot and locator kind: one entry per distinct pair, in stored order. */
+/** How one evidence location reads: a locale key and its params (W4-16: ordinals only, never document text). */
+export interface EvidenceLabel {
+  key: LocaleKey;
+  params: Record<string, number | string>;
+}
+
+/**
+ * W4-16: the ordinals a locator carries, as a label: "page 3", "section 12", "sheet 2, cell B7". A locator with no
+ * ordinal (a legacy row served as its kind only, a text range, absent) reads as its kind label.
+ */
+export function evidenceLabel(locator: EvidenceLocatorView): EvidenceLabel {
+  switch (locator.kind) {
+    case 'page':
+      return { key: 'review.evidence.ordinal.page', params: { page: locator.page } };
+    case 'section':
+      if (locator.index !== undefined)
+        return { key: 'review.evidence.ordinal.section', params: { index: locator.index } };
+      break;
+    case 'cell':
+      if (locator.sheetIndex !== undefined && locator.cell !== undefined)
+        return {
+          key: 'review.evidence.ordinal.cell',
+          params: { sheet: locator.sheetIndex, cell: locator.cell },
+        };
+      if (locator.sheetIndex !== undefined)
+        return { key: 'review.evidence.ordinal.sheet', params: { sheet: locator.sheetIndex } };
+      if (locator.cell !== undefined)
+        return { key: 'review.evidence.ordinal.cell_ref', params: { cell: locator.cell } };
+      break;
+    default:
+      break;
+  }
+  return { key: evidenceLocatorKey(locator.kind), params: {} };
+}
+
+/**
+ * Where a finding's evidence points, as slot, locator kind and its label: one entry per distinct slot and label, in
+ * stored order (two sections of one slot are two entries; W4-16).
+ */
 export function evidenceLocations(
   evidence: readonly FindingEvidence[] | undefined,
-): Array<{ slot: FindingEvidence['slot']; kind: EvidenceLocatorKind }> {
-  const out: Array<{ slot: FindingEvidence['slot']; kind: EvidenceLocatorKind }> = [];
+): Array<{ slot: FindingEvidence['slot']; kind: EvidenceLocatorKind; label: EvidenceLabel }> {
+  const out: Array<{ slot: FindingEvidence['slot']; kind: EvidenceLocatorKind; label: EvidenceLabel }> = [];
+  const seen = new Set<string>();
   for (const entry of evidence ?? []) {
-    if (out.some((seen) => seen.slot === entry.slot && seen.kind === entry.locator.kind)) continue;
-    out.push({ slot: entry.slot, kind: entry.locator.kind });
+    const label = evidenceLabel(entry.locator);
+    const id = JSON.stringify([entry.slot, label.key, label.params]);
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push({ slot: entry.slot, kind: entry.locator.kind, label });
   }
   return out;
 }
