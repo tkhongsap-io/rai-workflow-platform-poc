@@ -54,3 +54,10 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: Ta names the AI/COE lead and IT/Security owner; the owners review the briefs; Ta records D08, D09 and the W4 gate entry, or asks for changes.
 - Author: operator=ta session=w4-gate-briefs model=claude-opus-5-5
 - Evidence: https://github.com/tkhongsap-io/rai-workflow-platform-poc/pull/171
+
+## 2026-09-26 19:00 — W4a gate entry and kickoff rulings recorded
+- What: register rows "W4a gate entry", "D05 refinement (upload slot 5 and 9)", "W4a kickoff rulings"; BUILD_PLAN W4a status section; authorization lines in AGENTS and team-and-roles.
+- Why: Ta chose W4a first and ruled the slot-5/9 upload owner, the substitute revisit and the provisional rule set in the session of 2026-09-26.
+- Next: W4-00a plan review and merge; then W4a issues.
+- Author: operator=ta session=claude-code-w4a-gate model=claude-opus-5-5
+- Evidence: changes/2026-09-26-w4-00a-plan/

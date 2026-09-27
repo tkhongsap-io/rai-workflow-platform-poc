@@ -1,5 +1,9 @@
 # Development log
 
+## W4a opened; W4-00a plan — 2026-09-26
+
+Ta opened W4a: QC that reads only structured pack data (no document parsing, no model), on synthetic data, ahead of D08 and D09. Also recorded: an upload QC outage on slot 5 is AI/COE's, and slot 9 gets no upload run; the API substitute is kept through W4a; the four provisional rules are the W4a starting set. The [W4-00a plan](docs/engineering/implementation-plan-w4a.md) sets the order W4-11a, W4-02, W4-03, W4-13, W4-04, W4-12, then the W4a exit, each through a reviewed PR with the full suite. W4b stays gated on named owners, D08 and D09. [Review](changes/2026-09-26-w4-00a-plan/review.md).
+
 ## W3 follow-ups closed — 2026-09-26
 
 All seven follow-ups from Ta's W3 deferred rulings are merged: display names (F1, #163), no lane-opened mail to a BU-SPOC reviewer (F2, #164), per-lane finding count (F3, #165), send-back link to the case page (F4, #166), one Thai term for desk completion (F5, #167), `scopedCases` removed (F6, #168) and the one-hour temp-file floor (F7, #169). Each merged with two independent reviewer verdicts and green CI on its merged head. CI was blocked for part of the day by a GitHub Actions spending limit on the organization; nothing merged until it was raised and CI ran green. W3-F8 (#180, PR #181) is in review in a separate session. Open for Ta, not blocking: a Thai Ready card shows the term twice; the BU-SPOC reviewer in the SLA digest; the owner-as-reviewer mail case; the queue as a day-start list.

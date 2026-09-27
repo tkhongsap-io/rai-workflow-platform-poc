@@ -1,6 +1,6 @@
 # W4 work breakdown: version-aware soft QC
 
-**Draft — not authorized; becomes Ready only after D08, D09 and Ta's W4 gate entry.**
+**W4a authorized 2026-09-26 (register row "W4a gate entry", Option B below); W4a tickets become Ready when the [W4-00a plan](../engineering/implementation-plan-w4a.md) merges. W4b stays a draft: not authorized until D08, D09 and its own gate entry.**
 
 Status: agent draft prepared 2026-09-26 on Ta's instruction, for the owners to review. D03 covers W0-W3 only. No issue exists for any ticket below, and none should be opened until the gate entry is recorded. Packages, entry criteria and exit evidence come from [BUILD_PLAN](../../BUILD_PLAN.md) W4. Acceptance IDs come from [acceptance.md](../acceptance.md). The decisions each ticket waits for are argued in the [W4 decision briefs](w4-decision-briefs.md). Ticket paths and commands come from the W4 file-level plan (W4-00), so none are named here. Owner types, lanes and the PR size rule are as in the [slice 1 work breakdown](slice-1-work-breakdown.md) and [team and roles](team-and-roles.md).
 

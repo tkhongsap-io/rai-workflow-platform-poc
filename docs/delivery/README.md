@@ -11,8 +11,8 @@ Status: **G0 and W0-W2 exits recorded; W3 accepted by Ta on 2026-09-26 (slice 1 
 5. [Design-to-build map](design-to-build-map.md): each designed screen to its tickets and server invariants; what in the demo is simulation only.
 6. [Agent task brief template](agent-task-brief-template.md): how to hand one ticket to an agent.
 7. [Later packages](later-packages-outline.md): W4-W8 outline and candidate backlog.
-8. [W4 decision briefs](w4-decision-briefs.md): D08 and D09 as they bear on W4, with a draft W4 gate entry for Ta. Draft; nothing decided; W4 not authorized.
-9. [W4 work breakdown](w4-work-breakdown.md): draft W4 tickets. Not authorized; Ready only after D08, D09 and Ta's W4 gate entry.
+8. [W4 decision briefs](w4-decision-briefs.md): D08 and D09 as they bear on W4, with a draft W4 gate entry for Ta. W4a opened and related question 1 ruled on 2026-09-26; D08 and D09 undecided; W4b not authorized.
+9. [W4 work breakdown](w4-work-breakdown.md): W4 tickets. W4a authorized 2026-09-26 under the [W4-00a plan](../engineering/implementation-plan-w4a.md); W4b not authorized until D08, D09 and its gate entry.
 
 ## Path at a glance
 
@@ -22,7 +22,7 @@ W0  technical contract ........... tech lead + Ta          (10 tickets, docs + A
 W1  case + versioned pack ........ Lanes A / B / C         (15 tickets incl. Lane C and W1-INT)
 W2  lanes, send-back, Ready ...... D02, D05 recorded       (11 tickets)
 W3  queue, mail sink, SLA ........ D06, D11 recorded       (9 tickets + follow-ups W3-F1 to F8) → slice 1 done
-W4  soft QC ...................... D08, D09 open          (draft briefs + tickets; not authorized)
+W4  soft QC ...................... W4a authorized 2026-09-26 (deterministic metadata QC); W4b: D08, D09 open
 W5-W8 ............................ outline only; not authorized
 ```
 
@@ -50,4 +50,4 @@ Opened 2026-09-21 on Ta's instruction: one epic per package and one issue per ti
 | W2 parallel reviews, send-back, Ready | [#53](https://github.com/tkhongsap-io/rai-workflow-platform-poc/issues/53) (11 tickets, closed) |
 | W3 queue, notifications, SLA | [#54](https://github.com/tkhongsap-io/rai-workflow-platform-poc/issues/54) (9 tickets, closed; follow-ups #163-#169 closed, #180 open) |
 
-Filter: `is:open label:status:ready` shows what can start now; W0-W3 epics are closed. W4-W8 have no issues; they are not authorized.
+Filter: `is:open label:status:ready` shows what can start now; W0-W3 epics are closed. W4a issues are opened when the W4-00a plan merges; W4b-W8 have no issues and are not authorized.
