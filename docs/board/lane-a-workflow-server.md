@@ -237,3 +237,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w5-02-register-risk-rubric-seed model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #213)
 - Scope: per changes/2026-09-27-w5-02-register-risk-rubric-seed/: `risk_rubric` registered in `CONFIGURATION_BODY_SCHEMAS`/`ConfigurationBodies` with a `riskRubricBodyProblems` branch in `validateConfigurationBody`; the seed publishes revision 1 `synthetic-placeholder.1` (a labelled SYNTHETIC PLACEHOLDER for D07, not the approved instrument); `GET /api/configuration/risk-rubric/current` (200 / 404 `risk_rubric`, `config.read_effective`); seed and configuration tests updated; W0-02 section 7.3 amendment. No migration, no scoring, no UI. One PR.
+
+## 2026-09-27 22:45 — CLAIM lane-a: W4-05b extraction worker host, protocol and limits (#212)
+- Author: operator=ta session=claude-code-w4-05b-extraction-worker-host-protocol model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #212)
+- Scope: per changes/2026-09-27-w4-05b-extraction-worker-host-protocol/: the `Extractor` port, the IPC protocol with a TypeBox reply check, the limits, the forking host `createWorkerExtractor` (one process per call, empty env, no stdio, heap cap, SIGKILL on time/abort/output, concurrency semaphore) and the worker entry under `server/src/qc/extraction/`; worker module-graph test; fork latency measured under the source and built layouts. No format parser (W4-05c/d), no runner, no config key, no migration. One PR.
