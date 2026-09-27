@@ -1,10 +1,10 @@
 // W4-11b (W4b plan sections 7 and 8): a run's extractor and model identity and its unavailable detail, as the
 // qc_run columns and the qc.run.* log fields record them. Identifiers and numbers only (W0-10 redaction): no filename,
 // document text, excerpt, model input or output, or message param ever passes through here.
-import type { QcEngineIdentity, QcRunResult } from '@rai/shared/qc/types';
+import { QC_UNAVAILABLE_DETAIL_PATTERN, type QcEngineIdentity, type QcRunResult } from '@rai/shared/qc/types';
 
-/** The qc_run.unavailable_detail CHECK pattern (migration 0011). */
-export const UNAVAILABLE_DETAIL_PATTERN = /^[a-z0-9_]{1,64}$/;
+/** The qc_run.unavailable_detail CHECK pattern (migration 0012). */
+export const UNAVAILABLE_DETAIL_PATTERN = new RegExp(QC_UNAVAILABLE_DETAIL_PATTERN);
 /** Stored in place of a detail that is not a bounded code, so free text never reaches the row. */
 export const UNSPECIFIED_DETAIL = 'unspecified';
 /** The detail of a run refused because its `engine` identity failed `QcEngineIdentitySchema`. */

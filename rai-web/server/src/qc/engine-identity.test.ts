@@ -1,9 +1,13 @@
 // W4-11b (W4b plan sections 7 and 8): how a result's engine identity and detail become qc_run columns and log fields.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { QcRunResult } from '@rai/shared/qc/types';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { QC_UNAVAILABLE_DETAIL_PATTERN, type QcRunResult } from '@rai/shared/qc/types';
+import { MIGRATIONS_FOLDER } from '../db/migrate.js';
 import {
   ENGINE_IDENTITY_INVALID,
+  UNAVAILABLE_DETAIL_PATTERN,
   UNSPECIFIED_DETAIL,
   engineColumnsOf,
   engineLogFields,
@@ -90,4 +94,11 @@ test('W4-11b: the stored detail is the code when bounded, unspecified otherwise,
     assert.equal(storedUnavailableDetail(unavailable(odd as unknown as string)), UNSPECIFIED_DETAIL);
   assert.match(UNSPECIFIED_DETAIL, /^[a-z0-9_]{1,64}$/);
   assert.match(ENGINE_IDENTITY_INVALID, /^[a-z0-9_]{1,64}$/);
+});
+
+test('one detail pattern: the server check, the shared read schemas and the migration CHECK agree', () => {
+  assert.equal(QC_UNAVAILABLE_DETAIL_PATTERN, '^[a-z0-9_]{1,64}$');
+  assert.equal(UNAVAILABLE_DETAIL_PATTERN.source, QC_UNAVAILABLE_DETAIL_PATTERN);
+  const sql = readFileSync(path.join(MIGRATIONS_FOLDER, '0012_w4_11b_run_extraction_identity.sql'), 'utf8');
+  assert.ok(sql.includes(`"unavailable_detail" ~ '${QC_UNAVAILABLE_DETAIL_PATTERN}'`));
 });

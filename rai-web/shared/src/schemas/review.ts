@@ -7,7 +7,7 @@ import { Type, type Static } from 'typebox';
 import type { Lane } from '../constants.js';
 import { ExpectedVersionSchema } from './versions.js';
 import { SlotNumberSchema } from './slots.js';
-import { QC_ENGINE_LABEL_PATTERN } from '../qc/types.js';
+import { QC_ENGINE_LABEL_PATTERN, QC_UNAVAILABLE_DETAIL_PATTERN } from '../qc/types.js';
 
 // Explicit literals (not LANES[i]): noUncheckedIndexedAccess makes indexed access `Lane | undefined`.
 export const LaneSchema = Type.Union([
@@ -283,12 +283,12 @@ export type QcUnavailableReasonName = (typeof QC_UNAVAILABLE_REASONS)[number];
  * `qc_run.engine_id`; `ruleRevision` the recorded revision ID; `rulesLabel` the `label` of the `qc_rules` revision
  * with that ID (null when it names none); `rulesEvaluated` is null on rows written before migration 0009. W4-11b
  * (W4b plan section 9): `extractorVersion`, `model` and `modelUsage` are what the run recorded (null without
- * extraction or model use, and on rows written before migration 0011); `unavailableDetail` is the stored detail of an
+ * extraction or model use, and on rows written before migration 0012); `unavailableDetail` is the stored detail of an
  * unavailable run (a bounded code or `unspecified`; null when none). The model cost is not served. The identity
  * labels use the `QcEngineIdentitySchema` label bound and the detail the qc_run CHECK pattern (review round 1).
  */
 const QC_RUN_ENGINE_LABEL = Type.String({ pattern: QC_ENGINE_LABEL_PATTERN });
-const QC_RUN_UNAVAILABLE_DETAIL = Type.String({ pattern: '^[a-z0-9_]{1,64}$' });
+const QC_RUN_UNAVAILABLE_DETAIL = Type.String({ pattern: QC_UNAVAILABLE_DETAIL_PATTERN });
 
 export const QcRunSummarySchema = Type.Object({
   runId: Type.String(),

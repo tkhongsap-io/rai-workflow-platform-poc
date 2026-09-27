@@ -121,6 +121,10 @@ export const QC_RULE_ID_PATTERN = /^[A-Z]+(-[A-Z0-9]+)+$/;
 // qc-runs read schema so the two cannot drift apart.
 export const QC_ENGINE_LABEL_PATTERN = '^[A-Za-z0-9][A-Za-z0-9._+/@:-]{0,127}$';
 
+// W4-11b: the bounded code shape of qc_run.unavailable_detail (the migration CHECK uses the same literal), shared by
+// the server's stored-detail check, the qc-runs read and the log/operator schemas.
+export const QC_UNAVAILABLE_DETAIL_PATTERN = '^[a-z0-9_]{1,64}$';
+
 export type QcUnavailableReason = 'timeout' | 'runner_error' | 'not_configured' | 'artifact_unreadable';
 
 /** W4-11b (W4b plan section 5): the model a run used. No external provider value exists (WA-D08, decision 6). */

@@ -37,7 +37,7 @@ export const qcRun = pgTable(
     // W4-11a: rules the runner executed; 0 on an unavailable run, NULL on rows written before migration 0009.
     rulesEvaluated: integer('rules_evaluated'),
     // W4-11b: the extractor and model identity and usage the runner reported (QcRunResult.engine); NULL on rows
-    // written before migration 0011 and on runs without extraction or model use.
+    // written before migration 0012 and on runs without extraction or model use.
     extractorVersion: text('extractor_version'),
     modelProvider: text('model_provider'),
     modelId: text('model_id'),

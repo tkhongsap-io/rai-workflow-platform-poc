@@ -2,6 +2,7 @@
 import { Type, type Static } from 'typebox';
 import { LaneSchema } from './review.js';
 import { UNSAFE_UPLOAD_REASONS } from '../errors.js';
+import { QC_UNAVAILABLE_DETAIL_PATTERN } from '../qc/types.js';
 
 const values = Type.Enum;
 const object = <T extends Parameters<typeof Type.Object>[0]>(fields: T) =>
@@ -12,7 +13,7 @@ const count = Type.Integer({ minimum: 0 });
 // A QC runner name or version (QcRunner.identity): an identifier, never free text such as an exception message.
 const runnerLabel = Type.String({ pattern: '^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$' });
 // W4-11b: qc_run.unavailable_detail, a bounded code (the runner's detail or 'unspecified'), never free text.
-const unavailableDetail = Type.String({ pattern: '^[a-z0-9_]{1,64}$' });
+const unavailableDetail = Type.String({ pattern: QC_UNAVAILABLE_DETAIL_PATTERN });
 export const QcUnavailableReasonSchema = values([
   'timeout',
   'runner_error',
@@ -156,7 +157,7 @@ export const DeskHealthReportSchema = object({
       // W4-11a: the runner label, qc_run.engine_id and runner_version ('unrecorded' on rows before migration 0009).
       runner: runnerLabel,
       runnerVersion: runnerLabel,
-      // W4-11b: the stored detail; null when the run gave none and on rows written before migration 0011.
+      // W4-11b: the stored detail; null when the run gave none and on rows written before migration 0012.
       unavailableDetail: Type.Union([unavailableDetail, Type.Null()]),
       requestedAt: timestamp,
       correlationId: id,
