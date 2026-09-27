@@ -40,8 +40,8 @@ export const MIGRATION_CLASSES: Readonly<Record<string, RollbackClass>> = Object
   '0012_w6_02_configuration_admin': 'restore-required',
   // W7-06: one new table; an older build never reads it and signs in as before.
   '0013_w7_06_subject_profile': 'additive',
-  // W4-11b (0012 after W7-03, regenerated as 0013 after W6-02): nullable columns and CHECKs only, as its header says.
-  '0013_w4_11b_run_extraction_identity': 'additive',
+  // W4-11b (regenerated as 0014 after W7-06 merged first): nullable columns and CHECKs only, as its header says.
+  '0014_w4_11b_run_extraction_identity': 'additive',
 });
 
 /**

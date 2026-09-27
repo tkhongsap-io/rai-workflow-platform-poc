@@ -3,7 +3,7 @@
 // document text, excerpt, model input or output, or message param ever passes through here.
 import { QC_UNAVAILABLE_DETAIL_PATTERN, type QcEngineIdentity, type QcRunResult } from '@rai/shared/qc/types';
 
-/** The qc_run.unavailable_detail CHECK pattern (migration 0013). */
+/** The qc_run.unavailable_detail CHECK pattern (migration 0014). */
 export const UNAVAILABLE_DETAIL_PATTERN = new RegExp(QC_UNAVAILABLE_DETAIL_PATTERN);
 /** Stored in place of a detail that is not a bounded code, so free text never reaches the row. */
 export const UNSPECIFIED_DETAIL = 'unspecified';

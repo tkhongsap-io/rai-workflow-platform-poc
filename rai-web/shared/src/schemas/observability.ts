@@ -157,7 +157,7 @@ export const DeskHealthReportSchema = object({
       // W4-11a: the runner label, qc_run.engine_id and runner_version ('unrecorded' on rows before migration 0009).
       runner: runnerLabel,
       runnerVersion: runnerLabel,
-      // W4-11b: the stored detail; null when the run gave none and on rows written before migration 0013.
+      // W4-11b: the stored detail; null when the run gave none and on rows written before migration 0014.
       unavailableDetail: Type.Union([unavailableDetail, Type.Null()]),
       requestedAt: timestamp,
       correlationId: id,

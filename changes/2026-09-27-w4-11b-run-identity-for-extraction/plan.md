@@ -7,7 +7,7 @@
    - `shared/src/schemas/observability.test.ts`: `unavailableDetail` required, nullable, bounded.
    - `tests/integration/w4-12-qc-runs.test.ts`: the served shape gains the four fields (null for the substitute runs).
 3. GREEN:
-   - `db/schema/qc-run.ts`, then `npm run migrate:generate`, renamed to `0013_w4_11b_run_extraction_identity.sql` (0010, then 0011, then 0012, before W5-03, W7-03 and W6-02 merged first), header and CHECKs reviewed by hand.
+   - `db/schema/qc-run.ts`, then `npm run migrate:generate`, renamed to `0014_w4_11b_run_extraction_identity.sql` (0010, then 0011, then 0012, then 0013, before W5-03, W7-03, W6-02 and W7-06 merged first), header and CHECKs reviewed by hand.
    - `shared/src/qc/types.ts` (`QcEngineIdentity`, `engine?`), `shared/src/qc/validate.ts` (schema), `server/src/qc/engine-identity.ts` (new: columns, stored detail, log fields), `qc/repository.ts` (`InsertRunInput`), `qc/orchestrator.ts` (`checkedResult`, `recordRun`, log fields), `observability/log.ts`, `observability/operator.ts`, `shared/src/schemas/{observability,review}.ts`, `findings/repository.ts`.
    - Typed literals: `web/src/screens/case/view-model.test.ts` `qcRun()`, `web/src/api/client.test.ts`, `tests/browser/support/operator-rehearsal.ts`.
    - Documents: W0-02 section 7, W0-04, data contract, W0-07 section 7, W0-10.
