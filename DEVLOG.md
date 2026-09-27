@@ -1,5 +1,9 @@
 # Development log
 
+## W4-04 upload-trigger QC — 2026-09-27
+
+Fifth W4a ticket (#188). Attaching a different document to a slot on a draft now starts a QC run for that slot, after the save and without making the owner wait. The run is recorded on the draft, which becomes the submitted version, so its result travels with it. If QC is unavailable, the outage is recorded as a finding for the lane that reviews that slot (slot 5, which three lanes review, goes to AI/COE as Ta recorded), and an open outage still blocks Ready. Slot 9 gets no run. A result that arrives after the version is Ready is kept only as a late-result diagnostic, and a version sent back takes nothing new. A server shutdown waits for a running upload check. With the W4a rules nothing is checked at upload yet (0 rules evaluated; the document rules are W4b's), and the scripted test runner no longer invents upload findings. [Review](changes/2026-09-27-w4-04-upload-trigger/review.md).
+
 ## W4-13 runner selection — 2026-09-27
 
 Fourth W4a ticket (#187). The desk now runs the real W4a QC runner by default: `QC_MODE=deterministic` works in every environment and `.env.example` sets it. The scripted substitute (`QC_MODE=substitute`) is now a local-only setting: the server refuses to start with it in production or with a networked or production sign-in mode, where before a production process silently ran with no QC at all. A missing or unknown value still stops start-up, and one runner never stands in for the other. The health report names the runner actually bound. Every test suite and CI keep the substitute explicitly, so the W2 and W3 journeys behave as before. The W0-02 and W0-07 configuration rows and TESTING carry dated notes. Rule outcomes stay provisional until D09. [Review](changes/2026-09-27-w4-13-runner-selection/review.md).

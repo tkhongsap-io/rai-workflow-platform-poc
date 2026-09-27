@@ -14,7 +14,6 @@ import type { Db } from './db/client.js';
 import { createFixtureIdentityProvider, type FixtureIdentity } from './identity/fixture.js';
 import { createPgSessionStore } from './identity/session.js';
 import type { IdentityAdapter } from './identity/types.js';
-import { noopUploadTrigger } from './pack/qc-trigger.js';
 import { laneOpenRecipientsFromIdentities, laneReviewerSpocUnits } from './versions/open-lanes.js';
 import { sendBackRecipientsFromIdentities } from './workflow/send-back-notice.js';
 
@@ -64,8 +63,9 @@ export function composeAppDeps(inputs: ComposeInputs): AppDeps {
     },
     cases: { businessUnits: inputs.businessUnits, subjects },
     artifacts: { store: inputs.store, limits: config.upload },
-    // Upload-triggered QC is not implemented (W4), so the W0-07 upload hook stays a no-op.
-    pack: { limits: config.upload, uploadTrigger: noopUploadTrigger },
+    // W4-04: the upload-triggered QC run, bound in app.ts with the drain, only when a runner is bound. Without one the
+    // submit run records not_configured (A08), so upload runs would only stack identical outage rows.
+    pack: { limits: config.upload, ...(qcRunner === undefined ? {} : { qc: { runner: qcRunner } }) },
     versions: {
       subjects, // W3-F1: the same directory names submitters and deciders on reads
       laneOpenRecipients: laneOpenRecipientsFromIdentities(knownIdentities),

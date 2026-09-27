@@ -207,3 +207,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w4-03-deterministic-runner model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #186)
 - Scope: per changes/2026-09-27-w4-03-deterministic-runner/: the `deterministic` QcRunner under `server/src/qc/deterministic/` with `PACK-SLOT-MISSING`, `PACK-STAGE-MISMATCH` and `PACK-NA-VENDOR-DOC`, the no-`read()` and module-graph tests, th/en keys, W0-07 3.5 rows and the 3.4 step-6 deferral. One PR.
+
+## 2026-09-27 13:01 — CLAIM lane-a: W4-04 upload trigger (#188)
+- Author: operator=ta session=claude-code-w4-04-upload-trigger model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #188)
+- Scope: per changes/2026-09-27-w4-04-upload-trigger/: the W0-07 `upload` trigger bound on the save-draft attach (`loadUploadTarget`, `lane = NULL` with `slot`, runKey in-flight key, slot 5 outage to AI/COE, slot 9 no run, per-lane outage reuse), drain-tracked, substitute scripts without upload entries, W0-07 3.2/3.6/3.9 amendments. One PR.

@@ -90,6 +90,8 @@ export async function findLatestUnavailableFinding(
   versionId: string,
   trigger: QcTrigger,
   lane: Lane | null,
+  /** W4-04: an upload outage is reused per version and owning lane (`QC-UNAVAILABLE:run:upload:<owningLane>`). */
+  owningLane?: Lane,
 ): Promise<LatestUnavailableFinding | undefined> {
   const [row] = await exec
     .select({ finding: qcFinding, open: undispositioned })
@@ -102,6 +104,7 @@ export async function findLatestUnavailableFinding(
         eq(qcFinding.kind, 'unavailable'),
         eq(qcRun.trigger, trigger),
         lane === null ? isNull(qcRun.lane) : eq(qcRun.lane, lane),
+        owningLane === undefined ? undefined : eq(qcFinding.owningLane, owningLane),
       ),
     )
     .orderBy(desc(qcFinding.createdAt), desc(qcFinding.id))

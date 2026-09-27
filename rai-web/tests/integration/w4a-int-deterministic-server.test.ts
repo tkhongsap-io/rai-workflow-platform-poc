@@ -4,8 +4,9 @@
 // session cookie from POST /auth/fixture/sign-in. It reads readiness `qc.kind`, the stored `PACK-*` findings of the
 // three W4a metadata rules through the findings endpoint, the `qc_run` rows (runner identity, `rules_evaluated`) and
 // the `qc.run.*` lines. Since W4-13, `deterministic` is valid in every environment and `.env.example` sets it; the
-// test harness (tests/support/process.ts) pins `substitute`, so this file overrides it. W4-12 extends this file with
-// the qc-runs endpoint. Slot and stage edits go through the
+// test harness (tests/support/process.ts) pins `substitute`, so this file overrides it. W4-04: an attach over HTTP
+// fires one upload run on the draft (lane NULL, slot set, 0 rules evaluated: no W4a metadata rule has the upload
+// trigger). W4-12 extends this file with the qc-runs endpoint. Slot and stage edits go through the
 // save-draft route before submit; no document is parsed and nothing leaves the host.
 
 import { after, before, describe, it } from 'node:test';
@@ -36,6 +37,7 @@ const IT_SECURITY = 'fx-user-it-security';
 const MISSING_SLOT = findFixtureCase('fx-case-missing-slot')!; // CM, pre_build, non-vendor, slot 7 missing
 const NONVENDOR = findFixtureCase('fx-case-nonvendor')!; // CM, pre_launch, non-vendor, slot 8 attached
 const NA_REASONS = findFixtureCase('fx-case-na-reasons')!; // vendor, idea, slot 4 N/A with a reason
+const VENDOR = findFixtureCase('fx-case-vendor')!; // HR, pre_launch, vendor, all attached
 
 const SERVER_VERSION = (
   JSON.parse(readFileSync(new URL('../../server/package.json', import.meta.url), 'utf8')) as {
@@ -227,5 +229,60 @@ describe(`W4a real server, QC_MODE=deterministic — ${SET}`, () => {
     assert.deepEqual(await findings(await signIn(OWNER), NA_REASONS.caseId, target.versionId), [
       { rule: 'PACK-NA-VENDOR-DOC', slot: 4, lane: 'dpo' },
     ]);
+  });
+
+  it('upload: an attach over HTTP fires one upload run on the draft, lane NULL, slot set, 0 rules evaluated, no finding', async () => {
+    const owner = await signIn(OWNER);
+    const draft = (await call<PackDraft>(owner, 'GET', `/api/cases/${VENDOR.caseId}/draft`)).body;
+    const slot2 = draft.slots[2];
+    assert.equal(slot2?.state, 'attached');
+    const saved = await call<PackDraft>(owner, 'PUT', `/api/cases/${VENDOR.caseId}/draft`, {
+      expectedVersion: { versionId: draft.draftId, revision: draft.draftRevision },
+      slots: { 1: { state: 'attached', artifactId: (slot2 as { artifactId: string }).artifactId } },
+    } satisfies PackDraftUpdateRequest);
+    assert.equal(saved.status, 200, saved.text);
+    const correlationId = String(saved.headers.get('x-correlation-id'));
+
+    // The run lands after the save's response (W0-07 3.2); its completion line closes it.
+    const deadline = Date.now() + 10_000;
+    for (;;) {
+      const started = server.linesFor('qc.run.started').find((l) => l.correlationId === correlationId);
+      const runId = (started?.fields as Record<string, unknown> | undefined)?.qcRunId;
+      if (
+        runId !== undefined &&
+        server
+          .linesFor('qc.run.completed')
+          .some((l) => (l.fields as Record<string, unknown> | undefined)?.qcRunId === runId)
+      )
+        break;
+      assert.ok(Date.now() < deadline, 'the upload run did not complete within 10 s');
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    const runs = (
+      await db.owner.execute(
+        sql`SELECT trigger, slot, lane, engine_id, runner_version, status, rules_evaluated, correlation_id
+              FROM qc_run WHERE version_id = ${draft.draftId}`,
+      )
+    ).rows;
+    assert.deepEqual(runs, [
+      {
+        trigger: 'upload',
+        slot: 1,
+        lane: null,
+        engine_id: 'deterministic',
+        runner_version: SERVER_VERSION,
+        status: 'completed',
+        rules_evaluated: 0,
+        correlation_id: correlationId,
+      },
+    ]);
+    const stored = (
+      await db.owner.execute(
+        sql`SELECT count(*)::int AS n FROM qc_finding WHERE version_id = ${draft.draftId}`,
+      )
+    ).rows[0] as { n: number };
+    assert.equal(stored.n, 0);
+    const started = server.linesFor('qc.run.started').find((l) => l.correlationId === correlationId);
+    assert.equal((started?.fields as Record<string, unknown> | undefined)?.trigger, 'upload');
   });
 });

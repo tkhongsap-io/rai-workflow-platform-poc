@@ -28,6 +28,7 @@ import type { Db, Executor, Tx } from '../db/client.js';
 import { lockCase, withTransaction } from '../db/transaction.js';
 import { createErrorCapture, type ErrorCapture } from '../observability/errors.js';
 import type { Emitter } from '../observability/log.js';
+import type { Drain } from '../shutdown.js';
 import type { ActionContext } from '../versions/transaction.js';
 import { staleDetails } from '../workflow/refs.js';
 import { noopUploadTrigger, type UploadTrigger, type UploadTriggerEvent } from './qc-trigger.js';
@@ -48,7 +49,9 @@ export interface PackServiceDeps {
   limits: Pick<UploadLimits, 'maxPackBytes'>;
   emitter: Emitter;
   errors?: ErrorCapture;
-  uploadTrigger?: UploadTrigger; // the W0-07 hook point; the no-op until an orchestrator is bound
+  uploadTrigger?: UploadTrigger; // the W0-07 hook point; app.ts binds the QC upload trigger (W4-04)
+  /** W4-04: each fired trigger is tracked, so a graceful shutdown waits for the upload run (shutdown.ts). */
+  drain?: Pick<Drain, 'track'>;
   now?: () => Date;
 }
 
@@ -252,14 +255,18 @@ function bumpRevision(tx: Tx, before: CaseRow, now: Date): Promise<CaseRow> {
   return updateDraftFields(tx, before.id, {}, before.rowVersion, now);
 }
 
-/** After commit: the hook fires once per changed reference; a failure is logged, never surfaced (W0-07 3.2). */
+/**
+ * After commit: the hook fires once per changed reference; a failure is logged, never surfaced (W0-07 3.2). The
+ * response does not wait for it; the drain does (W4-04).
+ */
 function fireUploadTriggers(deps: PackServiceDeps, events: UploadTriggerEvent[]): void {
   const trigger = deps.uploadTrigger ?? noopUploadTrigger;
   for (const event of events) {
-    void Promise.resolve()
+    const task = Promise.resolve()
       .then(() => trigger(event))
       .catch((err: unknown) => {
         (deps.errors ?? createErrorCapture(deps.emitter)).internal(err);
       });
+    deps.drain?.track(task);
   }
 }

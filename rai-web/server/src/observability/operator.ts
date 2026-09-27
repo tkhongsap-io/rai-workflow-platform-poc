@@ -1,5 +1,13 @@
 import { and, desc, eq, gt, or, sql } from 'drizzle-orm';
-import { LANES, type Lane, unavailableOwningLane } from '@rai/shared/constants';
+import {
+  CURRENT_LANE_MAPPING,
+  LANE_MAPPINGS_BY_VERSION,
+  LANES,
+  SLOTS,
+  type Lane,
+  type Slot,
+  unavailableOwningLane,
+} from '@rai/shared/constants';
 import { Value } from 'typebox/value';
 import {
   DeskHealthReportSchema,
@@ -16,11 +24,26 @@ import {
   qcLateResult,
 } from '../db/schema/index.js';
 
-/** The lane an unavailable run's QC-UNAVAILABLE finding belongs to; upload runs (none in slice 1) are never guessed. */
-function owningLaneOfUnavailableRun(trigger: string, lane: string | null): Lane | undefined {
+/**
+ * The lane an unavailable run's QC-UNAVAILABLE finding belongs to, as the orchestrator assigned it. W4-04: an upload
+ * run's lane comes from its slot under the version's mapping (a draft: the current constant); slot 5 → AI/COE. An
+ * unknown mapping or slot is never guessed.
+ */
+function owningLaneOfUnavailableRun(
+  trigger: string,
+  lane: string | null,
+  slot: number | null,
+  laneMappingVersion: string | null,
+): Lane | undefined {
   if (trigger === 'approve_attempt' && lane !== null && (LANES as readonly string[]).includes(lane))
     return unavailableOwningLane({ trigger: 'approve_attempt', lane: lane as Lane });
   if (trigger === 'submit') return unavailableOwningLane({ trigger: 'submit', lane: null });
+  if (trigger === 'upload' && slot !== null && (SLOTS as readonly number[]).includes(slot)) {
+    const mapping =
+      laneMappingVersion === null ? CURRENT_LANE_MAPPING : LANE_MAPPINGS_BY_VERSION[laneMappingVersion];
+    if (mapping === undefined) return undefined;
+    return unavailableOwningLane({ trigger: 'upload', slot: slot as Slot }, mapping) ?? undefined;
+  }
   return undefined;
 }
 
@@ -67,6 +90,8 @@ export async function readDeskHealth(
           versionId: qcRun.versionId,
           trigger: qcRun.trigger,
           lane: qcRun.lane,
+          slot: qcRun.slot,
+          laneMappingVersion: packVersion.laneMappingVersion,
           reason: qcRun.unavailableReason,
           runner: qcRun.engineId, // W4-11a: the runner label
           runnerVersion: qcRun.runnerVersion,
@@ -137,8 +162,8 @@ export async function readDeskHealth(
         })),
         // W0-06 7.2 (recorded 2026-09-25): the outage finding's lane follows the run, so it is derived from the run
         // itself; that also covers a run that reused an earlier open finding and has no finding row of its own.
-        unavailableQc: unavailable.map(({ lane, ...row }) => {
-          const owningLane = owningLaneOfUnavailableRun(row.trigger, lane);
+        unavailableQc: unavailable.map(({ lane, slot, laneMappingVersion, ...row }) => {
+          const owningLane = owningLaneOfUnavailableRun(row.trigger, lane, slot, laneMappingVersion);
           return {
             ...row,
             reason: row.reason ?? 'unknown',

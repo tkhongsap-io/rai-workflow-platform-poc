@@ -33,34 +33,6 @@
           }
         }
       ]
-    },
-    {
-      "trigger": "upload",
-      "findings": [
-        {
-          "ruleId": "ACC-METRIC-CITED",
-          "scope": { "kind": "artifact", "slot": 1, "fixtureArtifactId": "fx-doc-0001-01" },
-          "severity": "medium",
-          "owningLane": "ai_coe",
-          "evidence": [
-            {
-              "fixtureArtifactId": "fx-doc-0001-01",
-              "slot": 1,
-              "locator": { "kind": "page", "page": 2 },
-              "excerptHash": "f9a580f6b64da8ccffd848c11e51ab870f002b780b7f2c0efc8584debc6ef336"
-            }
-          ],
-          "measure": {
-            "metric": "hallucination_rate",
-            "value": null,
-            "denominator": null,
-            "threshold": null,
-            "unit": "percent",
-            "thresholdSource": "v1.0 Sheet3"
-          },
-          "message": { "key": "qc.finding.acc_metric_cited", "params": { "slot": 1 } }
-        }
-      ]
     }
   ]
 }

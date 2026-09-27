@@ -67,8 +67,11 @@ const config = {
 
 export let db: TestDatabase;
 export let app: FastifyInstance;
-/** The current app's emitter and error capture, for suites that call a service directly. */
-export let diagnostics: Pick<App, 'emitter' | 'errors'>;
+/**
+ * The current app's emitter and error capture, for suites that call a service directly, and its drain: closing it
+ * waits for the app's background work (W4-04: upload-trigger QC runs) before the app stops.
+ */
+export let diagnostics: Pick<App, 'emitter' | 'errors' | 'drain'>;
 /** Every log line the current test's apps wrote. */
 export let capture: LogCapture;
 
@@ -87,8 +90,9 @@ export function openFixtureApp(suiteOptions: FixtureAppOptions): void {
     store = createFilesystemBlobStore(blobDir);
   });
   beforeEach(async () => {
-    // Close first: the previous test's app may still be delivering mail against the rows the reset removes.
-    if (app !== undefined) await app.close();
+    // Close first: the previous test's app may still be delivering mail or running upload QC against the rows the
+    // reset removes; the drain waits for that tracked background work.
+    if (app !== undefined) await closeCurrent();
     capture = createLogCapture();
     await db.reset();
     await db.owner.execute(sql.raw('TRUNCATE TABLE "session", "registry_counter"'));
@@ -106,12 +110,21 @@ export function openFixtureApp(suiteOptions: FixtureAppOptions): void {
     await rebuildApp();
   });
   after(async () => {
-    await app.close();
+    await closeCurrent();
     await db.close();
     await rm(blobDir, { recursive: true, force: true });
     await rm(outputDir, { recursive: true, force: true });
   });
 }
+
+/** Closes the current app through its drain (a second close of the same app is a no-op). */
+async function closeCurrent(): Promise<void> {
+  const current = diagnostics;
+  if (closed.has(current)) return;
+  closed.add(current);
+  await current.drain.close();
+}
+const closed = new WeakSet<object>();
 
 /** Replaces the app on the same database. */
 export async function rebuildApp({
@@ -119,7 +132,7 @@ export async function rebuildApp({
   mailSink = options.mailSink?.() ?? null,
   laneOpenRecipients,
 }: RebuildOverrides = {}) {
-  if (app !== undefined) await app.close();
+  if (app !== undefined) await closeCurrent();
   const { now } = options;
   const adapter = createIdentityAdapter({
     env: { RAI_IDENTITY_MODE: 'fixture', RAI_SESSION_ABSOLUTE_HOURS: '12', RAI_SESSION_IDLE_MINUTES: '120' },

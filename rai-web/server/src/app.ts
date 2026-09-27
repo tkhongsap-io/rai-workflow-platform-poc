@@ -22,6 +22,7 @@ import { registerQueueRoutes } from './queue/routes.js';
 import { registerPackRoutes, type PackRouteDeps } from './pack/routes.js';
 import { registerVersionRoutes, type VersionRouteDeps } from './versions/routes.js';
 import { createSubmitTrigger } from './qc/submit-trigger.js';
+import { createUploadTrigger } from './pack/qc-trigger.js';
 import type { QcOrchestratorDeps } from './qc/orchestrator.js';
 import { registerDecideRoutes, type DecideRouteDeps } from './workflow/routes.js';
 import { registerFindingsRoutes, type FindingsRouteDeps } from './findings/routes.js';
@@ -68,8 +69,12 @@ export interface AppDeps {
   cases?: Omit<CaseRouteDeps, Injected>;
   /** The blob store and W0-08 limits for the artifact routes. Needs `identity`. */
   artifacts?: Omit<ArtifactRouteDeps, Injected>;
-  /** The pack draft routes' dependencies (pack limit, the W0-07 upload hook). Needs `identity`. */
-  pack?: Omit<PackRouteDeps, Injected>;
+  /**
+   * The pack draft routes' dependencies (pack limit, the W0-07 upload hook). `qc` binds the upload-triggered QC run
+   * (W4-04), tracked by the drain like the submit trigger; without it `uploadTrigger` (default: no-op) is the hook.
+   * Needs `identity`.
+   */
+  pack?: Omit<PackRouteDeps, 'drain' | Injected> & { qc?: QcBinding };
   /** The submit and version-navigation routes; `qc` binds the submit-triggered QC run. Needs `identity`. */
   versions?: Omit<VersionRouteDeps, 'afterSubmit' | Injected> & { qc?: QcBinding };
   /** Lane approve / send-back. Needs `identity`. */
@@ -287,7 +292,17 @@ export function buildApp(deps: AppDeps): App {
     const packDeps = deps.pack;
     if (packDeps !== undefined) {
       void fastify.register((instance, _opts, done) => {
-        registerPackRoutes(instance, { ...packDeps, ...dbAndClock(), emitter, errors });
+        const { qc, ...routeDeps } = packDeps;
+        registerPackRoutes(instance, {
+          ...routeDeps,
+          ...dbAndClock(),
+          emitter,
+          errors,
+          drain,
+          ...(qc === undefined
+            ? {}
+            : { uploadTrigger: createUploadTrigger({ ...qc, ...dbAndClock(), emitter, errors }) }),
+        });
         done();
       });
     }
