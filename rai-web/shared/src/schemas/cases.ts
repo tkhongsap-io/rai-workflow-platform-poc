@@ -123,8 +123,9 @@ export interface ConfigurationView {
 // ---------------------------------------------------------------------------------------------------------------
 // Configuration revision bodies (W0-04 `configuration_revision.body`: "schema per kind in rai-web/shared, validated
 // on write"). One kind per revision. The W1-00 seed publishes checklist_templates, sla, calendar, operator_recipients
-// and use_case_groups; W4-02 adds qc_rules (revision 1, 'w4a.1'); risk_rubric arrives with W5 (D07), group_role_mapping
-// with W6/W8. A kind without a registered schema cannot be published (deny by default).
+// and use_case_groups; W4-02 adds qc_rules (revision 1, 'w4a.1'); risk_rubric arrives with W5 (schema W5-01,
+// registered W5-02; content D07), group_role_mapping with W6/W8. A kind without a registered schema cannot be
+// published (deny by default).
 // ---------------------------------------------------------------------------------------------------------------
 
 export const CONFIGURATION_KINDS = [
@@ -239,6 +240,122 @@ export function qcRulesBodyProblems(body: Static<typeof QcRulesBodySchema>): str
       }
     }
   }
+  return problems;
+}
+
+// W5-01 (W5 plan section 3): the `risk_rubric` body, the versioned questionnaire and its count rules. Defined here and
+// checked by `riskRubricBodyProblems`; W5-02 registers it in CONFIGURATION_BODY_SCHEMAS and seeds the placeholder.
+// Every value W5 seeds is a SYNTHETIC PLACEHOLDER for D07 (AI/COE): `provenance` accepts only 'synthetic_placeholder'
+// (R-2), so no W5 code path can call a rubric approved; the D07 instrument needs its own schema change.
+const BilingualSchema = Type.Object(
+  { th: Type.String({ minLength: 1, maxLength: 500 }), en: Type.String({ minLength: 1, maxLength: 500 }) },
+  { additionalProperties: false },
+); // D12: Admin-owned text carries both languages in the body
+// A literal tuple, not SlotNumberSchema's mapped array: TypeBox infers `never` from a Union over a mapped literal array
+// (the AllowedMediaTypeSchema / StageContextSchema fix).
+const EvidenceSlotSchema = Type.Union([
+  Type.Literal(1),
+  Type.Literal(2),
+  Type.Literal(3),
+  Type.Literal(4),
+  Type.Literal(5),
+  Type.Literal(6),
+  Type.Literal(7),
+  Type.Literal(8),
+  Type.Literal(9),
+]);
+const RiskLevelSchema = Type.Union([Type.Literal('low'), Type.Literal('medium'), Type.Literal('high')]);
+const RiskRuleTierSchema = Type.Union([Type.Literal('high'), Type.Literal('medium')]);
+export const RISK_QUESTION_COUNT = 7; // R3 "seven-question"
+export const RISK_MAX_OPTIONS = 5; // bounds enumeration stays <= 5^7 combinations (R-6)
+export const RISK_RESERVED_OPTION_VALUE = 'unknown'; // the UI always offers Unknown; no rubric option may take it
+export const RiskOptionSchema = Type.Object(
+  {
+    value: Type.String({ pattern: '^[a-z][a-z0-9_]{0,39}$' }),
+    label: BilingualSchema,
+    level: RiskLevelSchema,
+    escalatesTo: Type.Optional(RiskRuleTierSchema), // the tier is at least this when the option is chosen
+  },
+  { additionalProperties: false },
+);
+export const RiskQuestionSchema = Type.Object(
+  {
+    questionId: Type.String({ pattern: '^RQ[1-9]$' }),
+    text: BilingualSchema,
+    help: Type.Optional(BilingualSchema),
+    evidenceSlot: Type.Optional(EvidenceSlotSchema), // R-5: the answer counts only when this slot is attached
+    options: Type.Array(RiskOptionSchema, { minItems: 2, maxItems: RISK_MAX_OPTIONS }),
+  },
+  { additionalProperties: false },
+);
+export const RiskTierRuleSchema = Type.Object(
+  {
+    tier: RiskRuleTierSchema,
+    anyOf: Type.Array(
+      Type.Object(
+        {
+          allOf: Type.Array(
+            Type.Object(
+              {
+                level: RiskRuleTierSchema, // counts answers of exactly this level
+                atLeast: Type.Integer({ minimum: 1, maximum: RISK_QUESTION_COUNT }),
+              },
+              { additionalProperties: false },
+            ),
+            { minItems: 1 },
+          ),
+        },
+        { additionalProperties: false },
+      ),
+      { minItems: 1 },
+    ),
+  },
+  { additionalProperties: false },
+);
+export const RiskRubricBodySchema = Type.Object(
+  {
+    label: Type.String({ minLength: 1, maxLength: 100 }), // e.g. 'synthetic-placeholder.1'; never the recorded revision
+    provenance: Type.Literal('synthetic_placeholder'), // R-2: the only value W5 accepts
+    questions: Type.Array(RiskQuestionSchema, {
+      minItems: RISK_QUESTION_COUNT,
+      maxItems: RISK_QUESTION_COUNT,
+    }), // order is display order
+    tierRules: Type.Array(RiskTierRuleSchema), // first match wins; every high rule before any medium rule
+    defaultTier: Type.Literal('low'),
+    tierLabels: Type.Object(
+      { high: BilingualSchema, medium: BilingualSchema, low: BilingualSchema, unknown: BilingualSchema },
+      { additionalProperties: false },
+    ),
+  },
+  { additionalProperties: false },
+);
+export type RiskRubricBody = Static<typeof RiskRubricBodySchema>;
+
+/**
+ * The checks a `risk_rubric` body needs beyond its schema (W5 plan section 2): unique question IDs, unique option
+ * values within a question, the reserved option value `unknown`, and every `high` rule before any `medium` rule.
+ * Returns problem strings; empty when the body is valid. Call only on a body that passed `RiskRubricBodySchema`.
+ */
+export function riskRubricBodyProblems(body: RiskRubricBody): string[] {
+  const problems: string[] = [];
+  const questionIds = new Set<string>();
+  for (const question of body.questions) {
+    const at = `/questions/${question.questionId}`;
+    if (questionIds.has(question.questionId)) problems.push(`${at} is listed twice`);
+    questionIds.add(question.questionId);
+    const values = new Set<string>();
+    for (const option of question.options) {
+      if (option.value === RISK_RESERVED_OPTION_VALUE)
+        problems.push(`${at}/options/${option.value} the option value unknown is reserved`);
+      else if (values.has(option.value)) problems.push(`${at}/options/${option.value} is listed twice`);
+      values.add(option.value);
+    }
+  }
+  let seenMedium = false;
+  body.tierRules.forEach((rule, index) => {
+    if (rule.tier === 'medium') seenMedium = true;
+    else if (seenMedium) problems.push(`/tierRules/${index} a high rule follows a medium rule`);
+  });
   return problems;
 }
 
