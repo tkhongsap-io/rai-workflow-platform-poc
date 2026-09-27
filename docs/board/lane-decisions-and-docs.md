@@ -61,3 +61,10 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Next: W4-00a plan review and merge; then W4a issues.
 - Author: operator=ta session=claude-code-w4a-gate model=claude-opus-5-5
 - Evidence: changes/2026-09-26-w4-00a-plan/
+
+## 2026-09-27 — W4b-W7 plans and Ta's delegation recorded
+- What: register rows "Ta's delegation (2026-09-27)" and "W4b/W5/W6/W7 delegated rulings (provisional)"; BUILD_PLAN section "Status against this plan — 2026-09-27 (W4b-W7 under Ta's delegation)"; authorization lines in AGENTS and team-and-roles; status lines; ADR-0006 planned in W4b; the four file-level plans (W4-00b, W5-00, W6-00, W7-00a), consolidated against one another.
+- Why: Ta directed the agent team on 2026-09-27 to implement W4b-W7 on synthetic data without stopping and delegated the choices that would otherwise need Ta. Those choices are provisional; D07-D10 stay open for their owners; W8 is not authorized.
+- Next: independent review of the docs PR and merge; then one epic per package, one issue per ticket, and a CLAIM per lane before wave-1 tickets start (lead).
+- Author: operator=ta session=claude-code-w4b-w7-plans model=claude-opus-5-5
+- Evidence: changes/2026-09-27-w4b-w7-plans/

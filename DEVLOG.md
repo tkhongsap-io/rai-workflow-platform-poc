@@ -1,5 +1,21 @@
 # Development log
 
+## W4b-W7 plans under Ta's delegation — 2026-09-27
+
+Ta asked the agent team to build the rest of the PoC on synthetic data, without stopping: W4b (QC that reads document contents), W5 (the risk proposal), W6 (Admin configuration, with a desk dashboard) and W7 (restore and rollback, networked sign-in with an allow-list, and a synthetic rehearsal kit). The aim is a working review desk that streamlines the workflow, keeps every version's history and shows a dashboard, end to end. W8 is out of scope, and nothing is deployed.
+
+Ta also delegated the choices that would otherwise wait for Ta. For each one the team wrote two or three options and adopted the one that best serves that aim, recorded as provisional for Ta to confirm. The register now holds the delegation row and one "delegated rulings (provisional)" row per package. Questions that belong to other owners are not decided: the risk questionnaire (D07), real data and model providers (D08), QC evaluation sign-off (D09) and production hosting and identity (D10). The build runs on labelled working assumptions for them: a clearly marked placeholder questionnaire, no model provider (a model port exists but is off by default), a synthetic evaluation set with unsigned labels, and no non-loopback bind.
+
+Four file-level plans were written, each reviewed by two independent agents for up to three rounds. The four were then read together, and the conflicts between them were fixed. The main ones:
+
+- an advisory recheck finding could have hidden later real findings through dedup;
+- two packages set different labels on the same rule catalogue;
+- new status values would have broken the operator screen's exhaustive labels;
+- migrations lacked rollback classes;
+- the rehearsal would never have shown a content finding.
+
+The merged, dependency-ordered ticket list (81 tickets, 7 migrations queued one at a time) is in [the plan](changes/2026-09-27-w4b-w7-plans/plan.md). W4a's own package review is still Ta's.
+
 ## W4a engineering exit — 2026-09-27
 
 W4a exit record (#190). All six W4a tickets have merged, and the whole W4a check was re-run from a clean copy of `main` on an empty database. The new QC runner's own tests (6 and 10), the test that starts the real server with it (6), and the QC log screens on the real server (6, at three widths) all pass; the server reports the `deterministic` runner as ready; no test substitute is left in the build; the full gate passes (648 unit, 374 integration, 202 real-server browser, 48 substitute browser). Each result names the rule set (`w4a.1`), the runner (`deterministic` 0.0.0) and the synthetic fixture set. The record lists every PR and its review rounds, what each ticket did differently from the plan, the reviewers' open notes (two for Ta), and the limits: the rules are provisional until D09, nothing reads a document or uses a model yet (W4b), and uploads check 0 rules. W4a is not accepted until Ta reviews it. [Review](changes/2026-09-27-w4a-exit/review.md).
