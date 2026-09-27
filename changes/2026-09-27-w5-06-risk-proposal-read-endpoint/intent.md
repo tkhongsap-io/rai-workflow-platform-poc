@@ -1,0 +1,7 @@
+# Intent: risk proposal read endpoint (W5-06, #238)
+
+W5-05 records one risk proposal per submitted version inside the submit transaction, but nothing can read it yet: reviewers, the owner and the version screen (W5-08) need the proposal the desk recorded for exactly the version they are looking at. This ticket adds that read, `GET /api/cases/{caseId}/versions/{versionId}/risk-proposal`, authorized exactly like the version's qc-runs read (R-14).
+
+The read returns what was recorded at submit and nothing newer: the tier and its bounds, the explanation with each answer's attribution from the frozen version, and the rubric revision the version froze, even after a newer rubric revision is published. A version submitted before W5 has no proposal and reads `{ proposal: null }`; a draft has none by construction and reads 404. The tier stays a proposal, not a governance decision: the endpoint writes nothing and the policy table gains no row.
+
+It is order 5 in section 9 of the [W5 plan](../../docs/engineering/implementation-plan-w5.md) and implements section 6 (the endpoint row and `RiskProposalView`), under the register rows "Ta's delegation (2026-09-27)" and "W5 delegated rulings (provisional)" (R-14). D07 stays open: every rubric served is the labelled SYNTHETIC PLACEHOLDER. No migration, no UI, no substitute route (W5-08 adds it, R-16). Synthetic data only; no network call; no deploy.

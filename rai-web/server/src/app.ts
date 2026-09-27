@@ -27,6 +27,7 @@ import { createUploadTrigger } from './pack/qc-trigger.js';
 import type { QcOrchestratorDeps } from './qc/orchestrator.js';
 import { registerDecideRoutes, type DecideRouteDeps } from './workflow/routes.js';
 import { registerFindingsRoutes, type FindingsRouteDeps } from './findings/routes.js';
+import { registerRiskRoutes } from './risk/routes.js';
 import { staticPlugin, type StaticOptions } from './static.js';
 import type { FixtureIdentityProvider } from './identity/fixture.js';
 import { registerAuthRoutes, type SubjectProfileHook } from './identity/routes.js';
@@ -324,6 +325,11 @@ export function buildApp(deps: AppDeps): App {
           ...(qc === undefined
             ? {}
             : { afterSubmit: createSubmitTrigger({ ...qc, ...dbAndClock(), emitter, errors }, drain) }),
+        });
+        // W5-06: the risk proposal read sits with the version reads (same database and subject directory).
+        registerRiskRoutes(instance, {
+          db: dbAndClock().db,
+          ...(routeDeps.subjects === undefined ? {} : { subjects: routeDeps.subjects }),
         });
         done();
       });

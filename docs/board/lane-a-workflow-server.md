@@ -306,3 +306,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w4-16-locators model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #202, implementation lane qc-core)
 - Scope: per changes/2026-09-27-w4-16-locators-carry-no-document/: shared `EvidenceLocator` `section { index? }` and `cell { sheetIndex?, cell? }` (A1 pattern) with no `heading`/`sheet`; the runner schema and the extraction wire refuse the text shapes; `locatorView` serves legacy text rows as the bare kind; substitute scripts migrated; the evidence line renders ordinals; W0-07 3.3 and W0-02 section 7 amendments. One PR.
+
+## 2026-09-28 09:00 — CLAIM lane-a: W5-06 risk proposal read endpoint (#238)
+- Author: operator=ta session=claude-code-w5-06-risk-proposal-read-endpoint model=claude-opus-5-5 (implementation lane risk)
+- Takes over from: session=none (reason: new; ticket #238, W5-05 merged #297)
+- Scope: per changes/2026-09-27-w5-06-risk-proposal-read-endpoint/: `GET /api/cases/{caseId}/versions/{versionId}/risk-proposal` in `server/src/risk/routes.ts` (read only; `version.view` on the case, then the qc-runs 404 rule plus 404 for a draft), registered in `app.ts` with the version routes; `RiskProposalView` and its response schema in `shared/src/schemas/risk.ts`; the frozen rubric revision, never today's; `{ proposal: null }` for a version with no proposal; W0-02 section 7 amended. No migration, no UI (W5-08), no substitute route (W5-08). One PR.
