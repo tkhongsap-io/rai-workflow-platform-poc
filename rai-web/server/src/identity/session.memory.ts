@@ -10,25 +10,32 @@ import {
   newToken,
   type SessionRecord,
   type SessionStore,
+  type SubjectProfile,
 } from './session.js';
 
 export interface MemorySessionStore extends SessionStore {
   rows: Map<string, SessionRecord>; // by token hash
   refusals: Array<{ reason: string; issuerKey: string; subjectHashed: boolean }>;
   audit: string[]; // action names in order
+  profiles: Map<string, SubjectProfile>; // W7-06: by subject id
 }
 
 export function createMemorySessionStore(): MemorySessionStore {
   const rows = new Map<string, SessionRecord>();
   const audit: string[] = [];
   const refusals: MemorySessionStore['refusals'] = [];
+  const profiles = new Map<string, SubjectProfile>();
   const byId = (id: string) => [...rows.values()].find((r) => r.id === id);
   return {
     rows,
     audit,
     refusals,
+    profiles,
     create(input) {
       const now = input.now ?? new Date();
+      // W7-06: the Postgres CHECK refuses a fixture-mode profile and the transaction leaves nothing behind.
+      if (input.profile !== undefined && input.identityMode === 'fixture')
+        return Promise.reject(new Error('subject_profile_identity_mode_check'));
       const token = newToken();
       const session: SessionRecord = {
         id: uuidv7(now.getTime()),
@@ -43,7 +50,19 @@ export function createMemorySessionStore(): MemorySessionStore {
       };
       rows.set(hashToken(token), session);
       audit.push('identity.signed_in');
-      return Promise.resolve({ session, token });
+      if (input.profile === undefined) return Promise.resolve({ session, token });
+      const previous = profiles.get(input.principal.subjectId);
+      const profile: SubjectProfile = {
+        subjectId: input.principal.subjectId,
+        identityMode: input.identityMode,
+        email: input.profile.email,
+        displayName: input.profile.displayName,
+        roles: structuredClone(input.principal.roles),
+        firstSeenAt: previous?.firstSeenAt ?? now,
+        lastSignInAt: now,
+      };
+      profiles.set(profile.subjectId, profile);
+      return Promise.resolve({ session, token, profile: structuredClone(profile) });
     },
     resolve(token, policy, now = new Date()) {
       const row = rows.get(hashToken(token));

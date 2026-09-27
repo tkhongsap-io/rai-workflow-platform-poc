@@ -73,6 +73,7 @@ test('the schema holds the W0-04 tables (plus W1-01 session, W1-09 fixture_set, 
       'risk_proposal', // W5-03
       'schema_migration_class', // W7-03: rollback class of every applied migration (W7 plan section 3.3)
       'session', // W1-01 (0001_w1_01_session; W0-03 section 6.3)
+      'subject_profile', // W7-06: who has signed in outside fixture mode (W7 plan section 4.1)
     ],
   );
 
@@ -166,6 +167,9 @@ test('the schema holds the W0-04 tables (plus W1-01 session, W1-09 fixture_set, 
     'session:INSERT', // W1-01: W0-03 section 6.3 session rows (last_seen_at, revoked_at, locale are the mutable columns)
     'session:SELECT',
     'session:UPDATE',
+    'subject_profile:INSERT', // W7-06: upserted inside the sign-in transaction; never deleted (D08 retention)
+    'subject_profile:SELECT',
+    'subject_profile:UPDATE',
   ]);
   const jobUpdateColumns = await db.raw('owner', (c) =>
     c.query<{ column_name: string }>(

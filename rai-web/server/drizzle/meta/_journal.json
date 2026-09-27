@@ -92,6 +92,13 @@
       "when": 1790526640221,
       "tag": "0012_w6_02_configuration_admin",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790541714414,
+      "tag": "0013_w7_06_subject_profile",
+      "breakpoints": true
     }
   ]
 }

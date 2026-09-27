@@ -757,3 +757,22 @@ One mutable Admin working copy per kind (W6 plan Q1). Not evidence: it may hold 
 ## W7-02 restore recipe — 2026-09-28
 
 Amendment by [W7-02](../../changes/2026-09-27-w7-02-restore-and-verify/spec.md) under the [W7 plan](implementation-plan-w7.md) section 3.2 (W7-D7; register row "W7 delegated rulings (provisional)"). `npm run restore` implements the second half of the "Restored backup" recipe in "Schema evolution" for a W7-01 backup. It always restores into a **new** database and a **new** blob directory: it refuses the database any configured role URL names, an existing database or blob directory, and a dump whose SHA-256 differs from the manifest's, before creating anything. As `DATABASE_ADMIN_URL` it runs `CREATE DATABASE <name> OWNER rai_owner`, then the per-database statements of `docker/postgres/init/001-roles.sql` a dump does not carry (`REVOKE CREATE ON SCHEMA public FROM PUBLIC; GRANT USAGE ON SCHEMA public TO rai_app, rai_operator`), then `pg_restore --no-owner --role=rai_owner --exit-on-error` (triggers are post-data, created after the load). The table grants come from the dump. Blobs are copied into the new directory in this spec's layout and re-hashed against their keys. A failed restore drops what it created. Session rows are not in the backup, so every user signs in again. `npm run restore:verify` then re-proves the copy with the admin URL pointed at the new database, each role probe inside a rolled-back transaction after `SET LOCAL ROLE`: `journal`, `counts` (session excluded), `frozen_digest`, `manifest_hashes` (every submitted version's `manifest_hash` against its slot rows), `blobs` (`store:verify` on the new directory, count equal to the manifest's), `a07_frozen_slot`, `a11_audit` (`42501` as `rai_app`, `rai.append_only` as `rai_owner`) and `grants`: the tables `rai_app` may `DELETE` from (`has_table_privilege`, so direct, inherited and `PUBLIC` grants all count) must be a subset of `{configuration_draft}`, the roles rule of this spec as W6-02 amends it. The operator repoints `DATABASE_*` and `BLOB_DIR` afterwards; the commands never do.
+
+## W7-06 `subject_profile` — 2026-09-28
+
+Amendment by [W7-06](../../changes/2026-09-27-w7-06-subject-profile/spec.md) under the [W7 plan](implementation-plan-w7.md) section 4.1 (W7-D10 option A; register row "W7 delegated rulings (provisional)"). Migration `0013_w7_06_subject_profile`, class `additive`.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `subject_id` | text PRIMARY KEY | `<issuerKey>:<subject>` (W0-03 section 2.2) |
+| `identity_mode` | text NOT NULL, `CHECK IN ('local-google','network','production')` | The mode of the latest sign-in; never `fixture` |
+| `email` | text NOT NULL | Lower-cased, from the principal minted at sign-in |
+| `display_name` | text NOT NULL | From the principal |
+| `roles` | jsonb NOT NULL | The principal's `RoleScope[]` snapshot at the latest sign-in |
+| `first_seen_at` | timestamptz NOT NULL | The first sign-in; never updated |
+| `last_sign_in_at` | timestamptz NOT NULL | The latest sign-in |
+
+- **Writer.** Only the session store (`identity/session.ts` `create`), inside the sign-in transaction that inserts the `session` row and appends `identity.signed_in`: `INSERT ... ON CONFLICT (subject_id) DO UPDATE` of everything except `first_seen_at`. Every non-fixture sign-in writes it; a refused sign-in writes nothing.
+- **Readers.** The case subject directory (`cases/subject-directory.ts`), after the start-up table and the actor and before `session` rows, so names survive `db:cleanup`; from W7-07 the mail recipient directory.
+- **Roles.** `rai_app`: `SELECT`, `INSERT`, `UPDATE`. No `DELETE` for any runtime role: removal is a D08 retention question (working assumption: kept while the deployment lives, removed with the database), handled by "Executing an approved deletion of personal data" once D08 decides. The W0-04 roles rule ("`rai_app` deletes nothing", except `configuration_draft` since W6-02) holds unchanged.
+- **Class of data.** Operational, not evidence and not audit: no guard trigger, not in `frozenDigest`, no audit event of its own. It is in the backup (every public table except `session`) and in the restore `counts` check. Email and name are personal data of synthetic principals only until D08.
