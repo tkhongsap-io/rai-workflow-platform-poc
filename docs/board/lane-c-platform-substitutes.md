@@ -111,3 +111,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w7-10-rehearsal-templates-and-timing model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #210)
 - Scope: per changes/2026-09-27-w7-10-rehearsal-templates-and-timing/: `docs/operations/rehearsal/{rehearsal-plan,deficiency-log,timing-sheet,acceptance-report}-template.md`, `rai-web/tests/rehearsal/timing.ts` (`createStepTimer(runId)` writing `timings.json` and `timings.csv` under `REHEARSAL_OUT_DIR`, refused outside `rai-web/.local/`) with its unit test. One PR; no migration, no product code.
+
+## 2026-09-28 — CLAIM lane-c: W7-02 restore and verify (#216)
+- Author: operator=ta session=claude-code-w7-02-restore-and-verify model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #216)
+- Scope: per changes/2026-09-27-w7-02-restore-and-verify/: `npm run restore` (`operator/restore.ts`) and `npm run restore:verify` (`operator/restore-verify.ts`, checks `journal`, `counts`, `frozen_digest`, `manifest_hashes`, `blobs`, `a07_frozen_slot`, `a11_audit`, `grants`), `config.ts` `DATABASE_ADMIN_URL` (`parseRestoreConfig`), W0-10 operator restore events, `.env.example`, the CI integration-job `DATABASE_ADMIN_URL` line (lead-reviewed), W0-02 section 5 key, W0-04 restore recipe, TESTING. One PR; no migration.

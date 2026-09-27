@@ -121,6 +121,11 @@ export const EVENT_CATALOGUE = Object.freeze({
     fields: ['backupId', 'blobCount', 'tableCount', 'durationMs'],
   },
   'operator.backup.failed': { level: 'error', fields: ['stage', 'reason'] },
+  // W7-02 (W7 plan sections 3.2 and 8): `npm run restore` and `npm run restore:verify`. Check ids only, never a path.
+  'operator.restore.completed': { level: 'info', fields: ['backupId', 'durationMs'] },
+  'operator.restore.failed': { level: 'error', fields: ['stage', 'reason'] },
+  'operator.restore_verify.completed': { level: 'info', fields: ['backupId', 'ok', 'failedChecks'] },
+  'operator.restore_verify.failed': { level: 'error', fields: ['stage', 'reason'] },
   // W7-03 (W7 plan sections 3.3 and 8): `npm run release:check-rollback`. Tags and backup IDs only, never a path.
   'operator.rollback_check.completed': {
     level: 'info',

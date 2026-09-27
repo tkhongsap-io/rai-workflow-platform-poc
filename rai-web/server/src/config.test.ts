@@ -8,6 +8,7 @@ import {
   parseBackupConfig,
   parseConfig,
   parseDatabaseConfig,
+  parseRestoreConfig,
   REPO_ROOT,
   type Env,
 } from './config.js';
@@ -348,4 +349,52 @@ test('W7-01 parseConfig (the server) ignores the backup keys: no refusal from th
   );
   assert.ok(!JSON.stringify(config).includes('nonsense'));
   assert.ok(!('backup' in config));
+});
+
+// W7-02 (W7 plan section 2): DATABASE_ADMIN_URL is read by `restore` and `restore:verify` only, through
+// parseRestoreConfig, on top of the backup keys.
+const ADMIN = 'postgres://postgres:postgres-local@127.0.0.1:54320/postgres';
+
+function restoreReason(env: Env): string {
+  try {
+    parseRestoreConfig(env, rootFor);
+  } catch (err) {
+    if (err instanceof ConfigError) return err.reason;
+    throw err;
+  }
+  throw new Error('expected a ConfigError');
+}
+
+test('W7-02 parseRestoreConfig: the backup keys plus a required postgres DATABASE_ADMIN_URL', () => {
+  const config = parseRestoreConfig(backupEnv({ DATABASE_ADMIN_URL: ADMIN }), rootFor);
+  assert.equal(config.adminUrl, ADMIN);
+  assert.deepEqual(config.pgTools, { kind: 'docker-compose', project: 'rai-dev' });
+  assert.equal(config.containerPort, 5432);
+  assert.equal(config.backupDir, '/var/backups/rai');
+  assert.equal(
+    parseRestoreConfig(backupEnv({ DATABASE_ADMIN_URL: 'postgresql://a:b@localhost/x' }), rootFor).adminUrl,
+    'postgresql://a:b@localhost/x',
+  );
+  for (const value of [undefined, '', '  '])
+    assert.equal(restoreReason(backupEnv({ DATABASE_ADMIN_URL: value })), 'missing:DATABASE_ADMIN_URL');
+  for (const value of ['mysql://x@y/z', 'not a url', 'http://127.0.0.1/postgres'])
+    assert.equal(
+      restoreReason(backupEnv({ DATABASE_ADMIN_URL: value })),
+      'invalid:DATABASE_ADMIN_URL',
+      value,
+    );
+  // The backup rules still apply first.
+  assert.equal(
+    restoreReason(backupEnv({ DATABASE_ADMIN_URL: ADMIN, RAI_PG_TOOLS: undefined })),
+    'missing:RAI_PG_TOOLS',
+  );
+});
+
+test('W7-02 parseConfig (the server) ignores DATABASE_ADMIN_URL: no refusal and never echoed', () => {
+  const secret = 'admin-secret-w7-02';
+  const config = parseConfig(
+    withEnv({ DATABASE_ADMIN_URL: `postgres://postgres:${secret}@127.0.0.1:1/postgres` }),
+  );
+  assert.ok(!JSON.stringify(config).includes(secret));
+  assert.doesNotThrow(() => parseConfig(withEnv({ DATABASE_ADMIN_URL: 'nonsense' })));
 });
