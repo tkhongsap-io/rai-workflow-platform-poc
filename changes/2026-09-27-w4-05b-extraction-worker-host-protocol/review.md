@@ -60,9 +60,31 @@ Worktree `/tmp/rai-w4-05b-extraction-worker-host-protocol`, Postgres project `ra
 | `npm run test:browser:substitute`                                                                               | 48 passed                                                                                                                                               |
 | `node scripts/check-links.mjs` (root)                                                                           | 399 Markdown files, 1144 relative links, 0 broken                                                                                                       |
 | `git diff --check` (root)                                                                                       | clean                                                                                                                                                   |
+| Round 1 RED: `npx tsx --test src/qc/extraction/protocol.test.ts src/qc/extraction/worker/extract.test.ts` (from `server/`), new tests before the fix | 5 failed (smuggled locator keys accepted on every kind and on `region`; locator strings not counted; no per-field bound in host or sink), 14 passed |
+| Round 1, after rebasing onto `origin/main` 1216750 (W7-03; conflicts only in CHANGELOG, DEVLOG and the lane-a board, resolved by keeping both entries): `npm run lint` | exit 0 |
+| Round 1: `npm run typecheck` | exit 0 |
+| Round 1: `npm run test:unit` | 853/853, 0 skipped (main's W7-03 tests plus the 48 of this ticket) |
+| Round 1: `npm run migrate` then `npm run test:integration` | 390/390, 0 skipped (migrate applied main's 0011) |
+| Round 1: `npm run build && npm run check:substitute-absent` | exit 0; 775 files scanned, 0 with the marker |
+| Round 1: `npm run test:browser:server` | 205 passed |
+| Round 1: `npm run test:browser:substitute` | 48 passed |
+| Round 1: `node scripts/check-links.mjs` (root) | 404 Markdown files, 1161 relative links, 0 broken |
+| Round 1: `git diff --check origin/main` (root) | clean |
 
 ## Review verdicts
 
 | Round | Head | Reviewer | Verdict | Notes                                                                                                                          |
 | ----- | ---- | -------- | ------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | -     | -    | -        | pending | Two independent reviewer verdicts on the PR head, and green CI on that head, are recorded here before merge (D03 ticket flow). |
+| 1 | b702e12 | contract review | PASS | Done-when list implemented and tested; polish notes only (see Deferred). |
+| 1 | b702e12 | correctness review | BLOCK | Reply locators allowed extra keys and unbounded strings past `limit_output`. Fixed in round 1: strict `WireLocatorSchema`, locator strings counted toward `maxTextChars` in sink and host, 512-character per-field bound, 5 new tests (see Deviations). |
+| 2 | pending | - | pending | Round 2 verdicts on the rebased head, and green CI on it, before merge. |
+
+## Deferred reviewer notes (round 1)
+
+- ADR-0006's open-item checkbox for the `--permission` flags stays unticked; W4-14 can tick it with a dated note citing this review.
+- The built-layout latency in CI uses a worker transpiled in the test, not the `npm run build` output; the W4-14 exit evidence should say so.
+- Any native abort (SIGABRT or exit 134) reads as `limit_memory`, as recorded under Deviations; it still ends as a failure.
+- The host deserializes the whole IPC reply before counting it; the worker's sink and heap cap bound it in practice. A host-side byte bound on the reply is left for a later hardening ticket.
+- Parent loader flags reach only a TypeScript entry; production uses the JavaScript entry under `--permission` (as recorded).
+- Green CI on the head is required before merge (D03 flow); it was not yet reported at b702e12.
