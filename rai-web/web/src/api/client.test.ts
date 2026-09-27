@@ -421,6 +421,8 @@ function deskHealthReport(): DeskHealthReport {
         versionId: operatorId,
         trigger: 'submit',
         reason: 'unknown',
+        runner: 'substitute-scripted',
+        runnerVersion: 'unrecorded',
         requestedAt: operatorTime,
         correlationId: operatorId,
       },

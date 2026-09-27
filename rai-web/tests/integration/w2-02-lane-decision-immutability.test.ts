@@ -51,8 +51,8 @@ async function insertDecision(): Promise<string> {
   const id = uuidv7();
   const runId = randomUUID();
   await db.app.execute(sql`
-    INSERT INTO qc_run (id, version_id, trigger, lane, engine_id, rule_revision, status, requested_at, completed_at, correlation_id)
-    VALUES (${runId}, ${NONVENDOR.draftVersionId}, 'approve_attempt', 'dpo', 'substitute', 'v1', 'completed', now(), now(), ${randomUUID()})
+    INSERT INTO qc_run (id, version_id, trigger, lane, engine_id, runner_version, rule_revision, status, requested_at, completed_at, correlation_id)
+    VALUES (${runId}, ${NONVENDOR.draftVersionId}, 'approve_attempt', 'dpo', 'substitute', '0.0.0', 'v1', 'completed', now(), now(), ${randomUUID()})
   `);
   await db.app.execute(sql`
     INSERT INTO lane_decision (

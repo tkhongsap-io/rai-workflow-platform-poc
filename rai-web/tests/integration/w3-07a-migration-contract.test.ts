@@ -81,6 +81,16 @@ test(
         ).rows[0]!.unavailable_reason,
         null,
       );
+      // W4-11a (0009): a run written before the migration reads runner_version 'unrecorded' and no rule count.
+      assert.deepEqual(
+        (
+          await owner.query<{ engine_id: string; runner_version: string; rules_evaluated: number | null }>(
+            'SELECT engine_id, runner_version, rules_evaluated FROM qc_run WHERE id=$1',
+            [oldRun],
+          )
+        ).rows[0],
+        { engine_id: 'substitute', runner_version: 'unrecorded', rules_evaluated: null },
+      );
       app = new pg.Client({ connectionString: appUrl.href });
       await app.connect();
       const db = app;
@@ -173,10 +183,25 @@ test(
       );
       await assert.rejects(
         db.query(
-          `INSERT INTO qc_run (id,version_id,trigger,engine_id,rule_revision,status,requested_at,completed_at,correlation_id,unavailable_reason) VALUES ($1,$2,'submit','substitute','v1','unavailable',now(),now(),$3,'private exception')`,
+          `INSERT INTO qc_run (id,version_id,trigger,engine_id,runner_version,rule_revision,status,requested_at,completed_at,correlation_id,unavailable_reason) VALUES ($1,$2,'submit','substitute','0.0.0','v1','unavailable',now(),now(),$3,'private exception')`,
           [randomUUID(), versionId, correlation],
         ),
         /qc_run_unavailable_reason_check/,
+      );
+      // W4-11a (0009): the default was dropped, so a new run must name its runner version; counts are never negative.
+      await assert.rejects(
+        db.query(
+          `INSERT INTO qc_run (id,version_id,trigger,engine_id,rule_revision,status,requested_at,completed_at,correlation_id,unavailable_reason) VALUES ($1,$2,'submit','substitute','v1','unavailable',now(),now(),$3,'timeout')`,
+          [randomUUID(), versionId, correlation],
+        ),
+        /null value in column "runner_version"/,
+      );
+      await assert.rejects(
+        db.query(
+          `INSERT INTO qc_run (id,version_id,trigger,engine_id,runner_version,rules_evaluated,rule_revision,status,requested_at,completed_at,correlation_id) VALUES ($1,$2,'submit','substitute','0.0.0',-1,'v1','completed',now(),now(),$3)`,
+          [randomUUID(), versionId, correlation],
+        ),
+        /qc_run_rules_evaluated_check/,
       );
       const lateId = randomUUID(),
         attempted = randomUUID();

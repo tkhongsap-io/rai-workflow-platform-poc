@@ -17,9 +17,11 @@ export interface InsertRunInput {
   slot: number | null;
   lane: Lane | null;
   engineId: string;
+  runnerVersion: string; // W4-11a: the bound runner's identity.runnerVersion ('unbound' when none is bound)
   ruleRevision: string;
   status: 'completed' | 'unavailable';
   unavailableReason: QcUnavailableReason | null;
+  rulesEvaluated: number; // W4-11a: executed rules; 0 on an unavailable run
   requestedAt: Date;
   completedAt: Date;
   correlationId: string;
@@ -52,9 +54,11 @@ export async function insertQcRun(tx: Tx, input: InsertRunInput): Promise<void> 
     slot: input.slot,
     lane: input.lane,
     engineId: input.engineId,
+    runnerVersion: input.runnerVersion,
     ruleRevision: input.ruleRevision,
     status: input.status,
     unavailableReason: input.unavailableReason,
+    rulesEvaluated: input.rulesEvaluated,
     requestedAt: input.requestedAt,
     completedAt: input.completedAt,
     correlationId: input.correlationId,

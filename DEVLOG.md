@@ -1,5 +1,9 @@
 # Development log
 
+## W4-11a run identity — 2026-09-27
+
+First W4a ticket (#184). Every new `qc_run` row now records the runner's version beside its name and how many rules it evaluated (migration 0009; older rows read `unrecorded` and no count). The `qc.run.*` log lines name the runner, its version and the rule revision, and the QC kind comes from the bound runner instead of a constant. The Admin desk-health list of QC outages carries the runner label. Two runs on one version under different rule revisions can now be told apart from rows and logs alone. No rule, runner or screen changes. [Review](changes/2026-09-27-w4-11a-run-identity/review.md).
+
 ## W4a opened; W4-00a plan — 2026-09-26
 
 Ta opened W4a: QC that reads only structured pack data (no document parsing, no model), on synthetic data, ahead of D08 and D09. Also recorded: an upload QC outage on slot 5 is AI/COE's, and slot 9 gets no upload run; the API substitute is kept through W4a; the four provisional rules are the W4a starting set. The [W4-00a plan](docs/engineering/implementation-plan-w4a.md) sets the order W4-11a, W4-02, W4-03, W4-13, W4-04, W4-12, then the W4a exit, each through a reviewed PR with the full suite. W4b stays gated on named owners, D08 and D09. [Review](changes/2026-09-26-w4-00a-plan/review.md).

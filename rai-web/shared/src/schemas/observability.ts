@@ -9,6 +9,8 @@ const object = <T extends Parameters<typeof Type.Object>[0]>(fields: T) =>
 const timestamp = Type.String({ pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$' });
 const id = Type.String({ pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' });
 const count = Type.Integer({ minimum: 0 });
+// A QC runner name or version (QcRunner.identity): an identifier, never free text such as an exception message.
+const runnerLabel = Type.String({ pattern: '^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$' });
 export const QcUnavailableReasonSchema = values([
   'timeout',
   'runner_error',
@@ -148,6 +150,9 @@ export const DeskHealthReportSchema = object({
       trigger,
       reason: Type.Union([QcUnavailableReasonSchema, Type.Literal('unknown')]),
       owningLane: Type.Optional(LaneSchema),
+      // W4-11a: the runner label, qc_run.engine_id and runner_version ('unrecorded' on rows before migration 0009).
+      runner: runnerLabel,
+      runnerVersion: runnerLabel,
       requestedAt: timestamp,
       correlationId: id,
     }),

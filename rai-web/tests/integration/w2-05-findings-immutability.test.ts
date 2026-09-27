@@ -57,11 +57,11 @@ async function insertRunFindingDisposition(): Promise<{
   const dispositionId = uuidv7();
   await db.app.execute(sql`
     INSERT INTO qc_run (
-      id, version_id, trigger, slot, lane, engine_id, rule_revision,
+      id, version_id, trigger, slot, lane, engine_id, runner_version, rule_revision,
       status, requested_at, completed_at, correlation_id
     ) VALUES (
       ${runId}, ${NONVENDOR.draftVersionId}, 'approve_attempt', NULL, 'dpo',
-      'substitute-scripted', 'rev-test', 'completed', now(), now(), ${randomUUID()}
+      'substitute-scripted', '0.0.0', 'rev-test', 'completed', now(), now(), ${randomUUID()}
     )
   `);
   await db.app.execute(sql`

@@ -1,0 +1,5 @@
+# Intent: run identity for deterministic runs (W4-11a, #184)
+
+W4a brings a second QC runner (the deterministic runner, W4-03) beside the scripted substitute, and a `qc_rules` catalogue whose revision can differ between runs on one version (W4-02, W4-04). Today a `qc_run` row records only the runner name (`engine_id`) and the rule revision, and the `qc.run.*` log lines record neither the runner nor the revision; `qc.run.started` hard-codes `qcKind: 'substitute'`. Two runs on the same version by different runner builds or rule revisions cannot be told apart from rows and logs alone.
+
+This ticket records the runner version and the number of rules evaluated on every new run, puts the runner identity and rule revision on the log lines, derives `qcKind` from the bound runner and adds the runner label to the operator report's unavailable-QC rows. It is the first W4a ticket (plan section 9, order 1) and implements [W4a plan](../../docs/engineering/implementation-plan-w4a.md) section 6 under the register rows "W4a gate entry" and "W4a kickoff rulings" (Ta, 2026-09-26). No rule, runner, trigger or UI is added. Synthetic data only.

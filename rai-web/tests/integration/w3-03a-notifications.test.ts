@@ -742,8 +742,8 @@ test("W3-F3: each lane-opened mail counts only its own lane's findings recorded 
   const finding = async (lane: 'dpo' | 'it_security' | 'ai_coe', kind: 'defect' | 'unavailable') => {
     const runId = randomUUID();
     await db.app.execute(sql`
-      INSERT INTO qc_run (id, version_id, trigger, lane, engine_id, rule_revision, status, requested_at, completed_at, correlation_id)
-      VALUES (${runId}, ${version.versionId}, 'approve_attempt', ${lane}, 'substitute-scripted', 'rev-test',
+      INSERT INTO qc_run (id, version_id, trigger, lane, engine_id, runner_version, rule_revision, status, requested_at, completed_at, correlation_id)
+      VALUES (${runId}, ${version.versionId}, 'approve_attempt', ${lane}, 'substitute-scripted', '0.0.0', 'rev-test',
         ${kind === 'defect' ? 'completed' : 'unavailable'}, now(), now(), ${randomUUID()})
     `);
     await db.app.execute(sql`
