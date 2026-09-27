@@ -43,6 +43,11 @@ export const packVersion = pgTable(
     readyAt: timestamp('ready_at', { withTimezone: true }), // set once by the Ready transition (W0-06 4.9)
     manifestHash: text('manifest_hash'), // SHA-256 over the canonical JSON of the nine slot rows; NOT NULL at submit
     submitCorrelationId: text('submit_correlation_id'),
+    // W5-03: questionnaire answers with attribution (W5 plan section 6 shape, validated on write by W5-04); editable on
+    // the draft, frozen at submit by the whole-row comparison in pack_version_frozen.
+    riskAnswers: jsonb('risk_answers')
+      .notNull()
+      .default(sql`'{}'::jsonb`),
   },
   (t) => [
     uniqueIndex('pack_version_case_id_version_number_key').on(t.caseId, t.versionNumber),
