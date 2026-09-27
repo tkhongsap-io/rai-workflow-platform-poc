@@ -144,13 +144,12 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
   const importFixture = overrides.importFixture ?? ((specifier: string) => import(specifier));
   const fixtures = await Promise.all([
     importFixtureModule<FixtureUsersModule>(importFixture, 'data/users'),
-    // A production process stays unbound even if fixtures can import. `deterministic` parses only under
-    // NODE_ENV=test until W4-13 (config.ts).
-    config.qc.mode === 'deterministic'
-      ? (overrides.qcRunner ?? deterministicRunner(clock))
-      : config.qc.mode === 'substitute' && config.nodeEnv !== 'production'
-        ? (overrides.qcRunner ?? loadQcSubstituteRunner(importFixture, clock))
-        : undefined,
+    // W4a plan section 2: QC_MODE selects the runner and neither falls back to the other. config.ts refuses
+    // `substitute` under production or a non-local identity mode; without the fixtures package it stays unbound.
+    overrides.qcRunner ??
+      (config.qc.mode === 'deterministic'
+        ? deterministicRunner(clock)
+        : loadQcSubstituteRunner(importFixture, clock)),
   ]).catch(() => undefined);
   if (fixtures === undefined) return refuse('fixtures_import_failed', exit);
   const [usersModule, qcRunner] = fixtures;
@@ -199,7 +198,7 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
         identity: () => adapter.health(),
         loopbackBind: isLoopbackHost(config.host),
         mailKind: config.mail.mode === 'sink-memory' ? 'memory' : 'file',
-        qcKind: qcRunner === undefined ? 'substitute' : qcKindOf(qcRunner.identity),
+        qcKind: qcRunner === undefined ? config.qc.mode : qcKindOf(qcRunner.identity), // W4a plan section 2
         build: { commit: config.buildCommit, schemaVersion },
       },
       {

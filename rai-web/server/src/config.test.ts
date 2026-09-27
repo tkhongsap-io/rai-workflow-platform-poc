@@ -152,11 +152,37 @@ test('isLoopbackHost accepts only 127.0.0.1, ::1 and localhost', () => {
     assert.equal(isLoopbackHost(h), false, h);
 });
 
-test('QC_MODE=deterministic is a test-environment value until W4-13 (W4-03 real-server evidence, W4a plan section 8)', () => {
-  assert.equal(parseConfig(withEnv({ QC_MODE: 'deterministic' })).qc.mode, 'deterministic');
-  assert.equal(parseConfig(withEnv({})).qc.mode, 'substitute');
-  const localGoogle = { RAI_IDENTITY_MODE: 'local-google', QC_MODE: 'deterministic' };
-  assert.equal(reasonOf(withEnv({ ...localGoogle, NODE_ENV: 'development' })), 'invalid:QC_MODE');
-  assert.equal(reasonOf(withEnv({ ...localGoogle, NODE_ENV: 'production' })), 'invalid:QC_MODE');
-  assert.equal(reasonOf(withEnv({ QC_MODE: undefined })), 'missing:QC_MODE');
+// W4a plan section 2 (W4-13): `deterministic` binds the W4a runner in every environment; `substitute` is a local
+// value only, refused under NODE_ENV=production or a non-local identity mode. Unset and unknown refuse everywhere.
+const qcModeEnvs: Record<string, Record<string, string>> = {
+  'fixture/test': { NODE_ENV: 'test', RAI_IDENTITY_MODE: 'fixture' },
+  'local-google/development': { NODE_ENV: 'development', RAI_IDENTITY_MODE: 'local-google' },
+  'local-google/test': { NODE_ENV: 'test', RAI_IDENTITY_MODE: 'local-google' },
+  'local-google/production': { NODE_ENV: 'production', RAI_IDENTITY_MODE: 'local-google' },
+  'network/development': { NODE_ENV: 'development', RAI_IDENTITY_MODE: 'network', HOST: '0.0.0.0' },
+  'network/production': { NODE_ENV: 'production', RAI_IDENTITY_MODE: 'network', HOST: '0.0.0.0' },
+  'production/production': { NODE_ENV: 'production', RAI_IDENTITY_MODE: 'production', HOST: '0.0.0.0' },
+};
+const substituteAllowed = new Set(['fixture/test', 'local-google/development', 'local-google/test']);
+
+test('QC_MODE=deterministic parses in every NODE_ENV and identity mode (W4a plan section 2)', () => {
+  for (const [name, env] of Object.entries(qcModeEnvs))
+    assert.equal(parseConfig(withEnv({ ...env, QC_MODE: 'deterministic' })).qc.mode, 'deterministic', name);
+});
+
+test('QC_MODE=substitute is refused under NODE_ENV=production or a non-local identity mode (W4a plan section 2)', () => {
+  for (const [name, env] of Object.entries(qcModeEnvs)) {
+    const e = withEnv({ ...env, QC_MODE: 'substitute' });
+    if (substituteAllowed.has(name)) assert.equal(parseConfig(e).qc.mode, 'substitute', name);
+    else assert.equal(reasonOf(e), 'invalid:QC_MODE', name);
+  }
+});
+
+test('QC_MODE unset is missing and any other value is invalid, in every identity mode; no fallback', () => {
+  for (const [name, env] of Object.entries(qcModeEnvs)) {
+    assert.equal(reasonOf(withEnv({ ...env, QC_MODE: undefined })), 'missing:QC_MODE', name);
+    assert.equal(reasonOf(withEnv({ ...env, QC_MODE: ' ' })), 'missing:QC_MODE', name);
+    for (const value of ['real', 'model', 'none', 'disabled', 'Deterministic', 'substitute-scripted'])
+      assert.equal(reasonOf(withEnv({ ...env, QC_MODE: value })), 'invalid:QC_MODE', `${name} ${value}`);
+  }
 });

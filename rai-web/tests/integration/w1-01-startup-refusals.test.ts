@@ -116,6 +116,20 @@ test('local-google refuses to start on a non-loopback bind (S2) and on an unknow
   }
 });
 
+test('W4-13: the real process refuses QC_MODE=substitute with a non-local identity mode, exit 78 invalid:QC_MODE, never listening', async () => {
+  const port = await freePort();
+  // W4a plan section 2: `substitute` is a local value (fixture, local-google) outside NODE_ENV=production.
+  const r = await run({ ...baseEnv(port), NODE_ENV: 'development', RAI_IDENTITY_MODE: 'network' });
+  assert.equal(r.code, 78);
+  assert.deepEqual(JSON.parse(r.stderr.trim().split('\n').at(-1)!), {
+    event: 'process.refused',
+    reason: 'invalid:QC_MODE',
+  });
+  const probe = await fetch(`http://127.0.0.1:${port}/api/session`).catch(() => undefined);
+  assert.equal(probe, undefined, 'nothing listens');
+  assert.ok(!r.stdout.includes('process.started'));
+});
+
 test('the real process in fixture mode under NODE_ENV=test serves the fixture picker from @rai/fixtures and answers 401 without a session', async () => {
   const port = await freePort();
   const child = spawn(process.execPath, ['--import', 'tsx', '--conditions=rai-source', main], {

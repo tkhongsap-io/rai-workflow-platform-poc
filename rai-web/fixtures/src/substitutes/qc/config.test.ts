@@ -1,9 +1,10 @@
 // W0-07 section 3.9 "fail closed on configuration", the part this ticket owns: `QC_MODE` has exactly one slice-1
 // value (`substitute`, W0-02 section 5); unset or any other value (`none`, `scripted`, `model`, a `QC_RUNNER`
 // spelling) is refused by the W1-00 loader in every identity mode, and the runner the value selects identifies
-// itself as `substitute-scripted`, which readiness reports as `qc.kind = 'substitute'` (W0-10 5.3). The loader's
-// refusal of `production` identity together with `substitute` is W1-00's row and is not in `config.ts` today; see
-// the review note. QC has no "disabled" value: W0-07 section 10 proposes one and no ticket adds it until recorded.
+// itself as `substitute-scripted`, which readiness reports as `qc.kind = 'substitute'` (W0-10 5.3). QC has no
+// "disabled" value: W0-07 section 10 proposes one and no ticket adds it until recorded. W4-13 (W4a plan section 2)
+// adds `deterministic` and refuses `substitute` under NODE_ENV=production or a non-local identity mode; those rows are
+// tested in server/src/config.test.ts. None of the values below is `deterministic`, so this matrix is unchanged.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -3,7 +3,9 @@
 // provider on PLAYWRIGHT_BASE_URL (loopback only) against the real Postgres that `.env` names; no external service
 // is reached and nothing here can start the API substitute (`tests/integration/w1-int-substitute-absent.test.ts`
 // proves it). The specs reset the database and reload fixture set slice1-synthetic@1 through support/real-test.ts
-// while the child is stopped.
+// while the child is stopped. The child's QC runner is pinned to `QC_MODE=substitute` by support/real-server-lifecycle.ts
+// and tests/support/process.ts (W4a plan section 2), whatever `.env` says: the W2/W3 journeys assert scripted `ACC-*`
+// findings that only W4b's content rules will produce.
 import { defineConfig, devices } from '@playwright/test';
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:8788';

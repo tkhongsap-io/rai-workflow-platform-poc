@@ -91,3 +91,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=codex-w3-queue-substitute model=GPT-6
 - Takes over from: session=w2-10-w2-shapes (reason: handoff; scoped queue substitute, separate worktree from mail promotion)
 - Evidence: changes/2026-09-22-w3-08-queue-substitute/plan.md
+
+## 2026-09-27 12:15 — CLAIM lane-c: W4-13 runner selection (#187)
+- Author: operator=ta session=claude-code-w4-13-runner-selection model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #187)
+- Scope: per changes/2026-09-27-w4-13-runner-selection/: `QC_MODE=deterministic` in every environment, `substitute` refused under production or a non-local identity mode, readiness `qc.kind` from the bound runner, `.env.example` deterministic with CI and the evidence harness pinned to substitute, W0-02 section 5, W0-07 3.9 and section 6, TESTING. One PR.

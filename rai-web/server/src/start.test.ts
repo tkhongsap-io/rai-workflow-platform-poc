@@ -258,3 +258,79 @@ test('S2 / S1 through startServer: a 0.0.0.0 bind in local-google and an unknown
     assert.deepEqual(JSON.parse(lines[0]!), { event: 'process.refused', reason });
   }
 });
+
+// W4-13 (W4a plan section 2): QC_MODE selects the runner in every environment, with no fallback between runners,
+// and readiness `qc.kind` comes from the bound runner (or the configured mode when none is bound), never a constant.
+async function readinessQc(port: number) {
+  const report = (await (await fetch(`http://127.0.0.1:${port}/readyz`)).json()) as {
+    qc: { kind: string; status: string };
+  };
+  return report.qc;
+}
+
+test('W4-13: QC_MODE=deterministic outside NODE_ENV=test binds the deterministic runner and never loads the substitute', async () => {
+  const port = await freePort();
+  const imported: string[] = [];
+  const server = await startServer(
+    { ...envFor(port, 'local-google'), NODE_ENV: 'development', QC_MODE: 'deterministic' },
+    {
+      exit,
+      discovery,
+      importFixture: (specifier) => {
+        imported.push(specifier);
+        return Promise.reject(moduleError(`Cannot find package '@rai/fixtures' imported from /srv/x.js`));
+      },
+    },
+  );
+  try {
+    assert.deepEqual(await readinessQc(port), { kind: 'deterministic', status: 'ok' });
+    assert.ok(
+      imported.every((s) => !s.includes('substitutes/qc')),
+      `the substitute runner is never imported: ${imported.join(', ')}`,
+    );
+  } finally {
+    await server.close();
+  }
+});
+
+test('W4-13: QC_MODE=substitute with fixtures absent stays unbound (disabled), reports kind substitute, never falls back', async () => {
+  const port = await freePort();
+  const server = await startServer(envFor(port, 'fixture'), {
+    exit,
+    discovery,
+    fixtureUsers,
+    importFixture: () =>
+      Promise.reject(moduleError("Cannot find package '@rai/fixtures' imported from /srv/x.js")),
+  });
+  try {
+    assert.deepEqual(await readinessQc(port), { kind: 'substitute', status: 'disabled' });
+  } finally {
+    await server.close();
+  }
+});
+
+for (const [name, env] of [
+  ['network identity', { RAI_IDENTITY_MODE: 'network', NODE_ENV: 'development' }],
+  ['NODE_ENV=production', { RAI_IDENTITY_MODE: 'local-google', NODE_ENV: 'production' }],
+] as const) {
+  test(`W4-13: QC_MODE=substitute under ${name} exits 78 with invalid:QC_MODE before listening`, async () => {
+    const port = await freePort();
+    const lines: string[] = [];
+    const original = console.error;
+    console.error = (line: string) => lines.push(line);
+    try {
+      await assert.rejects(
+        startServer({ ...envFor(port, 'local-google'), ...env }, { exit, discovery, fixtureUsers }),
+        (err: unknown) => err instanceof Exited && err.code === 78,
+      );
+    } finally {
+      console.error = original;
+    }
+    assert.deepEqual(
+      lines.map((l) => JSON.parse(l) as unknown),
+      [{ event: 'process.refused', reason: 'invalid:QC_MODE' }],
+    );
+    const probe = await fetch(`http://127.0.0.1:${port}/readyz`).catch(() => undefined);
+    assert.equal(probe, undefined, 'nothing listens');
+  });
+}
