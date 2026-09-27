@@ -36,7 +36,12 @@ import type {
   SelectedRule,
   SlotState,
 } from '@rai/shared/qc/types';
-import { QcEngineIdentitySchema, checkOwningLane, validateQcFinding } from '@rai/shared/qc/validate';
+import {
+  QcEngineIdentitySchema,
+  checkOwningLane,
+  duplicateFindingKey,
+  validateQcFinding,
+} from '@rai/shared/qc/validate';
 import type { StoredFindingSummary } from '@rai/shared/schemas/review';
 import type { CaseRow, PackVersionRow } from '../cases/repository.js';
 import { readCaseRow, readVersionRow } from '../cases/repository.js';
@@ -246,7 +251,9 @@ function unavailableResult(reason: QcUnavailableReason, detail: string | null, s
 /**
  * W0-07 3.4 steps 4-5: the first finding that fails validation or the owning-lane check fails the whole run. W4-11b:
  * an `engine` identity that is not identifiers and bounded numbers fails it too (`engine_identity_invalid`) and is
- * not recorded; a valid one is kept on a run a finding refused, since that runner did use it.
+ * not recorded; a valid one is kept on a run a finding refused, since that runner did use it. W4-06a: the request is
+ * the validation context, so its artifacts bound every citation (`evidence_outside_request`), and two findings of the
+ * run with one `findingKey` fail it (`duplicate_finding_key`, decision 30).
  */
 function checkedResult(result: QcRunResult, request: QcRunRequest, stamp: Date): QcRunResult {
   if (result.engine !== undefined && !Value.Check(QcEngineIdentitySchema, result.engine))
@@ -264,6 +271,12 @@ function checkedResult(result: QcRunResult, request: QcRunRequest, stamp: Date):
         ...(result.engine === undefined ? {} : { engine: result.engine }),
       };
   }
+  const duplicate = duplicateFindingKey(result.findings);
+  if (duplicate !== null)
+    return {
+      ...unavailableResult('runner_error', duplicate, stamp),
+      ...(result.engine === undefined ? {} : { engine: result.engine }),
+    };
   return result;
 }
 

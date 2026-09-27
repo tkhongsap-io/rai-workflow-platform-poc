@@ -11,6 +11,7 @@ import {
   QcEngineIdentitySchema,
   QcRunResultSchema,
   checkOwningLane,
+  duplicateFindingKey,
   findingKeyOf,
   isEvidenceLocator,
   scopeKeyOf,
@@ -287,4 +288,174 @@ test('W4-16: a locator carries no document text; section by ordinal, cell by she
     );
   }
   assert.equal(CELL_REFERENCE_PATTERN, '^[A-Z]{1,3}[1-9][0-9]{0,6}$');
+});
+
+// ---- W4-06a (W4b plan sections 3.1 and 6; decisions 28 and 30) --------------------------------------------------
+
+const artifactHash = 'b'.repeat(64);
+const artifactFinding: QcFinding = {
+  findingKey: `ACC-METRIC-CITED:artifact:1:art-1:${artifactHash}:0123456789abcdef`,
+  ruleId: 'ACC-METRIC-CITED',
+  ruleRevision: 'cfg-rev-0001',
+  trigger: 'upload',
+  scope: { kind: 'artifact', slot: 1, artifactId: 'art-1', contentHash: artifactHash },
+  claimKey: '0123456789abcdef',
+  severity: 'medium',
+  owningLane: 'ai_coe',
+  evidence: [
+    {
+      artifactId: 'art-1',
+      contentHash: artifactHash,
+      slot: 1,
+      locator: { kind: 'section', index: 4 },
+      excerptHash: 'c'.repeat(64),
+    },
+  ],
+  measure: null,
+  message: { key: 'qc.finding.acc_metric_cited', params: { slot: 1, missing: 'denominator,threshold' } },
+  provenance: { runner: 'content', runnerVersion: '0.0.0' },
+};
+const uploadContext = { ...context, trigger: 'upload' as const };
+
+test('W4-06a: findingKeyOf appends the claim key only when one is given (decision 30)', () => {
+  const scope = {
+    kind: 'artifact' as const,
+    slot: 1 as const,
+    artifactId: 'art-1',
+    contentHash: artifactHash,
+  };
+  assert.equal(findingKeyOf('ACC-METRIC-CITED', scope), `ACC-METRIC-CITED:artifact:1:art-1:${artifactHash}`);
+  assert.equal(
+    findingKeyOf('ACC-METRIC-CITED', scope, 'abc_1'),
+    `ACC-METRIC-CITED:artifact:1:art-1:${artifactHash}:abc_1`,
+  );
+  // Every metadata key is unchanged.
+  assert.equal(
+    findingKeyOf('PACK-SLOT-MISSING', { kind: 'slot', slot: 7 }, undefined),
+    'PACK-SLOT-MISSING:slot:7',
+  );
+});
+
+test('W4-06a: a finding with a claim key validates; the key must be checked with its claim part and match the pattern', () => {
+  assert.equal(validateQcFinding(artifactFinding, uploadContext), null);
+  // The key without the claim part no longer matches.
+  assert.equal(
+    validateQcFinding(
+      { ...artifactFinding, findingKey: findingKeyOf(artifactFinding.ruleId, artifactFinding.scope) },
+      uploadContext,
+    ),
+    'finding_key_mismatch',
+  );
+  for (const claimKey of ['', 'ABC', 'has space', 'x'.repeat(65), 'naïve'])
+    assert.equal(
+      validateQcFinding(
+        {
+          ...artifactFinding,
+          claimKey,
+          findingKey: findingKeyOf(artifactFinding.ruleId, artifactFinding.scope, claimKey),
+        },
+        uploadContext,
+      ),
+      'schema_violation',
+      JSON.stringify(claimKey),
+    );
+});
+
+test('W4-06a: message_param_text allows keys, key lists, item references, decimals, numbers and the template only', () => {
+  const withParams = (params: Record<string, string | number>) =>
+    validateQcFinding({ ...artifactFinding, message: { ...artifactFinding.message, params } }, uploadContext);
+  for (const value of [
+    'denominator',
+    'extraction_accuracy',
+    'a',
+    'k'.repeat(64),
+    'denominator,threshold',
+    'metric,value,denominator,threshold,evidence',
+    '2',
+    '2.1',
+    '10.2.3.4',
+    '-0.5',
+    '97.25',
+    '1'.repeat(18) + '.' + '2'.repeat(18),
+    'v1.0 Sheet3', // exactly the request's template version (context.checklistTemplateVersion)
+  ])
+    assert.equal(withParams({ p: value }), null, value);
+  assert.equal(withParams({ slot: 1, value: 2.4 }), null, 'numbers are always allowed');
+  for (const value of [
+    '',
+    'The model achieved 97.5% accuracy', // document text
+    'Denominator', // not lower case
+    'denominator, threshold', // a space in the list
+    'denominator,', // a trailing comma
+    'k'.repeat(65),
+    '97.5%',
+    '1.2.3.4.5',
+    '-1.2.3', // neither a decimal nor an item reference
+    'v2.0', // another template version
+    'v1.0 sheet3', // not exactly the template
+    'ข้อมูล',
+    'a\nb',
+    Array.from({ length: 17 }, (_, i) => `k${i}`).join(','), // at most 16 keys
+  ])
+    assert.equal(withParams({ p: value }), 'message_param_text', JSON.stringify(value));
+  // The allowance follows the request: under v2.0 the v1.0 string is document text as far as the check knows.
+  assert.equal(
+    validateQcFinding(
+      { ...artifactFinding, message: { ...artifactFinding.message, params: { source: 'v1.0 Sheet3' } } },
+      { ...uploadContext, checklistTemplateVersion: 'v2.0' },
+    ),
+    'message_param_text',
+  );
+});
+
+test('W4-06a: evidence_outside_request runs only when the context lists the request artifacts', () => {
+  const artifacts = [{ artifactId: 'art-1', contentHash: artifactHash, slot: 1 }];
+  // Absent (the frozen API substitute's context literal): the check does not run.
+  assert.equal(validateQcFinding(artifactFinding, uploadContext), null);
+  assert.equal(validateQcFinding(artifactFinding, { ...uploadContext, artifacts }), null);
+  const citing = (evidence: Partial<QcFinding['evidence'][number]>) => ({
+    ...artifactFinding,
+    evidence: [{ ...artifactFinding.evidence[0]!, ...evidence }],
+  });
+  assert.equal(
+    validateQcFinding(citing({ artifactId: 'art-2' }), { ...uploadContext, artifacts }),
+    'evidence_outside_request',
+  );
+  assert.equal(
+    validateQcFinding(citing({ contentHash: 'd'.repeat(64) }), { ...uploadContext, artifacts }),
+    'evidence_outside_request',
+  );
+  assert.equal(
+    validateQcFinding(citing({ slot: 5 }), { ...uploadContext, artifacts }),
+    'evidence_outside_request',
+  );
+  assert.equal(
+    validateQcFinding(citing({ artifactId: null, contentHash: artifactHash }), {
+      ...uploadContext,
+      artifacts,
+    }),
+    'evidence_outside_request',
+  );
+  assert.equal(
+    validateQcFinding(citing({ artifactId: 'art-2' }), { ...uploadContext, artifacts: [] }),
+    'evidence_outside_request',
+  );
+  // A slot-level reference with no artifact is not a citation of one.
+  assert.equal(validateQcFinding(finding, { ...context, artifacts: [] }), null);
+});
+
+test('W4-06a: duplicateFindingKey refuses two findings with one key in one run (decision 30)', () => {
+  assert.equal(duplicateFindingKey([]), null);
+  assert.equal(duplicateFindingKey([finding, artifactFinding]), null);
+  assert.equal(duplicateFindingKey([finding, artifactFinding, { ...finding }]), 'duplicate_finding_key');
+  const second = {
+    ...artifactFinding,
+    claimKey: 'fedcba9876543210',
+    findingKey: findingKeyOf(artifactFinding.ruleId, artifactFinding.scope, 'fedcba9876543210'),
+  };
+  assert.equal(
+    duplicateFindingKey([artifactFinding, second]),
+    null,
+    'two claims in one artifact are two keys',
+  );
 });

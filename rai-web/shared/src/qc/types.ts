@@ -107,12 +107,21 @@ export type FindingScope =
   | { kind: 'pack' } // completeness, contradiction, stage mismatch
   | { kind: 'run'; trigger: QcTrigger; lane: Lane | null }; // the QC-unavailable finding; one per run; orchestrator-built only
 
+/**
+ * W4-06a (W4b plan section 3.1, decision 30): a content finding's claim discriminator, so two defective claims in one
+ * scope are two findings: the first 16 hex characters of the claim's `excerptHash`, or a fact ID.
+ */
+export const CLAIM_KEY_PATTERN = '^[a-z0-9_]{1,64}$';
+
 export interface QcFinding {
-  findingKey: string; // stable within the run: `${ruleId}:${scopeKey}`; the server assigns findingId on record
+  // stable within the run: `${ruleId}:${scopeKey}`, plus `:${claimKey}` when a claim key is present (decision 30);
+  // the server assigns findingId on record
+  findingKey: string;
   ruleId: string; // matches /^[A-Z]+(-[A-Z0-9]+)+$/ e.g. "ACC-METRIC-CITED"
   ruleRevision: string; // equals request.qcRulesRevision; a run never applies another revision
   trigger: QcTrigger;
   scope: FindingScope;
+  claimKey?: string; // W4-06a (decision 30): CLAIM_KEY_PATTERN; content findings only; metadata findings carry none
   severity: Severity;
   owningLane: Lane; // assigned by the W0-06 rule (section 7 there). Never a pending or guessed value.
   evidence: EvidenceLocation[]; // at least one; kind 'absent' when the defect is an omission

@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { LANE_MAPPINGS_BY_VERSION, owningLaneRule } from '@rai/shared/constants';
 import { LOCALE_CATALOGUES, isLocaleKey } from '@rai/shared/locales/keys';
 import type { QcFinding } from '@rai/shared/qc/types';
-import { checkOwningLane, validateQcFinding } from '@rai/shared/qc/validate';
+import { checkOwningLane, duplicateFindingKey, validateQcFinding } from '@rai/shared/qc/validate';
 import { ScriptedQcRunner, materializeFindings } from './scripted-runner.js';
 import { BUNDLED_QC_SCRIPTS, QcScriptError, RAW_BUNDLED_QC_SCRIPTS, validateScript } from './scripts.js';
 import { buildRequest } from './test-support.js';
@@ -374,4 +374,53 @@ test('W4-16: no bundled locator carries document text, and a script with a headi
     sheetIndex: 2,
     cell: 'B7',
   });
+});
+
+test('W4-06a: no script finding is refused by the new checks, so the frozen API substitute drops none', async () => {
+  // The frozen in-memory API substitute (`storeableFindings` in api/routes-review.ts) validates with this context
+  // literal, without `artifacts`, and silently drops a refused finding; the orchestrator validates with the request
+  // itself, which carries its artifacts (`evidence_outside_request`). Every string param must pass
+  // `message_param_text` in both, including `threshold_source: 'v1.0 Sheet3'` through the template allowance.
+  const runner = new ScriptedQcRunner();
+  let approveFindings = 0;
+  for (const script of BUNDLED_QC_SCRIPTS) {
+    const mapping = LANE_MAPPINGS_BY_VERSION[script.laneMappingVersion]!;
+    for (const entry of script.entries) {
+      const built = buildRequest(script.fixtureCaseId, {
+        trigger: entry.trigger,
+        ...(entry.lane === undefined ? {} : { lane: entry.lane }),
+      });
+      assert.ok(built.request.artifacts.length > 0, script.fixtureCaseId);
+      const result = await runner.run(built.request, new AbortController().signal);
+      assert.equal(result.status, 'completed');
+      if (result.status !== 'completed') continue;
+      assert.equal(duplicateFindingKey(result.findings), null, script.fixtureCaseId);
+      for (const finding of result.findings) {
+        assert.equal(validateQcFinding(finding, built.request), null, finding.findingKey);
+        if (entry.trigger !== 'approve_attempt') continue;
+        const storeableContext = {
+          trigger: 'approve_attempt' as const,
+          lane: entry.lane!,
+          qcRulesRevision: built.request.qcRulesRevision,
+          checklistTemplateVersion: built.request.checklistTemplateVersion,
+        };
+        assert.equal(validateQcFinding(finding, storeableContext), null, finding.findingKey);
+        assert.equal(checkOwningLane(finding, mapping, storeableContext.lane), null, finding.findingKey);
+        approveFindings += 1;
+      }
+    }
+  }
+  assert.ok(approveFindings >= 4, `${approveFindings} approve-attempt findings checked`);
+  // The scripts that carry a threshold source carry their case's template version.
+  const sources = BUNDLED_QC_SCRIPTS.flatMap((s) =>
+    s.entries.flatMap((e) =>
+      e.findings.flatMap((f) =>
+        typeof f.message.params['threshold_source'] === 'string'
+          ? [[f.message.params['threshold_source'], s.checklistTemplateVersion]]
+          : [],
+      ),
+    ),
+  );
+  assert.ok(sources.length >= 2);
+  for (const [source, template] of sources) assert.equal(source, template);
 });

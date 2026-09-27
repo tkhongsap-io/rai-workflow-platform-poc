@@ -19,7 +19,12 @@
 // the seed must never publish is listed in UNSEEDED_KINDS (W6 plan section 3): the identity mapping is D10's and has
 // no synthetic default (section 6), so Admin publishes it or nothing does.
 
-import type { ConfigurationBodies, SeedableConfigurationKind } from '@rai/shared/schemas/cases';
+import type {
+  AccMetricCitedParams,
+  ClaimLabels,
+  ConfigurationBodies,
+  SeedableConfigurationKind,
+} from '@rai/shared/schemas/cases';
 import type { Tx } from '../db/client.js';
 import { publishRevision, type ConfigurationRevisionRow } from './store.js';
 
@@ -57,12 +62,50 @@ const W4A_METADATA_RULES: readonly QcRule[] = [
   },
   { ruleId: 'PACK-NA-VENDOR-DOC', engine: 'metadata', triggers: ['submit'], severity: 'medium' },
 ];
+/**
+ * W4-06a (W4b plan sections 3.2 and 3.3; decision 10, WA-D09): the synthetic claim grammar's labels, in English and
+ * Thai. Provisional agent-team values until D09; the owners retune them as configuration. The English keys are the
+ * ones the W4-09a dev split writes (fixtures/src/evaluation/vocabulary.ts); the Thai keys are for Thai documents.
+ */
+export const CLAIM_LABELS: ClaimLabels = {
+  keys: {
+    item: { en: ['item', 'item no', 'item no.'], th: ['ข้อ', 'ลำดับ'] },
+    question: { en: ['question'], th: ['คำถาม'] },
+    answer: { en: ['answer'], th: ['คำตอบ'] },
+    metric: { en: ['metric'], th: ['ตัวชี้วัด'] },
+    value: { en: ['value', 'result'], th: ['ค่า', 'ผลลัพธ์'] },
+    unit: { en: ['unit'], th: ['หน่วย'] },
+    denominator: { en: ['denominator', 'sample size'], th: ['ตัวหาร', 'จำนวนตัวอย่าง'] },
+    threshold: { en: ['threshold'], th: ['เกณฑ์'] },
+    evidence: { en: ['evidence'], th: ['หลักฐาน'] },
+    tier: { en: ['tier'], th: ['ระดับ'] },
+  },
+  answers: {
+    yes: { en: ['yes', 'y'], th: ['ใช่', 'มี'] },
+    no: { en: ['no', 'n'], th: ['ไม่ใช่', 'ไม่มี'] },
+    na: { en: ['n/a', 'na', 'not applicable'], th: ['ไม่เกี่ยวข้อง'] },
+  },
+};
+
+/** W4-06a: `ACC-METRIC-CITED` reads slot 1 and slot 5, lane-scoped by the runner (decisions 22 and 28). */
+export const ACC_METRIC_CITED_PARAMS: AccMetricCitedParams = {
+  slots: [1, 5],
+  labels: CLAIM_LABELS,
+  items: {
+    hallucination: { en: ['hallucination'], th: ['การหลอน'] },
+    accuracy: { en: ['accuracy'], th: ['ความแม่นยำ'] },
+  },
+  acceptedMetrics: ['hallucination_rate', 'accuracy'],
+  claimSource: 'grammar',
+};
+
 const W4B_CONTENT_RULES: readonly QcRule[] = [
   {
     ruleId: 'ACC-METRIC-CITED',
     engine: 'content',
     triggers: ['approve_attempt', 'upload'],
     severity: 'medium',
+    params: ACC_METRIC_CITED_PARAMS, // W4-06a: registered with its params schema in the same PR (plan 3.3)
   },
   {
     ruleId: 'ACC-EXTRACTION-NOT-HALLUCINATION',
