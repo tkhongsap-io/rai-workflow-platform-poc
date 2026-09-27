@@ -1,6 +1,6 @@
 # Delivery pack
 
-Status: **G0 and W0-W2 exits recorded; W3 accepted by Ta on 2026-09-26 (slice 1 complete on synthetic data); W3 follow-ups W3-F1 to W3-F7 (#163-#169) merged the same day. W4–W8 remain gated.** See the [W3 evidence](../../changes/2026-09-23-w3-exit/review.md), the [walkthrough notes](../../changes/2026-09-26-nakhun-walkthrough/notes.md) and linked issues for current status. [BUILD_PLAN](../../BUILD_PLAN.md) stays the canonical plan. This pack is the work a team of 2-3 engineers plus AI agents picks up now.
+Status: **G0 and W0-W2 exits recorded; W3 accepted by Ta on 2026-09-26 (slice 1 complete on synthetic data); W3 follow-ups W3-F1 to W3-F7 (#163-#169) merged the same day. W4a engineering exit recorded 2026-09-27, awaiting Ta's review. W4b, W5, W6 and W7 authorized provisionally on synthetic data under Ta's direction of 2026-09-27 (register row "Ta's delegation (2026-09-27)"), each after its file-level plan merges; W8 remains gated.** See the [W3 evidence](../../changes/2026-09-23-w3-exit/review.md), the [walkthrough notes](../../changes/2026-09-26-nakhun-walkthrough/notes.md) and linked issues for current status. [BUILD_PLAN](../../BUILD_PLAN.md) stays the canonical plan. This pack is the work a team of 2-3 engineers plus AI agents picks up now.
 
 ## Read in this order
 
@@ -11,8 +11,8 @@ Status: **G0 and W0-W2 exits recorded; W3 accepted by Ta on 2026-09-26 (slice 1 
 5. [Design-to-build map](design-to-build-map.md): each designed screen to its tickets and server invariants; what in the demo is simulation only.
 6. [Agent task brief template](agent-task-brief-template.md): how to hand one ticket to an agent.
 7. [Later packages](later-packages-outline.md): W4-W8 outline and candidate backlog.
-8. [W4 decision briefs](w4-decision-briefs.md): D08 and D09 as they bear on W4, with a draft W4 gate entry for Ta. W4a opened and related question 1 ruled on 2026-09-26; D08 and D09 undecided; W4b not authorized.
-9. [W4 work breakdown](w4-work-breakdown.md): W4 tickets. W4a authorized 2026-09-26 under the [W4-00a plan](../engineering/implementation-plan-w4a.md); its tickets merged 2026-09-27 (#192-#197) and the [W4a exit record](../../changes/2026-09-27-w4a-exit/review.md) awaits Ta's package review; W4b not authorized until D08, D09 and its gate entry.
+8. [W4 decision briefs](w4-decision-briefs.md): D08 and D09 as they bear on W4, with a draft W4 gate entry for Ta. W4a opened and related question 1 ruled on 2026-09-26; D08 and D09 undecided; W4b authorized provisionally on 2026-09-27 on the working assumptions of the [W4b plan](../engineering/implementation-plan-w4b.md).
+9. [W4 work breakdown](w4-work-breakdown.md): W4 tickets. W4a authorized 2026-09-26 under the [W4-00a plan](../engineering/implementation-plan-w4a.md); its tickets merged 2026-09-27 (#192-#197) and the [W4a exit record](../../changes/2026-09-27-w4a-exit/review.md) awaits Ta's package review; W4b authorized provisionally on 2026-09-27 under the [W4b plan](../engineering/implementation-plan-w4b.md) (D08 and D09 stay open).
 
 ## Path at a glance
 
@@ -22,8 +22,11 @@ W0  technical contract ........... tech lead + Ta          (10 tickets, docs + A
 W1  case + versioned pack ........ Lanes A / B / C         (15 tickets incl. Lane C and W1-INT)
 W2  lanes, send-back, Ready ...... D02, D05 recorded       (11 tickets)
 W3  queue, mail sink, SLA ........ D06, D11 recorded       (9 tickets + follow-ups W3-F1 to F8) → slice 1 done
-W4  soft QC ...................... W4a authorized 2026-09-26 (deterministic metadata QC) → engineering exit recorded 2026-09-27, awaiting Ta's package review; W4b: D08, D09 open
-W5-W8 ............................ outline only; not authorized
+W4  soft QC ...................... W4a authorized 2026-09-26 (deterministic metadata QC) → engineering exit recorded 2026-09-27, awaiting Ta's package review; W4b authorized provisionally 2026-09-27 (D08, D09 open; working assumptions)
+W5  risk proposal ............... authorized provisionally 2026-09-27 (D07 open; synthetic placeholder rubric)
+W6  Admin config + dashboard ..... authorized provisionally 2026-09-27
+W7  synthetic rehearsal kit ...... authorized provisionally 2026-09-27 (real rehearsal pending D08 and the operator)
+W8 ............................... outline only; not authorized
 ```
 
 ## Ticket status legend
@@ -50,4 +53,4 @@ Opened 2026-09-21 on Ta's instruction: one epic per package and one issue per ti
 | W2 parallel reviews, send-back, Ready | [#53](https://github.com/tkhongsap-io/rai-workflow-platform-poc/issues/53) (11 tickets, closed) |
 | W3 queue, notifications, SLA | [#54](https://github.com/tkhongsap-io/rai-workflow-platform-poc/issues/54) (9 tickets, closed; follow-ups #163-#169 closed, #180 open) |
 
-Filter: `is:open label:status:ready` shows what can start now; W0-W3 epics are closed. W4a issues are opened when the W4-00a plan merges; W4b-W8 have no issues and are not authorized.
+Filter: `is:open label:status:ready` shows what can start now; W0-W3 epics are closed. W4a issues are opened when the W4-00a plan merges; W4b-W7 issues are opened when the consolidated W4b-W7 plans merge (Ta's direction of 2026-09-27); W8 has no issues and is not authorized.

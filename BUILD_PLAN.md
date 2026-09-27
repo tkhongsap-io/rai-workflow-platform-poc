@@ -231,3 +231,27 @@ A dated read; earlier sections stay as written.
 | W5-W8 | **Not authorized** (unchanged) | — | D07 before W5; D10 before networked tests or W8 |
 
 W4a is not accepted until Ta reviews the exit record. It reads only structured pack data; content rules, extraction, the model, the evaluation harness and dedup remain W4b's.
+
+## Status against this plan — 2026-09-27 (W4b-W7 under Ta's delegation)
+
+A dated read; earlier sections, and the package entry conditions above, stay as written.
+
+**Gate entries (Ta, 2026-09-27; register row "Ta's delegation (2026-09-27)").** In the Claude Code session of 2026-09-27 Ta directed the agent team to implement W4b, W5, W6 (with a desk dashboard) and W7 on synthetic data without stopping, under the D03 reviewed-ticket flow and its 2026-09-21 merge amendment (one ticket per branch and PR; two independent reviewer verdicts and green CI on the exact head before merge; Ta reviews package exit records). The north star is a working RAI review platform that streamlines the review workflow, tracks version history and shows a dashboard, running end to end on synthetic data; details are tuned with the team later. Ta delegated every choice that would otherwise need Ta to the agent team, made by options and a recommendation against that north star and recorded as **provisional** in the register rows "W4b/W5/W6/W7 delegated rulings (provisional)" for Ta to confirm or replace. Each package's file-level plan must merge before its code: [W4b](docs/engineering/implementation-plan-w4b.md), [W5](docs/engineering/implementation-plan-w5.md), [W6](docs/engineering/implementation-plan-w6.md), [W7](docs/engineering/implementation-plan-w7.md); the consolidated planning change is [changes/2026-09-27-w4b-w7-plans](changes/2026-09-27-w4b-w7-plans/intent.md).
+
+Entry conditions the delegation replaces or relaxes, **for synthetic-data work only**, stated so that nobody reads them as met:
+
+- **W4b.** "AI/COE lead and IT/Security owner named; D08 and D09 recorded" is replaced by the labelled D08 and D09 working assumptions of the W4b plan (no model provider, a port with a local fake disabled by default, a fresh child process per extraction, a synthetic evaluation set with provisional, unsigned labels and thresholds). D08 and D09 stay open, and real-data or provider use still needs them. ADR-0006 is provisional; Ta's and the tech lead's acceptance moves to the W4b exit review (W4-14).
+- **W5.** "W4 and D07 approved" is not met: D07 is open and not satisfied (a labelled synthetic placeholder rubric stands in), and W4 is only partly met (W4a merged, its exit record awaiting Ta's review; W4b runs in parallel). A03 stays partial until AI/COE records D07.
+- **W6.** "W5" is relaxed: W6 tickets that do not need W5 run in parallel with it. The desk dashboard is a delegated addition, not a PRD requirement. The W6 exit statement cites "all local A01-A10 coverage" only with the owner-dependent exceptions listed (A03 pending D07; A08/A09 thresholds pending D09; production group mapping pending D10/W8; production identity checks).
+- **W7.** The synthetic parts only: restore and rollback (W7-00) rehearsed by an agent as operator stand-in, `network` identity with the `allow-list` source proven on loopback, the rehearsal kit and a synthetic dress rehearsal. The real rehearsal (3-5 permitted cases with Nakhun), the operator-run rollback, the operator's review of the operator guide and PoC acceptance stay **pending D08 and the operator**. No non-loopback bind is performed (D10).
+
+| Gate / package | Status on 2026-09-27 | Next evidence needed |
+|---|---|---|
+| W4a (deterministic metadata QC) | Engineering exit recorded; **Ta's package review not recorded** (unchanged) | Ta's review of the W4a exit record |
+| W4b (content QC, extraction, evaluation) | **Authorized provisionally on synthetic data** (Ta's delegation of 2026-09-27); W4-00b plan in the consolidated planning change | Plan merged; W4b tickets through reviewed PRs; W4-14 exit record, which may honestly record a failed held-out threshold; Ta reviews it |
+| W5 (risk proposal) | **Authorized provisionally on synthetic data**, D07 open and not satisfied | Plan merged; W5 tickets; W5 exit record with A03 marked partial pending D07 |
+| W6 (Admin configuration, desk dashboard, operator guide) | **Authorized provisionally on synthetic data** | Plan merged; W6 tickets; W6 exit record with the qualified coverage statement |
+| W7 (synthetic rehearsal kit, restore and rollback, network identity) | **Authorized provisionally for its synthetic parts**; real rehearsal pending D08 and the operator | Plan merged; W7 tickets; W7 synthetic engineering exit record (not PoC acceptance) |
+| W8 (production integration and release) | **Not authorized**; out of scope of the delegation | D10, applicable D08 decisions and accountable True release authorization |
+
+Hard limits for all four packages: synthetic data only; no external network call from the product or its tests (no model provider; the model port's only implementation besides "disabled" is a local deterministic fake used in tests); no deploy (a later host such as Replit is Ta's choice and is not part of this entry); no claim that an owner approved anything. D07, D08, D09 and D10 remain open for their owners.

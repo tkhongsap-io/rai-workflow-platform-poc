@@ -1,6 +1,8 @@
 # Later packages: W4-W8 outline
 
-Status: outline only; **not authorized** (D03 covers W0-W3). Detail these packages when their entry gates approach, not now. [BUILD_PLAN](../../BUILD_PLAN.md) holds the full entry, work and exit criteria.
+Status: outline only; **not authorized** (D03 covers W0-W3). Detail these packages when their entry gates approach, not now.
+
+**Status 2026-09-27:** W4a is merged (exit awaiting Ta's review). W4b, W5, W6 and W7 are authorized provisionally on synthetic data under Ta's direction of 2026-09-27 and are detailed in their file-level plans: [W4b](../engineering/implementation-plan-w4b.md), [W5](../engineering/implementation-plan-w5.md), [W6](../engineering/implementation-plan-w6.md) (including the desk dashboard, a delegated addition), [W7](../engineering/implementation-plan-w7.md) (synthetic parts; the real rehearsal stays pending D08 and the operator). W8 stays not authorized. The rows below are kept as the original outline. [BUILD_PLAN](../../BUILD_PLAN.md) holds the full entry, work and exit criteria.
 
 | Package | Delivers | Blocking decisions and entry | Main risk to plan for |
 |---|---|---|---|
