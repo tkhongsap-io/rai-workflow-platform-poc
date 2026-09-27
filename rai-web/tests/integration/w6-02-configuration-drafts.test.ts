@@ -595,3 +595,42 @@ test('after the migration the trigger still refuses UPDATE of a revision; rai_ap
   const count = await db.owner.execute(sql`SELECT count(*)::int AS n FROM configuration_revision`);
   assert.ok((count.rows[0] as { n: number }).n >= 8);
 });
+
+test('a change note is measured in characters, as the CHECK measures it (char_length), not UTF-16 units', async () => {
+  // Round-1 review note: 500 astral characters (1000 UTF-16 units) are 500 characters to Postgres, so the store
+  // accepts and publishes them; 501 are refused by the store before the CHECK would refuse them.
+  const seeded = await seed();
+  const astral = '\u{1F4DD}';
+  const draft = await inTx((tx) =>
+    saveDraft(tx, {
+      kind: 'sla',
+      baseRevisionId: seeded.sla!.id,
+      expectedDraftVersion: null,
+      body: CONFIGURATION_SEED.sla,
+      changeNote: astral.repeat(500),
+      ...base(),
+    }),
+  );
+  const published = await inTx((tx) =>
+    publishDraft(tx, {
+      kind: 'sla',
+      expectedDraftVersion: draft.draftVersion,
+      expectedCurrentRevisionId: seeded.sla!.id,
+      ...base(),
+    }),
+  );
+  assert.equal(published.changeNote, astral.repeat(500));
+  await rejectsWith(
+    inTx((tx) =>
+      saveDraft(tx, {
+        kind: 'calendar',
+        baseRevisionId: seeded.calendar!.id,
+        expectedDraftVersion: null,
+        body: {},
+        changeNote: astral.repeat(501),
+        ...base(),
+      }),
+    ),
+    ConfigurationChangeNoteInvalid,
+  );
+});

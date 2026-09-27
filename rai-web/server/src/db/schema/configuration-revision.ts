@@ -24,7 +24,7 @@ export const CONFIGURATION_KINDS = [
   'use_case_groups',
   'risk_rubric', // W5
   'group_role_mapping', // W6/W8
-  'desk_controls', // W6-02 (0011_w6_02_configuration_admin)
+  'desk_controls', // W6-02 (0012_w6_02_configuration_admin)
 ] as const;
 /** The kind CHECK's SQL list, shared by `configuration_revision` and `configuration_draft`. */
 export const CONFIGURATION_KINDS_SQL = sql.raw(CONFIGURATION_KINDS.map((k) => `'${k}'`).join(', '));

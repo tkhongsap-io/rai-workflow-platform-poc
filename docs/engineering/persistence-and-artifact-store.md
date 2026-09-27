@@ -245,13 +245,13 @@ L12 configuration, versioned and immutable once published. Slice 1 seeds publish
 | Column | Type | Notes |
 |---|---|---|
 | `id` | uuid PK | |
-| `kind` | text NOT NULL | `checklist_templates`, `qc_rules`, `sla`, `calendar`, `operator_recipients`, `use_case_groups`, `risk_rubric` (W5), `group_role_mapping` (W6/W8), `desk_controls` (W6-02, migration 0011, 2026-09-27). One kind per revision keeps activation independent. |
+| `kind` | text NOT NULL | `checklist_templates`, `qc_rules`, `sla`, `calendar`, `operator_recipients`, `use_case_groups`, `risk_rubric` (W5), `group_role_mapping` (W6/W8), `desk_controls` (W6-02, migration 0012, 2026-09-27). One kind per revision keeps activation independent. |
 | `revision_number` | integer NOT NULL | `UNIQUE (kind, revision_number)` |
 | `body` | jsonb NOT NULL | Schema per kind in `rai-web/shared`. `sla` holds `{dpo: 3, ai_coe: 5, it_security: 5}` working days (D01); `operator_recipients` holds addresses (D06); `calendar` holds `{timezone: "Asia/Bangkok", holidays: ["YYYY-MM-DD", …]}`. |
 | `published_by`, `published_at` | text, timestamptz NOT NULL | Every row is published; the columns stay NOT NULL. W6-02 (2026-09-27) keeps drafts in the separate mutable table `configuration_draft` (W6 plan Q1) instead of a `draft_of` column, so the immutability trigger is never relaxed. |
 | `activation_rule` | text NOT NULL | `after_publish` in slice 1 (W1-00 provisional rule: applies to submissions after `published_at`); W6 may add values by migration. |
 | `supersedes_id` | uuid FK NULL | Previous revision of the same kind. |
-| `change_note` | text NULL | W6-02 (migration 0011): a person's note on the publish or restore, 1-500 characters (`configuration_revision_change_note_check`); required by the store on every Admin publish and restore; NULL on seed rows. Never copied into an audit ref. |
+| `change_note` | text NULL | W6-02 (migration 0012): a person's note on the publish or restore, 1-500 characters (`configuration_revision_change_note_check`); required by the store on every Admin publish and restore; NULL on seed rows. Never copied into an audit ref. |
 | `restores_id` | uuid FK NULL | W6-02: the revision K a restore copied (N+1 carries K's body, W6 plan Q3). |
 
 `pack_version.configuration_revision_id` points at **one** revision, so a version needs one row that carries every kind it froze. To keep one FK and independent kinds, the submit transaction resolves the current revision of each kind and records them in `pack_version.frozen_configuration jsonb` as `{kind: revision_id}`; `configuration_revision_id` holds the `qc_rules` revision (the one most often queried) and the jsonb holds all of them. Both are frozen columns.
@@ -734,7 +734,7 @@ Amendment by [W7-03](../../changes/2026-09-27-w7-03-migration-classes-ahead-read
 
 ## W6-02 configuration drafts, change note and restore — 2026-09-27
 
-Migration 0011 (`0011_w6_02_configuration_admin`, rollback class `restore-required`: once a `desk_controls` revision is published, an older binary's kind list does not know it, so rolling back past it means restoring the pre-migration backup) touches no existing row ([W6 plan](implementation-plan-w6.md) sections 2.3 and 3; [review](../../changes/2026-09-27-w6-02-configuration-drafts-change-note/review.md)):
+Migration 0012 (`0012_w6_02_configuration_admin`, rollback class `restore-required`: once a `desk_controls` revision is published, an older binary's kind list does not know it, so rolling back past it means restoring the pre-migration backup) touches no existing row ([W6 plan](implementation-plan-w6.md) sections 2.3 and 3; [review](../../changes/2026-09-27-w6-02-configuration-drafts-change-note/review.md)):
 
 - `configuration_revision.change_note` and `restores_id`, and `desk_controls` in `configuration_revision_kind_check` (see the `configuration_revision` table above); the `configuration_revision_frozen` trigger and the `rai_app` grant on it (`SELECT`, `INSERT`) are unchanged;
 - the `configuration_draft` entity below, with the one `DELETE` grant `rai_app` holds (roles table and "Deletion" row above).

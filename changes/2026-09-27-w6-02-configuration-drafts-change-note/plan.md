@@ -6,7 +6,7 @@
    - integration: `w6-02-configuration-drafts.test.ts` (spec item 8); `w1-00-migrations.test.ts` lists; `w1-05-submit.test.ts` frozen kinds by name; `BUSINESS_TABLES`.
 3. GREEN:
    - shared registration and owner map; seed type and entry; freeze skip; audit actions;
-   - Drizzle schema files; `npm run migrate:generate` for `0011_*`, the journal and snapshot; tag renamed to `0011_w6_02_configuration_admin`; SQL replaced by the hand-written migration; `migrate:generate` again reports nothing;
+   - Drizzle schema files; `npm run migrate:generate` for `0011_*` (regenerated as `0012_*` at the rebase onto W7-03), the journal and snapshot; tag renamed to `0012_w6_02_configuration_admin`; SQL replaced by the hand-written migration; `migrate:generate` again reports nothing;
    - store functions and error classes.
 4. W0-04 amendment.
 5. Full gate, one suite at a time, logs under `/tmp/rai-w6-02-configuration-drafts-change-note-logs/`.

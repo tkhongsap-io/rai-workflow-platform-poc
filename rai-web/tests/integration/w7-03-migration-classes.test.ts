@@ -69,16 +69,30 @@ const expectedRows = () =>
 const withoutTime = (rows: ClassRow[]) =>
   rows.map(({ hash, tag, rollback_class }) => ({ hash, tag, rollback_class }));
 
-/** Smallest journal length whose later migrations are all additive: the build a binary-only rollback returns to. */
+/**
+ * The journal length of the "release" the readiness and rollback tests start from: the longest journal, at or after
+ * the W7-03 migration, whose newest migration is additive. W6-02 (#214) put a restore-required migration after W7-03's,
+ * so the full journal no longer ends additive; the release database below is migrated to this prefix instead, and
+ * every assertion keeps its meaning whatever later migrations are classed.
+ */
+function releaseLength(): number {
+  const w703 = tags.findIndex((tag) => tag.endsWith('_w7_03_migration_class'));
+  assert.ok(w703 >= 0);
+  let n = tags.length;
+  while (n > w703 + 1 && MIGRATION_CLASSES[tags[n - 1]!] !== 'additive') n--;
+  assert.equal(MIGRATION_CLASSES[tags[n - 1]!], 'additive', 'the W7-03 migration is additive');
+  return n;
+}
+/** Smallest journal length whose later migrations (up to the release) are all additive: the binary-only target. */
 function additivePrefix(): number {
-  let p = tags.length;
+  let p = releaseLength();
   while (p > 0 && MIGRATION_CLASSES[tags[p - 1]!] === 'additive') p--;
-  assert.ok(p < tags.length, 'the newest migration is additive (true at W7-03)');
+  assert.ok(p < releaseLength(), 'the release ends with an additive migration');
   return p;
 }
-/** Journal length just before the newest non-additive migration: a rollback past it needs a restore. */
+/** Journal length just before the release's newest non-additive migration: a rollback past it needs a restore. */
 function restorePrefix(): number {
-  const last = tags.findLastIndex((tag) => MIGRATION_CLASSES[tag] !== 'additive');
+  const last = tags.slice(0, releaseLength()).findLastIndex((tag) => MIGRATION_CLASSES[tag] !== 'additive');
   assert.ok(last >= 0, '0007, 0009 (W7-D9) and 0010_w5_03_risk are restore-required');
   return last;
 }
@@ -150,9 +164,21 @@ test('the writer refuses a map without a tag (migration_class_missing) or with a
 });
 
 let scratch: ScratchDatabase | undefined;
+let release: { db: ScratchDatabase; folder: string } | undefined;
 after(async () => {
   await scratch?.drop();
+  await release?.db.drop();
 });
+
+/** A scratch database migrated to the release journal (see releaseLength), created once. */
+async function releaseDatabase(): Promise<{ db: ScratchDatabase; folder: string }> {
+  if (release !== undefined) return release;
+  const folder = await prefixMigrationFolder(root, releaseLength());
+  const releaseDb = await createScratchDatabase('w7_03_release');
+  release = { db: releaseDb, folder };
+  await runMigrations(releaseDb.urls.owner, folder);
+  return release;
+}
 
 test('on a database and folder without the W7-03 migration the writer does nothing; applying it back-fills 0000 onward', async () => {
   scratch = await createScratchDatabase('w7_03');
@@ -193,16 +219,20 @@ const readinessWith = (url: string, folder: string) =>
 
 test('readiness: an older build whose extra migrations are all recorded additive is ready with migrations ahead', async () => {
   assert.ok(scratch, 'the scratch database test ran first');
-  const current = await readinessWith(scratch.urls.app, MIGRATIONS_FOLDER);
+  const full = await readinessWith(scratch.urls.app, MIGRATIONS_FOLDER);
+  assert.deepEqual([full.status, full.store.migrations], ['ready', 'current']);
+  const { db: releaseDb, folder } = await releaseDatabase();
+  const current = await readinessWith(releaseDb.urls.app, folder);
   assert.deepEqual([current.status, current.store.migrations], ['ready', 'current']);
-  const ahead = await readinessWith(scratch.urls.app, await prefixMigrationFolder(root, additivePrefix()));
+  const ahead = await readinessWith(releaseDb.urls.app, await prefixMigrationFolder(root, additivePrefix()));
   assert.deepEqual([ahead.status, ahead.store.migrations], ['ready', 'ahead']);
-  const restore = await readinessWith(scratch.urls.app, await prefixMigrationFolder(root, restorePrefix()));
+  const restore = await readinessWith(releaseDb.urls.app, await prefixMigrationFolder(root, restorePrefix()));
   assert.deepEqual([restore.status, restore.store.migrations], ['not_ready', 'unknown']);
 });
 
 test('rollback check: binary_only, restore_required with the matching backup, incompatible; exit 0, 3, 4', async () => {
   assert.ok(scratch);
+  const { db: releaseDb, folder: releaseFolder } = await releaseDatabase();
   const backups = path.join(root, 'backups');
   const restoreTarget = await prefixMigrationFolder(root, restorePrefix());
   const targetJournal = readMigrationJournal(restoreTarget);
@@ -220,8 +250,8 @@ test('rollback check: binary_only, restore_required with the matching backup, in
   }
   const env = {
     NODE_ENV: 'development',
-    DATABASE_URL: scratch.urls.app,
-    DATABASE_MIGRATE_URL: scratch.urls.owner,
+    DATABASE_URL: releaseDb.urls.app,
+    DATABASE_MIGRATE_URL: releaseDb.urls.owner,
     BACKUP_DIR: backups,
   };
   const run = async (folder: string) => {
@@ -244,13 +274,13 @@ test('rollback check: binary_only, restore_required with the matching backup, in
     code: 3,
     fields: {
       verdict: 'restore_required',
-      extraMigrations: tags.slice(additive),
+      extraMigrations: tags.slice(additive, releaseLength()),
       blockingMigration: tags[additive],
       blockingReason: 'target_predates_ahead_readiness',
       matchingBackups: ['20260927T030000Z-before-w7-03'],
     },
   });
-  assert.deepEqual(await run(MIGRATIONS_FOLDER), {
+  assert.deepEqual(await run(releaseFolder), {
     code: 0,
     fields: { verdict: 'binary_only', extraMigrations: [] },
   });
@@ -260,7 +290,7 @@ test('rollback check: binary_only, restore_required with the matching backup, in
     code: 3,
     fields: {
       verdict: 'restore_required',
-      extraMigrations: tags.slice(restore),
+      extraMigrations: tags.slice(restore, releaseLength()),
       blockingMigration: tags[restore],
       blockingReason: 'not_additive',
       matchingBackups: ['20260927T010000Z-before'],

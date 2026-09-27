@@ -295,8 +295,9 @@ export class ConfigurationRestoreCurrent extends Error {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// Counted in code points ([...note].length), as the CHECK's char_length counts them, never in UTF-16 units.
 function assertChangeNote(kind: string, note: string | null | undefined): asserts note is string {
-  if (typeof note !== 'string' || note.trim() === '' || note.length > CHANGE_NOTE_MAX_LENGTH)
+  if (typeof note !== 'string' || note.trim() === '' || [...note].length > CHANGE_NOTE_MAX_LENGTH)
     throw new ConfigurationChangeNoteInvalid(kind);
 }
 

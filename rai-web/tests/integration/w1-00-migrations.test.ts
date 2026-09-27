@@ -56,7 +56,7 @@ test('the schema holds the W0-04 tables (plus W1-01 session, W1-09 fixture_set, 
       'artifact_slot',
       'audit_event',
       'case',
-      'configuration_draft', // W6-02 (0011_w6_02_configuration_admin): the Admin working copy, not evidence
+      'configuration_draft', // W6-02 (0012_w6_02_configuration_admin): the Admin working copy, not evidence
       'configuration_revision',
       'disposition_event', // W2-05 (0006_w2_05_findings_dispositions)
       'fixture_set', // W1-09 (0002_w1_09_fixture_set)
