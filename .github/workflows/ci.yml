@@ -138,6 +138,7 @@ jobs:
         env:
           OBS_MIGRATION_ADMIN_URL: postgres://postgres:postgres-local@127.0.0.1:54320/rai # disposable CI service only
           DATABASE_OPERATOR_URL: postgres://rai_operator:rai_operator@127.0.0.1:54320/rai # explicit isolated role for OBS sidecar
+          RAI_PG_TOOLS: docker:${{ job.services.postgres.id }} # W7-01: backup runs pg_dump inside the service container
         run: |
           test -n "$OBS_MIGRATION_ADMIN_URL"
           npm run test:integration

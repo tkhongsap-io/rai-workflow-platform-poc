@@ -6,6 +6,8 @@
 // pure read of the environment can decide that W1-00 needs (S1 mode, S13 fixture outside test, S14 fixture bind)
 // and hands the rest to the W1-01a adapter as `identityEnv`. The adapter's full table (S1-S18) is W1-01a's.
 
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { IDENTITY_MODES, type IdentityMode } from '@rai/shared/schemas/auth';
 
 export const EXIT_CONFIG = 78;
@@ -165,6 +167,64 @@ export function parseRetentionConfig(env: Env) {
 
 export function parseNodeEnv(env: Env): NodeEnv {
   return oneOf(env, 'NODE_ENV', ['development', 'test', 'production'] as const);
+}
+
+/** The repository checkout this file sits in (`server/src/config.ts` and `server/dist/config.js` alike). */
+export const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+
+/** W7 plan section 2 (W7-D5): where pg_dump and pg_restore run. */
+export type PgToolsMode =
+  | { kind: 'path' } // host binaries on PATH, against the configured host and port
+  | { kind: 'docker'; container: string } // docker exec into a named Postgres container (CI service container)
+  | { kind: 'docker-compose'; project: string }; // the `postgres` service container of a compose project (local)
+
+export interface BackupConfig {
+  pgTools: PgToolsMode;
+  containerPort: number; // the port Postgres listens on inside its container (docker modes only)
+  backupDir: string; // absolute
+}
+
+const CONTAINER_OR_PROJECT = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/;
+
+function parsePgTools(env: Env, nodeEnv: NodeEnv): PgToolsMode {
+  const value = required(env, 'RAI_PG_TOOLS');
+  if (value === 'path') return { kind: 'path' };
+  const separator = value.indexOf(':');
+  const kind = separator < 0 ? value : value.slice(0, separator);
+  const name = separator < 0 ? '' : value.slice(separator + 1);
+  if (!CONTAINER_OR_PROJECT.test(name)) throw new ConfigError('invalid:RAI_PG_TOOLS');
+  if (kind === 'docker') return { kind: 'docker', container: name };
+  if (kind === 'docker-compose') {
+    // A compose project is a development arrangement; a production host uses PATH or a named container.
+    if (nodeEnv === 'production') throw new ConfigError('invalid:RAI_PG_TOOLS');
+    return { kind: 'docker-compose', project: name };
+  }
+  throw new ConfigError('invalid:RAI_PG_TOOLS');
+}
+
+const isInside = (parent: string, child: string): boolean => {
+  const rel = path.relative(parent, child);
+  return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
+};
+
+/**
+ * W7 plan section 2: the keys only `backup`, `restore` and `restore:verify` read; the server never does
+ * (`parseConfig` ignores them). BACKUP_DIR resolves against the working directory and is refused inside the Git
+ * worktree anywhere but under rai-web/.local/ (gitignored), so a dump cannot be committed.
+ */
+export function parseBackupConfig(env: Env, where: { cwd?: string; repoRoot?: string } = {}): BackupConfig {
+  const nodeEnv = parseNodeEnv(env);
+  const pgTools = parsePgTools(env, nodeEnv);
+  const containerPort =
+    optional(env, 'RAI_PG_CONTAINER_PORT') === undefined
+      ? 5432
+      : integer(env, 'RAI_PG_CONTAINER_PORT', { min: 1, max: 65535 });
+  const repoRoot = path.resolve(where.repoRoot ?? REPO_ROOT);
+  const backupDir = path.resolve(where.cwd ?? process.cwd(), required(env, 'BACKUP_DIR'));
+  const inRepo = backupDir === repoRoot || isInside(repoRoot, backupDir);
+  if (inRepo && !isInside(path.join(repoRoot, 'rai-web', '.local'), backupDir))
+    throw new ConfigError('invalid:BACKUP_DIR');
+  return { pgTools, containerPort, backupDir };
 }
 
 const IDENTITY_ENV_PREFIXES = ['RAI_IDENTITY_', 'RAI_SECRET_', 'RAI_SESSION_'];

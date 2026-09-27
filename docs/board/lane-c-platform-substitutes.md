@@ -96,3 +96,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w4-13-runner-selection model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #187)
 - Scope: per changes/2026-09-27-w4-13-runner-selection/: `QC_MODE=deterministic` in every environment, `substitute` refused under production or a non-local identity mode, readiness `qc.kind` from the bound runner, `.env.example` deterministic with CI and the evidence harness pinned to substitute, W0-02 section 5, W0-07 3.9 and section 6, TESTING. One PR.
+
+## 2026-09-27 — CLAIM lane-c: W7-01 backup command (#207)
+- Author: operator=ta session=claude-code-w7-01-backup-command model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #207)
+- Scope: per changes/2026-09-27-w7-01-backup-command-ci-rai/: `npm run backup` (`operator/pg-tools.ts`, `operator/backup.ts`, `operator/frozen-digest.ts`), `config.ts` `parseBackupConfig` (`RAI_PG_TOOLS`, `RAI_PG_CONTAINER_PORT`, `BACKUP_DIR`), `.env.example`, the CI integration-job `RAI_PG_TOOLS` line (lead-reviewed), W0-10 operator events, W0-02 section 5 keys, W0-04 backup recipe. One PR; no migration.

@@ -1,0 +1,7 @@
+# Intent: backup command (W7-01, #207)
+
+W7-00 needs a recorded backup and restore rehearsal on synthetic data before any real case is loaded (BUILD_PLAN W7). Today there is no way to take a backup of the desk: nothing dumps the database, copies the artifact bytes or records what a restore must prove. This ticket adds the first half: `npm run backup`, which writes a Postgres custom-format dump (session rows excluded), a copy of every referenced blob in the W0-04 layout, and a manifest (migration journal, dump hash, blob totals, per-table counts, a digest over the frozen evidence tables and the fixture set) under `BACKUP_DIR`. W7-02 restores and verifies from that manifest.
+
+It implements the [W7 plan](../../docs/engineering/implementation-plan-w7.md) section 3.1, the section 2 keys `RAI_PG_TOOLS`, `RAI_PG_CONTAINER_PORT` and `BACKUP_DIR`, and the section 8 operator events, under the register rows "Ta's delegation (2026-09-27)" and "W7 delegated rulings (provisional)" (W7-D5 tools behind one key, host binaries or `docker exec`; W7-D6 dump then blobs plus manifest, session data excluded). The CI integration job gains the one `RAI_PG_TOOLS=docker:${{ job.services.postgres.id }}` line so the backup integration test runs green in CI (plan section 15, round 3 blocker 1).
+
+Not here: restore, verification and `DATABASE_ADMIN_URL` (W7-02), migration classes and rollback (W7-03), runbooks (W7-04). The production backup target and schedule are D10's (working assumption: none). Synthetic data only; no external network call; nothing is deployed.
