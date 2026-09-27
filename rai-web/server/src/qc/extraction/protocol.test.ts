@@ -142,3 +142,33 @@ test('a locator string over the per-field bound is limit_output even under a lar
   const atBound = [{ locator: { kind: 'section', heading: long.slice(1) }, text: 'a' }];
   assert.equal(classifyReply({ ok: true, segments: atBound }, limits).ok, true);
 });
+
+test('W4-05c: the text-free ordinal locators are accepted, closed to extra keys and checked by pattern', () => {
+  const limits: WorkerLimits = { ...LIMITS, maxTextChars: 10_000 };
+  const reply = (locator: unknown) => classifyReply({ ok: true, segments: [{ locator, text: 'a' }] }, limits);
+  for (const locator of [
+    { kind: 'section', index: 1 },
+    { kind: 'section', index: 50_000 },
+    { kind: 'cell', sheetIndex: 1, cell: 'A1' },
+    { kind: 'cell', sheetIndex: 3, cell: 'XFD1048576' },
+  ])
+    assert.deepEqual(
+      reply(locator),
+      { ok: true, segments: [{ locator, text: 'a' }] },
+      JSON.stringify(locator),
+    );
+  for (const locator of [
+    { kind: 'section', index: 0 },
+    { kind: 'section', index: 1.5 },
+    { kind: 'section', index: '1' },
+    { kind: 'section', index: 1, heading: 'H' },
+    { kind: 'section', index: 1, smuggled: 'x' },
+    { kind: 'cell', sheetIndex: 0, cell: 'A1' },
+    { kind: 'cell', sheetIndex: 1, cell: 'a1' },
+    { kind: 'cell', sheetIndex: 1, cell: 'A0' },
+    { kind: 'cell', sheetIndex: 1, cell: 'Sheet1!A1' },
+    { kind: 'cell', sheetIndex: 1, cell: 'A1', sheet: 'Sheet1' },
+    { kind: 'cell', sheetIndex: 1 },
+  ])
+    assert.deepEqual(reply(locator), { ok: false, reason: 'crash' }, JSON.stringify(locator));
+});

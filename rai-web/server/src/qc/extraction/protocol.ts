@@ -16,11 +16,14 @@ import {
 export type { WorkerLimits, WorkerReply, WorkerRequest } from './worker/extract.js';
 
 /**
- * The shared `EvidenceLocator` shape as the wire accepts it: the same five kinds, but every variant and the page region
+ * The shared `EvidenceLocator` shape as the wire accepts it: the same five kinds (plus, from W4-05c, the text-free
+ * ordinal `section` and `cell` shapes that W4-16 adds to the shared contract), but every variant and the page region
  * refuse unknown keys (spec item 3), and each string field is bounded. The shared read schema stays open; this one is
  * the untrusted boundary, so a worker cannot put document text into a stored, served locator (decisions 21 and 23).
  */
 const WIRE_STRICT = { additionalProperties: false } as const;
+/** W4b plan sections 4.3 and 9: the A1 reference a text-free `cell` locator may carry. */
+export const CELL_REFERENCE_PATTERN = '^[A-Z]{1,3}[1-9][0-9]{0,6}$';
 const WireLocatorString = Type.String({ maxLength: MAX_LOCATOR_STRING_CHARS });
 export const WireLocatorSchema = Type.Union([
   Type.Object(
@@ -37,6 +40,17 @@ export const WireLocatorSchema = Type.Union([
   Type.Object({ kind: Type.Literal('cell'), sheet: WireLocatorString, cell: WireLocatorString }, WIRE_STRICT),
   Type.Object({ kind: Type.Literal('section'), heading: WireLocatorString }, WIRE_STRICT),
   Type.Object({ kind: Type.Literal('absent') }, WIRE_STRICT),
+  // W4-05c: the text-free ordinal shapes the DOCX and XLSX parsers emit (decision 21, the W4-16 contract): a paragraph
+  // ordinal, and a sheet ordinal with an A1 reference checked by the plan's pattern. No string here is document text.
+  Type.Object({ kind: Type.Literal('section'), index: Type.Integer({ minimum: 1 }) }, WIRE_STRICT),
+  Type.Object(
+    {
+      kind: Type.Literal('cell'),
+      sheetIndex: Type.Integer({ minimum: 1 }),
+      cell: Type.String({ pattern: CELL_REFERENCE_PATTERN }),
+    },
+    WIRE_STRICT,
+  ),
 ]);
 
 const SegmentSchema = Type.Object(

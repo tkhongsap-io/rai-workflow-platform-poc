@@ -16,6 +16,19 @@ import {
 } from './client.js';
 import type { ExtractionLimits } from './limits.js';
 import type { ExtractResult } from './port.js';
+import { deflateRawSync } from 'node:zlib';
+import { SELF_TEST_DOCX, SELF_TEST_TEXT } from './selftest-docx.js';
+import {
+  DOCX as DOCX_TYPE,
+  XLSX as XLSX_TYPE,
+  buildTestZip,
+  docxEntries,
+  docxOf,
+  inlineCell,
+  para,
+  selfTestEntries,
+  xlsxEntries,
+} from './worker/ooxml.test-helper.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const FAULT = (name: string) => path.join(HERE, 'test-workers', `${name}.mjs`);
@@ -303,4 +316,76 @@ test('a missing worker entry is a crash on every call and a false selfTest, neve
   const worker = extractor({}, { entry: path.join(HERE, 'test-workers', 'missing.mjs') });
   assert.equal(failure(await worker.extract({ mediaType: PDF, bytes: BYTES }, never())), 'crash');
   assert.equal(await worker.selfTest(), false);
+});
+
+// ---- W4-05c: DOCX and XLSX through the real forked worker ------------------------------------------------------
+
+test('W4-05c: the real forked worker extracts a DOCX and an XLSX with ordinal locators', async () => {
+  const worker = extractor({ maxInputBytes: 64 * 1024 });
+  const docx = await worker.extract(
+    { mediaType: DOCX_TYPE, bytes: docxOf(['RAI-DESK-SYNTHETIC-FIXTURE client', 'metric: accuracy']) },
+    never(),
+  );
+  assert.deepEqual(docx, {
+    ok: true,
+    extractorVersion: worker.version,
+    segments: [
+      { locator: { kind: 'section', index: 1 }, text: 'RAI-DESK-SYNTHETIC-FIXTURE client' },
+      { locator: { kind: 'section', index: 2 }, text: 'metric: accuracy' },
+    ],
+  });
+  const xlsx = await worker.extract(
+    {
+      mediaType: XLSX_TYPE,
+      bytes: buildTestZip(
+        xlsxEntries([{ name: 'Sheet', cells: `<row r="7">${inlineCell('B7', 'Yes')}</row>` }]),
+      ),
+    },
+    never(),
+  );
+  assert.deepEqual(xlsx, {
+    ok: true,
+    extractorVersion: worker.version,
+    segments: [{ locator: { kind: 'cell', sheetIndex: 1, cell: 'B7' }, text: 'Yes' }],
+  });
+});
+
+test('W4-05c: a DOCTYPE, a zip bomb and an inconsistent ZIP end as a clean ok:false through the fork', async () => {
+  const worker = extractor({ maxInputBytes: 1024 * 1024 });
+  const doctype = buildTestZip(
+    docxEntries(para('x')).map((e) =>
+      e.name === 'word/document.xml' ? { ...e, data: `<!DOCTYPE d [<!ENTITY e "x">]>${String(e.data)}` } : e,
+    ),
+  );
+  const bomb = buildTestZip([
+    ...docxEntries('').filter((e) => e.name !== 'word/document.xml'),
+    {
+      name: 'word/document.xml',
+      data: 'x',
+      method: 8,
+      declaredSize: 100,
+      crc: 0,
+      compressedOverride: deflateRawSync(Buffer.alloc(64 * 1024 * 1024, 0x41)),
+    },
+  ]);
+  const inconsistent = buildTestZip(docxEntries(para('x')), { trailing: Buffer.alloc(4, 0x41) });
+  assert.equal(
+    failure(await worker.extract({ mediaType: DOCX_TYPE, bytes: doctype }, never())),
+    'unreadable',
+  );
+  assert.equal(failure(await worker.extract({ mediaType: DOCX_TYPE, bytes: bomb }, never())), 'limit_bytes');
+  assert.equal(
+    failure(await worker.extract({ mediaType: DOCX_TYPE, bytes: inconsistent }, never())),
+    'unreadable',
+  );
+});
+
+test('W4-05c: selfTest extracts the embedded synthetic DOCX; a worker that answers anything else fails it', async () => {
+  assert.equal(await extractor().selfTest(), true);
+  assert.equal(await fault('echo').selfTest(), false);
+  assert.ok(SELF_TEST_DOCX.byteLength < LIMITS.maxInputBytes, 'fits the smallest byte cap the tests use');
+});
+
+test('W4-05c: the embedded self-test DOCX is the helper rebuild of its text, byte for byte', () => {
+  assert.deepEqual(Buffer.from(SELF_TEST_DOCX), buildTestZip(selfTestEntries(SELF_TEST_TEXT)));
 });
