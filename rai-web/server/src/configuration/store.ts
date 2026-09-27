@@ -10,18 +10,14 @@
 // the after_publish rule it is the one in force for every event after its publish instant.
 
 import { and, desc, eq, sql } from 'drizzle-orm';
-import { Value } from 'typebox/value';
 import { uuidv7 } from '@rai/shared/ids';
 import {
-  CONFIGURATION_BODY_SCHEMAS,
   CONFIGURATION_KINDS,
   type ConfigurationBodies,
   type ConfigurationKind,
   type ConfigurationView,
   type RiskRubricView,
   type SeedableConfigurationKind,
-  qcRulesBodyProblems,
-  riskRubricBodyProblems,
 } from '@rai/shared/schemas/cases';
 import { APP_TIMEZONE } from '@rai/shared/constants';
 import { auditStore } from '../audit/store.js';
@@ -32,7 +28,17 @@ import {
 import type { Executor, Tx } from '../db/client.js';
 import { configurationDraft } from '../db/schema/configuration-draft.js';
 import { configurationRevision } from '../db/schema/configuration-revision.js';
+import type { MailMode } from '../config.js';
 import { revisionInForce } from './activation.js';
+import {
+  ConfigurationBodyInvalid,
+  publishProblems,
+  validateConfigurationBody,
+  type InForceBodies,
+} from './validate.js';
+
+// W6-03: moved to validate.ts unchanged; re-exported so every existing import of the store keeps working.
+export { ConfigurationBodyInvalid, validateConfigurationBody };
 
 export interface ConfigurationRevisionRow {
   id: string;
@@ -58,44 +64,7 @@ export interface PublishInput<K extends SeedableConfigurationKind = SeedableConf
   restoresId?: string | null; // W6-02: set by restoreRevision only
 }
 
-export class ConfigurationBodyInvalid extends Error {
-  constructor(
-    readonly kind: string,
-    readonly problems: string[],
-  ) {
-    super(`configuration body for ${kind} is invalid: ${problems.join('; ')}`);
-    this.name = 'ConfigurationBodyInvalid';
-  }
-}
-
 const KIND_SET: ReadonlySet<string> = new Set(CONFIGURATION_KINDS);
-
-/** Validates a body against the shared schema for its kind. A kind without a schema cannot be published. */
-export function validateConfigurationBody(
-  kind: string,
-  body: unknown,
-): asserts body is ConfigurationBodies[SeedableConfigurationKind] {
-  if (!KIND_SET.has(kind)) throw new ConfigurationBodyInvalid(kind, ['unknown kind']);
-  const schema = (CONFIGURATION_BODY_SCHEMAS as Record<string, unknown>)[kind];
-  if (schema === undefined)
-    throw new ConfigurationBodyInvalid(kind, ['no body schema registered for this kind yet']);
-  if (!Value.Check(schema as Parameters<typeof Value.Check>[0], body)) {
-    const problems = [...Value.Errors(schema as Parameters<typeof Value.Check>[0], body)].map(
-      (e) => `${e.instancePath || '/'} ${e.message}`,
-    );
-    throw new ConfigurationBodyInvalid(kind, problems);
-  }
-  if (kind === 'qc_rules') {
-    // W4-02: the catalogue checks the schema cannot express (a rule listed twice, params per rule ID).
-    const problems = qcRulesBodyProblems(body as ConfigurationBodies['qc_rules']);
-    if (problems.length > 0) throw new ConfigurationBodyInvalid(kind, problems);
-  }
-  if (kind === 'risk_rubric') {
-    // W5-02 (W5 plan section 2): duplicate IDs, the reserved option value `unknown`, misordered tier rules.
-    const problems = riskRubricBodyProblems(body as ConfigurationBodies['risk_rubric']);
-    if (problems.length > 0) throw new ConfigurationBodyInvalid(kind, problems);
-  }
-}
 
 /** Per-kind advisory lock key (W0-04 "Publish configuration": max + 1 under a per-kind advisory lock). */
 function lockKeyFor(kind: string): number {
@@ -443,18 +412,51 @@ export async function discardDraft(tx: Tx, input: DiscardDraftInput): Promise<vo
   });
 }
 
+/**
+ * W6-03 (W6 plan section 2.4): the Admin paths' full check. The cross-kind checks read the latest published
+ * `checklist_templates` and `qc_rules` bodies, the same "current" revision as the optimistic checks (see the header).
+ * An absent mail mode is treated as a sink, so the synthetic-recipient rule fails closed. The two kinds that check
+ * each other also take one shared coverage lock (after their own kind lock, so no two transactions wait on each other
+ * in opposite order): two Admins publishing `qc_rules` and `checklist_templates` at once are serialized, and the
+ * second reads the first's committed revision (read committed), so neither can leave a version uncovered.
+ */
+const TEMPLATE_COVERAGE_LOCK = 'checklist_templates+qc_rules';
+
+async function assertPublishable(
+  tx: Tx,
+  kind: ConfigurationKind,
+  body: unknown,
+  mailMode: MailMode = 'sink-file',
+): Promise<void> {
+  if (kind === 'qc_rules' || kind === 'checklist_templates') await lockKind(tx, TEMPLATE_COVERAGE_LOCK);
+  const [templates, rules] = await Promise.all([
+    latestRevision(tx, 'checklist_templates'),
+    latestRevision(tx, 'qc_rules'),
+  ]);
+  const inForce: InForceBodies = {
+    ...(templates === undefined
+      ? {}
+      : { checklist_templates: templates.body as ConfigurationBodies['checklist_templates'] }),
+    ...(rules === undefined ? {} : { qc_rules: rules.body as ConfigurationBodies['qc_rules'] }),
+  };
+  const problems = publishProblems(kind, body, inForce, mailMode);
+  if (problems.length > 0) throw new ConfigurationBodyInvalid(kind, problems);
+}
+
 export interface PublishDraftInput extends AdminWrite {
   kind: ConfigurationKind;
   expectedDraftVersion: number;
   expectedCurrentRevisionId: string | null;
   changeNote?: string; // the publish dialog's note; otherwise the draft's
+  mailMode?: MailMode; // W6-03: the configured MAIL_MODE (W6-04 passes config.mail.mode); absent means a sink
 }
 
 /**
  * `POST …/{kind}/draft/publish` (W6-04), one transaction (section 2.3): the kind lock; the draft version and "the
  * current revision is still both the caller's and the draft's base" (else `ConfigurationChanged`); a change note;
- * validation; `publishRevision` with the note (which audits `configuration.published`); the draft deleted. W6-03 adds
- * the cross-kind `publishProblems` here; the seed and fixtures keep calling `publishRevision` directly.
+ * validation (W6-03: `publishProblems`, the schema plus the cross-kind and registry checks of W6 plan section 2.4,
+ * refused as `ConfigurationBodyInvalid` with every problem; the draft is kept); `publishRevision` with the note (which
+ * audits `configuration.published`); the draft deleted. The seed and fixtures keep calling `publishRevision` directly.
  */
 export async function publishDraft(tx: Tx, input: PublishDraftInput): Promise<ConfigurationRevisionRow> {
   assertKnownKind(input.kind);
@@ -469,10 +471,10 @@ export async function publishDraft(tx: Tx, input: PublishDraftInput): Promise<Co
     throw changed();
   const changeNote = input.changeNote ?? draft.changeNote;
   assertChangeNote(input.kind, changeNote);
-  validateConfigurationBody(input.kind, draft.body);
+  await assertPublishable(tx, input.kind, draft.body, input.mailMode);
   const published = await publishRevision(tx, {
     kind: input.kind as SeedableConfigurationKind,
-    body: draft.body,
+    body: draft.body as ConfigurationBodies[SeedableConfigurationKind], // checked by assertPublishable; publishRevision re-checks
     publishedBy: input.actor.subjectId,
     publishedRole: input.actor.role,
     correlationId: input.correlationId,
@@ -488,12 +490,14 @@ export interface RestoreRevisionInput extends AdminWrite {
   revisionId: string; // revision K
   expectedCurrentRevisionId: string;
   changeNote: string;
+  mailMode?: MailMode; // W6-03: as PublishDraftInput.mailMode
 }
 
 /**
  * `POST …/{kind}/revisions/{revisionId}/restore` (W6-04, Q3): publishes a copy of revision K's body as N+1 with
  * `restores_id = K`, under the same lock and validation as a publish. Refused when K is not of this kind (404), when
- * the current revision moved (409) and when K is the current revision (422 `restore_current`). A draft of the kind is
+ * the current revision moved (409), when K is the current revision (422 `restore_current`) and when K's body fails
+ * today's `publishProblems` (W6-03; `ConfigurationBodyInvalid`). A draft of the kind is
  * kept; its base is now stale, so the SPA offers to discard it or start again from current.
  */
 export async function restoreRevision(
@@ -507,10 +511,10 @@ export async function restoreRevision(
   if (input.expectedCurrentRevisionId !== (current?.id ?? null)) throw changed();
   if (target.id === current?.id) throw new ConfigurationRestoreCurrent(input.kind, target.id);
   assertChangeNote(input.kind, input.changeNote);
-  validateConfigurationBody(input.kind, target.body);
+  await assertPublishable(tx, input.kind, target.body, input.mailMode);
   return publishRevision(tx, {
     kind: input.kind as SeedableConfigurationKind,
-    body: target.body,
+    body: target.body as ConfigurationBodies[SeedableConfigurationKind], // checked by assertPublishable; publishRevision re-checks
     publishedBy: input.actor.subjectId,
     publishedRole: input.actor.role,
     correlationId: input.correlationId,
