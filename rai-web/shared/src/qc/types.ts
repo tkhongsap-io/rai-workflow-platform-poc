@@ -51,6 +51,22 @@ export interface QcRunRequest {
   slots: SlotState[]; // all nine for submit; the lane's slots for approve_attempt; one for upload
   artifacts: AuthorizedArtifactRef[]; // exactly the artifacts referenced by `slots`
   deadlineMs: number; // orchestrator-owned; the runner also receives an AbortSignal
+  /**
+   * W4-02 (W0-07 3.3 amended 2026-09-27): the rules the orchestrator selected from the `qc_rules` revision
+   * `qcRulesRevision` for this template, trigger and model type. Configuration data, never document instructions.
+   * `[]`: the catalogue selects nothing here (a zero-rule run). `null`: no `qc_rules` revision applies (a version
+   * frozen before W4-02); the deterministic runner answers `unavailable:not_configured`. The scripted substitute
+   * ignores the field.
+   */
+  rules: SelectedRule[] | null;
+}
+
+/** A catalogue rule as the runner receives it (W4a plan section 3); `triggers` are already applied. */
+export interface SelectedRule {
+  ruleId: string; // QC_RULE_ID_PATTERN
+  engine: 'metadata' | 'content'; // W4a executes only 'metadata'
+  severity: Severity;
+  params?: Record<string, unknown>; // rule-specific, schema-checked per ruleId when the revision was published
 }
 
 export type EvidenceLocator =

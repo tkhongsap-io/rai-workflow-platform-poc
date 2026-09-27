@@ -5,6 +5,9 @@
 //                        public-holiday list (W6); the dates are widely published fixed-date holidays, not a claim
 //   operator_recipients  the single synthetic address of W0-08 section 8.2 (D06); never a real operator address
 //   use_case_groups      the D11 value list the W0-08 fixture cases use
+//   qc_rules             W4-02: the W4a rule catalogue, label 'w4a.1', per checklist template version (W4a plan
+//                        sections 3 and 4). Metadata rules run in W4a (W4-03); content rules are catalogued for
+//                        W4b. v2.0 has no ACC-BAND-V1-SHEET3 (L12). Severities follow W0-07 3.5; provisional until D09
 // The lane mapping is not configuration (D02; shared/src/constants.ts) and is never seeded here.
 
 import type { ConfigurationBodies, SeedableConfigurationKind } from '@rai/shared/schemas/cases';
@@ -14,8 +17,47 @@ import { publishRevision, type ConfigurationRevisionRow } from './store.js';
 export const SEED_ACTOR = { subjectId: 'system', role: 'system' } as const;
 
 export type ConfigurationSeed = {
-  [K in Exclude<SeedableConfigurationKind, 'qc_rules'>]: ConfigurationBodies[K];
+  [K in SeedableConfigurationKind]: ConfigurationBodies[K];
 };
+
+type QcRule = ConfigurationBodies['qc_rules']['templates'][string]['rules'][number];
+
+const LANE_GATED_SLOTS = [1, 2, 3, 4, 5, 6, 7, 8]; // every slot but 9 (D02 noLaneGate)
+const W4A_METADATA_RULES: readonly QcRule[] = [
+  {
+    ruleId: 'PACK-SLOT-MISSING',
+    engine: 'metadata',
+    triggers: ['submit', 'approve_attempt'],
+    severity: 'medium',
+  },
+  {
+    ruleId: 'PACK-STAGE-MISMATCH',
+    engine: 'metadata',
+    triggers: ['submit'],
+    severity: 'medium',
+    // The source spec's two examples: a deployment checklist (slot 8) filed at idea; any lane-gated slot not yet
+    // at pre_launch.
+    params: { attachedForbiddenAt: { idea: [8] }, notYetForbiddenAt: { pre_launch: LANE_GATED_SLOTS } },
+  },
+  { ruleId: 'PACK-NA-VENDOR-DOC', engine: 'metadata', triggers: ['submit'], severity: 'medium' },
+];
+const W4B_CONTENT_RULES: readonly QcRule[] = [
+  {
+    ruleId: 'ACC-METRIC-CITED',
+    engine: 'content',
+    triggers: ['approve_attempt', 'upload'],
+    severity: 'medium',
+  },
+  {
+    ruleId: 'ACC-EXTRACTION-NOT-HALLUCINATION',
+    engine: 'content',
+    triggers: ['approve_attempt'],
+    severity: 'high',
+  },
+  { ruleId: 'ACC-BAND-V1-SHEET3', engine: 'content', triggers: ['approve_attempt'], severity: 'high' },
+  { ruleId: 'ACC-CLASSIC-ML-METRIC', engine: 'content', triggers: ['approve_attempt'], severity: 'medium' },
+];
+const V1_SHEET3_RULES = [...W4A_METADATA_RULES, ...W4B_CONTENT_RULES];
 
 export const CONFIGURATION_SEED: Readonly<ConfigurationSeed> = Object.freeze({
   checklist_templates: { versions: ['v1.0 Sheet3', 'v2.0'] },
@@ -27,6 +69,14 @@ export const CONFIGURATION_SEED: Readonly<ConfigurationSeed> = Object.freeze({
   },
   operator_recipients: { addresses: ['operator-digest@rai-desk.example'] },
   use_case_groups: { groups: ['customer-analytics', 'customer-service', 'field-operations'] },
+  qc_rules: {
+    label: 'w4a.1',
+    templates: {
+      'v1.0 Sheet3': { rules: V1_SHEET3_RULES },
+      // Other versions never inherit the v1.0 Sheet-3 bands (source spec, L12).
+      'v2.0': { rules: V1_SHEET3_RULES.filter((rule) => rule.ruleId !== 'ACC-BAND-V1-SHEET3') },
+    },
+  },
 });
 
 export const SEED_KINDS = Object.freeze(Object.keys(CONFIGURATION_SEED) as Array<keyof ConfigurationSeed>);

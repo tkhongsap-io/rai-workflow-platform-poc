@@ -2,6 +2,7 @@
 
 ## 2026-09-27
 
+- W4-02 (#185): `qc_rules` revision 1 (`w4a.1`) catalogues the rules per template version; QC requests carry the selected rules; new versions record the `qc_rules` revision.
 - W4-11a (#184): QC runs record the runner version and the rules evaluated; `qc.run.*` log lines and the desk-health QC outage rows name the runner.
 
 ## 2026-09-26

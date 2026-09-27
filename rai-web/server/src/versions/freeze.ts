@@ -59,9 +59,11 @@ export interface FrozenConfiguration {
   byKind: Partial<Record<ConfigurationKind, string>>;
   /**
    * W0-04 `configuration_revision_id`: the `qc_rules` revision when one is in force (W0-04: "the one most often
-   * queried"); until W1-10 publishes one, the W0-02 7.3 `ConfigurationView.revisionId` rule (the latest published
-   * among the kinds the view exposes: use_case_groups, checklist_templates, sla), so the frozen id equals what
-   * `GET /api/configuration/current` showed the submitter. Recorded in changes/2026-09-22-w1-05/review.md.
+   * queried"); without one, the W0-02 7.3 `ConfigurationView.revisionId` rule (the latest published among the
+   * kinds the view exposes: use_case_groups, checklist_templates, sla), so the frozen id equals what
+   * `GET /api/configuration/current` showed the submitter. Recorded in changes/2026-09-22-w1-05/review.md. W4-02
+   * (2026-09-27) seeds `qc_rules` revision 1, so every new submit records the `qc_rules` revision; versions frozen
+   * before it keep a view-kind revision, which QC reads as "no rules in force" (qc/rules-revision.ts).
    */
   configurationRevisionId: ConfigurationRevisionId;
 }

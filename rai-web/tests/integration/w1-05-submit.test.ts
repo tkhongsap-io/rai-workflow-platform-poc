@@ -365,7 +365,14 @@ describe(`W1-05 submit freezes an immutable version (A07) — ${SET}, fx-case-no
     assert.equal(version.submittedAt, now().toISOString());
     assert.equal(version.checklistTemplateVersion, NONVENDOR.checklistTemplateVersion);
     assert.equal(version.stageContext, NONVENDOR.stageContext);
-    assert.equal(version.configurationRevisionId, config.revisionId); // the exact revision the submitter saw
+    // W4-02 (W0-02 7.6 amended 2026-09-27): the frozen FK is the qc_rules revision in force (W0-04), which the seed
+    // now publishes; it is no longer the ConfigurationView.revisionId the submitter saw (a view kind's revision).
+    const qcRules = (
+      await db.owner.execute(sql`SELECT id FROM configuration_revision WHERE kind = 'qc_rules'`)
+    ).rows as Array<{ id: string }>;
+    assert.equal(qcRules.length, 1);
+    assert.equal(version.configurationRevisionId, qcRules[0]!.id);
+    assert.notEqual(version.configurationRevisionId, config.revisionId);
     assert.equal(version.laneMappingVersion, CURRENT_LANE_MAPPING.version);
     assert.equal(version.laneMappingVersion, 'lane-mapping/v1'); // D02
     assert.equal(version.isLatest, true);
@@ -393,7 +400,7 @@ describe(`W1-05 submit freezes an immutable version (A07) — ${SET}, fx-case-no
     assert.equal(row.submitted_by, subjectOf(OWNER_A));
     assert.equal(row.submitted_role, 'owner');
     assert.equal(new Date(row.submitted_at as string).toISOString(), version.submittedAt);
-    assert.equal(row.configuration_revision_id, config.revisionId);
+    assert.equal(row.configuration_revision_id, qcRules[0]!.id);
     assert.equal(row.lane_mapping_version, 'lane-mapping/v1');
     assert.deepEqual(row.lane_mapping, {
       version: 'lane-mapping/v1',
@@ -411,6 +418,7 @@ describe(`W1-05 submit freezes an immutable version (A07) — ${SET}, fx-case-no
     assert.ok(revisions.length >= 5);
     assert.deepEqual(row.frozen_configuration, Object.fromEntries(revisions.map((r) => [r.kind, r.id])));
     assert.ok(Object.values(row.frozen_configuration as Record<string, string>).includes(config.revisionId));
+    assert.equal((row.frozen_configuration as Record<string, string>)['qc_rules'], qcRules[0]!.id);
     assert.ok('sla' in (row.frozen_configuration as object)); // W3-05 reads the SLA values from here
     // manifest_hash covers the nine slot rows (W0-04).
     const slots = await slotRows(version.versionId);

@@ -1,5 +1,9 @@
 # Development log
 
+## W4-02 rule catalogue — 2026-09-27
+
+Second W4a ticket (#185). The `qc_rules` configuration now holds a real rule catalogue per checklist template version, and the seed publishes revision 1 (label `w4a.1`): the three provisional metadata rules W4-03 will run, plus the four accuracy rules catalogued for W4b. Template v2.0 never gets the v1.0 Sheet-3 bands. QC now sends the runner the rules its recorded revision selects for the template, trigger and model type. A version submitted before this change has no rule catalogue and gets no rules, which the deterministic runner will report as an outage, never a clean pass. An unknown template version is an outage too. New submits now record the rule catalogue's revision as their configuration revision. The scripted substitute used by the test suites ignores the rules, so nothing a user sees changes yet. [Review](changes/2026-09-27-w4-02-rule-catalogue/review.md).
+
 ## W4-11a run identity — 2026-09-27
 
 First W4a ticket (#184). Every new `qc_run` row now records the runner's version beside its name and how many rules it evaluated (migration 0009; older rows read `unrecorded` and no count). The `qc.run.*` log lines name the runner, its version and the rule revision, and the QC kind comes from the bound runner instead of a constant. The Admin desk-health list of QC outages carries the runner label. Two runs on one version under different rule revisions can now be told apart from rows and logs alone. No rule, runner or screen changes. [Review](changes/2026-09-27-w4-11a-run-identity/review.md).

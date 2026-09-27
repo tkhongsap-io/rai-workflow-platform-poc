@@ -270,6 +270,23 @@ test('determinism: same request and script give the same output apart from times
   assert.equal(completed(first).finishedAt, fixed.toISOString());
 });
 
+test('W4-02: the scripted substitute ignores request.rules (none, empty or a selection give the same result)', async () => {
+  const fixed = new Date('2026-09-21T03:00:00.000Z');
+  const runner = new ScriptedQcRunner({ now: () => fixed });
+  const selection = [
+    { ruleId: 'PACK-SLOT-MISSING', engine: 'metadata' as const, severity: 'medium' as const },
+    { ruleId: 'ACC-METRIC-CITED', engine: 'content' as const, severity: 'medium' as const },
+  ];
+  const results = [];
+  for (const rules of [null, [], selection]) {
+    const { request } = buildRequest('fx-case-vendor', { trigger: 'approve_attempt', lane: 'ai_coe', rules });
+    results.push(await runner.run(request, new AbortController().signal));
+  }
+  assert.ok(completed(results[0]!).findings.length > 0);
+  assert.deepEqual(results[1], results[0]);
+  assert.deepEqual(results[2], results[0]);
+});
+
 test('calls records every request received, in order; reset clears simulations, overrides, health and calls', async () => {
   const runner = new ScriptedQcRunner();
   const one = buildRequest('fx-case-vendor', { trigger: 'submit' });

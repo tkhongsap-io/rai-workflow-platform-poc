@@ -608,6 +608,8 @@ export interface ConfigurationView {     // the published revision that applies 
 | `GET /api/cases?page&pageSize` | `CaseListQuery` | `200 CaseListResponse`, scoped: owner → own cases; bu_spoc → its BU; reviewers and admin → all. `total` counts only in-scope cases | `401`; `422 invalid_input` on a bad page |
 | `GET /api/configuration/current` | — | `200 ConfigurationView` | `401` |
 
+**W4-02 amendment (2026-09-27).** `ConfigurationView.revisionId` is unchanged: the latest published revision among `use_case_groups`, `checklist_templates` and `sla` in force now. The configuration seed now also publishes `qc_rules` revision 1 (label `w4a.1`, [W4a plan](implementation-plan-w4a.md) section 3); the view does not expose it. So from W4-02 on a submitted version's `configurationRevisionId` (7.6) is the `qc_rules` revision, not the `revisionId` this view showed the submitter; the view's revision stays among the version's frozen kinds (W0-04 `frozen_configuration`).
+
 ### 7.4 Artifact upload and download (W1-03a/b; consumed by W1-06)
 
 ```ts
@@ -752,6 +754,8 @@ export interface VersionListResponse { items: VersionSummary[] }    // ascending
 `decisions` carries every `lane_decision` row of the version, send-back feedback included, under the same `version.view` authorization as the rest of the body: whoever may read the version may read its decisions, and there is no separate route. The submit `201` carries `decisions: []` (nothing is decided at the freeze), and so does its replay. Feedback is reviewer text: it is never logged and never written to an audit ref. The case screen lists the decisions on the version, and shows version N's send-backs above the N+1 draft it opened.
 
 Immutability at the store (W0-04, A07): the version and frozen-slot tables have no `UPDATE` path in the data-access layer, and the migration that creates them adds a trigger that raises on `UPDATE`/`DELETE`; the W1-05 "second write to that version's artifact ref is rejected" test exercises the trigger directly. Restart proof: the W1-INT journey stops and restarts the API process against the same database and re-reads the version.
+
+**W4-02 amendment (2026-09-27).** `SubmittedVersion.configurationRevisionId` is the `qc_rules` revision in force at the submit instant whenever one is in force, as W0-04 already preferred (`versions/freeze.ts`); the seed publishes one from W4-02 on, so every new version records it. Only when no `qc_rules` revision is in force does it fall back to the 7.3 `ConfigurationView.revisionId` rule. Versions frozen before W4-02 keep that view-kind revision: QC loads the revision by ID, sees a kind other than `qc_rules` and sends the runner no rules (W0-07 3.3 amendment; `unavailable:not_configured` from the deterministic runner). The frozen value never changes; `frozen_configuration` still names every kind in force.
 
 ### 7.7 W2 shapes
 
