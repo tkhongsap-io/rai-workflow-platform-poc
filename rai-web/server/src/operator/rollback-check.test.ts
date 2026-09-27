@@ -51,7 +51,12 @@ test('journal 2: target is a prefix and an extra is not additive → restore_req
     blockingReason: 'not_additive',
   });
   assert.deepEqual(
-    rollbackVerdict(['h0', 'h1', 'h2', 'h3', 'h4'], applied('h0', 'h1', 'h2', 'h3', 'h4', 'h5'), classOf, AHEAD),
+    rollbackVerdict(
+      ['h0', 'h1', 'h2', 'h3', 'h4'],
+      applied('h0', 'h1', 'h2', 'h3', 'h4', 'h5'),
+      classOf,
+      AHEAD,
+    ),
     {
       verdict: 'restore_required',
       extraMigrations: ['tag_h5'],
@@ -102,7 +107,7 @@ test('a target built before W7-03 cannot serve ahead: restore_required even when
   });
 });
 
-test('the ahead-readiness migration is the one W7-03 migration of this build\'s journal, found by tag suffix', () => {
+test("the ahead-readiness migration is the one W7-03 migration of this build's journal, found by tag suffix", () => {
   const journal = readMigrationJournal(MIGRATIONS_FOLDER);
   const named = journal.filter(({ tag }) => tag.endsWith(AHEAD_READINESS_TAG_SUFFIX));
   assert.equal(named.length, 1);

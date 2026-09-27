@@ -50,7 +50,10 @@ export async function prefixMigrationFolder(
  * A folder holding this build's whole journal plus one synthetic migration after it: what a newer release's
  * server/drizzle looks like to this build, so a rollback from that release to this build can be proved.
  */
-export async function extendedMigrationFolder(root: string, extra: { tag: string; sql: string }): Promise<string> {
+export async function extendedMigrationFolder(
+  root: string,
+  extra: { tag: string; sql: string },
+): Promise<string> {
   const journal = JSON.parse(
     await readFile(path.join(MIGRATIONS_FOLDER, 'meta/_journal.json'), 'utf8'),
   ) as Journal;

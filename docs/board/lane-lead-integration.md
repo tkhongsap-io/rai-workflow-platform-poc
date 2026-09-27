@@ -169,3 +169,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w5-03-risk-migration-and-drizzle model=claude-opus-5-5
 - Takes over from: session=none (reason: new; W5 plan section 9 shared-file rule; the slot is held by W4-11b (#201, PR #282) at this time)
 - Scope: queued behind the W4-11b holder: the W5-03 PR opens for review with `server/drizzle/0010_w5_03_risk.sql` and `meta/` (next free number on main now) and must not merge while W4-11b holds the slot; when W4-11b merges, W5-03 takes the slot, rebases onto main and regenerates its migration by hand at the next free number (0011), keeping its hand-written SQL. Released at merge of the W5-03 PR.
+
+## 2026-09-27 21:41 — CLAIM lead-integration: MIGRATION-SLOT queued (W7-03, #208)
+- Author: operator=ta session=claude-code-w7-03-migration-classes-ahead-readiness model=claude-opus-5-5 (implementation lane ops)
+- Takes over from: session=none (reason: new; W7 plan section 9.1 single `MIGRATION-SLOT` rule; the slot is held by W4-11b (#201, PR #282) at this time; W5-03 (#286) merged first with `0010_w5_03_risk`)
+- Scope: queued behind the current holder: PR #287 is in review with `server/drizzle/0011_w7_03_migration_class.sql` and `meta/` (rebased onto W5-03 and renumbered by hand from 0010, keeping its hand-written SQL; `MIGRATION_CLASSES` gained `0010_w5_03_risk: restore-required`) and must not merge while W4-11b holds the slot. When W4-11b merges, W7-03 takes the slot, rebases onto main, regenerates its migration by hand at the next free number, adds the `MIGRATION_CLASSES` entry for W4-11b's migration (additive) and reruns the full gate. Released at merge of the W7-03 PR.

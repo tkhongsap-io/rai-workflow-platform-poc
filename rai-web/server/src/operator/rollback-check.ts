@@ -26,11 +26,7 @@ import {
   type Env,
 } from '../config.js';
 import { MIGRATIONS_FOLDER, readMigrationJournal } from '../db/migrate.js';
-import {
-  AHEAD_READINESS_TAG_SUFFIX,
-  isRollbackClass,
-  type RollbackClass,
-} from '../db/migration-classes.js';
+import { AHEAD_READINESS_TAG_SUFFIX, isRollbackClass, type RollbackClass } from '../db/migration-classes.js';
 import { buildLogLine } from '../observability/log.js';
 
 export const EXIT_USAGE = 64;

@@ -274,7 +274,7 @@ test('rollback check: binary_only, restore_required with the matching backup, in
   });
 });
 
-test('rollback check and readiness: a newer release\'s additive migration rolls back binary-only to this build', async () => {
+test("rollback check and readiness: a newer release's additive migration rolls back binary-only to this build", async () => {
   assert.ok(scratch, 'the scratch database tests ran first');
   // A synthetic newer release: this build's journal plus one additive migration (a new table only).
   const extraTag = `${String(tags.length).padStart(4, '0')}_synthetic_newer_release`;

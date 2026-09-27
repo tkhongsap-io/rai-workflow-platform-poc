@@ -38,9 +38,9 @@ export const MIGRATION_CLASSES: Readonly<Record<string, RollbackClass>> = Object
 });
 
 /**
- * The tag suffix of the W7-03 migration (0010 at W7-03; the number may change on a rebase, the suffix does not). A
- * build whose journal carries it answers readiness `ahead`; a build before it answers `unknown` for any longer
- * journal, so binary-only rollback is possible only to a build at or after W7-03 (W0-04 amendment, plan 3.3).
+ * The tag suffix of the W7-03 migration (0011 since the rebase onto W5-03; a rebase may change the number, never the
+ * suffix). A build whose journal carries it answers readiness `ahead`; a build before it answers `unknown` for any
+ * longer journal, so binary-only rollback is possible only to a build at or after W7-03 (W0-04 amendment, plan 3.3).
  */
 export const AHEAD_READINESS_TAG_SUFFIX = '_w7_03_migration_class';
 
