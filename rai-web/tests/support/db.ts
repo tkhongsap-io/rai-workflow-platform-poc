@@ -42,6 +42,7 @@ export const BUSINESS_TABLES = [
   'artifact',
   'pack_version',
   'case',
+  'configuration_draft', // W6-02 (references configuration_revision)
   'configuration_revision',
 ] as const;
 

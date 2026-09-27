@@ -14,7 +14,10 @@
 //                        thresholds are deliberately unlike the operating-model section 7 summary (High needs >= 3
 //                        high answers; personal data escalates only to Medium), so the seed cannot be read as that
 //                        summary coded ahead of D07. D07 replaces it with a new revision and its own schema change (R-2)
-// The lane mapping is not configuration (D02; shared/src/constants.ts) and is never seeded here.
+//   desk_controls        W6-02: the incident switches (W6 plan section 7, Q12), every switch off
+// The lane mapping is not configuration (D02; shared/src/constants.ts) and is never seeded here. A registered kind
+// the seed must never publish is listed in UNSEEDED_KINDS (W6 plan section 3): the identity mapping is D10's and has
+// no synthetic default (section 6), so Admin publishes it or nothing does.
 
 import type { ConfigurationBodies, SeedableConfigurationKind } from '@rai/shared/schemas/cases';
 import type { Tx } from '../db/client.js';
@@ -22,8 +25,15 @@ import { publishRevision, type ConfigurationRevisionRow } from './store.js';
 
 export const SEED_ACTOR = { subjectId: 'system', role: 'system' } as const;
 
+/**
+ * W6-02 (W6 plan section 3): registered kinds the seed never publishes. `Exclude` of a kind that is not yet registered
+ * is a no-op, so the seed type compiles before and after W6-11 registers `group_role_mapping`.
+ */
+export const UNSEEDED_KINDS = ['group_role_mapping'] as const;
+export type UnseededConfigurationKind = (typeof UNSEEDED_KINDS)[number];
+
 export type ConfigurationSeed = {
-  [K in SeedableConfigurationKind]: ConfigurationBodies[K];
+  [K in Exclude<SeedableConfigurationKind, UnseededConfigurationKind>]: ConfigurationBodies[K];
 };
 
 type QcRule = ConfigurationBodies['qc_rules']['templates'][string]['rules'][number];
@@ -191,6 +201,7 @@ export const CONFIGURATION_SEED: Readonly<ConfigurationSeed> = Object.freeze({
     },
   },
   risk_rubric: RISK_RUBRIC_PLACEHOLDER,
+  desk_controls: { writesFrozen: false, mailPaused: false, qcPaused: false }, // W6-02
 });
 
 export const SEED_KINDS = Object.freeze(Object.keys(CONFIGURATION_SEED) as Array<keyof ConfigurationSeed>);

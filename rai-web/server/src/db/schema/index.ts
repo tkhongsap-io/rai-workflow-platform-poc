@@ -6,6 +6,7 @@ export * from './pack-version.js';
 export * from './artifact.js';
 export * from './artifact-slot.js';
 export * from './configuration-revision.js';
+export * from './configuration-draft.js'; // W6-02
 export * from './audit-event.js';
 export * from './idempotency-key.js';
 export * from './lane-decision.js';

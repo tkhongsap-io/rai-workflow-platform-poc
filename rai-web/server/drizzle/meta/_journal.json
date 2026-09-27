@@ -85,6 +85,13 @@
       "when": 1790520009963,
       "tag": "0011_w7_03_migration_class",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790526640221,
+      "tag": "0012_w6_02_configuration_admin",
+      "breakpoints": true
     }
   ]
 }

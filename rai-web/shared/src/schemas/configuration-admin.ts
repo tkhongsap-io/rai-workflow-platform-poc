@@ -20,7 +20,7 @@ export type ConfigurationValuesOwner = (typeof CONFIGURATION_VALUES_OWNERS)[numb
 /**
  * Per kind (W6 plan section 2.1). `qc_rules` is Admin's; its content-rule thresholds are D09's and the editor badges
  * those params one by one (Q7). `risk_rubric` is D07's (Q8) and `group_role_mapping` D10's (Q9). Exhaustive over
- * `ConfigurationKind`, so a kind added later (W6-02 `desk_controls`) must name its owner here.
+ * `ConfigurationKind`, so a kind added later must name its owner here (W6-02 added `desk_controls`).
  */
 export const CONFIGURATION_VALUES_OWNER: Readonly<Record<ConfigurationKind, ConfigurationValuesOwner>> =
   Object.freeze({
@@ -32,6 +32,7 @@ export const CONFIGURATION_VALUES_OWNER: Readonly<Record<ConfigurationKind, Conf
     use_case_groups: 'admin',
     risk_rubric: 'D07',
     group_role_mapping: 'D10',
+    desk_controls: 'admin', // W6-02: the incident switches are an operator choice (Q12)
   });
 
 // Derived from the one kind list (the lane mapping is never a kind, D02).

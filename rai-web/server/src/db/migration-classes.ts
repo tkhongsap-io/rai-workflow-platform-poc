@@ -35,6 +35,9 @@ export const MIGRATION_CLASSES: Readonly<Record<string, RollbackClass>> = Object
   // 'unknown'); added here when W7-03 rebased onto it (W7 plan section 9.1).
   '0010_w5_03_risk': 'restore-required',
   '0011_w7_03_migration_class': 'additive',
+  // W6-02 (numbered 0011 until W7-03 merged first): its header says restore-required (an older binary's kind list
+  // does not know a published `desk_controls` revision).
+  '0012_w6_02_configuration_admin': 'restore-required',
 });
 
 /**

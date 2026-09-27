@@ -91,7 +91,7 @@ D04 mapping: repositories are TypeScript modules over Drizzle's query builder, e
 | Enumerations | Postgres `text` with a `CHECK (col IN (...))` constraint, mirrored by a TypeScript union in `rai-web/shared`. Adding a value is a migration plus a shared-type change. |
 | JSON | `jsonb` only for shapes this document names; each has a schema in `rai-web/shared` validated on write. No free-form blobs. |
 | Text | `text` everywhere, UTF-8; Thai and mixed-script values are stored unchanged (W1-03 filename round-trip test). Length limits are application validation (W0-02 shapes), not `varchar(n)`. |
-| Deletion | The application role has no `DELETE` on any business table (see [Immutability](#immutability)). Cleanup of drafts and orphan blobs is a named operator command, not a route. |
+| Deletion | The application role has no `DELETE` on any business table except `configuration_draft` (W6-02, amended 2026-09-27): an Admin working copy that is not evidence, deleted only by `discardDraft` and `publishDraft`, each audited (see [Immutability](#immutability)). Cleanup of drafts and orphan blobs is a named operator command, not a route. |
 
 ### Entity relationships
 
@@ -245,12 +245,14 @@ L12 configuration, versioned and immutable once published. Slice 1 seeds publish
 | Column | Type | Notes |
 |---|---|---|
 | `id` | uuid PK | |
-| `kind` | text NOT NULL | `checklist_templates`, `qc_rules`, `sla`, `calendar`, `operator_recipients`, `use_case_groups`, `risk_rubric` (W5), `group_role_mapping` (W6/W8). One kind per revision keeps activation independent. |
+| `kind` | text NOT NULL | `checklist_templates`, `qc_rules`, `sla`, `calendar`, `operator_recipients`, `use_case_groups`, `risk_rubric` (W5), `group_role_mapping` (W6/W8), `desk_controls` (W6-02, migration 0012, 2026-09-27). One kind per revision keeps activation independent. |
 | `revision_number` | integer NOT NULL | `UNIQUE (kind, revision_number)` |
 | `body` | jsonb NOT NULL | Schema per kind in `rai-web/shared`. `sla` holds `{dpo: 3, ai_coe: 5, it_security: 5}` working days (D01); `operator_recipients` holds addresses (D06); `calendar` holds `{timezone: "Asia/Bangkok", holidays: ["YYYY-MM-DD", …]}`. |
-| `published_by`, `published_at` | text, timestamptz NOT NULL | Slice 1 has no unpublished revisions; the columns are NOT NULL until W6 introduces drafts by a migration that adds a nullable `draft_of` column, never by relaxing these. |
+| `published_by`, `published_at` | text, timestamptz NOT NULL | Every row is published; the columns stay NOT NULL. W6-02 (2026-09-27) keeps drafts in the separate mutable table `configuration_draft` (W6 plan Q1) instead of a `draft_of` column, so the immutability trigger is never relaxed. |
 | `activation_rule` | text NOT NULL | `after_publish` in slice 1 (W1-00 provisional rule: applies to submissions after `published_at`); W6 may add values by migration. |
 | `supersedes_id` | uuid FK NULL | Previous revision of the same kind. |
+| `change_note` | text NULL | W6-02 (migration 0012): a person's note on the publish or restore, 1-500 characters (`configuration_revision_change_note_check`); required by the store on every Admin publish and restore; NULL on seed rows. Never copied into an audit ref. |
+| `restores_id` | uuid FK NULL | W6-02: the revision K a restore copied (N+1 carries K's body, W6 plan Q3). |
 
 `pack_version.configuration_revision_id` points at **one** revision, so a version needs one row that carries every kind it froze. To keep one FK and independent kinds, the submit transaction resolves the current revision of each kind and records them in `pack_version.frozen_configuration jsonb` as `{kind: revision_id}`; `configuration_revision_id` holds the `qc_rules` revision (the one most often queried) and the jsonb holds all of them. Both are frozen columns.
 
@@ -320,6 +322,7 @@ Rule (W0 contract): a submitted version and its artifact references are never up
 | `lane_decision`, `qc_run`, `qc_finding`, `disposition_event` | app | never | never | triggers raise on UPDATE; no `UPDATE`/`DELETE` grant |
 | `audit_event` | app | never | never | trigger raises on UPDATE and DELETE; no `UPDATE`/`DELETE` grant; the DAL has no method |
 | `configuration_revision` | app (seed, W6 publish) | never once published | never | trigger raises on UPDATE where `OLD.published_at IS NOT NULL`; no `DELETE` grant |
+| `configuration_draft` | app (Admin, W6-02) | freely (the working copy; `draft_version` optimistic counter) | app (`discardDraft`, `publishDraft`, each audited) | not evidence; the only table on which `rai_app` holds `DELETE` (amended 2026-09-27) |
 | `notification` | app | only the four delivery columns | never | trigger raises if any other column changes |
 | `case` | app | editable columns freely; projections gated | never | trigger above; no `DELETE` grant |
 | `idempotency_key` | app | never | operator cleanup only | no `UPDATE` grant; `DELETE` granted to the operator role only |
@@ -329,7 +332,7 @@ Database roles (created by the compose init script locally and by the D10 runboo
 | Role | Used by | Grants |
 |---|---|---|
 | `rai_owner` | migrations (`DATABASE_MIGRATE_URL`) | owns the schema; DDL; still subject to the triggers, so a migration that tries to rewrite a frozen row fails |
-| `rai_app` | the Fastify process (`DATABASE_URL`) | `SELECT`, `INSERT` on all tables; `UPDATE` only on `case`, `pack_version`, `artifact_slot`, `artifact`, `notification`; no `DELETE` anywhere; no DDL |
+| `rai_app` | the Fastify process (`DATABASE_URL`) | `SELECT`, `INSERT` on all tables; `UPDATE` only on `case`, `pack_version`, `artifact_slot`, `artifact`, `notification` (and the later mutable tables each migration names); no `DELETE` on any table except `configuration_draft` (W6-02, amended 2026-09-27: an Admin working copy that is not evidence, deleted only by `discardDraft` and `publishDraft`, each audited); no DDL |
 | `rai_operator` | operator commands (`db:cleanup`, `store:verify`, `store:cleanup`, `reset` locally) | `rai_app` plus `DELETE` on `idempotency_key`, on draft `pack_version`/`artifact_slot` rows through the cleanup function, and `TRUNCATE` only when `NODE_ENV <> 'production'` (enforced in the command, not the grant) |
 
 Both the trigger and the grant are required. The trigger protects against a privileged connection (a migration, an operator session); the grant protects against an application bug. The A11 test attempts `UPDATE` and `DELETE` on `audit_event` as `rai_app` and as `rai_owner` and expects both to fail (permission error and trigger error respectively).
@@ -728,3 +731,25 @@ Amendment by [W7-03](../../changes/2026-09-27-w7-03-migration-classes-ahead-read
 - **Readiness.** "If ahead by an additive migration, it serves" is now implemented: `store.migrations` is `ahead` (ready) when the build's journal is a strict prefix of the database's and every newer migration is recorded `additive` in the table, which the probe reads by hash (never the build's map). Binary-only rollback is therefore possible only to a build at or after W7-03; an older build has no `ahead` state and needs the restore path.
 - **Rollback check.** `npm run release:check-rollback -- --target-migrations <the target release's server/drizzle>` compares the target journal with the database's (`binary_only` exit 0, only for a target at or after W7-03 since an earlier build cannot answer `ahead`; `restore_required` exit 3 naming the first non-additive migration, or the first newer migration when the target predates W7-03, and the backups under `BACKUP_DIR` whose manifest journal equals the target's, `incompatible` exit 4).
 - **Rule for later migrations.** Each new migration adds its `MIGRATION_CLASSES` entry and a header with one of the three values; a renumbering on rebase keeps both.
+
+## W6-02 configuration drafts, change note and restore — 2026-09-27
+
+Migration 0012 (`0012_w6_02_configuration_admin`, rollback class `restore-required`: once a `desk_controls` revision is published, an older binary's kind list does not know it, so rolling back past it means restoring the pre-migration backup) touches no existing row ([W6 plan](implementation-plan-w6.md) sections 2.3 and 3; [review](../../changes/2026-09-27-w6-02-configuration-drafts-change-note/review.md)):
+
+- `configuration_revision.change_note` and `restores_id`, and `desk_controls` in `configuration_revision_kind_check` (see the `configuration_revision` table above); the `configuration_revision_frozen` trigger and the `rai_app` grant on it (`SELECT`, `INSERT`) are unchanged;
+- the `configuration_draft` entity below, with the one `DELETE` grant `rai_app` holds (roles table and "Deletion" row above).
+
+The store (`configuration/store.ts`) adds `saveDraft`, `discardDraft`, `publishDraft` and `restoreRevision`. Each runs in the caller's transaction under the per-kind advisory lock of "Publish configuration". Each checks the draft's `draft_version` and the kind's current revision optimistically (the latest published one; a mismatch is `configuration_changed`, W6 plan Q5). A publish copies the draft into a new revision with its change note and deletes the draft; a restore publishes a copy of revision K as N+1 with `restores_id = K` and keeps any draft. Audit: `configuration.draft_saved`, `configuration.draft_discarded`, and `configuration.published` (with `afterRef.restores_configuration_revision_id` on a restore); refs hold IDs, kinds and numbers only. `desk_controls` and `group_role_mapping` are not frozen on a version (`versions/freeze.ts` `UNFROZEN_KINDS`): neither is evidence about a case.
+
+### `configuration_draft`
+
+One mutable Admin working copy per kind (W6 plan Q1). Not evidence: it may hold any JSON object up to 64 KiB (Q18) and is validated only when published.
+
+| Column | Type | Notes |
+|---|---|---|
+| `kind` | text PK | The same kind list and CHECK as `configuration_revision` (`configuration_draft_kind_check`). |
+| `base_revision_id` | uuid FK NULL → `configuration_revision` | The revision the draft started from; NULL before any publish of the kind. Publishing needs it to still be the current revision. |
+| `body` | jsonb NOT NULL | The working body. |
+| `change_note` | text NULL | The note the publish will carry unless the publish request gives one; 1-500 characters (`configuration_draft_change_note_check`). |
+| `draft_version` | integer NOT NULL | Optimistic counter, 1 on create, +1 per save (`configuration_draft_draft_version_check`). |
+| `updated_by`, `updated_role`, `updated_at` | text, text, timestamptz NOT NULL | Who saved last. |

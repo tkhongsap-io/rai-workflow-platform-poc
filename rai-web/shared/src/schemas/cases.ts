@@ -124,8 +124,9 @@ export interface ConfigurationView {
 // Configuration revision bodies (W0-04 `configuration_revision.body`: "schema per kind in rai-web/shared, validated
 // on write"). One kind per revision. The W1-00 seed publishes checklist_templates, sla, calendar, operator_recipients
 // and use_case_groups; W4-02 adds qc_rules (revision 1, 'w4a.1'); risk_rubric arrives with W5 (schema W5-01,
-// registered W5-02; content D07), group_role_mapping with W6/W8. A kind without a registered schema cannot be
-// published (deny by default).
+// registered W5-02; content D07), group_role_mapping with W6/W8; W6-02 adds desk_controls (registered and seeded,
+// W6 plan section 3). A kind without a registered schema cannot be published (deny by default). The db copy of this
+// list (server/src/db/schema/configuration-revision.ts) changes with it; a unit test asserts they are equal.
 // ---------------------------------------------------------------------------------------------------------------
 
 export const CONFIGURATION_KINDS = [
@@ -137,6 +138,7 @@ export const CONFIGURATION_KINDS = [
   'use_case_groups',
   'risk_rubric',
   'group_role_mapping',
+  'desk_controls', // W6-02: the incident switches (W6 plan section 7, Q12); not frozen on a version
 ] as const;
 export type ConfigurationKind = (typeof CONFIGURATION_KINDS)[number];
 
@@ -164,6 +166,14 @@ export const OperatorRecipientsBodySchema = Type.Object({
 export const UseCaseGroupsBodySchema = Type.Object({
   groups: Type.Array(Type.String({ minLength: 1, maxLength: 100 }), { minItems: 1 }), // D11 value list
 });
+/**
+ * W6-02 (W6 plan sections 2.1 and 7, Q12): the desk's incident switches, published by Admin like any kind and read per
+ * request by W6-17. A missing or invalid body means every switch is off. Never frozen on a version.
+ */
+export const DeskControlsBodySchema = Type.Object(
+  { writesFrozen: Type.Boolean(), mailPaused: Type.Boolean(), qcPaused: Type.Boolean() },
+  { additionalProperties: false },
+);
 // W4-02 (W4a plan section 3): the rule catalogue, keyed by checklist_template_version (L12). The revision a run
 // records is this body's configuration_revision.id, never `label`. Rule lists and severities are provisional until
 // D09. Content rules are catalogued for W4b and not executed in W4a.
@@ -367,6 +377,7 @@ export const CONFIGURATION_BODY_SCHEMAS = Object.freeze({
   use_case_groups: UseCaseGroupsBodySchema,
   qc_rules: QcRulesBodySchema,
   risk_rubric: RiskRubricBodySchema, // W5-02; publishing also runs riskRubricBodyProblems
+  desk_controls: DeskControlsBodySchema, // W6-02
 }) satisfies Partial<Record<ConfigurationKind, unknown>>;
 
 export type ConfigurationBodies = {
@@ -377,6 +388,7 @@ export type ConfigurationBodies = {
   use_case_groups: Static<typeof UseCaseGroupsBodySchema>;
   qc_rules: Static<typeof QcRulesBodySchema>;
   risk_rubric: RiskRubricBody;
+  desk_controls: Static<typeof DeskControlsBodySchema>; // W6-02
 };
 export type SeedableConfigurationKind = keyof ConfigurationBodies;
 

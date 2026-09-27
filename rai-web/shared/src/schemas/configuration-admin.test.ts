@@ -62,6 +62,7 @@ test('every configuration kind names who owns its values; D07, D09 and D10 value
   assert.deepEqual(Object.keys(CONFIGURATION_VALUES_OWNER).sort(), [...CONFIGURATION_KINDS].sort());
   assert.equal(CONFIGURATION_VALUES_OWNER.risk_rubric, 'D07');
   assert.equal(CONFIGURATION_VALUES_OWNER.group_role_mapping, 'D10');
+  assert.equal(CONFIGURATION_VALUES_OWNER.desk_controls, 'admin'); // W6-02: the incident switches are Admin's (Q12)
   for (const kind of [
     'checklist_templates',
     'qc_rules',

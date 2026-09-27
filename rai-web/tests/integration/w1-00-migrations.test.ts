@@ -56,6 +56,7 @@ test('the schema holds the W0-04 tables (plus W1-01 session, W1-09 fixture_set, 
       'artifact_slot',
       'audit_event',
       'case',
+      'configuration_draft', // W6-02 (0012_w6_02_configuration_admin): the Admin working copy, not evidence
       'configuration_revision',
       'disposition_event', // W2-05 (0006_w2_05_findings_dispositions)
       'fixture_set', // W1-09 (0002_w1_09_fixture_set)
@@ -111,7 +112,9 @@ test('the schema holds the W0-04 tables (plus W1-01 session, W1-09 fixture_set, 
   );
   const byGrantee = (g: string) =>
     grants.rows.filter((r) => r.grantee === g).map((r) => `${r.table_name}:${r.privilege_type}`);
-  // rai_app: SELECT/INSERT everywhere; UPDATE only on the mutable tables; no DELETE, no TRUNCATE (W0-04 roles).
+  // rai_app: SELECT/INSERT everywhere; UPDATE only on the mutable tables; no TRUNCATE; no DELETE on any table except
+  // configuration_draft (W6-02): an Admin working copy that is not evidence, deleted only by discardDraft and
+  // publishDraft, each audited (W0-04 roles, amended 2026-09-27).
   assert.deepEqual(byGrantee('rai_app'), [
     'artifact:INSERT',
     'artifact:SELECT',
@@ -124,6 +127,10 @@ test('the schema holds the W0-04 tables (plus W1-01 session, W1-09 fixture_set, 
     'case:INSERT',
     'case:SELECT',
     'case:UPDATE',
+    'configuration_draft:DELETE', // W6-02: the only DELETE rai_app holds
+    'configuration_draft:INSERT',
+    'configuration_draft:SELECT',
+    'configuration_draft:UPDATE',
     'configuration_revision:INSERT',
     'configuration_revision:SELECT',
     'disposition_event:INSERT', // W2-05: append-only
@@ -190,4 +197,17 @@ test('rai_app has no DDL: it cannot create a table or a function', async () => {
     }
   });
   assert.equal(ddl?.code, '42501');
+});
+
+test('W6-02: the only table on which rai_app holds DELETE is configuration_draft', async () => {
+  const rows = await db.raw('owner', (c) =>
+    c.query<{ table_name: string }>(
+      `SELECT DISTINCT table_name FROM information_schema.role_table_grants
+       WHERE table_schema = 'public' AND grantee = 'rai_app' AND privilege_type = 'DELETE' ORDER BY table_name`,
+    ),
+  );
+  assert.deepEqual(
+    rows.rows.map((r) => r.table_name),
+    ['configuration_draft'],
+  );
 });
