@@ -1,0 +1,126 @@
+{
+  "caseId": "ev-dev-09",
+  "split": "dev",
+  "labelledBy": "agent-team, provisional (Ta delegation 2026-09-27); lane-expert sign-off pending (D09)",
+  "runs": [
+    {
+      "trigger": "upload",
+      "slot": 1,
+      "lane": null,
+      "parts": {
+        "deterministic": {
+          "status": "completed",
+          "findings": []
+        },
+        "content": {
+          "status": "completed",
+          "findings": []
+        }
+      }
+    },
+    {
+      "trigger": "upload",
+      "slot": 2,
+      "lane": null,
+      "parts": {
+        "deterministic": {
+          "status": "completed",
+          "findings": []
+        },
+        "content": {
+          "status": "completed",
+          "findings": []
+        }
+      }
+    },
+    {
+      "trigger": "upload",
+      "slot": 5,
+      "lane": null,
+      "parts": {
+        "deterministic": {
+          "status": "completed",
+          "findings": []
+        },
+        "content": {
+          "status": "completed",
+          "findings": []
+        }
+      }
+    },
+    {
+      "trigger": "submit",
+      "lane": null,
+      "parts": {
+        "deterministic": {
+          "status": "completed",
+          "findings": []
+        },
+        "content": {
+          "status": "completed",
+          "findings": []
+        }
+      }
+    },
+    {
+      "trigger": "approve_attempt",
+      "lane": "ai_coe",
+      "parts": {
+        "deterministic": {
+          "status": "completed",
+          "findings": []
+        },
+        "content": {
+          "status": "completed",
+          "findings": [
+            {
+              "ruleId": "ACC-CLASSIC-ML-METRIC",
+              "owningLane": "ai_coe",
+              "scope": {
+                "kind": "artifact",
+                "slot": 1
+              },
+              "evidence": [
+                {
+                  "slot": 1,
+                  "locator": {
+                    "kind": "section",
+                    "index": 4
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "trigger": "approve_attempt",
+      "lane": "dpo",
+      "parts": {
+        "deterministic": {
+          "status": "completed",
+          "findings": []
+        },
+        "content": {
+          "status": "completed",
+          "findings": []
+        }
+      }
+    },
+    {
+      "trigger": "approve_attempt",
+      "lane": "it_security",
+      "parts": {
+        "deterministic": {
+          "status": "completed",
+          "findings": []
+        },
+        "content": {
+          "status": "completed",
+          "findings": []
+        }
+      }
+    }
+  ]
+}

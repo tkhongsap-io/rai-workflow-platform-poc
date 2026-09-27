@@ -5,6 +5,7 @@
 // The medium variant appends deterministic `%` comment filler before the xref so the file is about 2 MiB.
 
 import { createHash } from 'node:crypto';
+import { zlibFixed } from './deflate.js';
 
 export const PDF_MEDIUM_TARGET_BYTES = 2 * 1024 * 1024;
 
@@ -99,5 +100,114 @@ export function buildPdf(input: PdfInput): Buffer {
   for (let i = 1; i < count; i += 1) xref += `${String(offsets[i]!).padStart(10, '0')} 00000 n \n`;
   push(xref);
   push(`trailer\n<< /Size ${count} /Root 1 0 R /Info 6 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`);
+  return Buffer.concat(parts);
+}
+
+// ---- W4-09a: multi-page documents for the QC evaluation set (W4b plan section 11.1) ---------------------------
+// Additive: buildPdf above and the slice1-synthetic bytes are unchanged. A page is text (Helvetica; an ASCII line
+// is a literal string, any other line a UTF-16BE hex string with BOM, both of which the W4-05d extractor decodes),
+// an image (one image XObject and no text operator: a scan), or CID text (a Type0 Identity-H font with no
+// ToUnicode, glyph codes only: not decodable, plan section 4.3). `flate` compresses every stream with the
+// platform-independent encoder of deflate.ts. `brokenXref` shifts every xref offset and startxref (malformed).
+
+export type PdfPageSpec =
+  { kind: 'text'; lines: string[] } | { kind: 'image' } | { kind: 'cid'; lines: string[] };
+
+export interface PdfDocumentInput {
+  title: string; // ASCII, into /Info /Title
+  commentLines: string[]; // `%` comments after the header (UTF-8)
+  pages: PdfPageSpec[];
+  compression: 'none' | 'flate';
+  brokenXref?: boolean;
+}
+
+const ASCII_PRINTABLE = /^[\x20-\x7e]*$/;
+const IMAGE_SIZE = 8;
+
+function textOperand(line: string): string {
+  if (ASCII_PRINTABLE.test(line)) return pdfString(line);
+  return utf16beHex(line);
+}
+
+/** Glyph codes for the CID page: two bytes per character, offset so no code is a Thai or ASCII code unit. */
+function cidOperand(line: string): string {
+  const codes = [...line].map((ch) => (0x1000 + (ch.codePointAt(0)! % 0x1000)).toString(16).toUpperCase());
+  return `<${codes.join('')}>`;
+}
+
+function pageContent(page: PdfPageSpec): string {
+  if (page.kind === 'image') return `q\n400 0 0 400 96 300 cm\n/Im1 Do\nQ\n`;
+  const font = page.kind === 'text' ? '/F1' : '/F2';
+  const operand = page.kind === 'text' ? textOperand : cidOperand;
+  return (
+    `BT\n${font} 11 Tf\n72 780 Td\n14 TL\n` +
+    page.lines.map((line, i) => `${i === 0 ? '' : 'T*\n'}${operand(line)} Tj\n`).join('') +
+    'ET\n'
+  );
+}
+
+export function buildPdfDocument(input: PdfDocumentInput): Buffer {
+  const parts: Buffer[] = [];
+  let length = 0;
+  const offsets: number[] = [];
+  const push = (s: string | Buffer): void => {
+    const b = typeof s === 'string' ? Buffer.from(s, 'utf8') : s;
+    parts.push(b);
+    length += b.length;
+  };
+  const object = (n: number, body: string): void => {
+    offsets[n] = length;
+    push(`${n} 0 obj\n${body}\nendobj\n`);
+  };
+  const streamObject = (n: number, dict: string, data: Buffer): void => {
+    const encoded = input.compression === 'flate' ? zlibFixed(data) : data;
+    const filter = input.compression === 'flate' ? ' /Filter /FlateDecode' : '';
+    offsets[n] = length;
+    push(`${n} 0 obj\n<< ${dict}${filter} /Length ${encoded.length} >>\nstream\n`);
+    push(encoded);
+    push('\nendstream\nendobj\n');
+  };
+
+  // 1 catalog, 2 pages, 3 info, 4 Helvetica, 5 Type0, 6 CIDFont, 7 image; then page i: 8 + 2i, content 9 + 2i.
+  const pageObject = (i: number): number => 8 + 2 * i;
+  push('%PDF-1.4\n');
+  for (const line of input.commentLines) push(`% ${line}\n`);
+  object(1, '<< /Type /Catalog /Pages 2 0 R >>');
+  object(
+    2,
+    `<< /Type /Pages /Kids [${input.pages.map((_, i) => `${pageObject(i)} 0 R`).join(' ')}] /Count ${input.pages.length} >>`,
+  );
+  object(3, `<< /Producer (rai-web/fixtures) /Title ${pdfString(input.title)} >>`);
+  object(4, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+  object(
+    5,
+    '<< /Type /Font /Subtype /Type0 /BaseFont /EvalThaiCid /Encoding /Identity-H /DescendantFonts [6 0 R] >>',
+  );
+  object(
+    6,
+    '<< /Type /Font /Subtype /CIDFontType2 /BaseFont /EvalThaiCid /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> /DW 1000 >>',
+  );
+  const pixels = Buffer.alloc(IMAGE_SIZE * IMAGE_SIZE);
+  for (let i = 0; i < pixels.length; i += 1) pixels[i] = (i * 4) & 0xff;
+  streamObject(
+    7,
+    `/Type /XObject /Subtype /Image /Width ${IMAGE_SIZE} /Height ${IMAGE_SIZE} /ColorSpace /DeviceGray /BitsPerComponent 8`,
+    pixels,
+  );
+  input.pages.forEach((page, i) => {
+    object(
+      pageObject(i),
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> /XObject << /Im1 7 0 R >> >> /Contents ${pageObject(i) + 1} 0 R >>`,
+    );
+    streamObject(pageObject(i) + 1, '', Buffer.from(pageContent(page), 'utf8'));
+  });
+
+  const shift = input.brokenXref === true ? 13 : 0;
+  const xrefOffset = length;
+  const count = pageObject(input.pages.length);
+  let xref = `xref\n0 ${count}\n0000000000 65535 f \n`;
+  for (let i = 1; i < count; i += 1) xref += `${String(offsets[i]! + shift).padStart(10, '0')} 00000 n \n`;
+  push(xref);
+  push(`trailer\n<< /Size ${count} /Root 1 0 R /Info 3 0 R >>\nstartxref\n${xrefOffset + shift}\n%%EOF\n`);
   return Buffer.concat(parts);
 }

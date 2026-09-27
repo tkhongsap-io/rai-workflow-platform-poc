@@ -101,3 +101,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w7-01-backup-command model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #207)
 - Scope: per changes/2026-09-27-w7-01-backup-command-ci-rai/: `npm run backup` (`operator/pg-tools.ts`, `operator/backup.ts`, `operator/frozen-digest.ts`), `config.ts` `parseBackupConfig` (`RAI_PG_TOOLS`, `RAI_PG_CONTAINER_PORT`, `BACKUP_DIR`), `.env.example`, the CI integration-job `RAI_PG_TOOLS` line (lead-reviewed), W0-10 operator events, W0-02 section 5 keys, W0-04 backup recipe. One PR; no migration.
+
+## 2026-09-27 20:24 — CLAIM lane-c: W4-09a evaluation set generator, dev split (#203)
+- Author: operator=ta session=claude-code-w4-09a-eval-set model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #203)
+- Scope: per changes/2026-09-27-w4-09a-evaluation-set-generator-dev/: `fixtures/src/evaluation/*` (cases, renderers, provisional per-lane labels, manifest), additive `fixtures/src/generate/{pdf,ooxml}.ts` builders, `npm run fixtures:eval:generate`. Dev split of `qc-eval-synthetic@1` only; held-out and freeze are W4-09b. One PR.
