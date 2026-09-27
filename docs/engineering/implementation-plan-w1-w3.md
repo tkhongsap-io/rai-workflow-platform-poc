@@ -309,6 +309,8 @@ Not added, on purpose: no i18n library (section 10 uses a typed key union, `Intl
 
 `npm ci` in CI fails when `package-lock.json` disagrees with any `package.json`, which is the "lockfile drift" check ADR-0003 names. `npm audit --omit=dev --audit-level=high` runs in CI and blocks on a high or critical advisory in a runtime dependency; the fix is a lead PR updating this section.
 
+**W4-01 note (2026-09-27): W4b adds no dependency.** [ADR-0006](../../adr/0006-qc-engine-and-extraction.md) (provisional) records that the W4b document extractors (DOCX, XLSX, text-layer PDF) are hand-written on Node built-ins (`node:zlib`, `node:buffer`) and run in a forked worker (`node:child_process`), following `server/src/artifacts/sniff.ts`; `pdfjs-dist`, an OOXML library and an external binary such as `pdftotext` were weighed and not chosen ([W4b plan](implementation-plan-w4b.md) decision 8). The model port adds no provider SDK. The lists in 4.1 and 4.2 are unchanged.
+
 ---
 
 ## 5. Local configuration and secrets

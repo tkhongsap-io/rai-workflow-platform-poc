@@ -360,6 +360,8 @@ The W1-13 UI substitute reads the same manifest to serve shapes; it never loads 
 - [ ] **W1-04**: slot 9 cardinality; the per-pack total in section 3 is defined independently of it.
 - [ ] **W2-10**: rows for the correction documents in section 8.4.
 
+**W4-01 note (2026-09-27): parsing worker.** The "parsing worker" part of the D08 item above is settled **for synthetic data only** by [ADR-0006](../../adr/0006-qc-engine-and-extraction.md) (provisional under Ta's delegation of 2026-09-27; a D08 working assumption, not a D08 decision): QC content extraction runs in a fresh child process per artifact, with hand-written parsers on Node built-ins and fail-closed limits, implemented locally by W4-05b-d ([W4b plan](implementation-plan-w4b.md) section 4). It does not change the upload sniff (section 2) or the upload path: bytes are still stored only after the section 4 checks, and extraction reads the stored bytes afterwards. The real-data items of the D08 bullet stay open: real per-file and per-pack limits, embedded files in PDFs, OLE embeddings, a host malware scanner, whether real data needs stronger isolation (a container or sandbox), rejected-upload retention, blob deletion and key custody, and a library detector.
+
 ## References
 
 - [W0 technical contract](../delivery/w0-technical-contract.md#w0-08--upload-safety-policy-and-fixtures) — W0-08 text this document implements; W0-02 to W0-07, W0-09, W0-10 sections linked above
