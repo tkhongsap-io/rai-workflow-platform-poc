@@ -242,3 +242,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w4-05b-extraction-worker-host-protocol model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #212)
 - Scope: per changes/2026-09-27-w4-05b-extraction-worker-host-protocol/: the `Extractor` port, the IPC protocol with a TypeBox reply check, the limits, the forking host `createWorkerExtractor` (one process per call, empty env, no stdio, heap cap, SIGKILL on time/abort/output, concurrency semaphore) and the worker entry under `server/src/qc/extraction/`; worker module-graph test; fork latency measured under the source and built layouts. No format parser (W4-05c/d), no runner, no config key, no migration. One PR.
+
+## 2026-09-27 22:10 — CLAIM lane-a: W7-05 network fail-closed amendments and test seams (#209)
+- Author: operator=ta session=claude-code-w7-05-network-fail-closed-amendments model=claude-opus-5-5 (implementation lane ops)
+- Takes over from: session=none (reason: new; ticket #209, W7 plan merged)
+- Scope: per changes/2026-09-27-w7-05-network-fail-closed-amendments/: S17 extended to `network` (`base_url_not_https`), the ID-01 `network` http/https rows and the `HOST` table, the `StartOverrides.exchange` seam refused unless `NODE_ENV=test` on loopback (before parse, `test_exchange_override_forbidden`), the `discovery` override refused under `NODE_ENV=production` (after parse, `test_discovery_override_forbidden`), the real-process `network` http refusal, and the W0-03 S17, section 2/3, section 11 and section 14 amendments. No migration; one PR.

@@ -297,6 +297,42 @@ const rows: Array<{ row: string; env: IdentityEnv; bind: BindTarget; nodeEnv?: s
     bind: { ...networked, publicBaseUrl: new URL('http://desk.example.test') },
     expect: 'base_url_not_https',
   },
+  // W7-05 (W7 plan section 5.1): S17 extended to network, both sources, before any other network row.
+  {
+    row: 'S17 network/allow-list base URL not https',
+    env: networkAllowList,
+    bind: { ...networked, publicBaseUrl: new URL('http://desk.example.test') },
+    expect: 'base_url_not_https',
+  },
+  {
+    row: 'S17 network/allow-list http base URL on loopback is still refused',
+    env: networkAllowList,
+    bind: { ...loopback, publicBaseUrl: new URL('http://127.0.0.1:8787') },
+    expect: 'base_url_not_https',
+  },
+  {
+    row: 'S17 network/ad base URL not https',
+    env: networkAd,
+    bind: { ...networked, publicBaseUrl: new URL('http://desk.example.test') },
+    expect: 'base_url_not_https',
+  },
+  {
+    row: 'S17 network http refuses before the source row (S6)',
+    env: { ...networkAllowList, RAI_IDENTITY_NETWORK_SOURCE: undefined },
+    bind: { ...networked, publicBaseUrl: new URL('http://desk.example.test') },
+    expect: 'base_url_not_https',
+  },
+  {
+    row: 'S17 network/allow-list https with HOST=0.0.0.0 and TRUST_PROXY=true parses',
+    env: { ...networkAllowList, RAI_IDENTITY_OIDC_ISSUER_URL: 'https://idp.rai-desk.test' },
+    bind: {
+      host: '0.0.0.0',
+      port: 8787,
+      publicBaseUrl: new URL('https://desk.rai-desk.test'),
+      trustProxy: true,
+    },
+    expect: 'ok',
+  },
   {
     row: 'session lifetime out of range refuses',
     env: { ...fixture, RAI_SESSION_ABSOLUTE_HOURS: '48' },

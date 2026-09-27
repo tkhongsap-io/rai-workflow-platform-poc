@@ -166,7 +166,7 @@ Cases, lane decisions, dispositions and audit events reference `subjectId`, neve
 
 The mode is configuration (`RAI_IDENTITY_MODE`). An unknown value, a missing value or a value whose prerequisites are absent refuses to start (section 5). There is no default mode.
 
-Slice 1 implements `local-google` and `fixture` (W1-01). `network` is implemented at W7-00 only if the operator rehearsal is networked; `production` at W8 after D10. The start-up rules for all four modes are implemented in W1-01 and unit-tested there (ID-01, ID-18, ID-19 in section 11: the pure parse for the environment and bind rows, an injected discovery for S11 and S18, an injected mapping reader for S12) so a later ticket cannot loosen them unnoticed; the live Entra and mapping checks are repeated at W8 (ID-17).
+Slice 1 implements `local-google` and `fixture` (W1-01). `network` is implemented at W7-00 only if the operator rehearsal is networked; `production` at W8 after D10. **W7-05 note (2026-09-27):** in W7 `network` is implemented with source `allow-list` only and any configured OIDC issuer (W7 plan W7-D3, provisional); the `ad` source still parses (S9-S12, unit-tested) but is not rehearsed. A `network` deployment must use an `https` public base URL (row S17). The start-up rules for all four modes are implemented in W1-01 and unit-tested there (ID-01, ID-18, ID-19 in section 11: the pure parse for the environment and bind rows, an injected discovery for S11 and S18, an injected mapping reader for S12) so a later ticket cannot loosen them unnoticed; the live Entra and mapping checks are repeated at W8 (ID-17).
 
 ## 4. Verifiers and role resolvers per mode
 
@@ -227,7 +227,7 @@ No provider. The verifier is a test-only route that names one of the eight fixtu
 | S14 | `fixture` and bind host not loopback | refuse | `bind_not_loopback` | W1-01 |
 | S15 | Any secret whose value is empty, whitespace or the placeholder literal `set-in-custody` | treated as absent | as S4/S7/S9 | W1-01 |
 | S16 | After `listen`, `server.address()` is not loopback in `local-google` or `fixture` | close and exit 78 | `bind_not_loopback` | W1-01 (ID-02: loopback bind host so S2/S14 pass, `server.address()` stubbed to a non-loopback address) |
-| S17 | `production` and `PUBLIC_BASE_URL` scheme not `https` | refuse | `base_url_not_https` | W1-01 (ID-01) |
+| S17 | `production` or `network` (W7-05, 2026-09-27: `network` added, both sources, checked before any other `network` row) and `PUBLIC_BASE_URL` scheme not `https` | refuse | `base_url_not_https` | W1-01 (ID-01); W7-05 for `network` |
 | S18 | Any provider mode (`local-google`, `network`, `production`) and OIDC discovery fails or returns an invalid document (missing `issuer` or `authorization_endpoint`; an Entra issuer that resolves but differs from the tenant is S11, not S18) | refuse | `discovery_failed` | W1-01 (ID-18, unit, injected discovery that throws or returns an invalid document) |
 
 ```ts
@@ -297,7 +297,7 @@ sessions: {
 
 W0-09 confirmed this mechanism (section 14 b): the cookie is an opaque random value looked up by hash; there is no signing key, so W0-02 section 5 carries no `SESSION_SECRET`, and `RAI_SESSION_ABSOLUTE_HOURS` and `RAI_SESSION_IDLE_MINUTES` (section 9.1) replace W0-02's earlier `SESSION_TTL_MINUTES`. W1-01 implements this section.
 
-- Cookie `__Host-rai_session`: `HttpOnly`, `SameSite=Lax`, `Path=/`, `Secure` (on loopback over plain `http` the `__Host-` prefix and `Secure` are dropped and the cookie is named `rai_session`; the adapter picks the name from the public base URL scheme, and `production` refuses a non-`https` base URL, reason `base_url_not_https`, row S17). No signing secret is needed because the cookie value is random and looked up by hash; `@fastify/cookie` (W0-02 section 4.1) only parses and sets it.
+- Cookie `__Host-rai_session`: `HttpOnly`, `SameSite=Lax`, `Path=/`, `Secure` (on loopback over plain `http` the `__Host-` prefix and `Secure` are dropped and the cookie is named `rai_session`; the adapter picks the name from the public base URL scheme, and `production` refuses a non-`https` base URL, reason `base_url_not_https`, row S17; W7-05, 2026-09-27: so does `network`, so a `network` session cookie is always `__Host-rai_session`, `Secure`). No signing secret is needed because the cookie value is random and looked up by hash; `@fastify/cookie` (W0-02 section 4.1) only parses and sets it.
 - A request is authenticated when the hash matches a row with `revokedAt IS NULL`, `expiresAt > now()` and `lastSeenAt > now() - RAI_SESSION_IDLE_MINUTES` (default 120). `lastSeenAt` is updated at most once per minute to avoid a write per request.
 - Roles are a snapshot. A change in the allow-list or the group mapping takes effect at the next sign-in; the absolute TTL bounds the staleness. Revoking all sessions of a subject on a mapping change is a W6 operator action, not slice 1.
 - Sign-in always creates a new session row (no fixation: an existing cookie is ignored and replaced).
@@ -430,7 +430,7 @@ Resolution: for each `groups` entry in the token, every matching rule contribute
 
 | ID | Test | Layer | Ticket |
 |---|---|---|---|
-| ID-01 | Rows S1-S10, S13-S15 and S17 of section 5 as a table-driven case over the pure `parseIdentityConfig(env, bind)`; S5 is the case with `bind.trustProxy = true` in `local-google`, S17 the `production` case with an `http://` base URL. S11 and S12 are not in this file (they need the discovery result and the revision store: ID-18, ID-19); S16 is ID-02 | unit, `node:test` | W1-01 |
+| ID-01 | Rows S1-S10, S13-S15 and S17 of section 5 as a table-driven case over the pure `parseIdentityConfig(env, bind)`; S5 is the case with `bind.trustProxy = true` in `local-google`, S17 the `production` case with an `http://` base URL (W7-05, 2026-09-27: plus the `network` rows, `allow-list` and `ad` with an `http://` base URL refused, and `network`/`allow-list` with `https`, `HOST=0.0.0.0` and `TRUST_PROXY=true` accepted; the start path and the real process repeat the `network` http refusal in `start.test.ts` and `w1-01-startup-refusals`). S11 and S12 are not in this file (they need the discovery result and the revision store: ID-18, ID-19); S16 is ID-02 | unit, `node:test` | W1-01 |
 | ID-02 | S16 post-listen check, for `local-google` and for `fixture`: start with a bind host that satisfies S2 (`localhost`), stub `server.address()` (or the address resolution behind it) to return a non-loopback address, assert the server closes with exit 78 and `bind_not_loopback`. A `0.0.0.0` bind is refused before `listen` (S2/S14, same reason code) and would pass without S16 implemented; that run is the S2 path covered by ID-01 and ID-14 | integration (real listen, stubbed address) | W1-01 |
 | ID-03 | Each of the eight fixture users (W0-02 section 8.3 ids) resolves to exactly the pairs in section 7; `fx-user-dpo-spoc-hr` keeps both; `fx-user-owner-cm-2` resolves to `own_cases` and sees no fixture case | unit | W1-01 |
 | ID-04 | Fixture table invariants: eight entries, unique ids and emails, two `owner` entries, only one multi-pair user | unit | W1-00 |
@@ -451,6 +451,8 @@ Resolution: for each `groups` entry in the token, every matching rule contribute
 | ID-19 | S12: `start()` in `production` with an injected `groupMappingSource` that returns no published `identity.group_role_mapping` revision refuses with `group_mapping_missing`; one whose `tenantId` differs from the configured tenant is refused the same way; a source returning a valid revision with synthetic group IDs starts. No Postgres: the source is a function | unit, injected mapping reader | W1-01 |
 
 No test calls Google, Entra or any network host. `openid-client` is exercised against synthetic discovery documents and claims objects in W1-01; the live provider paths are ID-14 (manual), ID-16 and ID-17.
+
+**W7-05 note (2026-09-27): start-up test seams.** `startServer` (`start.ts`) takes two identity seams as `StartOverrides`. `exchange` (passed to `createIdentityAdapter`) returns the claims a principal is minted from, so it is refused **before** the configuration parse, in every identity mode, unless `NODE_ENV=test` and `HOST` is loopback (`process.refused` reason `test_exchange_override_forbidden`, exit 78). `discovery` only supplies a document S18 still validates, so it is refused only under `NODE_ENV=production`, **after** the parse so every parse reason keeps precedence (`test_discovery_override_forbidden`, exit 78). Both reasons are `process.refused` codes like `test_qc_override_forbidden`, not `StartupReasonCode`s, and never reach readiness. `start.test.ts` covers both guards; W7-08 uses both seams for the A01 `network` clause.
 
 ## 12. Locale keys (D12)
 
@@ -503,7 +505,7 @@ Architecture boundary: "Identity adapter" row of the [boundary table](../archite
 
 - [ ] AD group-to-role mapping values, Entra tenant, app registration and whether an overage fallback via Microsoft Graph is added — W6 (screen) and W8 (values) at D10; ADR-0004.
 - [ ] Custody mechanism on the True host (`env` from the host secret manager, `file` mount, or a third `SecretSource`) — D10, ADR-0004/0007.
-- [ ] Whether the W7 rehearsal is networked; if so which `network` source and, for `allow-list`, which non-True issuer — W7 entry.
+- [x] Whether the W7 rehearsal is networked; if so which `network` source and, for `allow-list`, which non-True issuer — W7 entry. Answered 2026-09-27 (W7-05) by the W7 plan's provisional rulings W7-D1 (the end-to-end walkthrough runs in `fixture` mode; `network` is proven by the W7-08 integration suite) and W7-D3 (`allow-list` source, any configured OIDC issuer; the synthetic `https://idp.rai-desk.test` in tests).
 - [ ] The `local-google` default-to-`owner` rule for unmapped accounts (4.1) — lead confirms at this ticket's review.
 - [ ] Whether a dual-role reviewer (also owner or BU SPOC on the case) is withheld send-back as well as approve. D05 as recorded withholds approve only; extending it to send-back is a W0-05 refinement under D05's "review leads may refine" clause, recorded there if adopted, not in this spec.
 - [x] Any drift between this spec's route and variable names and the W0-02 sections that mirror them — reconciled at the W0-09 exit review (2026-09-21): routes and shapes follow W0-02 7.2 (section 6), identity variable names follow this spec (W0-02 section 5), the session mechanism of 6.3 is confirmed.

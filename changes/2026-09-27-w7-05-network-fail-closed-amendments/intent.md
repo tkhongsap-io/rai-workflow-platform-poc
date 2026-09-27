@@ -1,0 +1,10 @@
+# Intent: `network` fail-closed amendments and test seams (W7-05, #209)
+
+W7 proves the `network` identity mode (allow-list source, any configured OIDC issuer) on the real HTTP stack in W7-08, and the deployment-readiness note names it as the mode a host would run before W8. Two gaps stand in the way under the [W7 plan](../../docs/engineering/implementation-plan-w7.md) sections 2 and 5.1 and the register rows "Ta's delegation (2026-09-27)" and "W7 delegated rulings (provisional)" (W7-D1, W7-D3):
+
+- **`network` accepts a plain `http` public base URL.** W0-03 row S17 refuses a non-`https` base URL only in `production`. A `network` deployment binds off loopback, so with `http` the session cookie would be neither `Secure` nor `__Host-` and would travel in clear on the network. The start-up must fail closed instead (`base_url_not_https`), before discovery and before listening.
+- **W7-08 needs an `exchange` seam through `startServer`** so an in-process test can sign in a synthetic account without a real OIDC provider. `exchange` returns the claims a principal is minted from, so it is the dangerous seam: it must be refused unless `NODE_ENV=test` and the bind is loopback, like the existing `qcRunner` override. The existing `discovery` override only supplies a document that S18 still validates, and W4-13 tests pass it outside `NODE_ENV=test`, so it is refused only under `NODE_ENV=production`, after the parse, so every existing refusal keeps its reason.
+
+The W0-03 spec follows: S17 covers `network`, ID-01 gains the two `network` rows, section 3 says `network` is implemented with `allow-list` only in W7, and section 14's "is the W7 rehearsal networked" item is ticked as answered by W7-D1 and W7-D3.
+
+Not here: `subject_profile` (W7-06), mail and directories (W7-07), the A01 network suite (W7-08), the sign-in method endpoint (W7-09). Synthetic data only; no external network call (tests inject discovery and exchange, and the http refusal happens before discovery); nothing is deployed.
