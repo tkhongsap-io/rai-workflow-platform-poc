@@ -296,3 +296,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w4-11b-run-identity model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #201, implementation lane qc-core)
 - Scope: per changes/2026-09-27-w4-11b-run-identity-for-extraction/: `qc_run` identity and usage columns plus `unavailable_detail` (one migration), `QcRunResult.engine`, `recordRun`, the qc-runs read, `qc.run.completed`/`qc.run.unavailable` fields, operator `unavailableQc.unavailableDetail`, W0-02 section 7, W0-04, data contract, W0-07 section 7 and W0-10 amendments. One PR.
+
+## 2026-09-28 10:00 — CLAIM lane-a: W6-14 queue drill-down filters (#224)
+- Author: operator=ta session=claude-code-w6-14-queue-drill-down-filters model=claude-opus-5-5 (implementation lane admin)
+- Takes over from: session=none (reason: new; ticket #224, W6-13 merged #295)
+- Scope: per changes/2026-09-27-w6-14-queue-drill-down-filters/: `QueueQuerySchema` gains the W6-01 drill-down keys (`lane`, `laneStatus`, `sla`, `findingLane`, `findingSeverity`, `findingKind`), applied by `queue/repository.ts` `readQueue` inside the scoped `visible` sub-select before counts, options and pages; `laneStatus=pending` and `sla` use the dashboard's `openReviewTargets` rule through one shared SLA-state helper; the queue screen reads and writes them in the URL, keeps them on Apply and shows them with a clear button (th/en keys). No migration, no dashboard UI (W6-15), no `riskTier` (W6-16), no recheck predicate (W6-09). One PR.

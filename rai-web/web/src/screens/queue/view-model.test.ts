@@ -1,6 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseQueueQuery, queueParams, NEXT_ACTION_LABELS } from './view-model.js';
+import {
+  applyQueueForm,
+  drilldownLabels,
+  drilldownOf,
+  parseQueueQuery,
+  queueParams,
+  withoutDrilldown,
+  NEXT_ACTION_LABELS,
+} from './view-model.js';
 
 test('URL values round-trip without dropping literal Thai/wildcard filters', () => {
   const query = {
@@ -44,4 +52,91 @@ test('pagination preserves applied restrictions and action labels use the API cu
   });
   assert.equal(NEXT_ACTION_LABELS.resolve_findings, 'queue.next.resolve_findings');
   assert.equal(NEXT_ACTION_LABELS.review_complete, 'queue.next.review_complete');
+});
+
+// W6-14 (W6 plan section 8.2): the dashboard drill-down filters live in the URL, so a dashboard link opens the
+// filtered list, and the search form never drops them.
+test('drill-down filters round-trip through the URL with the base filters', () => {
+  const query = {
+    search: 'x',
+    searchBy: 'all' as const,
+    lane: 'dpo' as const,
+    laneStatus: 'pending' as const,
+    sla: 'breached' as const,
+    findingLane: 'it_security' as const,
+    findingSeverity: 'high' as const,
+    findingKind: 'unavailable' as const,
+    page: 1,
+    pageSize: 25,
+  };
+  assert.deepEqual(parseQueueQuery(queueParams(query).toString()), { valid: true, query });
+  assert.deepEqual(parseQueueQuery('lane=dpo&sla=breached'), {
+    valid: true,
+    query: { page: 1, pageSize: 25, searchBy: 'all', lane: 'dpo', sla: 'breached' },
+  });
+});
+test('malformed or repeated drill-down values never widen the list', () => {
+  for (const q of [
+    'lane=hr',
+    'lane=',
+    'laneStatus=ready',
+    'sla=overdue',
+    'findingSeverity=info',
+    'findingKind=advisory',
+    'riskTier=high',
+    'lane=dpo&lane=ai_coe',
+    'sla=breached&sla=due_soon',
+  ])
+    assert.deepEqual(parseQueueQuery(q), { valid: false }, q);
+});
+test('applying the form keeps the drill-down; clearing it keeps the base filters', () => {
+  const parsed = parseQueueQuery('lane=dpo&laneStatus=pending&findingKind=defect&owner=x&page=3');
+  assert.ok(parsed.valid);
+  assert.deepEqual(drilldownOf(parsed.query), { lane: 'dpo', laneStatus: 'pending', findingKind: 'defect' });
+  assert.deepEqual(
+    applyQueueForm(parsed.query, {
+      search: 'abc',
+      searchBy: 'all',
+      status: 'in_review',
+      page: 1,
+      pageSize: 10,
+    }),
+    {
+      lane: 'dpo',
+      laneStatus: 'pending',
+      findingKind: 'defect',
+      search: 'abc',
+      searchBy: 'all',
+      status: 'in_review',
+      page: 1,
+      pageSize: 10,
+    },
+  );
+  assert.deepEqual(withoutDrilldown(parsed.query), {
+    owner: 'x',
+    page: 1,
+    pageSize: 25,
+    searchBy: 'all',
+  });
+  assert.deepEqual(drilldownOf({ page: 1 }), {});
+});
+test('each drill-down key has a th/en label, in the fixed key order', () => {
+  const parsed = parseQueueQuery(
+    'findingKind=unavailable&findingSeverity=low&findingLane=ai_coe&sla=due_soon&laneStatus=sent_back&lane=dpo',
+  );
+  assert.ok(parsed.valid);
+  assert.deepEqual(drilldownLabels(parsed.query), [
+    { key: 'lane', label: 'queue.drill.lane', params: { lane: 'lane.dpo' } },
+    { key: 'laneStatus', label: 'queue.drill.lane_status', params: { state: 'projection.sent_back' } },
+    { key: 'sla', label: 'queue.drill.sla.due_soon', params: { days: 2 } },
+    { key: 'findingLane', label: 'queue.drill.finding_lane', params: { lane: 'lane.ai_coe' } },
+    {
+      key: 'findingSeverity',
+      label: 'queue.drill.finding_severity',
+      params: { severity: 'finding.severity.low' },
+    },
+    { key: 'findingKind', label: 'queue.drill.finding_kind.unavailable', params: {} },
+  ]);
+  assert.deepEqual(drilldownLabels({ page: 1 }), []);
+  assert.deepEqual(drilldownLabels({ sla: 'breached' })[0]!.label, 'queue.drill.sla.breached');
 });

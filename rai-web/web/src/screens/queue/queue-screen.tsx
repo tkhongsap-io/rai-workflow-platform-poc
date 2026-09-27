@@ -12,7 +12,15 @@ import { useSignedInSession } from '../../session/session-provider.js';
 import { ROUTES } from '../../routes.js';
 import { pageCount } from '../cases/case-list.view-model.js';
 import { canCreateCase } from '../operator/desk-health.view-model.js';
-import { NEXT_ACTION_LABELS, SEARCH_LABELS, parseQueueQuery, queueParams } from './view-model.js';
+import {
+  NEXT_ACTION_LABELS,
+  SEARCH_LABELS,
+  applyQueueForm,
+  drilldownLabels,
+  parseQueueQuery,
+  queueParams,
+  withoutDrilldown,
+} from './view-model.js';
 import './queue.css';
 
 const LANE_TONE: Record<LaneProjectionStatus, BadgeTone> = {
@@ -256,6 +264,40 @@ function QueueFilters({
   );
 }
 
+/** W6-14: the dashboard drill-down the URL carries, named in the reader's language, with a way to drop only it. */
+function QueueDrilldown({ query, clear }: { query: QueueQuery; clear: () => void }): JSX.Element | null {
+  const { t } = useLocale();
+  const labels = drilldownLabels(query);
+  if (labels.length === 0) return null;
+  return (
+    <section
+      className={'queue-drilldown'}
+      aria-labelledby={'queue-drilldown-title'}
+      data-testid={'queue-drilldown'}
+    >
+      <h2 id={'queue-drilldown-title'}>{t('queue.drill.title')}</h2>
+      <ul>
+        {labels.map(({ key, label, params }) => (
+          <li key={key} data-drilldown={key}>
+            {t(
+              label,
+              Object.fromEntries(
+                Object.entries(params).map(([name, value]) => [
+                  name,
+                  typeof value === 'number' ? value : t(value),
+                ]),
+              ),
+            )}
+          </li>
+        ))}
+      </ul>
+      <button type={'button'} className={'btn btn-secondary'} onClick={clear}>
+        {t('queue.drill.clear')}
+      </button>
+    </section>
+  );
+}
+
 type Result =
   { key: string; kind: 'loaded'; response: QueueResponse } | { key: string; kind: 'failed'; error: unknown };
 export function QueueScreen(): JSX.Element {
@@ -317,11 +359,15 @@ export function QueueScreen(): JSX.Element {
         </div>
       ) : (
         <>
+          <QueueDrilldown
+            query={parsed.query}
+            clear={() => setParams(queueParams(withoutDrilldown(parsed.query)))}
+          />
           <QueueFilters
             key={`${actorKey}:${search}:${resetCount}`}
             query={parsed.query}
             options={response?.filterOptions}
-            apply={(q) => setParams(queueParams(q))}
+            apply={(q) => setParams(queueParams(applyQueueForm(parsed.query, q)))}
             reset={reset}
           />
           {state === undefined ? (

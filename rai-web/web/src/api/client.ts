@@ -256,6 +256,13 @@ export function createApiClient(fetchImpl: FetchLike = (input, init) => fetch(in
           useCaseGroup: query.useCaseGroup,
           page: query.page,
           pageSize: query.pageSize,
+          // W6-14 drill-down (W6 plan section 8.2), applied by the server inside the actor's scope.
+          lane: query.lane,
+          laneStatus: query.laneStatus,
+          sla: query.sla,
+          findingLane: query.findingLane,
+          findingSeverity: query.findingSeverity,
+          findingKind: query.findingKind,
         },
       }),
     listCases: (query: CaseListQuery = {}) =>

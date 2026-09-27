@@ -841,6 +841,8 @@ No audit-read endpoint (W2-08 reconstructs the journey from the table through `t
 | Queue drill-down | `rai-web/shared/src/schemas/queue.ts` | `QueueDrilldownQuerySchema`: `lane`, `laneStatus`, `sla` (`due_soon`, `breached`), `findingLane`, `findingSeverity`, `findingKind` (`defect`, `unavailable`). Declared now; joined to the served `QueueQuerySchema` by W6-14 in the PR that applies them inside scope, so the queue never accepts a filter it ignores. |
 | Version configuration | `rai-web/shared/src/schemas/versions.ts` | `SubmittedVersion.frozenConfiguration?: Array<{ kind, revisionId, revisionNumber, label \| null }>` (7.6), optional; W6-09 serves it and declares `FrozenConfigurationEntrySchema` in the route schema. |
 
+**W6-14 amendment (2026-09-28).** The drill-down keys are now part of the served `QueueQuerySchema` (`GET /api/queue`) and are applied by `readQueue` inside the scoped `visible` sub-select, so `total`, `items`, `statusCounts` and `filterOptions` describe the drilled-down, in-scope population. `laneStatus=pending` and `sla` use the open review target set, `approved`/`sent_back` the projection on a current submitted version, `lane` alone any current submitted version, and the finding keys one undispositioned finding on the current version; without `lane`, a lane key applies to any lane. `QUEUE_DRILLDOWN_KEYS` lists them. See [W6-14 spec](../../changes/2026-09-27-w6-14-queue-drill-down-filters/spec.md).
+
 The recheck route (`POST …/versions/{versionId}/qc-rechecks`, W6 plan section 4.4) and its request shape arrive with W6-09. Section 7.9's "no configuration write (W6)" line is annotated by W6-04.
 
 ---
