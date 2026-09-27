@@ -17,6 +17,7 @@ export const AUDIT_ACTIONS = [
   'version.submitted',
   'version.resubmitted',
   'lane.opened',
+  'risk.proposed', // W5-05; W0-06 9.4 amended: the submit's risk proposal, in the submit transaction
   'lane.approved',
   'lane.sent_back',
   'draft.successor_created',

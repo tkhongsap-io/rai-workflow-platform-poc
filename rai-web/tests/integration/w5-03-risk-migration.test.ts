@@ -4,6 +4,8 @@
 // - risk_proposal is append-only (no UPDATE, no DELETE for any role; rai_app has no DELETE grant at all);
 // - case.risk_tier accepts 'unknown', still only inside rai.workflow_write (the W1-00 projection gate);
 // - at most one submit proposal per version (partial unique index), and the status consistency CHECK.
+// W5-05: every submit now records its own `submit` proposal, so rows inserted here by hand after a submit are
+// `recheck` rows, and the unique-index test relies on the proposal the submit wrote.
 // Synthetic fixture data only (fixture set slice1-synthetic@1); no rubric content (D07 stays open).
 
 import { describe, it } from 'node:test';
@@ -121,7 +123,13 @@ describe(`W5-03 risk migration guards — ${SET}`, () => {
   it('risk_proposal is append-only: rai_app and rai_operator have no UPDATE or DELETE grant; rai_owner is refused by the trigger with rai.append_only', async () => {
     const { versionId, revisionId } = await submitVendor();
     const id = randomUUID();
-    const inserted = await insertProposal('app', { id, versionId, rubricRevisionId: revisionId });
+    // W5-05: the submit already recorded the version's one `submit` proposal, so the row inserted here is a `recheck`.
+    const inserted = await insertProposal('app', {
+      id,
+      versionId,
+      trigger: 'recheck',
+      rubricRevisionId: revisionId,
+    });
     assert.equal(inserted, undefined, inserted?.message);
 
     for (const statement of [
@@ -184,7 +192,11 @@ describe(`W5-03 risk migration guards — ${SET}`, () => {
 
   it('a second submit proposal on one version violates risk_proposal_one_submit_per_version_key; a recheck proposal on it is accepted', async () => {
     const { versionId, revisionId } = await submitVendor();
-    assert.equal(await insertProposal('app', { versionId, rubricRevisionId: revisionId }), undefined);
+    // W5-05: the submit itself wrote the version's first `submit` proposal (it used to be inserted here by hand).
+    const written = await db.owner.execute(
+      sql`SELECT count(*)::int AS n FROM risk_proposal WHERE version_id = ${versionId} AND trigger = 'submit'`,
+    );
+    assert.equal((written.rows[0] as { n: number }).n, 1);
     const second = (await insertProposal('app', {
       versionId,
       status: 'unavailable',
@@ -229,6 +241,7 @@ describe(`W5-03 risk migration guards — ${SET}`, () => {
     assert.equal(badEnum?.code, CHECK_VIOLATION, badEnum?.message);
     const notConfigured = await insertProposal('app', {
       versionId,
+      trigger: 'recheck', // W5-05: the submit already holds the version's one `submit` proposal
       status: 'unavailable',
       unavailableReason: 'not_configured',
     });

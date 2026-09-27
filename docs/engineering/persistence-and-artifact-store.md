@@ -124,7 +124,7 @@ One review case. Mutable columns are the inherited descriptive fields (owner and
 | `source_record_id` | text NOT NULL | owner / SPOC | `TPM-…`, `VRO-…` or the literal `Unknown` (L10). Never validated against an external system. |
 | `use_case_name`, `business_unit`, `business_owner`, `technical_owner` | text NOT NULL | owner / SPOC | Inherited descriptive fields. W0-09 (W0-05 section 8 reconciliation): `business_unit` is the descriptive text of the W0-02 `businessUnit` body field and `business_owner` is written by the server as the display name of the subject in `owner_subject_id` at create and at every owner change; neither is ever read for access. |
 | `use_case_group` | text NOT NULL | owner / SPOC | D11: value must exist in the current `use_case_groups` configuration revision at write time; checked in the application, not by FK (revisions are immutable and the list may change later). |
-| `risk_tier` | text NULL | workflow (W5) | `high`, `medium`, `low`, `unknown` or NULL (`unknown` added by migration 0010, W5-03, 2026-09-27). Written only by the W5 risk proposal on submit; slice 1 never writes it. Never editable by owner or SPOC. |
+| `risk_tier` | text NULL | workflow (W5) | `high`, `medium`, `low`, `unknown` or NULL (`unknown` added by migration 0010, W5-03, 2026-09-27). Written only inside the submit transaction by the W5 risk proposal (`unknown` when evidence is missing; NULL when the proposal is `unavailable` or the version predates W5); never editable by owner or SPOC (writer amended by W5-05, 2026-09-28). |
 | `privacy_status`, `security_status`, `rai_status`, `ai_readiness_status` | text NOT NULL | **workflow only** | Read-only projections; see [the projection rule](#desk-local-case-fields-and-the-four-status-projections). |
 | `vendor_involved` | boolean NOT NULL | owner / SPOC | Desk-local (W0-04 fields). Drives the slot 3/4 default in W1-04. Never exported as a registry field. |
 | `model_type` | text NOT NULL | owner / SPOC | Desk-local (W0-04 fields). `llm`, `classic_ml` or `other`. Drives the classic-ML metric-or-N/A rule in W4. Never exported. |
@@ -669,7 +669,7 @@ Passwords above are local Docker placeholders for synthetic data only; networked
 - [ ] W0-07 proposals to this spec (W0-07 section 10): a nullable `qc_run.run_key` column with a partial unique index for replay lookup by key. Not added at W0 exit; the column-based lookup in W0-07 3.7 stands until the W2-05 contract PR asks for it. The `operator_job_run` table proposed by W0-10 section 7.3 is W3-07's migration, not this spec's schema.
 - [ ] D08 (DPO + IT/Security, before real data): choose among deletion options A/B/C; retention periods for business data, audit, notifications; draft retention; whether audit purge exists. ADR-0005 drafted then.
 - [ ] D10 (IT/Security + accountable owner): key custody for option B; production database roles and backup target for the restore test.
-- [ ] W5: `risk_tier` writer arrives with the rubric (D07); the column and its write gate exist from W1-00 so that no earlier ticket writes it.
+- [x] W5: `risk_tier` writer arrives with the rubric (D07); the column and its write gate exist from W1-00 so that no earlier ticket writes it. Done by W5-05 (2026-09-28) against the SYNTHETIC PLACEHOLDER rubric; D07 stays open.
 
 ## References
 

@@ -21,7 +21,12 @@ export const ModelTypeSchema = Type.Union([
   Type.Literal('other'),
 ]); // a tuple, not MODEL_TYPES.map(): a mapped array widens the inferred type to never (W1-02, as W1-01 did for IdentityMode)
 
-export type RiskTier = string; // opaque placeholder: D07 records the labels before W5; null throughout slice 1
+/**
+ * W5-05 (R-9): the tier codes of `case.risk_tier` and the risk proposal. `unknown` when missing answers or evidence
+ * leave more than one tier possible (never read as Low). Display labels come from the rubric's `tierLabels` (D07).
+ */
+export const RISK_TIERS = ['high', 'medium', 'low', 'unknown'] as const;
+export type RiskTier = (typeof RISK_TIERS)[number];
 
 export const LANE_PROJECTION_STATUSES = ['pending', 'approved', 'sent_back'] as const; // confirmed by W0-04
 export type LaneProjectionStatus = (typeof LANE_PROJECTION_STATUSES)[number];

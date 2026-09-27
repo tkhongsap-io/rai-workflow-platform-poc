@@ -624,6 +624,8 @@ export interface ConfigurationView {     // the published revision that applies 
 |---|---|---|---|
 | `GET /api/configuration/risk-rubric/current` | — | `200 RiskRubricView { revisionId, label, provenance: 'synthetic_placeholder', publishedAt, body: RiskRubricBody }`, the `risk_rubric` revision in force now under the W1-00 activation rule; W0-05 action `config.read_effective` (every role) | `401`; `404 not_found` with `details.resource = 'risk_rubric'` when no revision is in force |
 
+**W5-05 amendment (2026-09-28): `RiskTier` and `CaseView.riskTier`.** [W5 plan](implementation-plan-w5.md) R-9 and R-10. The opaque placeholder above is replaced by `type RiskTier = 'high' | 'medium' | 'low' | 'unknown'` (`RISK_TIERS` in `shared/src/schemas/cases.ts`). `CaseView.riskTier` is no longer null throughout: it is the tier of the latest submitted version's risk proposal, written by the submit transaction (`unknown` when missing answers or evidence leave the tier open), and NULL when that proposal is `unavailable` or no version has one. It stays a projected field: never writable through `PATCH` (422 `projected_field`). Display labels come from the rubric's `tierLabels`, a SYNTHETIC PLACEHOLDER until D07.
+
 ### 7.4 Artifact upload and download (W1-03a/b; consumed by W1-06)
 
 ```ts

@@ -79,6 +79,25 @@ export const EVENT_CATALOGUE = Object.freeze({
     level: 'warn',
     fields: ['qcRunId', 'caseId', 'versionId', 'trigger', 'lane', 'status', 'refusedFindingCount'],
   },
+  // W5-05 (W5 plan section 8): the submit's risk proposal, after commit. No answer value, question text or name.
+  'risk.proposal.recorded': {
+    level: 'info',
+    fields: [
+      'proposalId',
+      'caseId',
+      'versionId',
+      'status',
+      'tier',
+      'rubricRevision',
+      'engineVersion',
+      'unknownCount',
+      'durationMs',
+    ],
+  },
+  'risk.proposal.unavailable': {
+    level: 'error',
+    fields: ['proposalId', 'caseId', 'versionId', 'reason', 'rubricRevision'],
+  },
   'mail.enqueued': {
     level: 'info',
     fields: ['notificationId', 'eventType', 'caseId', 'versionId', 'lane', 'recipientCount'],
