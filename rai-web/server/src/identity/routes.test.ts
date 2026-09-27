@@ -9,7 +9,9 @@ import assert from 'node:assert/strict';
 import { buildApp } from '../app.js';
 import { createIdentityAdapter } from './adapter.js';
 import { GOOGLE_ISSUER, type IdClaims } from './oidc.js';
+import { createFixtureIdentityProvider, type FixtureIdentity } from './fixture.js';
 import { createMemorySessionStore } from './session.memory.js';
+import type { SubjectProfile } from './session.js';
 
 const publicBaseUrl = new URL('http://127.0.0.1:8787');
 const config = {
@@ -32,7 +34,14 @@ interface Harness {
   exchangeCalls: number;
 }
 
-async function harness(options: { exchangeThrows?: boolean; now?: () => Date } = {}): Promise<Harness> {
+async function harness(
+  options: {
+    exchangeThrows?: boolean;
+    now?: () => Date;
+    appNow?: () => Date; // the app clock (session and profile timestamps); W7-06
+    profiles?: { recorded(profile: SubjectProfile): void };
+  } = {},
+): Promise<Harness> {
   const store = createMemorySessionStore();
   let nextClaims: Partial<IdClaims> = {};
   const state = { exchangeCalls: 0 };
@@ -64,11 +73,13 @@ async function harness(options: { exchangeThrows?: boolean; now?: () => Date } =
   await adapter.start({ host: '127.0.0.1', port: 8787, publicBaseUrl, trustProxy: false });
   const { fastify } = buildApp({
     config,
+    ...(options.appNow === undefined ? {} : { now: options.appNow }),
     identity: {
       adapter,
       sessionStore: store,
       facts,
       ...(options.now === undefined ? {} : { now: options.now }),
+      ...(options.profiles === undefined ? {} : { profiles: options.profiles }),
     },
   });
   await fastify.ready();
@@ -393,4 +404,134 @@ test('ID-10 (unit half): the fixture routes do not exist in local-google mode (4
     assert.equal(res.statusCode, 404, req.url);
     assert.equal(res.json<{ error: { code: string } }>().error.code, 'not_found');
   }
+});
+
+const FX_ADMIN: FixtureIdentity = {
+  fixtureUserId: 'fx-user-admin',
+  subjectId: 'fixture:fx-user-admin',
+  displayName: 'Desk Admin (fixture)',
+  email: 'admin@rai-desk.example',
+  roles: [{ role: 'admin', scope: { kind: 'all_cases' } }],
+};
+
+// W7-06 (W7 plan section 4.1): every non-fixture sign-in upserts the subject profile in the session store's create,
+// and establishSession then calls the optional `profiles.recorded` hook (bound by W7-07) once with the written row.
+async function completeCallback(h: Harness) {
+  const { redirect, cookieHeader } = await beginSignIn(h);
+  return h.app.inject({
+    method: 'GET',
+    url: `/auth/callback?code=synthetic-code&state=${redirect.searchParams.get('state')}`,
+    headers: { cookie: cookieHeader },
+  });
+}
+
+test('W7-06: a local-google callback records the subject profile from the principal and calls profiles.recorded once with it', async () => {
+  let clock = Date.parse('2026-09-28T01:00:00Z');
+  const recorded: SubjectProfile[] = [];
+  const h = await harness({ appNow: () => new Date(clock), profiles: { recorded: (p) => recorded.push(p) } });
+  h.claims({ email: 'Dev@Example.test', name: 'Dev Person' });
+  const res = await completeCallback(h);
+  assert.equal(res.statusCode, 303);
+  assert.equal(h.store.profiles.size, 1);
+  const profile = h.store.profiles.get('google:1234567890');
+  assert.deepEqual(profile, {
+    subjectId: 'google:1234567890',
+    identityMode: 'local-google',
+    email: 'dev@example.test',
+    displayName: 'Dev Person',
+    roles: [{ role: 'owner', scope: { kind: 'own_cases' } }],
+    firstSeenAt: new Date('2026-09-28T01:00:00Z'),
+    lastSignInAt: new Date('2026-09-28T01:00:00Z'),
+  });
+  assert.deepEqual(recorded, [profile]);
+
+  clock = Date.parse('2026-09-28T05:00:00Z');
+  h.claims({ email: 'dev@example.test', name: 'Dev Renamed' });
+  assert.equal((await completeCallback(h)).statusCode, 303);
+  assert.equal(h.store.profiles.size, 1, 'the second sign-in updates the one row');
+  const second = h.store.profiles.get('google:1234567890');
+  assert.equal(second?.displayName, 'Dev Renamed');
+  assert.deepEqual(second?.firstSeenAt, new Date('2026-09-28T01:00:00Z'), 'first seen is kept');
+  assert.deepEqual(second?.lastSignInAt, new Date('2026-09-28T05:00:00Z'));
+  assert.equal(recorded.length, 2);
+  assert.deepEqual(recorded[1], second);
+});
+
+test('W7-06: a refused callback records no profile and does not call the hook', async () => {
+  const recorded: SubjectProfile[] = [];
+  const h = await harness({ profiles: { recorded: (p) => recorded.push(p) } });
+  h.claims({ email_verified: false });
+  const res = await completeCallback(h);
+  assert.equal(res.statusCode, 401);
+  assert.equal(h.store.profiles.size, 0);
+  assert.deepEqual(recorded, []);
+});
+
+test('W7-06: a throwing profiles.recorded hook does not undo or fail the committed sign-in', async () => {
+  const h = await harness({
+    profiles: {
+      recorded: () => {
+        throw new Error('synthetic hook failure');
+      },
+    },
+  });
+  const res = await completeCallback(h);
+  assert.equal(res.statusCode, 303);
+  assert.ok(cookieOf(res, 'rai_session'), 'the session cookie is still set');
+  assert.equal(h.store.rows.size, 1);
+  assert.equal(h.store.profiles.size, 1);
+});
+
+test('W7-06: a fixture sign-in records no subject profile and never calls the hook', async () => {
+  const store = createMemorySessionStore();
+  const recorded: SubjectProfile[] = [];
+  const adapter = createIdentityAdapter({
+    env: { RAI_IDENTITY_MODE: 'fixture' },
+    nodeEnv: 'test',
+    discovery: () => Promise.reject(new Error('never called in fixture mode')),
+    groupMappingSource: () => Promise.resolve(null),
+    fixtureUsers: [FX_ADMIN],
+  });
+  await adapter.start({ host: '127.0.0.1', port: 8787, publicBaseUrl, trustProxy: false });
+  const { fastify } = buildApp({
+    config,
+    identity: {
+      adapter,
+      sessionStore: store,
+      facts,
+      fixtureProvider: createFixtureIdentityProvider([FX_ADMIN]),
+      profiles: { recorded: (p) => recorded.push(p) },
+    },
+  });
+  await fastify.ready();
+  const res = await fastify.inject({
+    method: 'POST',
+    url: '/auth/fixture/sign-in',
+    payload: { fixtureUserId: 'fx-user-admin' },
+  });
+  assert.equal(res.statusCode, 200);
+  assert.equal(store.rows.size, 1);
+  assert.equal(store.profiles.size, 0);
+  assert.deepEqual(recorded, []);
+});
+
+test('W7-06: the memory store refuses a profile in fixture mode, as the Postgres CHECK does, and writes nothing', async () => {
+  const store = createMemorySessionStore();
+  await assert.rejects(
+    store.create({
+      principal: {
+        subjectId: 'fixture:fx-user-admin',
+        displayName: 'Desk Admin (fixture)',
+        email: 'admin@rai-desk.example',
+        roles: [{ role: 'admin', scope: { kind: 'all_cases' } }],
+      },
+      identityMode: 'fixture',
+      absoluteHours: 12,
+      correlationId: 'synthetic',
+      profile: { email: 'admin@rai-desk.example', displayName: 'Desk Admin (fixture)' },
+    }),
+  );
+  assert.equal(store.rows.size, 0);
+  assert.equal(store.profiles.size, 0);
+  assert.deepEqual(store.audit, []);
 });

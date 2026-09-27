@@ -29,7 +29,7 @@ import { registerDecideRoutes, type DecideRouteDeps } from './workflow/routes.js
 import { registerFindingsRoutes, type FindingsRouteDeps } from './findings/routes.js';
 import { staticPlugin, type StaticOptions } from './static.js';
 import type { FixtureIdentityProvider } from './identity/fixture.js';
-import { registerAuthRoutes } from './identity/routes.js';
+import { registerAuthRoutes, type SubjectProfileHook } from './identity/routes.js';
 import { cookieNames, type SessionStore } from './identity/session.js';
 import type { IdentityAdapter } from './identity/types.js';
 import { maybeContext, mintCorrelationId, runWithContext } from './observability/context.js';
@@ -47,6 +47,8 @@ export interface IdentityDeps {
   sessionStore: SessionStore;
   facts: ScopeFactsSource;
   fixtureProvider?: FixtureIdentityProvider; // fixture mode only
+  /** W7-06: told about every committed subject profile; W7-07 binds the mail recipient directory's refresh. */
+  profiles?: SubjectProfileHook;
 }
 
 /** What buildApp injects into every route group, so no group can hold a different database or clock. */
@@ -274,6 +276,8 @@ export function buildApp(deps: AppDeps): App {
         publicBaseUrl: deps.config.publicBaseUrl,
         emitter,
         ...(identity.fixtureProvider === undefined ? {} : { fixtureProvider: identity.fixtureProvider }),
+        ...(identity.profiles === undefined ? {} : { profiles: identity.profiles }),
+        errors,
         now,
       });
       done();

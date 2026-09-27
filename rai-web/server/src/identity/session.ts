@@ -7,10 +7,11 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { and, eq, isNull, lt, or, sql } from 'drizzle-orm';
 import { uuidv7 } from '@rai/shared/ids';
-import type { IdentityMode, Locale, Principal } from '@rai/shared/schemas/auth';
+import type { IdentityMode, Locale, Principal, RoleScope } from '@rai/shared/schemas/auth';
 import { auditStore } from '../audit/store.js';
 import type { Db, Executor } from '../db/client.js';
 import { session as sessionTable } from '../db/schema/session.js';
+import { subjectProfile as subjectProfileTable } from '../db/schema/subject-profile.js';
 import { withTransaction } from '../db/transaction.js';
 import type { SignInReasonCode } from './types.js';
 
@@ -32,17 +33,43 @@ export interface SessionRecord {
   locale: Locale;
 }
 
+/**
+ * W7-06 (W7 plan section 4.1): the `subject_profile` row a non-fixture sign-in upserts. Email and name come from the
+ * principal minted from the verified login; `roles` is its (role, scope) snapshot at this sign-in.
+ */
+export interface SubjectProfile {
+  subjectId: string;
+  identityMode: IdentityMode;
+  email: string;
+  displayName: string;
+  roles: RoleScope[];
+  firstSeenAt: Date; // the first sign-in; kept by every later upsert
+  lastSignInAt: Date;
+}
+
 export interface CreateSessionInput {
   principal: Principal;
   identityMode: IdentityMode;
   absoluteHours: number;
   correlationId: string;
   now?: Date;
+  /** W7-06: present on every non-fixture sign-in; upserts `subject_profile` in the same transaction. */
+  profile?: { email: string; displayName: string };
+}
+
+export interface CreatedSession {
+  session: SessionRecord;
+  token: string;
+  /** The written `subject_profile` row; present exactly when `input.profile` was given. */
+  profile?: SubjectProfile;
 }
 
 export interface SessionStore {
-  /** Creates a new row and returns the cookie value once; writes `identity.signed_in` in the same transaction. */
-  create(input: CreateSessionInput): Promise<{ session: SessionRecord; token: string }>;
+  /**
+   * Creates a new row and returns the cookie value once; writes `identity.signed_in` and, when `input.profile` is
+   * given, upserts `subject_profile`, all in the same transaction (any failure leaves none of them).
+   */
+  create(input: CreateSessionInput): Promise<CreatedSession>;
   /** The live session for a cookie value, or undefined (no row, revoked, expired, idle-expired). Touches lastSeenAt (throttled). */
   resolve(token: string, policy: { idleMinutes: number }, now?: Date): Promise<SessionRecord | undefined>;
   /** Sign-out: marks the row revoked and writes `identity.signed_out`. */
@@ -97,6 +124,18 @@ export function isLive(row: SessionRecord, policy: { idleMinutes: number }, now:
   return true;
 }
 
+function toProfile(row: typeof subjectProfileTable.$inferSelect): SubjectProfile {
+  return {
+    subjectId: row.subjectId,
+    identityMode: row.identityMode as IdentityMode,
+    email: row.email,
+    displayName: row.displayName,
+    roles: row.roles as RoleScope[],
+    firstSeenAt: row.firstSeenAt,
+    lastSignInAt: row.lastSignInAt,
+  };
+}
+
 function toRecord(row: typeof sessionTable.$inferSelect): SessionRecord {
   return {
     id: row.id,
@@ -118,7 +157,7 @@ export function createPgSessionStore(db: Db): SessionStore {
       const token = newToken();
       const id = uuidv7(now.getTime());
       const expiresAt = new Date(now.getTime() + input.absoluteHours * 60 * 60 * 1000);
-      const session = await withTransaction(db, async (tx) => {
+      const written = await withTransaction(db, async (tx) => {
         const [row] = await tx
           .insert(sessionTable)
           .values({
@@ -146,9 +185,36 @@ export function createPgSessionStore(db: Db): SessionStore {
           correlationId: input.correlationId,
           occurredAt: now,
         });
-        return toRecord(row!);
+        const session = toRecord(row!);
+        if (input.profile === undefined) return { session };
+        // W7-06: last in the transaction, so a refused upsert (e.g. the identity_mode CHECK) takes the session and
+        // the audit row with it. first_seen_at is written once; every later sign-in refreshes the rest.
+        const values = {
+          subjectId: input.principal.subjectId,
+          identityMode: input.identityMode,
+          email: input.profile.email,
+          displayName: input.profile.displayName,
+          roles: input.principal.roles,
+          firstSeenAt: now,
+          lastSignInAt: now,
+        };
+        const [profileRow] = await tx
+          .insert(subjectProfileTable)
+          .values(values)
+          .onConflictDoUpdate({
+            target: subjectProfileTable.subjectId,
+            set: {
+              identityMode: values.identityMode,
+              email: values.email,
+              displayName: values.displayName,
+              roles: values.roles,
+              lastSignInAt: values.lastSignInAt,
+            },
+          })
+          .returning();
+        return { session, profile: toProfile(profileRow!) };
       });
-      return { session, token };
+      return { ...written, token };
     },
 
     async resolve(token, policy, now = new Date()) {

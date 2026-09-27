@@ -44,6 +44,7 @@ export const BUSINESS_TABLES = [
   'case',
   'configuration_draft', // W6-02 (references configuration_revision)
   'configuration_revision',
+  'subject_profile', // W7-06: no FK; reset so each test starts with no profiles
 ] as const;
 
 /**

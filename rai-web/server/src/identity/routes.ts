@@ -17,9 +17,10 @@ import {
   type Principal,
   type SessionInfo,
 } from '@rai/shared/schemas/auth';
+import type { ErrorCapture } from '../observability/errors.js';
 import type { Emitter } from '../observability/log.js';
 import type { FixtureIdentityProvider } from './fixture.js';
-import { cookieNames, type SessionRecord, type SessionStore } from './session.js';
+import { cookieNames, type SessionRecord, type SessionStore, type SubjectProfile } from './session.js';
 import { SignInRefused, type IdentityAdapter, type SignInTransaction } from './types.js';
 import { TRANSACTION_TTL_MS } from './oidc.js';
 
@@ -29,7 +30,16 @@ export interface AuthRouteDeps {
   publicBaseUrl: URL;
   emitter: Emitter;
   fixtureProvider?: FixtureIdentityProvider; // fixture mode only
+  /** W7-06: told about every committed subject profile (W7-07 binds the recipient directory's refresh). */
+  profiles?: SubjectProfileHook;
+  /** Records a failing profile hook as `error.captured`; absent in unit harnesses that build no app. */
+  errors?: ErrorCapture;
   now?: () => Date;
+}
+
+/** W7-06 (W7 plan section 4.1, 5.3): called once, after the sign-in transaction committed, with the written row. */
+export interface SubjectProfileHook {
+  recorded(profile: SubjectProfile): void;
 }
 
 /** W0-02 7.2: an unknown fixture user is 404 not_found with the plain envelope (a fixture user is not a W0-06 resource). */
@@ -79,15 +89,26 @@ export function registerAuthRoutes(fastify: FastifyInstance, deps: AuthRouteDeps
     request: FastifyRequest,
     reply: FastifyReply,
     principal: Principal,
+    withProfile: boolean,
   ): Promise<SessionRecord> {
-    const { session, token } = await deps.sessionStore.create({
+    const { session, token, profile } = await deps.sessionStore.create({
       principal,
       identityMode: mode,
       absoluteHours: deps.adapter.sessionPolicy().absoluteHours,
       correlationId: request.id,
       now: now(),
+      // W7-06: every non-fixture sign-in upserts subject_profile inside the session transaction.
+      ...(withProfile ? { profile: { email: principal.email, displayName: principal.displayName } } : {}),
     });
     void reply.setCookie(names.session, token, { ...cookieBase, expires: session.expiresAt });
+    if (profile !== undefined && deps.profiles !== undefined) {
+      // The session has committed: a failing hook is recorded, never turned into a failed sign-in.
+      try {
+        deps.profiles.recorded(profile);
+      } catch (err) {
+        deps.errors?.internal(err, '/auth/callback');
+      }
+    }
     deps.emitter.log('auth.signin.succeeded', {
       identityMode: mode,
       actorSubjectId: principal.subjectId,
@@ -148,7 +169,7 @@ export function registerAuthRoutes(fastify: FastifyInstance, deps: AuthRouteDeps
       async (request, reply) => {
         const principal = provider.resolve(request.body.fixtureUserId);
         if (principal === undefined) throw new FixtureUserUnknownError();
-        const session = await establishSession(request, reply, principal);
+        const session = await establishSession(request, reply, principal, false);
         return sessionInfo(session);
       },
     );
@@ -214,7 +235,7 @@ export function registerAuthRoutes(fastify: FastifyInstance, deps: AuthRouteDeps
       });
       throw err.errorType === 'forbidden' ? new ForbiddenError() : new UnauthenticatedError();
     }
-    await establishSession(request, reply, principal);
+    await establishSession(request, reply, principal, true);
     const returnTo = transaction.returnTo;
     return reply.redirect(returnTo !== undefined && isSameOriginPath(returnTo) ? returnTo : '/', 303);
   });

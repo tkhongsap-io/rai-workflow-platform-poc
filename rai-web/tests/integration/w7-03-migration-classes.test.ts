@@ -70,17 +70,19 @@ const withoutTime = (rows: ClassRow[]) =>
   rows.map(({ hash, tag, rollback_class }) => ({ hash, tag, rollback_class }));
 
 /**
- * The journal length of the "release" the readiness and rollback tests start from: the longest journal, at or after
- * the W7-03 migration, whose newest migration is additive. W6-02 (#214) put a restore-required migration after W7-03's,
- * so the full journal no longer ends additive; the release database below is migrated to this prefix instead, and
- * every assertion keeps its meaning whatever later migrations are classed.
+ * The journal length of the "release" the readiness and rollback tests start from: the W7-03 migration followed by
+ * the longest unbroken run of additive migrations after it. W6-02 (#214) put a restore-required migration after
+ * W7-03's, so the full journal no longer ends additive; W7-06 (#217) then added an additive one after W6-02's, so
+ * "the longest journal ending additive" would put a restore-required migration between W7-03 and the release end and
+ * leave no pre-W7-03 target whose later migrations are all additive. The release database below is migrated to this
+ * prefix instead, and every assertion keeps its meaning whatever later migrations are classed.
  */
 function releaseLength(): number {
   const w703 = tags.findIndex((tag) => tag.endsWith('_w7_03_migration_class'));
   assert.ok(w703 >= 0);
-  let n = tags.length;
-  while (n > w703 + 1 && MIGRATION_CLASSES[tags[n - 1]!] !== 'additive') n--;
-  assert.equal(MIGRATION_CLASSES[tags[n - 1]!], 'additive', 'the W7-03 migration is additive');
+  assert.equal(MIGRATION_CLASSES[tags[w703]!], 'additive', 'the W7-03 migration is additive');
+  let n = w703 + 1;
+  while (n < tags.length && MIGRATION_CLASSES[tags[n]!] === 'additive') n++;
   return n;
 }
 /** Smallest journal length whose later migrations (up to the release) are all additive: the binary-only target. */

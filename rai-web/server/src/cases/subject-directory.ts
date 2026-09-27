@@ -2,13 +2,15 @@
 // display name the server writes into the descriptive `business_owner` column at create and at every owner change
 // (W0-04 `case` row, W0-05 section 8 reconciliation). A subject that does not resolve is 422 invalid_input (W0-05
 // "Create target"). Sources, in order: subjects handed in at construction (the fixture identities in fixture mode),
-// the acting principal, then any subject that has signed in through the identity adapter (the `session` table's
-// stored principal, newest row first). No directory call leaves the process; nothing here reads an email.
+// the acting principal, the `subject_profile` row every non-fixture sign-in upserts (W7-06; it survives `db:cleanup`,
+// which removes session rows), then any subject that has signed in through the identity adapter (the `session`
+// table's stored principal, newest row first). No directory call leaves the process; nothing here reads an email.
 
 import { desc, eq } from 'drizzle-orm';
 import type { Principal } from '@rai/shared/schemas/auth';
 import type { Executor } from '../db/client.js';
 import { session } from '../db/schema/session.js';
+import { subjectProfile } from '../db/schema/subject-profile.js';
 
 export interface ResolvedSubject {
   subjectId: string;
@@ -40,6 +42,12 @@ export function createSubjectDirectory(
       if (fromKnown !== undefined) return { subjectId, displayName: fromKnown };
       if (actor !== undefined && actor.subjectId === subjectId)
         return { subjectId, displayName: actor.displayName };
+      const [profile] = await exec
+        .select({ displayName: subjectProfile.displayName })
+        .from(subjectProfile)
+        .where(eq(subjectProfile.subjectId, subjectId))
+        .limit(1);
+      if (profile !== undefined) return { subjectId, displayName: profile.displayName };
       const [row] = await exec
         .select({ principal: session.principal })
         .from(session)

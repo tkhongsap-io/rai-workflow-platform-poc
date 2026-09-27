@@ -38,6 +38,8 @@ export const MIGRATION_CLASSES: Readonly<Record<string, RollbackClass>> = Object
   // W6-02 (numbered 0011 until W7-03 merged first): its header says restore-required (an older binary's kind list
   // does not know a published `desk_controls` revision).
   '0012_w6_02_configuration_admin': 'restore-required',
+  // W7-06: one new table; an older build never reads it and signs in as before.
+  '0013_w7_06_subject_profile': 'additive',
 });
 
 /**
