@@ -1,5 +1,13 @@
 # Development log
 
+## W4-05c DOCX and XLSX extraction — 2026-09-27
+
+Third extraction ticket of W4b (#220). The document reader that W4-05b built can now read Word and Excel files. A Word document comes back as its paragraphs, each located by its paragraph number. An Excel workbook comes back as its non-empty cells, each located by its sheet number and cell reference (such as `B7`). No location carries document text: no heading and no sheet name, only numbers and the cell reference. The text stays in memory for the one QC run that asked for it.
+
+Both readers are hand-written on Node's built-ins, with no new library. The ZIP reader checks the whole container before it reads anything. It caps every decompression, so a small file that expands to gigabytes is stopped at 20 MiB, and it checks each part's size and checksum. The XML reader refuses any DOCTYPE, so no entity trick or external reference can run, and it expands only the standard escapes. Everything a hostile or broken file can do ends as a clean "could not read" answer, never a crash: every row of the upload hostile set, a decompression bomb, a DOCTYPE, and a ZIP whose parts disagree with its directory. The start-up self-test now reads a small embedded synthetic Word file, so readiness will prove a real parse.
+
+The readers also read every Word and Excel file of the synthetic evaluation set at exactly the locations its labels expect, which the evaluation harness (W4-08a) will rely on. PDF and images come next (W4-05d); rules that judge the text come in W4-06a.
+
 ## W6-02 configuration drafts, change note and restore — 2026-09-27
 
 Second W6 ticket (#214). The desk's store can now hold an Admin's configuration change as a draft, publish it with a note, and roll it back, without ever changing a published revision. Nothing a user can see changes yet: the routes are W6-04 and the screens W6-05 onwards.

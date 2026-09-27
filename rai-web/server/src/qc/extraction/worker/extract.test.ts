@@ -36,8 +36,15 @@ const request = (mediaType = 'application/pdf'): WorkerRequest => ({
 });
 const registry = (format: FormatExtractor) => new Map([['application/pdf', format]]);
 
-test('with no format registered, every media type is unreadable', () => {
-  assert.equal(FORMAT_EXTRACTORS.size, 0, 'W4-05c and W4-05d register the formats');
+test('DOCX and XLSX are registered (W4-05c); PDF waits for W4-05d; bytes that are not a package are unreadable', () => {
+  assert.deepEqual(
+    [...FORMAT_EXTRACTORS.keys()].sort(),
+    [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ],
+    'W4-05d registers PDF; PNG and JPEG stay unregistered (no OCR)',
+  );
   for (const mediaType of MEDIA_TYPES)
     assert.deepEqual(extractInWorker(request(mediaType)), { ok: false, reason: 'unreadable' });
 });

@@ -21,6 +21,7 @@ import { SERVER_PACKAGE_VERSION } from '../../server-version.js';
 import { extractionLimitsProblems, workerLimitsOf, type ExtractionLimits } from './limits.js';
 import type { ExtractFailureReason, ExtractResult, Extractor } from './port.js';
 import { buildWorkerRequest, classifyReply, type ClassifiedReply, type WorkerLimits } from './protocol.js';
+import { SELF_TEST_DOCX, SELF_TEST_TEXT } from './selftest-docx.js';
 
 export const EXTRACTOR_PROTOCOL = 'rai-extract/1';
 
@@ -194,9 +195,10 @@ function runWorker(
   });
 }
 
+/** W4-05c: the self-test extracts the embedded synthetic DOCX (plan section 2, readiness). */
 const SELF_TEST_PROBE = {
-  mediaType: 'application/pdf' as AllowedMediaType,
-  bytes: Uint8Array.from([0x25, 0x50, 0x44, 0x46, 0x2d]),
+  mediaType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' as AllowedMediaType,
+  bytes: SELF_TEST_DOCX,
 };
 
 export function createWorkerExtractor(
@@ -260,12 +262,19 @@ export function createWorkerExtractor(
     version,
     extract,
     /**
-     * W4-05b: true when a worker starts, reads a request and answers with a well-formed reply. W4-05c tightens it to
-     * the embedded synthetic DOCX yielding segments; W4-13b caches it as the readiness probe answer.
+     * W4-05c: true only when a worker extracts the embedded synthetic DOCX to its one expected paragraph, so the probe
+     * proves a real parse, not just a round trip. W4-13b caches it as the readiness probe answer.
      */
     async selfTest() {
       const result = await extract(SELF_TEST_PROBE, new AbortController().signal);
-      return result.ok || result.reason === 'unreadable';
+      if (!result.ok || result.segments.length !== 1) return false;
+      const [segment] = result.segments;
+      return (
+        segment?.text === SELF_TEST_TEXT &&
+        segment.locator.kind === 'section' &&
+        'index' in segment.locator &&
+        segment.locator.index === 1
+      );
     },
   };
 }
