@@ -19,9 +19,10 @@ export interface WorkerLimits {
 }
 
 /**
- * The most UTF-16 code units any one locator string field (`sheet`, `cell`, `heading`) may carry. Locators are stored
- * and served (decisions 21 and 23), so their strings also count toward `maxTextChars`; this per-field bound keeps a
- * heading from carrying a paragraph even under a large text cap. Over it is `limit_output`.
+ * The most UTF-16 code units any one locator string field may carry. Locators are stored and served (decisions 21
+ * and 23), so their strings also count toward `maxTextChars`; this per-field bound keeps any string field from carrying
+ * a paragraph even under a large text cap. Over it is `limit_output`. Since W4-16 the only string the wire accepts is
+ * the A1 `cell` reference; a `heading` or `sheet` field is refused by the host schema as document text.
  */
 export const MAX_LOCATOR_STRING_CHARS = 512;
 

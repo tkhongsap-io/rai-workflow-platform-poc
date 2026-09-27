@@ -16,7 +16,7 @@
             {
               "fixtureArtifactId": "fx-doc-0002-01",
               "slot": 1,
-              "locator": { "kind": "section", "heading": "4. Hallucination and accuracy" }
+              "locator": { "kind": "section", "index": 4 }
             }
           ],
           "measure": {

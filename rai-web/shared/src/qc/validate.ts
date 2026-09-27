@@ -6,7 +6,13 @@
 import { Type } from 'typebox';
 import { Value } from 'typebox/value';
 import { LANES, type Lane, type LaneMapping, owningLaneRule } from '../constants.js';
-import { QC_ENGINE_LABEL_PATTERN, QC_RULE_ID_PATTERN, type FindingScope, type QcFinding } from './types.js';
+import {
+  CELL_REFERENCE_PATTERN,
+  QC_ENGINE_LABEL_PATTERN,
+  QC_RULE_ID_PATTERN,
+  type FindingScope,
+  type QcFinding,
+} from './types.js';
 
 const SlotSchema = Type.Union([1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => Type.Literal(n)));
 const LaneSchema = Type.Union(LANES.map((lane) => Type.Literal(lane)));
@@ -39,12 +45,18 @@ export const EvidenceLocatorSchema = Type.Union([
     },
     { additionalProperties: false },
   ),
+  // W4-16 (decision 21): no document text. A sheet ordinal and an A1 reference, never a sheet name; a section
+  // ordinal, never a heading. `additionalProperties: false` refuses the pre-W4-16 `sheet` and `heading` fields.
   Type.Object(
-    { kind: Type.Literal('cell'), sheet: Type.String({ minLength: 1 }), cell: Type.String({ minLength: 1 }) },
+    {
+      kind: Type.Literal('cell'),
+      sheetIndex: Type.Optional(Type.Integer({ minimum: 1 })),
+      cell: Type.Optional(Type.String({ pattern: CELL_REFERENCE_PATTERN })),
+    },
     { additionalProperties: false },
   ),
   Type.Object(
-    { kind: Type.Literal('section'), heading: Type.String({ minLength: 1 }) },
+    { kind: Type.Literal('section'), index: Type.Optional(Type.Integer({ minimum: 1 })) },
     { additionalProperties: false },
   ),
   Type.Object({ kind: Type.Literal('absent') }, { additionalProperties: false }),

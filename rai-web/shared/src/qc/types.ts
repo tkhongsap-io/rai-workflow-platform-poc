@@ -69,11 +69,18 @@ export interface SelectedRule {
   params?: Record<string, unknown>; // rule-specific, schema-checked per ruleId when the revision was published
 }
 
+/** W4-16 (W4b plan section 9, decision 21): the A1 reference a text-free `cell` locator may carry. */
+export const CELL_REFERENCE_PATTERN = '^[A-Z]{1,3}[1-9][0-9]{0,6}$';
+
+/**
+ * Where evidence points. References only, and no document text (W4-16, decision 21): a `section` is located by its
+ * 1-based ordinal, never its heading, and a `cell` by its 1-based sheet ordinal and A1 reference, never the sheet name.
+ */
 export type EvidenceLocator =
   | { kind: 'page'; page: number; region?: { x: number; y: number; w: number; h: number } }
   | { kind: 'text_range'; start: number; end: number }
-  | { kind: 'cell'; sheet: string; cell: string }
-  | { kind: 'section'; heading: string }
+  | { kind: 'cell'; sheetIndex?: number; cell?: string } // cell matches CELL_REFERENCE_PATTERN
+  | { kind: 'section'; index?: number }
   | { kind: 'absent' }; // the rule looked for something and found nothing
 
 /** Maps 1:1 onto W0-04 qc_finding.evidence: {artifact_id?, page?, locator?, excerpt_hash?}. References only. */

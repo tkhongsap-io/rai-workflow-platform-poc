@@ -236,11 +236,15 @@ test.describe(`W4-12 QC log and unavailable runs on the real server (${FIXTURE_S
     const extraction = rows.filter({
       has: page.locator('[data-finding-rule="ACC-EXTRACTION-NOT-HALLUCINATION"]'),
     });
+    // W4-16: the line names the ordinal the scripted locator carries (section 4, page 3), never document text.
     const slotOne = (locale: Locale, kind: 'section' | 'page') =>
       t(locale, 'review.evidence.label', {
         locations: t(locale, 'review.evidence.location', {
           place: t(locale, 'review.evidence.slot', { number: 1 }),
-          kind: t(locale, `review.evidence.locator.${kind}`),
+          kind:
+            kind === 'section'
+              ? t(locale, 'review.evidence.ordinal.section', { index: 4 })
+              : t(locale, 'review.evidence.ordinal.page', { page: 3 }),
         }),
       });
     for (const locale of ['th', 'en'] as const) {
