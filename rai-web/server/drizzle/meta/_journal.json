@@ -78,6 +78,13 @@
       "when": 1790517069128,
       "tag": "0010_w5_03_risk",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790520009963,
+      "tag": "0011_w7_03_migration_class",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,261 @@
+// W7-03 (W7 plan section 3.3, section 9 row W7-03): `npm run migrate` records every applied migration's rollback
+// class in schema_migration_class (back-filled, idempotent, skipped when the table does not exist yet); readiness
+// answers `ahead` (ready) only when every migration the build does not know is recorded as additive, reading the
+// classes from the database rather than the build's map; `release:check-rollback` gives its three verdicts.
+import { after, before, test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import {
+  MIGRATIONS_FOLDER,
+  readMigrationJournal,
+  recordMigrationClasses,
+  runMigrations,
+} from '@rai/server/db/migrate';
+import { MIGRATION_CLASSES, MigrationClassError } from '@rai/server/db/migration-classes';
+import { createStoreProbes } from '@rai/server/observability/probes';
+import { computeReadiness } from '@rai/server/observability/health';
+import { main as rollbackCheck } from '@rai/server/operator/rollback-check';
+import {
+  INSUFFICIENT_PRIVILEGE,
+  RAISE_EXCEPTION,
+  expectSqlError,
+  openTestDatabase,
+  type TestDatabase,
+} from '../support/db.js';
+import {
+  buildJournalTags,
+  createScratchDatabase,
+  prefixMigrationFolder,
+  withClient,
+  type ScratchDatabase,
+} from '../support/migration-folder.js';
+
+let db: TestDatabase;
+let root: string;
+let tags: string[];
+before(async () => {
+  db = await openTestDatabase();
+  root = await mkdtemp(path.join(tmpdir(), 'rai-w7-03-'));
+  tags = await buildJournalTags();
+});
+after(async () => {
+  await db?.close();
+  if (root !== undefined) await rm(root, { recursive: true, force: true });
+});
+
+interface ClassRow {
+  hash: string;
+  tag: string;
+  rollback_class: string;
+  recorded_at: Date;
+}
+const classRows = (url: string) =>
+  withClient(
+    url,
+    async (client) =>
+      (
+        await client.query<ClassRow>(
+          'SELECT hash, tag, rollback_class, recorded_at FROM schema_migration_class ORDER BY tag',
+        )
+      ).rows,
+  );
+const expectedRows = () =>
+  readMigrationJournal(MIGRATIONS_FOLDER)
+    .map(({ tag, hash }) => ({ hash, tag, rollback_class: MIGRATION_CLASSES[tag] }))
+    .sort((a, b) => a.tag.localeCompare(b.tag));
+const withoutTime = (rows: ClassRow[]) =>
+  rows.map(({ hash, tag, rollback_class }) => ({ hash, tag, rollback_class }));
+
+/** Smallest journal length whose later migrations are all additive: the build a binary-only rollback returns to. */
+function additivePrefix(): number {
+  let p = tags.length;
+  while (p > 0 && MIGRATION_CLASSES[tags[p - 1]!] === 'additive') p--;
+  assert.ok(p < tags.length, 'the newest migration is additive (true at W7-03)');
+  return p;
+}
+/** Journal length just before the newest non-additive migration: a rollback past it needs a restore. */
+function restorePrefix(): number {
+  const last = tags.findLastIndex((tag) => MIGRATION_CLASSES[tag] !== 'additive');
+  assert.ok(last >= 0, '0007, 0009 (W7-D9) and 0010_w5_03_risk are restore-required');
+  return last;
+}
+
+test('migrate back-fills one class row per applied migration from the map, and a rerun changes nothing', async () => {
+  const first = await classRows(db.urls.owner);
+  assert.deepEqual(withoutTime(first), expectedRows());
+  const rerun = await runMigrations(db.urls.owner, MIGRATIONS_FOLDER);
+  assert.deepEqual(rerun.applied, []);
+  const second = await classRows(db.urls.owner);
+  assert.deepEqual(second, first, 'no new row and no recorded_at change on rerun');
+});
+
+test('schema_migration_class is readable by rai_app and rai_operator, writable by nobody at runtime, append-only', async () => {
+  for (const role of ['app', 'operator'] as const) {
+    const who = await db.raw(
+      role,
+      async (c) => (await c.query<{ u: string }>('SELECT current_user AS u')).rows[0]!.u,
+    );
+    assert.equal(who, role === 'app' ? 'rai_app' : 'rai_operator');
+    const count = await db.raw(
+      role,
+      async (c) => (await c.query('SELECT hash FROM schema_migration_class')).rowCount,
+    );
+    assert.equal(count, tags.length);
+    for (const statement of [
+      `INSERT INTO schema_migration_class (hash, tag, rollback_class) VALUES ('synthetic', 'synthetic', 'additive')`,
+      `UPDATE schema_migration_class SET rollback_class = 'additive'`,
+      `DELETE FROM schema_migration_class`,
+    ])
+      assert.equal(
+        (await expectSqlError(db, role, statement))?.code,
+        INSUFFICIENT_PRIVILEGE,
+        `${role}: ${statement}`,
+      );
+  }
+  for (const statement of [
+    `UPDATE schema_migration_class SET rollback_class = 'copy-forward' WHERE tag = '${tags[0]}'`,
+    `DELETE FROM schema_migration_class WHERE tag = '${tags[0]}'`,
+  ]) {
+    const err = await expectSqlError(db, 'owner', statement);
+    assert.equal(err?.code, RAISE_EXCEPTION, statement);
+    assert.equal(err?.message, 'rai.append_only');
+  }
+  const bad = await expectSqlError(
+    db,
+    'owner',
+    `INSERT INTO schema_migration_class (hash, tag, rollback_class) VALUES ('synthetic', 'synthetic', 'forward repair only')`,
+  );
+  assert.equal(bad?.code, '23514', 'only the three W0-04 classes');
+});
+
+test('the writer refuses a map without a tag (migration_class_missing) or with a changed class (migration_class_changed)', async () => {
+  const before = await classRows(db.urls.owner);
+  const missing: Record<string, string> = { ...MIGRATION_CLASSES };
+  delete missing[tags[3]!];
+  const changed = { ...MIGRATION_CLASSES, [tags[0]!]: 'restore-required' as const };
+  for (const [classes, code] of [
+    [missing, 'migration_class_missing'],
+    [changed, 'migration_class_changed'],
+  ] as const)
+    await withClient(db.urls.owner, async (client) => {
+      await assert.rejects(
+        recordMigrationClasses(client, MIGRATIONS_FOLDER, classes as typeof MIGRATION_CLASSES),
+        (err: unknown) => err instanceof MigrationClassError && err.code === code,
+      );
+    });
+  assert.deepEqual(await classRows(db.urls.owner), before);
+});
+
+let scratch: ScratchDatabase | undefined;
+after(async () => {
+  await scratch?.drop();
+});
+
+test('on a database and folder without the W7-03 migration the writer does nothing; applying it back-fills 0000 onward', async () => {
+  scratch = await createScratchDatabase('w7_03');
+  const w703 = tags.findIndex((tag) => tag.endsWith('_w7_03_migration_class'));
+  assert.ok(w703 > 0);
+  const older = await prefixMigrationFolder(root, w703);
+  const first = await runMigrations(scratch.urls.owner, older);
+  assert.equal(first.applied.length, w703);
+  assert.equal(await runMigrations(scratch.urls.owner, older).then((r) => r.applied.length), 0);
+  const regclass = await withClient(
+    scratch.urls.owner,
+    async (c) =>
+      (await c.query<{ t: string | null }>(`SELECT to_regclass('public.schema_migration_class') AS t`))
+        .rows[0]!.t,
+  );
+  assert.equal(regclass, null);
+
+  const upgraded = await runMigrations(scratch.urls.owner, MIGRATIONS_FOLDER);
+  assert.equal(upgraded.applied.length, tags.length - w703);
+  assert.deepEqual(withoutTime(await classRows(scratch.urls.owner)), expectedRows());
+});
+
+const readinessWith = (url: string, folder: string) =>
+  computeReadiness(
+    {
+      identity: () => ({ mode: 'fixture', ready: true }),
+      loopbackBind: true,
+      mailKind: 'memory',
+      qcKind: 'substitute',
+      build: { commit: 'dev', schemaVersion: '10' },
+    },
+    {
+      ...createStoreProbes(url, root, folder),
+      mailSink: () => Promise.resolve('ok'),
+      qc: () => Promise.resolve('unavailable'),
+    },
+  );
+
+test('readiness: an older build whose extra migrations are all recorded additive is ready with migrations ahead', async () => {
+  assert.ok(scratch, 'the scratch database test ran first');
+  const current = await readinessWith(scratch.urls.app, MIGRATIONS_FOLDER);
+  assert.deepEqual([current.status, current.store.migrations], ['ready', 'current']);
+  const ahead = await readinessWith(scratch.urls.app, await prefixMigrationFolder(root, additivePrefix()));
+  assert.deepEqual([ahead.status, ahead.store.migrations], ['ready', 'ahead']);
+  const restore = await readinessWith(scratch.urls.app, await prefixMigrationFolder(root, restorePrefix()));
+  assert.deepEqual([restore.status, restore.store.migrations], ['not_ready', 'unknown']);
+});
+
+test('rollback check: binary_only, restore_required with the matching backup, incompatible; exit 0, 3, 4', async () => {
+  assert.ok(scratch);
+  const backups = path.join(root, 'backups');
+  const restoreTarget = await prefixMigrationFolder(root, restorePrefix());
+  const targetJournal = readMigrationJournal(restoreTarget);
+  for (const [id, journal] of [
+    ['20260927T010000Z-before', targetJournal],
+    ['20260927T020000Z-other', targetJournal.slice(0, 1)],
+  ] as const) {
+    await mkdir(path.join(backups, id), { recursive: true });
+    await writeFile(
+      path.join(backups, id, 'manifest.json'),
+      JSON.stringify({ backupId: id, journal: journal.map(({ tag, hash }) => ({ tag, hash })) }),
+    );
+  }
+  const env = {
+    NODE_ENV: 'development',
+    DATABASE_URL: scratch.urls.app,
+    DATABASE_MIGRATE_URL: scratch.urls.owner,
+    BACKUP_DIR: backups,
+  };
+  const run = async (folder: string) => {
+    const lines: string[] = [];
+    const code = await rollbackCheck(['--target-migrations', folder], env, (line) => void lines.push(line));
+    assert.equal(lines.length, 1);
+    assert.equal(lines[0]!.includes('postgres://'), false);
+    assert.equal(lines[0]!.includes(root), false, 'no path is printed');
+    const line = JSON.parse(lines[0]!) as { event: string; fields: Record<string, unknown> };
+    assert.equal(line.event, 'operator.rollback_check.completed');
+    return { code, fields: line.fields };
+  };
+
+  const additive = additivePrefix();
+  assert.deepEqual(await run(await prefixMigrationFolder(root, additive)), {
+    code: 0,
+    fields: { verdict: 'binary_only', extraMigrations: tags.slice(additive) },
+  });
+  assert.deepEqual(await run(MIGRATIONS_FOLDER), {
+    code: 0,
+    fields: { verdict: 'binary_only', extraMigrations: [] },
+  });
+
+  const restore = restorePrefix();
+  assert.deepEqual(await run(restoreTarget), {
+    code: 3,
+    fields: {
+      verdict: 'restore_required',
+      extraMigrations: tags.slice(restore),
+      blockingMigration: tags[restore],
+      matchingBackups: ['20260927T010000Z-before'],
+    },
+  });
+
+  const rewritten = await prefixMigrationFolder(root, 3, { [tags[1]!]: '-- rewritten\nSELECT 1;\n' });
+  assert.deepEqual(await run(rewritten), {
+    code: 4,
+    fields: { verdict: 'incompatible', extraMigrations: [] },
+  });
+});

@@ -38,6 +38,7 @@ export const OPERATOR_VALUE_KEYS = {
   timeout: 'operator.value.timeout',
   current: 'operator.value.current',
   pending: 'operator.value.pending',
+  ahead: 'operator.value.ahead', // W7-03: store.migrations, additive-only newer schema
   unknown: 'operator.value.unknown',
   not_writable: 'operator.value.not_writable',
   unavailable: 'operator.value.unavailable',

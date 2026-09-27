@@ -70,6 +70,7 @@ test('the schema holds the W0-04 tables (plus W1-01 session, W1-09 fixture_set, 
       'qc_run', // W2-05
       'registry_counter', // W1-02 (0003_w1_02_registry_counter; W0-04 case.registry_id per-year sequence)
       'risk_proposal', // W5-03
+      'schema_migration_class', // W7-03: rollback class of every applied migration (W7 plan section 3.3)
       'session', // W1-01 (0001_w1_01_session; W0-03 section 6.3)
     ],
   );
@@ -98,6 +99,7 @@ test('the schema holds the W0-04 tables (plus W1-01 session, W1-09 fixture_set, 
       'qc_late_result.qc_late_guard', // W3-07a
       'qc_run.qc_run_append_only', // W2-05
       'risk_proposal.risk_proposal_append_only', // W5-03
+      'schema_migration_class.schema_migration_class_guard', // W7-03: append-only
     ],
   );
 
@@ -153,6 +155,7 @@ test('the schema holds the W0-04 tables (plus W1-01 session, W1-09 fixture_set, 
     'registry_counter:UPDATE',
     'risk_proposal:INSERT', // W5-03: append-only
     'risk_proposal:SELECT',
+    'schema_migration_class:SELECT', // W7-03: read by readiness and the rollback check; written only by migrate
     'session:INSERT', // W1-01: W0-03 section 6.3 session rows (last_seen_at, revoked_at, locale are the mutable columns)
     'session:SELECT',
     'session:UPDATE',
@@ -169,7 +172,12 @@ test('the schema holds the W0-04 tables (plus W1-01 session, W1-09 fixture_set, 
     ['breach_count', 'error_code', 'error_stage', 'finished_at', 'status'],
   );
   // rai_operator: rai_app (by membership, docker/postgres/init) plus DELETE on idempotency_key and on session (W1-01 sweep).
-  assert.deepEqual(byGrantee('rai_operator'), ['idempotency_key:DELETE', 'session:DELETE']);
+  // W7-03 grants SELECT on schema_migration_class to rai_operator explicitly as well (W7 plan section 3.3).
+  assert.deepEqual(byGrantee('rai_operator'), [
+    'idempotency_key:DELETE',
+    'schema_migration_class:SELECT',
+    'session:DELETE',
+  ]);
 });
 
 test('rai_app has no DDL: it cannot create a table or a function', async () => {

@@ -5,6 +5,7 @@ import {
   canCreateCase,
   isOperatorAdmin,
   visibleOperatorResult,
+  migrationsDisplay,
   type OperatorResult,
 } from './desk-health.view-model.js';
 function session(roles: RoleScope[]): SessionInfo {
@@ -66,4 +67,12 @@ test('render gate invalidates data immediately for logout, role changes, same-su
     assert.equal(visibleOperatorResult(old, current, 0), undefined);
   assert.equal(visibleOperatorResult(old, admin, 1), undefined);
   assert.equal(visibleOperatorResult(undefined, admin, 0), undefined);
+});
+test('W7-03 migrations display: ahead is a warning with the additive note; other values carry no note', () => {
+  assert.deepEqual(migrationsDisplay('ahead'), {
+    tone: 'warn',
+    noteKey: 'operator.field.migrations_ahead_note',
+  });
+  for (const value of ['current', 'pending', 'unknown'] as const)
+    assert.deepEqual(migrationsDisplay(value), {});
 });

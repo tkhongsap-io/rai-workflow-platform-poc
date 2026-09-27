@@ -73,7 +73,13 @@ export async function computeReadiness(
   }
   const [db, migrations, blob, mail, qc] = await Promise.all([
     bounded(() => probes.db(), ['ok', 'unreachable', 'timeout'], 'unreachable', 'timeout', timeout),
-    bounded(() => probes.migrations(), ['current', 'pending', 'unknown'], 'unknown', 'unknown', timeout),
+    bounded(
+      () => probes.migrations(),
+      ['current', 'pending', 'ahead', 'unknown'],
+      'unknown',
+      'unknown',
+      timeout,
+    ),
     bounded(
       () => probes.blob(),
       ['ok', 'unreachable', 'not_writable'],
@@ -86,7 +92,12 @@ export async function computeReadiness(
   ]);
   return {
     status:
-      identity.status === 'ok' && db === 'ok' && migrations === 'current' && blob === 'ok' && mail === 'ok'
+      // W7-03: `ahead` (every newer applied migration is additive) serves, as W0-04 "Schema evolution" requires.
+      identity.status === 'ok' &&
+      db === 'ok' &&
+      (migrations === 'current' || migrations === 'ahead') &&
+      blob === 'ok' &&
+      mail === 'ok'
         ? 'ready'
         : 'not_ready',
     checkedAt: (options.now?.() ?? new Date()).toISOString(),

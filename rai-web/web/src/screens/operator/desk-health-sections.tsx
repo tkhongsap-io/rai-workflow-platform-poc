@@ -12,6 +12,8 @@ import {
   type OperatorValue,
 } from '../../i18n/operator-labels.js';
 import { ROUTES } from '../../routes.js';
+import { Badge } from '../../components/status-badge.js';
+import { migrationsDisplay } from './desk-health.view-model.js';
 
 type FieldName = Extract<LocaleKey, `operator.field.${string}`>;
 function Field({ name, children }: { name: FieldName; children: ReactNode }): JSX.Element {
@@ -26,6 +28,18 @@ function Field({ name, children }: { name: FieldName; children: ReactNode }): JS
 function Status({ value }: { value: OperatorValue }): JSX.Element {
   const { t } = useLocale();
   return <span data-status={value}>{t(OPERATOR_VALUE_KEYS[value])}</span>;
+}
+/** W7-03: the migrations value; `ahead` is a warning badge (glyph, not colour alone) with the additive note. */
+function Migrations({ value }: { value: DeskHealthReport['readiness']['store']['migrations'] }): JSX.Element {
+  const { t } = useLocale();
+  const display = migrationsDisplay(value);
+  if (display.tone === undefined) return <Status value={value} />;
+  return (
+    <>
+      <Badge status={value} tone={display.tone} label={t(OPERATOR_VALUE_KEYS[value])} />
+      {display.noteKey ? <p className={'operator-note'}>{t(display.noteKey)}</p> : null}
+    </>
+  );
 }
 function At({ value }: { value: string | undefined }): JSX.Element {
   const { t, locale } = useLocale();
@@ -113,7 +127,7 @@ export function DeskHealthSections({ report }: { report: DeskHealthReport }): JS
             <Status value={r.store.db} />
           </Field>
           <Field name={'operator.field.migrations'}>
-            <Status value={r.store.migrations} />
+            <Migrations value={r.store.migrations} />
           </Field>
           <Field name={'operator.field.blob_store'}>
             <Status value={r.store.blob} />

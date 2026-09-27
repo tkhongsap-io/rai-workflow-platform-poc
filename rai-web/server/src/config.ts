@@ -219,12 +219,30 @@ export function parseBackupConfig(env: Env, where: { cwd?: string; repoRoot?: st
     optional(env, 'RAI_PG_CONTAINER_PORT') === undefined
       ? 5432
       : integer(env, 'RAI_PG_CONTAINER_PORT', { min: 1, max: 65535 });
+  const backupDir = resolveBackupDir(required(env, 'BACKUP_DIR'), where);
+  return { pgTools, containerPort, backupDir };
+}
+
+/** `BACKUP_DIR` resolved and refused inside the repository anywhere but under `rai-web/.local/` (W7 plan section 2). */
+function resolveBackupDir(value: string, where: { cwd?: string; repoRoot?: string }): string {
   const repoRoot = path.resolve(where.repoRoot ?? REPO_ROOT);
-  const backupDir = path.resolve(where.cwd ?? process.cwd(), required(env, 'BACKUP_DIR'));
+  const backupDir = path.resolve(where.cwd ?? process.cwd(), value);
   const inRepo = backupDir === repoRoot || isInside(repoRoot, backupDir);
   if (inRepo && !isInside(path.join(repoRoot, 'rai-web', '.local'), backupDir))
     throw new ConfigError('invalid:BACKUP_DIR');
-  return { pgTools, containerPort, backupDir };
+  return backupDir;
+}
+
+/**
+ * W7-03 `release:check-rollback`: `BACKUP_DIR` is optional there (it only names the backups a restore could use);
+ * when set, the same rule as `backup` applies. Unset → undefined.
+ */
+export function parseOptionalBackupDir(
+  env: Env,
+  where: { cwd?: string; repoRoot?: string } = {},
+): string | undefined {
+  const value = optional(env, 'BACKUP_DIR');
+  return value === undefined ? undefined : resolveBackupDir(value, where);
 }
 
 const IDENTITY_ENV_PREFIXES = ['RAI_IDENTITY_', 'RAI_SECRET_', 'RAI_SESSION_'];
