@@ -233,6 +233,19 @@ function resolveBackupDir(value: string, where: { cwd?: string; repoRoot?: strin
   return backupDir;
 }
 
+export interface RestoreConfig extends BackupConfig {
+  adminUrl: string; // DATABASE_ADMIN_URL: CREATEDB and SET ROLE to rai_app and rai_owner; never read by the server
+}
+
+/**
+ * W7-02 `restore` and `restore:verify` (W7 plan section 2): the backup keys plus the required `DATABASE_ADMIN_URL`
+ * (a postgres URL, else `missing:` / `invalid:DATABASE_ADMIN_URL`). `parseConfig` never reads it.
+ */
+export function parseRestoreConfig(env: Env, where: { cwd?: string; repoRoot?: string } = {}): RestoreConfig {
+  const backup = parseBackupConfig(env, where);
+  return { ...backup, adminUrl: postgresUrl(env, 'DATABASE_ADMIN_URL') };
+}
+
 /**
  * W7-03 `release:check-rollback`: `BACKUP_DIR` is optional there (it only names the backups a restore could use);
  * when set, the same rule as `backup` applies. Unset → undefined.
