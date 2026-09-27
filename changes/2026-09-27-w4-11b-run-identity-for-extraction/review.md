@@ -4,13 +4,13 @@ Framed in [intent](intent.md), [spec](spec.md) and [plan](plan.md). Source: [W4b
 
 ## Change
 
-- **Migration `0012_w4_11b_run_extraction_identity`** (numbered 0010, then 0011, until W5-03 and W7-03 merged first; forward-only, `rai-web/server/drizzle/`, journal and snapshot from `npm run migrate:generate`, file renamed from the generated name, header added by hand, rollback class `additive`): `qc_run` gains `extractor_version`, `model_provider`, `model_id`, `prompt_revision` (text), `model_input_tokens`, `model_output_tokens`, `model_latency_ms` (integer), `model_cost_usd_micros` (bigint), each number with `CHECK (IS NULL OR >= 0)`, and `unavailable_detail` (text) with `CHECK (unavailable_detail IS NULL OR (status = 'unavailable' AND unavailable_detail ~ '^[a-z0-9_]{1,64}$'))`. All nullable; no trigger or grant change. `db/schema/qc-run.ts` matches; `drizzle-kit generate` afterwards reports no drift. W7-03's `MIGRATION_CLASSES` map has not merged, so no class entry is added (W7-03 adds it when it rebases, per the W7 plan).
+- **Migration `0012_w4_11b_run_extraction_identity`** (numbered 0010, then 0011, until W5-03 and W7-03 merged first; forward-only, `rai-web/server/drizzle/`, journal and snapshot from `npm run migrate:generate`, file renamed from the generated name, header added by hand, rollback class `additive`): `qc_run` gains `extractor_version`, `model_provider`, `model_id`, `prompt_revision` (text), `model_input_tokens`, `model_output_tokens`, `model_latency_ms` (integer), `model_cost_usd_micros` (bigint), each number with `CHECK (IS NULL OR >= 0)`, and `unavailable_detail` (text) with `CHECK (unavailable_detail IS NULL OR (status = 'unavailable' AND unavailable_detail ~ '^[a-z0-9_]{1,64}$'))`. All nullable; no trigger or grant change. `db/schema/qc-run.ts` matches; `drizzle-kit generate` afterwards reports no drift. W7-03's `MIGRATION_CLASSES` (merged first) gains `'0012_w4_11b_run_extraction_identity': 'additive'`, pinned by `migration-classes.test.ts` (Round 3 changes).
 - **Types and boundary check.** `shared/src/qc/types.ts`: `QcModelIdentity`, `QcModelUsage`, `QcEngineIdentity` and `engine?` on both `QcRunResult` statuses. `shared/src/qc/validate.ts`: `QcEngineIdentitySchema` (identifiers `^[A-Za-z0-9][A-Za-z0-9._+/@:-]{0,127}$`, provider `local-fake` only, int32 non-negative tokens and latency, safe-integer non-negative cost, no unknown key) and `engine` accepted by `QcRunResultSchema`. `qc/orchestrator.ts` `checkedResult`: an invalid `engine` makes the run `runner_error` / `engine_identity_invalid` with no identity recorded; a valid one is kept when a finding violation refuses the run.
 - **Recording.** New `server/src/qc/engine-identity.ts` maps the engine to columns and log fields and computes the stored detail (bounded code, `unspecified`, or NULL). `recordRun` now takes the checked result and writes status, reason, rule count, identity columns and `unavailable_detail` from it; `qc/repository.ts` `InsertRunInput` carries them.
 - **Logs** (`observability/log.ts`): `qc.run.completed` and `qc.run.unavailable` register the seven engine fields (emitted only when recorded); `qc.run.unavailable` also `unavailableDetail` (emitted when not NULL); `qc.extract.failed` registered (`qcRunId`, `slot`, `reason`, `durationMs`, `extractorVersion`), level `warn`, for W4-05b / W4-13b to emit.
 - **Reads.** `QcRunSummarySchema` and `listQcRunsForVersion`: `extractorVersion`, `model`, `modelUsage`, `unavailableDetail` (cost not served). `DeskHealthReport.unavailableQc` rows: required `unavailableDetail: string | null`, bounded by the same pattern; `observability/operator.ts` reads it.
 - **Documents** (dated notes): W0-02 section 7 (`implementation-plan-w1-w3.md`, after the W4-12 `QcRunSummary` paragraph), W0-04 (`persistence-and-artifact-store.md`, `qc_run` paragraph), the data contract (QC run row), W0-07 section 7 (`qc-boundary-and-mail-sink.md`, one new row) and W0-10 (`observability-contract.md`: section 3.3 rows, the new `qc.extract.failed` row, section 7.2 shape, a dated "W4-11b" section).
-- **Tests.** New `tests/integration/w4-11b-run-extraction-identity.test.ts` (8 cases: completed run with identity on row, line and qc-runs read; run without identity; unavailable run with extractor version and detail on row, line, qc-runs read and desk health; `unspecified` and NULL detail; validator refusal keeps the violation and identity; invalid identity and a non-local provider → `engine_identity_invalid`; four runs differing only in extractor, model or prompt told apart from rows and lines; migration on the database of the migration before it (0009 at first, 0010 after the rebase) with a row in it, NULL on the old row, the rai_app role writes every column, every CHECK refuses its bad value, the row stays append-only). New `server/src/qc/engine-identity.test.ts` (3). `shared/src/qc/validate.test.ts` (+2), `shared/src/schemas/observability.test.ts` (extended).
+- **Tests.** New `tests/integration/w4-11b-run-extraction-identity.test.ts` (8 cases: completed run with identity on row, line and qc-runs read; run without identity; unavailable run with extractor version and detail on row, line, qc-runs read and desk health; `unspecified` and NULL detail; validator refusal keeps the violation and identity; invalid identity and a non-local provider → `engine_identity_invalid`; four runs differing only in extractor, model or prompt told apart from rows and lines; migration on the database of the migration before it (0009 at first, 0010 after the round 1 rebase, 0011 after the round 3 rebase) with a row in it, NULL on the old row, the rai_app role writes every column, every CHECK refuses its bad value, the row stays append-only). New `server/src/qc/engine-identity.test.ts` (3). `shared/src/qc/validate.test.ts` (+2), `shared/src/schemas/observability.test.ts` (extended).
 
 ## Deviations
 
@@ -51,9 +51,16 @@ Deferred (not changed here):
 
 - Merge queue conflict: W7-03 (#287) merged `0011_w7_03_migration_class` first. Rebased onto `origin/main` (`dd59421`); main's `meta/_journal.json` and `meta/0011_snapshot.json` were taken as they are, `npm run migrate:generate --name w4_11b_run_extraction_identity` produced idx 12 and `meta/0012_snapshot.json`, and the generated SQL was statement-for-statement identical to the hand-written file, which was restored with its header (tag line now `0012`). Never renumbered by the queue. CHANGELOG, DEVLOG, both board streams and the W0-10 amendment list kept both sides (append-only; main's entries untouched).
 - W7-03's `migration-classes.test.ts` failed on the rebased head (`no class for 0012_w4_11b_run_extraction_identity`); `MIGRATION_CLASSES` gains `0012_w4_11b_run_extraction_identity: 'additive'`, which matches the file's `-- rollback expectation: additive;` header, and the test now also asserts the W4-11b migration is additive.
-- Every reference this ticket makes to its own migration now says 0012 (schema, engine-identity, shared schemas, spec, plan, W0-02, W0-04, W0-10, DEVLOG). Main's W5-03 and W7-03 references are untouched.
+- References this ticket makes to its own migration were moved to 0012 (schema, engine-identity, shared schemas, spec, plan, W0-02, W0-04, the dated W0-10 section, DEVLOG). Main's W5-03 and W7-03 references are untouched. (Round 4: two were missed, the `DeskHealthReport.unavailableDetail` line in W0-10 section 7.2 and the CHANGELOG line; both now say 0012.)
 - Reviewer polish taken: the detail pattern is exported once as `QC_UNAVAILABLE_DETAIL_PATTERN` from `shared/src/qc/types.ts` and used by `engine-identity.ts`, `schemas/review.ts` and `schemas/observability.ts`; a new unit test checks the three agree with the migration CHECK literal (RED first: missing export). The Drizzle `qc-run.ts` CHECK keeps the literal so the snapshot does not change.
 - Deferred, unchanged: the reviewer note that the qc-runs read returns `model` null when any one of its three columns is NULL (the writer always sets them together; listed above).
+
+## Round 4 changes
+
+- W0-10 contract (`docs/engineering/observability-contract.md` section 7.2): the `DeskHealthReport.unavailableDetail` line this PR adds said "null ... before migration 0011", which is W7-03's migration; it now says 0012, matching the dated W4-11b section and the shared schema comment.
+- CHANGELOG W4-11b line: "(migration 0011)" now "(migration 0012)".
+- review.md: the Change bullet on the migration now records the `MIGRATION_CLASSES` entry this PR adds (it said no entry was added); the Round 3 claim that every self-reference said 0012 is corrected in place with a note naming the two it missed; the Tests bullet names the 0011 base after the round 3 rebase; round 4 verdict rows filled in with the head and results.
+- Documentation only: no code, migration, snapshot or test changed. Historical round 1 and round 2 notes that name 0011 describe that round and are left as written.
 
 ## Commands and results
 
@@ -108,6 +115,16 @@ Worktree `/tmp/rai-w4-11b-run-identity-for-extraction`, Postgres project `rai-qc
 | `npm run test:browser:substitute` | 48 passed |
 | `node scripts/check-links.mjs` (root) | 407 Markdown files, 1171 links, 0 broken |
 | `git diff --cached --check` (root) | clean |
+| **Round 4**, head `0b98df8` plus documentation fixes, still on `dd59421` (no rebase), existing `rai-qc-core` database | |
+| `npm run lint` | exit 0 |
+| `npm run typecheck` | exit 0 |
+| `npm run test:unit` | 816/816 |
+| `npm run test:integration` | 402/402, 0 skipped |
+| `npm run build && npm run check:substitute-absent` | exit 0; 735 files scanned, 0 with the marker |
+| `npm run test:browser:server` | 205 passed |
+| `npm run test:browser:substitute` | 48 passed |
+| `node scripts/check-links.mjs` (root) | 407 Markdown files, 1171 links, 0 broken |
+| `git diff --check` (root) | clean |
 
 ## Review verdicts
 
@@ -121,4 +138,6 @@ Worktree `/tmp/rai-w4-11b-run-identity-for-extraction`, Postgres project `rai-qc
 | 3 | `9239ee6` | reviewer 1 | pass, notes | tsc, lint, unit 741/741 locally. Notes: conflicting with main (rebase, keep both append-only entries), name the actual head in this table (done), no CI on a conflicting head. |
 | 3 | `9239ee6` | reviewer 2 | pass, notes | tsc, lint, unit 741/741; migration additive and forward-only, snapshot and schema match. Notes: detail pattern repeated in three files (fixed, Round 3 changes), `model` null on a partial block (deferred). |
 | 3 | `9239ee6` | merge queue | conflict | Migration 0011 taken by W7-03 on main; rebased onto `dd59421` and regenerated at 0012 (Round 3 changes). |
-| 4 | round 3 fix head (named in the PR comment) | - | pending | Two independent reviewer verdicts on the new head, and green CI on that head, are recorded here before merge (D03 ticket flow). |
+| 4 | `0b98df8` | reviewer 1 | changes requested | W0-10 contract: section 7.2 `unavailableDetail` line said "before migration 0011" (W7-03's number); records inaccurate (CHANGELOG said 0011, Round 3 claim overstated, Change bullet said no class entry). All fixed (Round 4 changes). Also: tsc, lint, unit 816/816 locally; CI 9 jobs green, integration and browser pending at the verdict. |
+| 4 | `0b98df8` | reviewer 2 | pass, notes | tsc, lint, unit 816/816; migration chain (0012 prevId = main's 0011 id), class entry, shared pattern test and fail-closed orchestrator verified. Notes: same two 0011 references (fixed), Tests bullet said 0010 (fixed), fill in this row (done), deferred items unchanged. |
+| 5 | round 4 fix head (named in the PR comment) | - | pending | Two independent reviewer verdicts on the new head, and green CI on that head, are recorded here before merge (D03 ticket flow). |

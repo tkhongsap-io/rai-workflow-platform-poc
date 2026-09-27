@@ -346,7 +346,7 @@ export interface DeskHealthReport {
     reason: 'timeout' | 'runner_error' | 'not_configured' | 'artifact_unreadable';   // W0-07 QcUnavailableReason
     owningLane?: 'ai_coe' | 'dpo' | 'it_security';       // the QC-unavailable finding's lane (W0-07 3.6), derived from the run under W0-06 7.2; absent for an upload run
     runner: string; runnerVersion: string;              // W4-11a (2026-09-27): qc_run.engine_id and runner_version ('unrecorded' before migration 0009); identifiers only
-    unavailableDetail: string | null;                   // W4-11b (2026-09-27): qc_run.unavailable_detail, a code matching ^[a-z0-9_]{1,64}$ ('unspecified' for any other detail); null when none or before migration 0011
+    unavailableDetail: string | null;                   // W4-11b (2026-09-27): qc_run.unavailable_detail, a code matching ^[a-z0-9_]{1,64}$ ('unspecified' for any other detail); null when none or before migration 0012
     requestedAt: string;                                // W0-04 qc_run.requested_at
     correlationId: CorrelationId;
   }>;
