@@ -40,3 +40,7 @@ W0-02 section 7.2: a dated "W7-09 amendment (2026-09-28)" paragraph after the ta
 - `web/src/api/client.test.ts`: `getSignInMethod` path, method and credentials; invalid body → `InvalidResponseError`; a 401 does not call the unauthenticated handler.
 - `web/src/screens/sign-in/sign-in.view-model.test.ts` (new): the four `loadSignInPicker` outcomes and `PROVIDER_COPY` keys.
 - `tests/browser/w7-09-sign-in-method.spec.ts` (real built server, fixture mode): the real server answers `{ method: 'fixture' }`; with `page.route` answering `/auth/fixture/users` 404 and `/auth/sign-in-method` `organization`, the screen shows the organisation button and note and no Google button, th then en (locale switch by keyboard), the button reachable and focused by Tab with a visible ring, axe zero critical and serious, no horizontal scroll; at 1440, 834 and 390 (the config's projects). The button is not pressed: that would call `POST /auth/sign-in`, which fixture mode does not serve.
+
+## Amendment (2026-09-28, round 1)
+
+The last bullet's "The button is not pressed" is superseded: the browser spec also Tabs to the organisation button and presses Enter, answering `POST /auth/sign-in` through `page.route` with a same-origin redirect, so the button is proven to work by keyboard without leaving loopback (review.md, Deviations).

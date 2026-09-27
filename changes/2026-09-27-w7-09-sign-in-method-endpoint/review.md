@@ -20,6 +20,22 @@ Framed in [intent](intent.md), [spec](spec.md) and [plan](plan.md). Source: [W7 
 - **`Cache-Control: no-store`** on the answer (the plan does not say): the method follows the running mode, which can change at a restart.
 - **Lane environment.** `rai-web/.env` (never committed) sets `RAI_PG_TOOLS=docker-compose:rai-ops`, as earlier W7 lanes did, so the W7-01/W7-02 backup tests find this lane's Postgres container.
 
+## Review verdicts
+
+| Round | Reviewer | Verdict | Notes |
+| --- | --- | --- | --- |
+| 1 | reviewer agent A | pass (non-blocking notes) | Route public in every mode, `{ method }` only, no issuer/client/allow-list value; UI, locales and W0-02 7.2 amendment match plan sections 6-7. |
+| 1 | reviewer agent B | pass (non-blocking notes) | Client fails closed with `InvalidResponseError`; path is a sign-in-flow path; `fixture` after the 404 is an error. |
+| 1 | merge queue | conflict | Rebase onto `fbb7566` conflicted in `web/src/api/client.test.ts` (W5-07's `getRiskRubric` test and the W7-09 tests appended at the same spot), `CHANGELOG.md`, `DEVLOG.md` and the lane-b board; all resolved keeping both sides (board entries appended in order). |
+
+Round 1 fixes: rebased onto `origin/main` `fbb7566`; spec.md gains a dated amendment replacing "The button is not pressed" (the browser spec presses it by keyboard, as the Deviations say).
+
+Deferred (non-blocking):
+
+- The change folder is dated 2026-09-27 (the plan and ticket date) while the W0-02 amendment and DEVLOG entry say 2026-09-28 (the day the work was done). Kept: renaming the folder would break links from the board CLAIM and CHANGELOG.
+- `auth.sign_in_with_true_ad` stays unused; the plan chose the generic organisation label, and W8 may revisit it. Removing a key is outside this ticket.
+- No route-level test for `production` mode (building a production adapter needs production config); the shared `signInMethodOf` test covers the mapping.
+
 ## Commands and results
 
 Worktree `/tmp/rai-w7-09-sign-in-method-endpoint`, Postgres project `rai-ops` on 55385 (`docker compose -p rai-ops down -v; POSTGRES_PORT=55385 docker compose -p rai-ops up -d --wait`), `rai-web/.env` from `.env.example` with 54320 → 55385, `PORT=8841`, `PUBLIC_BASE_URL=http://127.0.0.1:8841`, `PLAYWRIGHT_BASE_URL=http://127.0.0.1:8842`, `SUBSTITUTE_PORT=8843`, `SUBSTITUTE_WEB_PORT=5195`, `OBS_MIGRATION_ADMIN_URL` for 55385, `RAI_PG_TOOLS=docker-compose:rai-ops`; `npm ci`. One suite at a time after `set -a; . ./.env; set +a`; logs under `/tmp/rai-w7-09-sign-in-method-endpoint-logs/`. Base `origin/main` cac09e0.
@@ -40,6 +56,22 @@ Worktree `/tmp/rai-w7-09-sign-in-method-endpoint`, Postgres project `rai-ops` on
 | `npm run test:browser:substitute`                                                                                                                                  | 48 passed                                                                                              |
 | `node scripts/check-links.mjs` (repository root)                                                                                                                   | 0 broken                                                                                               |
 | `git diff --check` (repository root)                                                                                                                               | clean                                                                                                  |
+
+### Round 1 (after rebase onto `origin/main` fbb7566)
+
+Same lane environment; database recreated (`docker compose -p rai-ops down -v; POSTGRES_PORT=55385 docker compose -p rai-ops up -d --wait`) since main gained migration 0014. Logs `r1-*.log`.
+
+| Command (from `rai-web/` unless noted) | Result |
+| --- | --- |
+| `npm run lint` | pass |
+| `npm run typecheck` | pass |
+| `npm run test:unit` | 1060 tests, 1060 pass |
+| `npm run test:integration` | 454 tests, 454 pass |
+| `npm run build && npm run check:substitute-absent` | pass; scanned 923 files, 0 with the marker |
+| `npm run test:browser:server` | 220 passed (8.7m) |
+| `npm run test:browser:substitute` | 48 passed |
+| `node scripts/check-links.mjs` (repository root) | 473 files, 0 broken |
+| `git diff --check` (repository root) | clean |
 
 ## Reviewer notes
 
