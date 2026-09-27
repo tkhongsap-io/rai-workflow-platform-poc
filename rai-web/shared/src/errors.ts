@@ -1,9 +1,10 @@
 // The error contract: W0-06 section 8 is authoritative (codes 8.1, envelope 8.2, guarantees 8.3, locale keys 8.5);
-// W0-02 section 7.1 reproduces it; the codes are the ones ADR-0003 (W0-01) chose. Eight codes: the seven W0-06
-// contract types plus `not_found`. `internal_error` (HTTP 500) is the catch-all outside the contract types.
-// Every user-facing message is a locale key (D12), never rendered text.
+// W0-02 section 7.1 reproduces it; the codes are the ones ADR-0003 (W0-01) chose. Nine codes: the seven W0-06
+// contract types, `not_found`, and `desk_frozen` (W6-01, W6 plan section 4.2). `internal_error` (HTTP 500) is the
+// catch-all outside the contract types. Every user-facing message is a locale key (D12), never rendered text.
 
 import type { CorrelationId, LocaleKey } from './ids.js';
+import type { ConfigurationKind } from './schemas/cases.js';
 
 export const ERROR_CODES = [
   'unauthenticated', // 401
@@ -14,6 +15,7 @@ export const ERROR_CODES = [
   'qc_unavailable', // 503 (only from a synchronous QC endpoint; none in slice 1)
   'mail_delivery_failed', // 502 (on the notification record, never on the actor's business action)
   'not_found', // 404, in-scope reference that does not exist (W0-06 8.1, W0-05 section 4)
+  'desk_frozen', // 503, W6-01: a write refused while an Admin has frozen the desk (W6 plan section 7, desk_controls)
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -27,6 +29,7 @@ export const HTTP_STATUS_BY_CODE: Readonly<Record<ErrorCode, number>> = Object.f
   qc_unavailable: 503,
   mail_delivery_failed: 502,
   not_found: 404,
+  desk_frozen: 503,
 });
 
 /** Outside the contract types (W0-06 8.1): HTTP 500, body = code + `error.internal_error` + correlationId only. */
@@ -45,6 +48,7 @@ export const STALE_REASONS = [
   'version_closed', // successor draft exists after a send-back, or the version is Ready
   'lane_already_decided', // this lane already decided this version
   'qc_run_superseded', // a newer lane-QC run exists; findings must be seen first
+  'configuration_changed', // W6-01: an Admin configuration draft moved, or the revision in force is not its base
 ] as const;
 export type StaleReason = (typeof STALE_REASONS)[number];
 
@@ -66,22 +70,37 @@ export const UNSAFE_UPLOAD_REASONS = [
 ] as const;
 export type UnsafeUploadReason = (typeof UNSAFE_UPLOAD_REASONS)[number];
 
-export type NotFoundResource = 'case' | 'version' | 'finding' | 'artifact' | 'notification';
+export type NotFoundResource = 'case' | 'version' | 'finding' | 'artifact' | 'notification' | 'configuration';
+
+/** The W0-06 8.2 details of a 409 about a case version: the current reference of that version. */
+export interface VersionStaleDetails {
+  reason: StaleReason;
+  guidanceKey: `error.stale_version.guidance.${StaleReason | 'ready'}`;
+  current: {
+    versionId: string;
+    versionNumber: number;
+    revision: number;
+    state: 'draft' | 'submitted';
+    ready: boolean;
+  };
+  refreshPath: string; // relative SPA path of the current version; never an absolute host
+}
+
+/**
+ * W6-01 (W6 plan section 4.2, Q5): the 409 about an Admin configuration draft or publish. `current` is the kind's
+ * state as the server now holds it: the revision in force (null before any publish) and the draft's version (null
+ * when no draft exists). The SPA reloads the kind page at `refreshPath`.
+ */
+export interface ConfigurationStaleDetails {
+  reason: 'configuration_changed';
+  guidanceKey: 'error.stale_version.guidance.configuration_changed';
+  current: { kind: ConfigurationKind; revisionId: string | null; draftVersion: number | null };
+  refreshPath: string;
+}
 
 export interface ErrorDetails {
   invalid_input: { fields: FieldError[] };
-  stale_version: {
-    reason: StaleReason;
-    guidanceKey: `error.stale_version.guidance.${StaleReason | 'ready'}`;
-    current: {
-      versionId: string;
-      versionNumber: number;
-      revision: number;
-      state: 'draft' | 'submitted';
-      ready: boolean;
-    };
-    refreshPath: string; // relative SPA path of the current version; never an absolute host
-  };
+  stale_version: VersionStaleDetails | ConfigurationStaleDetails;
   unsafe_upload: {
     reasonKey: `error.unsafe_upload.${UnsafeUploadReason}`;
     params?: Record<string, string | number>;
@@ -91,6 +110,7 @@ export interface ErrorDetails {
   not_found: { resource: NotFoundResource };
   unauthenticated: never; // nothing about the resource leaks
   forbidden: never;
+  desk_frozen: never; // W6-01: the SPA banner reads readiness (W6-17); the refusal names nothing about the target
 }
 
 export type ErrorMessageKey<C extends ErrorCode = ErrorCode> = `error.${C}`;
@@ -222,6 +242,14 @@ export class NotFoundError extends ContractError<'not_found'> {
   readonly code = 'not_found' as const;
   constructor(resource: NotFoundResource) {
     super({ resource });
+  }
+}
+
+/** W6-01 (W6 plan section 7): a write refused while `desk_controls.writesFrozen` is on, or a recheck while QC is paused. */
+export class DeskFrozenError extends ContractError<'desk_frozen'> {
+  readonly code = 'desk_frozen' as const;
+  constructor() {
+    super();
   }
 }
 

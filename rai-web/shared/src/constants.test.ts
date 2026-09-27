@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   APP_TIMEZONE,
+  DASHBOARD_DUE_SOON_WORKING_DAYS,
   CURRENT_LANE_MAPPING,
   LANE_MAPPINGS_BY_VERSION,
   LANE_MAPPING_V1,
@@ -98,4 +99,8 @@ test('unavailableOwningLane for upload (register row "D05 refinement (upload slo
   // The submit and approve-attempt overload keeps its non-null return type (a compile-time check).
   const lane: 'ai_coe' | 'dpo' | 'it_security' = unavailableOwningLane({ trigger: 'submit', lane: null });
   assert.equal(lane, 'ai_coe');
+});
+
+test('W6-01 (W6 plan Q14): the dashboard due-soon horizon is a display constant of 2 working days', () => {
+  assert.equal(DASHBOARD_DUE_SOON_WORKING_DAYS, 2);
 });

@@ -26,7 +26,7 @@ import { Writable } from 'node:stream';
 import { sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { CURRENT_LANE_MAPPING } from '@rai/shared/constants';
-import type { ErrorDetails, ErrorResponse } from '@rai/shared/errors';
+import type { ErrorDetails, ErrorResponse, VersionStaleDetails } from '@rai/shared/errors';
 import type { ArtifactRef } from '@rai/shared/schemas/artifacts';
 import type {
   CaseCreateRequest,
@@ -307,7 +307,7 @@ function invalidFields(res: Res) {
   return (errorOf(res).details as ErrorDetails['invalid_input'] | undefined)?.fields ?? [];
 }
 function staleOf(res: Res) {
-  return errorOf(res).details as ErrorDetails['stale_version'] | undefined;
+  return errorOf(res).details as VersionStaleDetails | undefined; // W6-01: a version 409, not a configuration one
 }
 function assertPlainForbidden(res: Res): void {
   assert.equal(res.statusCode, 403, res.body);

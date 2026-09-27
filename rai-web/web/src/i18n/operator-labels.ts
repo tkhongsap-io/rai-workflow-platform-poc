@@ -86,6 +86,7 @@ export const OPERATOR_VALUE_KEYS = {
   mail_delivery_failed: 'operator.value.mail_delivery_failed',
   not_found: 'operator.value.not_found',
   internal_error: 'operator.value.internal_error',
+  desk_frozen: 'operator.value.desk_frozen', // W6-01
 } as const satisfies Record<OperatorValue, LocaleKey>;
 
 export const OPERATOR_IDENTITY_REASON_KEYS = {

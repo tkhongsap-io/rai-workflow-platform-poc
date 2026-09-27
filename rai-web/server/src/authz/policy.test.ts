@@ -61,6 +61,7 @@ function targetFor(action: Action, facts: CaseScopeFacts, role: Role = 'dpo'): T
     case 'queue.search':
     case 'queue.count':
     case 'operator.view':
+    case 'dashboard.view': // W6-01: scope applied in SQL by caseScopeWhere
       return { kind: 'none' };
     case 'lane.approve':
     case 'lane.send_back':
@@ -93,6 +94,7 @@ test('every row names a known role and action; W1-00 plus W2-02 D05 rows are pre
       'config.publish',
       'config.read_effective',
       'config.read_revisions',
+      'dashboard.view',
       'finding.confirm_fixed',
       'finding.mark_fixed',
       'finding.mark_na',
@@ -102,9 +104,10 @@ test('every row names a known role and action; W1-00 plus W2-02 D05 rows are pre
       'lane.approve',
       'lane.send_back',
       'operator.view',
+      'qc.recheck',
       'version.view',
     ],
-    'queue.* remain without rows; operator.view is Admin-only',
+    'queue.* remain without rows; operator.view is Admin-only; W6-01 adds qc.recheck and dashboard.view',
   );
   for (const row of POLICY_ROWS) {
     assert.ok((ROLES as readonly string[]).includes(row.role));
@@ -386,4 +389,74 @@ test('W3-07a operator.view admits only Admin, including explicit denial of combi
     authorize(actorOf('admin'), 'lane.approve', { kind: 'lane', facts: outOfScope, lane: 'dpo' }).allow,
     false,
   );
+});
+
+// W6-01 (W6 plan section 4.1): the W6 rows. qc.recheck is Admin only; dashboard.view is every role, scoped in SQL.
+
+test('W6-01: qc.recheck is Admin only, on a case target; every reviewer role is denied with reason role', () => {
+  assert.deepEqual(rowsForAction('qc.recheck'), [
+    { action: 'qc.recheck', role: 'admin', scope: 'all_cases' },
+  ]);
+  for (const facts of [inScope, outOfScope]) {
+    const decision = authorize(actorOf('admin'), 'qc.recheck', { kind: 'case', facts });
+    assert.equal(decision.allow, true);
+    assert.equal(decision.allow && decision.via.role, 'admin');
+  }
+  for (const role of ROLES.filter((r) => r !== 'admin')) {
+    assert.deepEqual(
+      authorize(actorOf(role), 'qc.recheck', { kind: 'case', facts: inScope }),
+      { allow: false, code: 'forbidden', reason: 'role' },
+      role,
+    );
+  }
+  assert.equal(
+    authorize(actorOf('ai_coe', 'dpo', 'it_security'), 'qc.recheck', { kind: 'case', facts: inScope }).allow,
+    false,
+  );
+});
+
+test('W6-01: dashboard.view is granted to all six roles through the VIEW_ROLES scopes', () => {
+  assert.deepEqual(
+    rowsForAction('dashboard.view').map((row) => [row.role, row.scope]),
+    [
+      ['owner', 'own_cases'],
+      ['bu_spoc', 'business_unit'],
+      ['ai_coe', 'all_cases'],
+      ['dpo', 'all_cases'],
+      ['it_security', 'all_cases'],
+      ['admin', 'all_cases'],
+    ],
+  );
+  for (const role of ROLES) {
+    assert.equal(authorize(actorOf(role), 'dashboard.view', { kind: 'none' }).allow, true, role);
+  }
+  assert.equal(authorize(actorOf(), 'dashboard.view', { kind: 'none' }).allow, false);
+});
+
+test('W6-01 T40 (unit level): every non-Admin role, alone or combined, is denied each Admin configuration action', () => {
+  const adminActions = ['config.read_revisions', 'config.publish', 'qc.recheck'] as const;
+  const targetOf = (action: (typeof adminActions)[number]): Target =>
+    action === 'qc.recheck' ? { kind: 'case', facts: outOfScope } : { kind: 'none' };
+  for (const action of adminActions) {
+    assert.equal(authorize(actorOf('admin'), action, targetOf(action)).allow, true, action);
+    for (const role of ROLES.filter((r) => r !== 'admin')) {
+      assert.deepEqual(
+        authorize(actorOf(role), action, targetOf(action)),
+        { allow: false, code: 'forbidden', reason: 'role' },
+        `${role} × ${action}`,
+      );
+    }
+    assert.deepEqual(
+      authorize(actorOf('owner', 'bu_spoc', 'ai_coe', 'dpo', 'it_security'), action, targetOf(action)),
+      { allow: false, code: 'forbidden', reason: 'role' },
+      `combined non-Admin roles × ${action}`,
+    );
+  }
+  // T18: Admin still holds no lane or finding authority.
+  const adminActionsHeld = new Set(
+    POLICY_ROWS.filter((row) => row.role === 'admin').map((row) => row.action),
+  );
+  for (const action of adminActionsHeld) {
+    assert.equal(action.startsWith('lane.') || action.startsWith('finding.'), false, action);
+  }
 });

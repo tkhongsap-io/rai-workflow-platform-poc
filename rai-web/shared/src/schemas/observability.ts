@@ -34,6 +34,7 @@ export const ErrorCategorySchema = values([
   'mail_delivery_failed',
   'not_found',
   'internal_error',
+  'desk_frozen', // W6-01: a write refused while the desk is frozen (an operator choice, logged at info)
 ] as const);
 export type ErrorCategory = Static<typeof ErrorCategorySchema>;
 const deliveryError = values([
@@ -243,9 +244,10 @@ export const SafeErrorFieldsSchema = Type.Union([
   object({
     category: Type.Literal('not_found'),
     targetType: Type.Optional(
-      values(['case', 'version', 'finding', 'artifact', 'notification', 'route'] as const),
+      values(['case', 'version', 'finding', 'artifact', 'notification', 'configuration', 'route'] as const),
     ),
   }),
+  object({ category: Type.Literal('desk_frozen') }), // W6-01: nothing about the refused route's target
   object({
     category: Type.Literal('internal_error'),
     stackHash: Type.String({ pattern: '^[0-9a-f]{64}$' }),

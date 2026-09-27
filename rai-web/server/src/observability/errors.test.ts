@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  DeskFrozenError,
   InvalidInputError,
   UnsafeUploadError,
   UnauthenticatedError,
@@ -79,4 +80,44 @@ test('HTTP and job captures use safe fields, correct levels/statuses and bounded
   } as never);
   assert.equal(lines.at(-1)!.fields.category, 'internal_error');
   assert.equal(JSON.stringify(lines).includes(sentinel), false);
+});
+
+test('W6-01: a DeskFrozenError is captured as desk_frozen, 503, at info, with no stack, never as internal_error', () => {
+  const lines: LogLine[] = [];
+  const emitter: Emitter = {
+    log(event, fields, level) {
+      const line = buildLogLine(event, fields, {
+        strict: true,
+        ...(level === undefined ? {} : { level }),
+        correlationId: id,
+      });
+      lines.push(line);
+      return line;
+    },
+  };
+  const capture = createErrorCapture(emitter);
+  assert.deepEqual(capture.http(new DeskFrozenError(), '/api/cases/:caseId/submit'), {
+    category: 'desk_frozen',
+    httpStatus: 503,
+  });
+  assert.equal(lines.length, 1);
+  const line = lines[0]!;
+  assert.equal(line.event, 'error.captured');
+  assert.equal(line.level, 'info', 'a frozen desk is an operator choice, not a fault');
+  assert.equal(line.fields.category, 'desk_frozen');
+  assert.equal(line.fields.code, 'desk_frozen');
+  assert.equal(line.fields.httpStatus, 503);
+  assert.equal('stack' in line.fields, false);
+  assert.equal('stackHash' in line.fields, false);
+  assert.deepEqual(
+    capture.counters().map((counter) => counter.code),
+    ['desk_frozen'],
+    'counted under desk_frozen, never internal_error',
+  );
+  // W6-01: the new not-found resource is a safe target type, not a schema miss that falls back to internal_error
+  assert.deepEqual(capture.http(new NotFoundError('configuration')), {
+    category: 'not_found',
+    httpStatus: 404,
+  });
+  assert.equal(lines.at(-1)!.fields.targetType, 'configuration');
 });

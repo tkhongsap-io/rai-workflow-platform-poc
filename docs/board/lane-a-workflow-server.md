@@ -222,3 +222,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w5-03-risk-migration-and-drizzle model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #205)
 - Scope: per changes/2026-09-27-w5-03-risk-migration-and-drizzle/: one migration (`server/drizzle/0010_w5_03_risk.sql`, class `restore-required`; renumbered by hand at rebase if another migration merges first) adding `pack_version.risk_answers`, `unknown` in `case_risk_tier_check` and the append-only `risk_proposal` table with its grant; Drizzle schema, `meta/`, migration-guard tests, the `w1-00-migrations` lists, `BUSINESS_TABLES` and the W0-04 rows. No writer, route or UI. One PR.
+
+## 2026-09-27 16:00 — CLAIM lane-a: W6-01 W6 contract (#206)
+- Author: operator=ta session=claude-code-w6-01-w6-contract-shared-shapes model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #206)
+- Scope: per changes/2026-09-27-w6-01-w6-contract-shared-shapes/: shared shapes (`configuration-admin.ts`, `dashboard.ts`, `QueueQuerySchema` filters, optional `SubmittedVersion.frozenConfiguration`), policy rows (`qc.recheck`, `dashboard.view`, `config.publish` scope), error codes (`desk_frozen` 503, `configuration_changed`, `configuration` resource) with capture at info, locale keys, and the W0-02/W0-05/W0-06/W0-10 amendments. One PR, no migration.

@@ -798,6 +798,19 @@ W3-05 adds the due-date and breach-query shapes in `rai-web/shared/src/schemas/s
 
 No audit-read endpoint (W2-08 reconstructs the journey from the table through `tests/support`; an Admin/operator read arrives with W3-07's operator view under W0-10), no configuration write (W6), no lane, finding, disposition or Ready endpoint (W2), no search (W3), no risk (W5), no external-register call of any kind (L3, L6).
 
+### 7.10 W6 shapes
+
+**W6-01 amendment (2026-09-27).** [W6 plan](implementation-plan-w6.md) sections 4.2, 4.3, 8.1 and 8.2; provisional agent-team rulings under Ta's delegation of 2026-09-27. Contract only: W6-04, W6-09, W6-13 and W6-14 serve these shapes.
+
+| Shape | Where | Meaning |
+|---|---|---|
+| Admin configuration | `rai-web/shared/src/schemas/configuration-admin.ts` | `ConfigurationRevisionSummary` `{ revisionId, kind, revisionNumber, publishedAt, publishedBy, publishedByDisplayName?, changeNote \| null, restoresRevisionNumber \| null, inForce, frozenOnVersionCount }`, `ConfigurationRevisionDetail` (plus `body`), `ConfigurationDraftSummary` `{ kind, baseRevisionId \| null, draftVersion, updatedBy, updatedByDisplayName?, updatedAt, changeNote \| null, problemCount }`, `ConfigurationDraftDetail` (plus `body`, `problems: FieldError[]`), the index `{ kinds: [{ kind, editable, valuesOwner, current, draft }] }`, the revision list `{ items, total }` (query `page`, `pageSize` ≤ 100), and the request bodies for save draft `{ baseRevisionId, expectedDraftVersion, body, changeNote? }`, discard `{ expectedDraftVersion }`, publish `{ expectedDraftVersion, expectedCurrentRevisionId, changeNote? }` and restore `{ expectedCurrentRevisionId, changeNote }`. A change note is 1-500 characters; a draft body is a JSON object of at most 64 KiB. `CONFIGURATION_VALUES_OWNER` names each kind's values owner (`admin`, or `D07` for `risk_rubric` and `D10` for `group_role_mapping`; D09 content-rule params are badged per param). Path parameters are plain strings so an unknown kind or malformed revision ID is 404 `configuration`. |
+| Dashboard | `rai-web/shared/src/schemas/dashboard.ts` | `DashboardResponse` `{ asOf, today, cases: { total, byStatus }, lanes[], findings: { open[], unavailableOpen, advisory }, qc: { runs30d, unavailableRuns30d, pausedRuns30d, rechecks30d }, risk, activity[] }` as W6 plan section 8.1; eight activity weeks; `DASHBOARD_DUE_SOON_WORKING_DAYS = 2` in `constants.ts`. |
+| Queue drill-down | `rai-web/shared/src/schemas/queue.ts` | `QueueDrilldownQuerySchema`: `lane`, `laneStatus`, `sla` (`due_soon`, `breached`), `findingLane`, `findingSeverity`, `findingKind` (`defect`, `unavailable`). Declared now; joined to the served `QueueQuerySchema` by W6-14 in the PR that applies them inside scope, so the queue never accepts a filter it ignores. |
+| Version configuration | `rai-web/shared/src/schemas/versions.ts` | `SubmittedVersion.frozenConfiguration?: Array<{ kind, revisionId, revisionNumber, label \| null }>` (7.6), optional; W6-09 serves it and declares `FrozenConfigurationEntrySchema` in the route schema. |
+
+The recheck route (`POST …/versions/{versionId}/qc-rechecks`, W6 plan section 4.4) and its request shape arrive with W6-09. Section 7.9's "no configuration write (W6)" line is annotated by W6-04.
+
 ---
 
 ## 8. Test-layer map

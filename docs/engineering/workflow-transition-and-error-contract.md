@@ -446,6 +446,14 @@ The same PR (W2-05, `codex/w2-05-owning-lane`) replaced `owningLaneForSlot` with
 
 Outside the contract types, the server has one catch-all: **`internal_error`, HTTP 500**, body with `code`, `error.internal_error` and the correlation ID only. W0-10 categorises captured errors by the eight codes above plus this one. There is no other code; in particular, Fastify's default 400/413/415 replies are mapped: malformed JSON → `invalid_input`, multipart over limit → `unsafe_upload`, unsupported media type → `invalid_input`.
 
+**W6-01 amendment (2026-09-27): a ninth code, `desk_frozen`.** [W6 plan](implementation-plan-w6.md) sections 4.2 and 7; provisional agent-team ruling under Ta's delegation of 2026-09-27 (Q12).
+
+| `code` | HTTP | Contract type | When | Locale key (message) |
+|---|---|---|---|---|
+| `desk_frozen` | 503 | Desk frozen | An Admin has switched the `desk_controls` revision to `writesFrozen` and the request is a write outside the exemption list (W6-17), or a recheck is requested while `qcPaused` is on. Reads keep working | `error.desk_frozen` |
+
+`DeskFrozenError` carries no `details` (`ErrorDetails.desk_frozen: never`): the SPA banner reads readiness (W6-17). W0-10 captures it under its own category `desk_frozen` at `info`, never `internal_error` (a frozen desk is an operator choice, not a fault). `rai-web/shared/src/errors.ts` holds the code; section 8.2's listing above predates it and is not rewritten.
+
 ### 8.2 Response envelope
 
 ```ts
@@ -502,6 +510,11 @@ Rules: every error response has `Cache-Control: no-store`; `forbidden` and `unau
 - **QC unavailable.** On upload, submit and approve attempt the business action **succeeds** and an `unavailable` finding with an `owning_lane` (section 7) is appended; the reviewer sees it before deciding; it counts as an undispositioned finding for Ready until dispositioned. No silent cloud fallback. The 503 is reserved for synchronous QC endpoints.
 - **Mail delivery failed.** The committed event stands; the notification record carries `deliveryStatus = { code: 'mail_delivery_failed', attempts, nextRetryAt }`, retried three times with backoff and visible to Admin (D06, W3-04). Never returned on approve, send back, submit or Ready.
 - **Not found.** Only for an in-scope reference, as [W0-05 section 4](authorization-policy-matrix.md#4-out-of-scope-references-403-with-non-guessable-identifiers) makes evaluable: an unresolvable case or artifact id is 404 only for an actor holding an `all_cases` row for the action; an owner or BU SPOC gets 403 whether or not the case exists.
+
+**W6-01 amendment (2026-09-27).** [W6 plan](implementation-plan-w6.md) section 4.2.
+- **Stale version, `configuration_changed`.** A sixth `StaleReason` for the Admin configuration writes (W6-04): the draft's `draftVersion` moved, or the revision in force is no longer the draft's base or the request's `expectedCurrentRevisionId` (Q5). Nothing is written. Its details are `ConfigurationStaleDetails`: `current` is `{ kind, revisionId, draftVersion }` (the revision in force, null before any publish; the draft's version, null when no draft exists), never a version reference, and `refreshPath` is the kind's Admin page. Guidance key `error.stale_version.guidance.configuration_changed`. The version-shaped details keep their name `VersionStaleDetails`.
+- **Not found, `configuration`.** `NotFoundResource` gains `configuration`: an Admin configuration route naming a kind outside `CONFIGURATION_KINDS`, or a revision that does not exist or is of another kind. Only Admin reaches it (every other role is 403 `role` first).
+- **Desk frozen.** Nothing is written. The client shows `error.desk_frozen` and does not retry; reads continue.
 
 ### 8.4 Out-of-scope references: recorded by W0-05 (closed at W0 exit)
 
