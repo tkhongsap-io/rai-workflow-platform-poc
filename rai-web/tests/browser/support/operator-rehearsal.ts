@@ -55,6 +55,8 @@ export function report(populated = true): DeskHealthReport {
         versionId: secondId,
         trigger: 'submit',
         reason: 'unknown',
+        runner: 'substitute-scripted',
+        runnerVersion: 'unrecorded',
         requestedAt: at,
         correlationId: recordId,
       },

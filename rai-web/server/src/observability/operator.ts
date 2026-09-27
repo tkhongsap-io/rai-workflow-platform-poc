@@ -68,6 +68,8 @@ export async function readDeskHealth(
           trigger: qcRun.trigger,
           lane: qcRun.lane,
           reason: qcRun.unavailableReason,
+          runner: qcRun.engineId, // W4-11a: the runner label
+          runnerVersion: qcRun.runnerVersion,
           requestedAt: qcRun.requestedAt,
           correlationId: qcRun.correlationId,
         })

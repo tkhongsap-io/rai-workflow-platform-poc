@@ -64,7 +64,7 @@ test('operator SQL preserves unknown QC and unscheduled failures, derives termin
     );
     for (let index = 0; index < 101; index++)
       await client.query(
-        `INSERT INTO qc_run (id,version_id,trigger,lane,engine_id,rule_revision,status,requested_at,completed_at,correlation_id) VALUES ($1,$2,'approve_attempt','dpo','substitute','v1','unavailable',now(),now(),$3)`,
+        `INSERT INTO qc_run (id,version_id,trigger,lane,engine_id,runner_version,rule_revision,status,requested_at,completed_at,correlation_id) VALUES ($1,$2,'approve_attempt','dpo','substitute','0.0.0','v1','unavailable',now(),now(),$3)`,
         [randomUUID(), versionId, correlation],
       );
     for (const [status, attempts, lane] of [

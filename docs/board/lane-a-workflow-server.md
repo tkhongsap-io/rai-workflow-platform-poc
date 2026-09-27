@@ -192,3 +192,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w3-f7-blob-tmp-min model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #169)
 - Scope: per changes/2026-09-26-w3-f7-blob-tmp-min/. One PR.
+
+## 2026-09-27 09:45 — CLAIM lane-a: W4-11a run identity (#184)
+- Author: operator=ta session=claude-code-w4-11a-run-identity model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #184)
+- Scope: per changes/2026-09-27-w4-11a-run-identity/: `qc_run.runner_version` and `rules_evaluated`, runner identity on `qc.run.*` lines and on desk-health `unavailableQc` rows. One PR.

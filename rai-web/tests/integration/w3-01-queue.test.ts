@@ -298,6 +298,7 @@ describe(`W3-01 scoped queue — ${SET}`, () => {
       versionId: v.versionId,
       trigger: 'submit',
       engineId: 'synthetic',
+      runnerVersion: 'test',
       ruleRevision: '1',
       status: 'completed',
       requestedAt: now(),

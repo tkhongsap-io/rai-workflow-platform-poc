@@ -3,7 +3,8 @@
 // or the owning-lane check fails the whole run as unavailable:runner_error, never a silently shorter clean run.
 // An unavailable result stores a qc_run with status unavailable plus the QC-UNAVAILABLE finding of W0-07 3.6,
 // owned per W0-06 7.3 part 4 and appended once per open scope. An unbound runner (production) persists engine_id
-// `unbound` and replays that row.
+// `unbound` and replays that row. W4-11a: every run row and qc.run.* line names the runner (engine_id,
+// runner_version) and the rule revision, and a recorded run stores how many rules it evaluated.
 
 import { createHash } from 'node:crypto';
 import { Value } from 'typebox/value';
@@ -44,9 +45,12 @@ import {
   listFindingsForRun,
   ruleRevisionOf,
 } from './repository.js';
+import { qcKindOf } from './kind.js';
 
 export const QC_TIMEOUT_MS = 10_000;
 export const UNBOUND_ENGINE_ID = 'unbound' as const;
+/** W4-11a: the runner_version recorded beside engine_id `unbound`; no runner, so no version to name. */
+export const UNBOUND_RUNNER_VERSION = 'unbound' as const;
 
 export interface QcOrchestratorDeps {
   emitter?: Emitter;
@@ -176,9 +180,21 @@ async function buildRequest(
 
 interface RunRecord {
   id: string;
-  engineId: string;
+  engineId: string; // the bound runner's identity.runner, or `unbound`
+  runnerVersion: string; // the bound runner's identity.runnerVersion, or `unbound`
   stamp: Date;
   correlationId: string;
+}
+
+/** The W0-10 run identity fields (W4-11a) of a recorded run's qc.run.* lines. */
+interface RunLabel {
+  runner: string;
+  runnerVersion: string;
+  ruleRevision: string;
+}
+
+function labelOf(run: RunRecord, request: QcRunRequest): RunLabel {
+  return { runner: run.engineId, runnerVersion: run.runnerVersion, ruleRevision: request.qcRulesRevision };
 }
 
 function unavailableResult(reason: QcUnavailableReason, detail: string | null, stamp: Date): QcRunResult {
@@ -208,6 +224,7 @@ async function recordRun(
   run: RunRecord,
   unavailableReason: QcUnavailableReason | null,
   findingCount: number,
+  rulesEvaluated: number,
 ): Promise<void> {
   await insertQcRun(tx, {
     id: run.id,
@@ -216,9 +233,11 @@ async function recordRun(
     slot: null,
     lane: request.lane,
     engineId: run.engineId,
+    runnerVersion: run.runnerVersion,
     ruleRevision: request.qcRulesRevision,
     status: unavailableReason === null ? 'completed' : 'unavailable',
     unavailableReason,
+    rulesEvaluated,
     requestedAt: run.stamp,
     completedAt: run.stamp,
     correlationId: run.correlationId,
@@ -250,13 +269,14 @@ async function persistResult(
   if (result.status === 'unavailable') {
     const prior = await findLatestUnavailableFinding(tx, version.id, request.trigger, request.lane);
     const reuse = prior !== undefined && prior.undispositioned;
-    await recordRun(tx, version, request, run, result.reason, reuse ? 0 : 1);
+    // The run row names the bound runner, not the orchestrator that builds the QC-UNAVAILABLE finding (W0-07 3.6).
+    await recordRun(tx, version, request, run, result.reason, reuse ? 0 : 1, 0);
     if (reuse)
       return { status: 'unavailable', reason: result.reason, runId: run.id, findings: [prior.summary] };
     const summary = await appendUnavailableFinding(tx, version, request, run, result.reason);
     return { status: 'unavailable', reason: result.reason, runId: run.id, findings: [summary] };
   }
-  await recordRun(tx, version, request, run, null, result.findings.length);
+  await recordRun(tx, version, request, run, null, result.findings.length, result.rulesEvaluated.length);
   const findings: StoredFindingSummary[] = [];
   for (const finding of result.findings) {
     const findingId = uuidv7(run.stamp.getTime());
@@ -408,22 +428,30 @@ async function replayPrior(
 }
 
 type Settled =
-  { kind: 'replayed'; outcome: SubmitQcOutcome } | { kind: 'recorded'; outcome: PersistQcOutcome };
+  | { kind: 'replayed'; outcome: SubmitQcOutcome }
+  | { kind: 'recorded'; outcome: PersistQcOutcome; label: RunLabel; rulesEvaluated: number };
 
 /** A replay emits nothing; a newly recorded run emits its W0-10 completion line. */
 function settle(deps: QcOrchestratorDeps, input: RunQcInput, settled: Settled, startedAt: number) {
   if (settled.kind === 'recorded') {
-    const { outcome } = settled;
+    const { outcome, label } = settled;
     if (outcome.status === 'unavailable')
-      emitUnavailable(deps, input, outcome.runId, outcome.reason, outcome.findings[0]?.owningLane);
+      emitUnavailable(deps, input, outcome.runId, outcome.reason, label, outcome.findings[0]?.owningLane);
     else
       deps.emitter?.log('qc.run.completed', {
         qcRunId: outcome.runId,
+        ...label,
+        rulesEvaluated: settled.rulesEvaluated,
         findingCount: outcome.findings.length,
         durationMs: Math.max(0, performance.now() - startedAt),
       });
   }
   return settled.outcome;
+}
+
+function recorded(outcome: PersistQcOutcome, label: RunLabel, result: QcRunResult): Settled {
+  const rulesEvaluated = result.status === 'completed' ? result.rulesEvaluated.length : 0;
+  return { kind: 'recorded', outcome, label, rulesEvaluated };
 }
 
 async function callRunner(
@@ -525,13 +553,12 @@ async function runQc(deps: QcOrchestratorDeps, input: RunQcInput): Promise<Submi
     );
     if (runner === undefined) {
       const notConfigured = unavailableResult('not_configured', null, stamp);
-      const outcome = await persistResult(tx, version, request, notConfigured, {
-        ...run,
-        engineId: UNBOUND_ENGINE_ID,
-      });
-      return { kind: 'recorded' as const, outcome };
+      const unbound = { ...run, engineId: UNBOUND_ENGINE_ID, runnerVersion: UNBOUND_RUNNER_VERSION };
+      const outcome = await persistResult(tx, version, request, notConfigured, unbound);
+      return recorded(outcome, labelOf(unbound, request), notConfigured);
     }
-    return { kind: 'ready' as const, request, run: { ...run, engineId: runner.identity.runner }, runner };
+    const bound = { ...run, engineId: runner.identity.runner, runnerVersion: runner.identity.runnerVersion };
+    return { kind: 'ready' as const, request, run: bound, runner };
   });
   if (prepared.kind !== 'ready') return settle(deps, input, prepared, performance.now());
 
@@ -542,7 +569,8 @@ async function runQc(deps: QcOrchestratorDeps, input: RunQcInput): Promise<Submi
     versionId: input.versionId,
     trigger: input.trigger,
     ...(input.lane === null ? {} : { lane: input.lane }),
-    qcKind: 'substitute', // W0-W3 binds only synthetic QC; real engines remain W4-gated.
+    qcKind: qcKindOf(prepared.runner.identity),
+    ...labelOf(run, request),
   });
   const startedAt = performance.now();
   const result = await callRunner(prepared.runner, request, run.stamp, timeoutMs);
@@ -552,7 +580,7 @@ async function runQc(deps: QcOrchestratorDeps, input: RunQcInput): Promise<Submi
       const { version } = await loadOpenSubmittedTarget(tx, input);
       const replayed = await replayPrior(tx, input, version, true);
       if (replayed !== undefined) return { kind: 'replayed', outcome: replayed };
-      return { kind: 'recorded', outcome: await persistResult(tx, version, request, result, run) };
+      return recorded(await persistResult(tx, version, request, result, run), labelOf(run, request), result);
     });
     return settle(deps, input, stored, startedAt);
   } catch (error) {
@@ -566,12 +594,15 @@ function emitUnavailable(
   input: RunSubmitQcInput,
   runId: string,
   reason: QcUnavailableReason,
+  label: RunLabel,
   owningLane?: Lane,
 ): void {
   const fields = { qcRunId: runId, caseId: input.caseId, versionId: input.versionId, reason };
-  // W0-10 3.3: the log line names the QC-UNAVAILABLE finding's lane (W0-07 3.6); the error capture keeps its shape.
+  // W0-10 3.3: the log line names the QC-UNAVAILABLE finding's lane (W0-07 3.6) and, since W4-11a, the run's
+  // runner and rule revision; the error capture keeps its shape.
   deps.emitter?.log('qc.run.unavailable', {
     ...fields,
+    ...label,
     ...(owningLane === undefined ? {} : { owningLane }),
   });
   deps.errors?.job({ category: 'qc_unavailable', ...fields });

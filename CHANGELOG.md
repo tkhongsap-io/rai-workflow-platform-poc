@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-27
+
+- W4-11a (#184): QC runs record the runner version and the rules evaluated; `qc.run.*` log lines and the desk-health QC outage rows name the runner.
+
 ## 2026-09-26
 
 - W4a authorized by Ta (deterministic metadata QC, synthetic data); slot-5/9 upload rule and W4a kickoff rulings recorded; W4-00a file-level plan added.

@@ -49,6 +49,8 @@ test('operator report represents historical unknown reasons and durable late res
         versionId: id,
         trigger: 'submit',
         reason: 'unknown',
+        runner: 'substitute-scripted',
+        runnerVersion: 'unrecorded',
         requestedAt: at,
         correlationId: id,
       },
@@ -77,6 +79,21 @@ test('operator report represents historical unknown reasons and durable late res
     }),
     false,
   );
+  // W4-11a: every unavailable row names its runner; the label is an identifier, never free text.
+  const { runner: _runner, ...unlabelled } = report.unavailableQc[0]!;
+  assert.equal(Value.Check(DeskHealthReportSchema, { ...report, unavailableQc: [unlabelled] }), false);
+  const { runnerVersion: _version, ...unversioned } = report.unavailableQc[0]!;
+  assert.equal(Value.Check(DeskHealthReportSchema, { ...report, unavailableQc: [unversioned] }), false);
+  for (const unsafe of ['', 'runner with spaces', 'x'.repeat(65), 'a/b', 'Traceback: boom'])
+    for (const key of ['runner', 'runnerVersion'])
+      assert.equal(
+        Value.Check(DeskHealthReportSchema, {
+          ...report,
+          unavailableQc: [{ ...report.unavailableQc[0], [key]: unsafe }],
+        }),
+        false,
+        `${key}=${unsafe}`,
+      );
 });
 test('safe errors reject values hidden in unknown paths, filenames, messages and stacks', () => {
   for (const payload of [
