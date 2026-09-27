@@ -42,6 +42,36 @@ async function readSlaCalendar(exec: Executor, slaId: string, calendarId: string
   return { sla: slaRow.body, holidays: calendarRow.body.holidays };
 }
 
+async function frozenSlaCalendar(
+  exec: Executor,
+  version: { id: string; frozenConfiguration: unknown },
+  memo: SlaCalendarMemo,
+) {
+  const slaId = frozenId(version.frozenConfiguration, 'sla');
+  const calendarId = frozenId(version.frozenConfiguration, 'calendar');
+  if (slaId === undefined || calendarId === undefined) throw new FrozenSlaUnavailable(version.id);
+  const key = `${slaId}:${calendarId}`;
+  if (!memo.has(key)) memo.set(key, readSlaCalendar(exec, slaId, calendarId));
+  const frozen = await memo.get(key);
+  if (frozen === undefined) throw new FrozenSlaUnavailable(version.id);
+  return frozen;
+}
+
+/**
+ * W6-13: the Asia/Bangkok date `workingDays` working days after the date of `asOf`, walked with this version's frozen
+ * calendar (the dashboard's due-soon horizon). Fails closed like `dueDatesFor`.
+ */
+export async function workingDaysAfter(
+  exec: Executor,
+  version: { id: string; frozenConfiguration: unknown },
+  asOf: Date,
+  workingDays: number,
+  memo: SlaCalendarMemo = new Map(),
+): Promise<string> {
+  const frozen = await frozenSlaCalendar(exec, version, memo);
+  return dueOn(asOf, workingDays, frozen.holidays);
+}
+
 /**
  * Due date of each lane. The clock is this version's `submitted_at` (D06: it restarts on the next submit).
  * Fails closed if the frozen sla or calendar revision is missing.
@@ -51,13 +81,7 @@ export async function dueDatesFor(
   version: { id: string; submittedAt: Date; frozenConfiguration: unknown },
   memo: SlaCalendarMemo = new Map(),
 ): Promise<LaneDue[]> {
-  const slaId = frozenId(version.frozenConfiguration, 'sla');
-  const calendarId = frozenId(version.frozenConfiguration, 'calendar');
-  if (slaId === undefined || calendarId === undefined) throw new FrozenSlaUnavailable(version.id);
-  const key = `${slaId}:${calendarId}`;
-  if (!memo.has(key)) memo.set(key, readSlaCalendar(exec, slaId, calendarId));
-  const frozen = await memo.get(key);
-  if (frozen === undefined) throw new FrozenSlaUnavailable(version.id);
+  const frozen = await frozenSlaCalendar(exec, version, memo);
   const opened = version.submittedAt;
   return LANES.map((lane: Lane) => ({
     lane,

@@ -16,6 +16,7 @@ import type { Lane, LaneDecisionResponse, LaneQcRunResponse } from '@rai/shared/
 import type { QueueResponse } from '@rai/shared/schemas/queue';
 import type { SessionInfo } from '@rai/shared/schemas/auth';
 import type { DeskHealthReport } from '@rai/shared/schemas/observability';
+import type { DashboardResponse } from '@rai/shared/schemas/dashboard';
 import { Api, expectedQueue, queueShape, validateManifest, type Manifest, type RunConfig } from './core.js';
 import {
   guardLaunch,
@@ -258,6 +259,11 @@ async function selectedReads(rows: QueueResponse['items']): Promise<SurfacePlan[
   const operator = await admin.json<DeskHealthReport>('/api/operator/desk-health');
   for (const field of ['failedMail', 'unavailableQc', 'lateQc'] as const)
     assert.deepEqual(operator[field], []);
+  // W6-13: the dashboard over all 1,000 cases (Admin) and a lane reviewer's view; the case counts are stable.
+  const adminDashboard = await admin.json<DashboardResponse>('/api/dashboard');
+  const dpo = await signedIn(plan.queue.baseUrl, 'fx-user-dpo');
+  const dpoDashboard = await dpo.json<DashboardResponse>('/api/dashboard');
+  assert.equal(adminDashboard.cases.total, rows.length);
   const ids = {
     session: {},
     case: { caseId: view.caseId },
@@ -265,12 +271,14 @@ async function selectedReads(rows: QueueResponse['items']): Promise<SurfacePlan[
     version: { caseId: view.caseId, versionId: version.versionId },
     history: { caseId: view.caseId },
     operator: {},
+    dashboard: {},
   };
   const read = (
-    name: keyof typeof ids,
+    name: string,
     actor: string,
     expected: Record<string, unknown>,
-  ): SurfacePlan['reads'][number] => ({ name, kind: name, actor, ids: ids[name], expected });
+    kind: keyof typeof ids = name as keyof typeof ids,
+  ): SurfacePlan['reads'][number] => ({ name, kind, actor, ids: ids[kind], expected });
   return [
     read('session', OWNER, { identityMode: 'fixture', locale: 'th' }),
     read('case', OWNER, { caseId: view.caseId, useCaseName: view.useCaseName, status: view.status }),
@@ -283,6 +291,8 @@ async function selectedReads(rows: QueueResponse['items']): Promise<SurfacePlan[
     }),
     read('history', OWNER, { items: history.items }),
     read('operator', 'fx-user-admin', { failedMail: [], unavailableQc: [], lateQc: [] }),
+    read('dashboard', 'fx-user-admin', { cases: adminDashboard.cases, risk: { available: false } }),
+    read('dashboard-dpo', 'fx-user-dpo', { cases: dpoDashboard.cases }, 'dashboard'),
   ];
 }
 function boundPages(resources: Resources, rows: QueueResponse['items']): PagePlan['pages'] {

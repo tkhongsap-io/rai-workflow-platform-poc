@@ -13,6 +13,7 @@ import {
   guardPlan,
   json,
   measured,
+  READ_BUDGETS_MS,
   READS,
   routePath,
   Transport,
@@ -90,7 +91,7 @@ export async function measureSurfaces(plan: SurfacePlan, controls: { queue: Cont
       'queue',
       route,
       200,
-      300,
+      READ_BUDGETS_MS[selection.kind],
       () => async () =>
         measured(await api.request(path), 200, (r) => {
           const value = json(r);

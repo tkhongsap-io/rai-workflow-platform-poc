@@ -31,6 +31,7 @@ W3-06 records per-surface synthetic p95 measurements using the W0-10 `request.co
 | Upload (25 MiB file) | < 10 s end to end | Streaming hash and sniff (W0-08); bounded by disk, not CPU |
 | Download (25 MiB file) | < 5 s | Streamed from the blob store with `Content-Length` |
 | Queue search (W3-01) | < 300 ms at 1,000 cases | Scoped `WHERE` (`caseScopeWhere`, W0-05), indexed status and BU columns |
+| Desk dashboard (`GET /api/dashboard`, W6-13) | < 500 ms at 1,000 cases | Added 2026-09-27 by W6-13 from the [W6 plan](implementation-plan-w6.md) section 8.1 (a delegated addition, not a PRD requirement). One read-only snapshot, every query scoped by `caseScopeWhere`; measured as the `dashboard` read of `npm run perf:run` (`READ_BUDGETS_MS`). Lane sample in the [W6-13 review](../../changes/2026-09-27-w6-13-dashboard-api-advisory-and/review.md) |
 | Readiness (`GET /readyz`) | < 100 ms cached, < 2.5 s uncached | 2,000 ms probe ceiling, 5 s cache (W0-10 5.5) |
 
 ## 3. Time budgets carried from the specs

@@ -266,3 +266,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w5-04-draft-risk-answers model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #222)
 - Scope: per changes/2026-09-27-w5-04-draft-risk-answers/: `PackDraft.riskAnswers` and `PackDraftUpdateRequest.riskAnswers` (W0-02 7.5), validated against the `risk_rubric` in force (422 `error.risk.not_configured`, `validation.not_in_configured_list`), stored with attribution in `pack_version.risk_answers`, `draft.saved` refs, copied to the successor draft on send-back; the API substitute's draft literals typed with `riskAnswers: {}`. No scoring, no migration, no UI. One PR.
+
+## 2026-09-28 00:45 — CLAIM lane-a: W6-13 dashboard API (#215)
+- Author: operator=ta session=claude-code-w6-13-dashboard-api-advisory-and model=claude-opus-5-5 (implementation lane admin)
+- Takes over from: session=none (reason: new; ticket #215, W6-01 merged #283)
+- Scope: per changes/2026-09-27-w6-13-dashboard-api-advisory-and/: `GET /api/dashboard` (`dashboard.view`) served by `server/src/dashboard/{repository,routes}.ts` inside one read-only snapshot from `caseScopeWhere`; `openReviewTargets` gains an optional scope predicate; `findings.advisory` and `qc.rechecks30d` served as `0` until W6-09; a `dashboard` read in the performance harness and a recorded p95 sample at 1,000 cases. No migration, no UI (W6-15). One PR.
