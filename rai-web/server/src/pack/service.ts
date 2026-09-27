@@ -23,6 +23,7 @@ import type { ExpectedVersion } from '@rai/shared/schemas/versions';
 import type { UploadLimits } from '../artifacts/pipeline.js';
 import { auditStore, type AuditRefValue } from '../audit/store.js';
 import { readCaseRow, readVersionRow, updateDraftFields, type CaseRow } from '../cases/repository.js';
+import { readNames, type SubjectDirectory } from '../cases/subject-directory.js';
 import { currentBody } from '../configuration/store.js';
 import type { Db, Executor, Tx } from '../db/client.js';
 import { lockCase, withTransaction } from '../db/transaction.js';
@@ -39,9 +40,16 @@ import {
   packDraftView,
   readDraftSlots,
   updateDraftContext,
+  updateDraftRiskAnswers,
   updateDraftSlot,
   type ArtifactRow,
 } from './repository.js';
+import {
+  mergeRiskAnswers,
+  riskAnswerAuditRefs,
+  riskAnswerProblems,
+  storedRiskAnswers,
+} from './risk-answers.js';
 import { SLOT_NUMBERS, slotPath, slotStateFromColumns, validateSlotValues } from './slots.js';
 
 export interface PackServiceDeps {
@@ -52,6 +60,8 @@ export interface PackServiceDeps {
   uploadTrigger?: UploadTrigger; // the W0-07 hook point; app.ts binds the QC upload trigger (W4-04)
   /** W4-04: each fired trigger is tracked, so a graceful shutdown waits for the upload run (shutdown.ts). */
   drain?: Pick<Drain, 'track'>;
+  /** W5-04: names the answerers on the draft read (W3-F1 pattern); absent, `answeredByName` is omitted. */
+  subjects?: SubjectDirectory;
   now?: () => Date;
 }
 
@@ -60,13 +70,17 @@ export const ARTIFACT_CASE_MISMATCH = 'error.artifact_case_mismatch' as const;
 const MIB = 1024 * 1024;
 
 /** `GET /api/cases/{caseId}/draft`: 404 `case` when the row is gone, 404 `version` when no draft is open. */
-export async function readDraft(exec: Executor, caseId: string): Promise<PackDraft> {
+export async function readDraft(
+  exec: Executor,
+  caseId: string,
+  subjects?: SubjectDirectory,
+): Promise<PackDraft> {
   const row = await readCaseRow(exec, caseId);
   if (row === undefined) throw new NotFoundError('case');
   if (row.draftVersionId === null) throw new NotFoundError('version');
   const draft = await readVersionRow(exec, row.draftVersionId);
   if (draft === undefined) throw new NotFoundError('version');
-  return packDraftView(exec, row, draft);
+  return packDraftView(exec, row, draft, readNames(subjects));
 }
 
 interface SlotWrite {
@@ -95,6 +109,11 @@ async function validateValues(
   }
   const slots = request.slots ?? {};
   errors.push(...validateSlotValues(slots, caseRow.vendorInvolved));
+  if (request.riskAnswers !== undefined) {
+    // W5-04: against the risk_rubric revision in force at the save (W1-00 activation rule); `null` always clears.
+    const rubric = await currentBody(tx, 'risk_rubric', at);
+    errors.push(...riskAnswerProblems(request.riskAnswers, rubric));
+  }
   const writes: SlotWrite[] = [];
   for (const slot of SLOT_NUMBERS) {
     const state = slots[slot];
@@ -219,7 +238,21 @@ export async function saveDraft(
     if (request.stageContext !== undefined) contextPatch.stageContext = request.stageContext;
     if (validated.checklistTemplateVersion !== undefined)
       contextPatch.checklistTemplateVersion = validated.checklistTemplateVersion;
-    const draftAfter = await updateDraftContext(tx, draftRow.id, contextPatch);
+    let draftAfter = await updateDraftContext(tx, draftRow.id, contextPatch);
+    let riskAnswersChanged = false;
+    if (request.riskAnswers !== undefined) {
+      const { merged, changed } = mergeRiskAnswers(
+        storedRiskAnswers(draftRow.riskAnswers),
+        request.riskAnswers,
+        {
+          answeredBy: ctx.actor.subjectId,
+          answeredRole: ctx.role,
+          answeredAt: now.toISOString(),
+        },
+      );
+      riskAnswersChanged = changed;
+      if (changed) draftAfter = await updateDraftRiskAnswers(tx, draftRow.id, merged);
+    }
 
     const changed: string[] = [];
     if (contextPatch.stageContext !== undefined && contextPatch.stageContext !== draftRow.stageContext)
@@ -230,6 +263,10 @@ export async function saveDraft(
     )
       changed.push('checklist_template_version');
     if (slotRefs.length > 0) changed.push('slots');
+    if (riskAnswersChanged) changed.push('risk_answers');
+    const targetRef: Record<string, AuditRefValue> = { changed_fields: changed, slots: slotRefs };
+    // W5-04: question IDs and values only (enumerations, never text or names); present only when the request had them.
+    if (request.riskAnswers !== undefined) targetRef.risk_answers = riskAnswerAuditRefs(request.riskAnswers);
 
     const after = await bumpRevision(tx, before, now);
     await auditStore.append(tx, {
@@ -238,13 +275,13 @@ export async function saveDraft(
       action: 'draft.saved',
       targetCaseId: caseId,
       targetVersionId: draftRow.id,
-      targetRef: { changed_fields: changed, slots: slotRefs },
+      targetRef,
       beforeRef: { row_version: before.rowVersion },
       afterRef: { row_version: after.rowVersion },
       correlationId: ctx.correlationId,
       occurredAt: now,
     });
-    return { draft: await packDraftView(tx, after, draftAfter), attached };
+    return { draft: await packDraftView(tx, after, draftAfter, readNames(deps.subjects)), attached };
   });
   fireUploadTriggers(deps, attached);
   return draft;

@@ -137,6 +137,7 @@ export function newDraft(
     slots: defaultSlots(fields.vendorInvolved),
     draftRevision: 1,
     updatedAt,
+    riskAnswers: {}, // W5-04: the substitute never stores answers (W5 plan section 7)
   };
 }
 
@@ -376,6 +377,7 @@ export function ensureSuccessorDraft(
     slots: unfreezeSlots(parent.slots),
     draftRevision: 1,
     updatedAt: nowIso,
+    riskAnswers: {}, // W5-04: the substitute never stores answers (W5 plan section 7)
   };
   stored.draft = draft;
   stored.status = 'sent_back';

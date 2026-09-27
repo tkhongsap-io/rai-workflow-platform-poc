@@ -261,3 +261,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w4-05c-docx-and-xlsx-extraction model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #220)
 - Scope: per changes/2026-09-27-w4-05c-docx-and-xlsx-extraction/: hand-written `worker/zip.ts` (central directory, stored and deflate with `maxOutputLength`, CRC and size checks), `worker/xml.ts` (tokenizer that refuses a DOCTYPE, five predefined and numeric entities only), `worker/docx.ts` (one `section` segment per paragraph ordinal) and `worker/xlsx.ts` (one `cell` segment per non-empty cell, sheet ordinal plus A1 reference) registered in the worker's format registry; text-free ordinal locators accepted on the wire; `selfTest()` extracts an embedded synthetic DOCX; hostile set fed to the extractor. No PDF (W4-05d), no runner, no config key, no migration. One PR.
+
+## 2026-09-27 23:31 — CLAIM lane-a: W5-04 draft risk answers (#222)
+- Author: operator=ta session=claude-code-w5-04-draft-risk-answers model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #222)
+- Scope: per changes/2026-09-27-w5-04-draft-risk-answers/: `PackDraft.riskAnswers` and `PackDraftUpdateRequest.riskAnswers` (W0-02 7.5), validated against the `risk_rubric` in force (422 `error.risk.not_configured`, `validation.not_in_configured_list`), stored with attribution in `pack_version.risk_answers`, `draft.saved` refs, copied to the successor draft on send-back; the API substitute's draft literals typed with `riskAnswers: {}`. No scoring, no migration, no UI. One PR.

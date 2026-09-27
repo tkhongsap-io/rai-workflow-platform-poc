@@ -1,5 +1,9 @@
 # Development log
 
+## W5-04 draft risk answers — 2026-09-27
+
+Third W5 implementation ticket (#222). The owner or BU SPOC can now answer the risk questionnaire on the pack draft, through the same save that edits the slots. Each answer is one of the question's options or "Unknown"; there is no free-text answer, so no personal data can enter through it. The desk records who answered, in which role and when. The answer keeps its answerer until someone changes it, and clearing it removes it. Answers are checked against the questionnaire in force: an answer to a question or option it does not have is refused, and so is any answer when no questionnaire is configured, though clearing an old answer always works. The audit trail records which questions were answered with which values, never names. Answers are frozen with the version at submit, and when a reviewer sends a version back the new draft starts with the same answers and their original answerers. The questionnaire is still the labelled synthetic placeholder: D07 stays with AI/COE. Nothing scores or shows the answers yet (W5-05 and W5-07). [Review](changes/2026-09-27-w5-04-draft-risk-answers/review.md).
+
 ## W4-05c DOCX and XLSX extraction — 2026-09-27
 
 Third extraction ticket of W4b (#220). The document reader that W4-05b built can now read Word and Excel files. A Word document comes back as its paragraphs, each located by its paragraph number. An Excel workbook comes back as its non-empty cells, each located by its sheet number and cell reference (such as `B7`). No location carries document text: no heading and no sheet name, only numbers and the cell reference. The text stays in memory for the one QC run that asked for it.

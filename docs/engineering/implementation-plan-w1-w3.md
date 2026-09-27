@@ -703,6 +703,23 @@ Defaults when a draft is created (W1-02 create, W2-03 send-back): every slot `mi
 
 The case screen offers the editor's Change, Save and Submit controls only to a writer of the case (an owner grant on the case's business owner, or the SPOC of its BU: the `case.edit_draft` rows). Anyone else in scope reads the draft's settings and slots with no editing control. This is presentation only; the `PUT` and submit still answer `403` to them.
 
+**W5-04 amendment (2026-09-27): risk questionnaire answers on the draft.** [W5 plan](implementation-plan-w5.md) sections 2, 4 and 6 (R-3, R-13). Both shapes gain one field:
+
+```ts
+export interface RiskAnswer {
+  value: string;                       // an option value of the rubric in force when it was given, or 'unknown'
+  answeredBy: SubjectId;
+  answeredByName?: string;             // display only (W3-F1); omitted when the subject does not resolve
+  answeredRole: Role;                  // the acting role; owner or bu_spoc (the case.edit_draft rows)
+  answeredAt: string;
+}
+// PackDraft:              riskAnswers: Record<RiskQuestionId, RiskAnswer>;              // {} when nothing is answered
+// PackDraftUpdateRequest: riskAnswers?: Record<RiskQuestionId, string | null>;          // only the answers being changed; null clears
+//                         (RiskQuestionId ^RQ[1-9]$; value ^[a-z][a-z0-9_]{0,39}$; additionalProperties false; at most 20 keys)
+```
+
+A new or changed answer is stored in `pack_version.risk_answers` with the acting subject, role and instant; an unchanged answer keeps its original attribution; `null` removes it. No name is stored. The `PUT` gains two `422 invalid_input` rows: a non-null answer when no `risk_rubric` revision is in force is `error.risk.not_configured` at `body.riskAnswers`; a question not in the rubric in force, or a value that is neither one of its options nor `unknown`, is `validation.not_in_configured_list` at `body.riskAnswers.<questionId>`. A clear (`null`) is always accepted. `draft.saved` lists `risk_answers` in `changed_fields` when an answer changed and carries `risk_answers: [{ question_id, value }]` when the request had answers (values only, never text or names). A send-back successor draft (W2-03) copies the parent's answers with their attribution. The rubric is the labelled synthetic placeholder until D07 (AI/COE) is recorded.
+
 ### 7.6 Submit and version navigation (W1-05; consumed by W1-06, W2-07)
 
 ```ts

@@ -77,6 +77,7 @@
   "error.mail_delivery_failed": "The notification email could not be delivered. The decision is recorded and delivery will be retried.",
   "error.not_found": "Not found.",
   "error.qc_unavailable": "QC is unavailable. The check is recorded as unavailable, not as passed.",
+  "error.risk.not_configured": "No risk questionnaire is configured, so answers cannot be saved yet.",
   "error.stale_version": "This version changed after you opened it. Nothing was saved.",
   "error.stale_version.guidance.configuration_changed": "This configuration changed after you opened it. Nothing was saved. Reload to see the revision in force and the current draft.",
   "error.stale_version.guidance.lane_already_decided": "This lane has already decided this version.",
