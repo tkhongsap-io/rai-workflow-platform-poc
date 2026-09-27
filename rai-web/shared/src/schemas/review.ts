@@ -283,7 +283,7 @@ export type QcUnavailableReasonName = (typeof QC_UNAVAILABLE_REASONS)[number];
  * `qc_run.engine_id`; `ruleRevision` the recorded revision ID; `rulesLabel` the `label` of the `qc_rules` revision
  * with that ID (null when it names none); `rulesEvaluated` is null on rows written before migration 0009. W4-11b
  * (W4b plan section 9): `extractorVersion`, `model` and `modelUsage` are what the run recorded (null without
- * extraction or model use, and on rows written before migration 0012); `unavailableDetail` is the stored detail of an
+ * extraction or model use, and on rows written before migration 0013); `unavailableDetail` is the stored detail of an
  * unavailable run (a bounded code or `unspecified`; null when none). The model cost is not served. The identity
  * labels use the `QcEngineIdentitySchema` label bound and the detail the qc_run CHECK pattern (review round 1).
  */

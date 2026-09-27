@@ -39,7 +39,7 @@ test('W7-D9: 0000-0006 and 0008 additive, 0007 and 0009 restore-required, the W7
   const w703 = tags.find((tag) => tag.endsWith('_w7_03_migration_class'));
   assert.ok(w703, 'the W7-03 migration is in the folder');
   assert.equal(MIGRATION_CLASSES[w703], 'additive');
-  // W4-11b (rebased onto W7-03 as 0012): nine nullable columns and five CHECKs, no trigger, grant or default.
+  // W4-11b (0012 after W7-03, 0013 after W6-02): nine nullable columns and five CHECKs, no trigger, grant or default.
   const w411b = tags.find((tag) => tag.endsWith('_w4_11b_run_extraction_identity'));
   assert.ok(w411b, 'the W4-11b migration is in the folder');
   assert.equal(MIGRATION_CLASSES[w411b], 'additive');

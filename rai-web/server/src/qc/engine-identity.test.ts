@@ -99,6 +99,6 @@ test('W4-11b: the stored detail is the code when bounded, unspecified otherwise,
 test('one detail pattern: the server check, the shared read schemas and the migration CHECK agree', () => {
   assert.equal(QC_UNAVAILABLE_DETAIL_PATTERN, '^[a-z0-9_]{1,64}$');
   assert.equal(UNAVAILABLE_DETAIL_PATTERN.source, QC_UNAVAILABLE_DETAIL_PATTERN);
-  const sql = readFileSync(path.join(MIGRATIONS_FOLDER, '0012_w4_11b_run_extraction_identity.sql'), 'utf8');
+  const sql = readFileSync(path.join(MIGRATIONS_FOLDER, '0013_w4_11b_run_extraction_identity.sql'), 'utf8');
   assert.ok(sql.includes(`"unavailable_detail" ~ '${QC_UNAVAILABLE_DETAIL_PATTERN}'`));
 });
