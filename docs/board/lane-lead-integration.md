@@ -147,3 +147,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w4a-gate model=claude-opus-5-5
 - Takes over from: session=none (reason: new; W4a gate entry of 2026-09-26)
 - Scope: docs/engineering/implementation-plan-w4a.md and the gate records, one PR.
+
+## 2026-09-27 14:58 — CLAIM lead-integration: W4a exit record (W4a-EXIT)
+- Author: operator=ta session=claude-code-w4a-exit model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #190, all six W4a tickets merged #192-#197)
+- Scope: changes/2026-09-27-w4a-exit/ and status text only (plan section 10 exit evidence, section 8 gate); no application code, no decision.
