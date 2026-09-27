@@ -420,6 +420,11 @@ describe(`W1-05 submit freezes an immutable version (A07) — ${SET}, fx-case-no
     assert.ok(Object.values(row.frozen_configuration as Record<string, string>).includes(config.revisionId));
     assert.equal((row.frozen_configuration as Record<string, string>)['qc_rules'], qcRules[0]!.id);
     assert.ok('sla' in (row.frozen_configuration as object)); // W3-05 reads the SLA values from here
+    // W5-02: the placeholder risk_rubric is frozen with the version; configuration_revision_id stays qc_rules.
+    const riskRubric = revisions.find((r) => r.kind === 'risk_rubric');
+    assert.ok(riskRubric, 'the seed publishes risk_rubric');
+    assert.equal((row.frozen_configuration as Record<string, string>)['risk_rubric'], riskRubric.id);
+    assert.notEqual(row.configuration_revision_id, riskRubric.id);
     // manifest_hash covers the nine slot rows (W0-04).
     const slots = await slotRows(version.versionId);
     assert.equal(

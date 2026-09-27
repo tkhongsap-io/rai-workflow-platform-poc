@@ -244,7 +244,17 @@ export const SafeErrorFieldsSchema = Type.Union([
   object({
     category: Type.Literal('not_found'),
     targetType: Type.Optional(
-      values(['case', 'version', 'finding', 'artifact', 'notification', 'configuration', 'route'] as const),
+      // W5-02 adds risk_rubric (no risk_rubric revision in force; W5 plan section 6).
+      values([
+        'case',
+        'version',
+        'finding',
+        'artifact',
+        'notification',
+        'configuration',
+        'risk_rubric',
+        'route',
+      ] as const),
     ),
   }),
   object({ category: Type.Literal('desk_frozen') }), // W6-01: nothing about the refused route's target

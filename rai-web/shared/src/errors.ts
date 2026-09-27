@@ -70,7 +70,9 @@ export const UNSAFE_UPLOAD_REASONS = [
 ] as const;
 export type UnsafeUploadReason = (typeof UNSAFE_UPLOAD_REASONS)[number];
 
-export type NotFoundResource = 'case' | 'version' | 'finding' | 'artifact' | 'notification' | 'configuration';
+// W5-02 adds risk_rubric: no risk_rubric revision in force (GET /api/configuration/risk-rubric/current).
+export type NotFoundResource =
+  'case' | 'version' | 'finding' | 'artifact' | 'notification' | 'configuration' | 'risk_rubric';
 
 /** The W0-06 8.2 details of a 409 about a case version: the current reference of that version. */
 export interface VersionStaleDetails {

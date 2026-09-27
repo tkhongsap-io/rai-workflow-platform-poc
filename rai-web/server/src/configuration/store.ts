@@ -12,8 +12,10 @@ import {
   type ConfigurationBodies,
   type ConfigurationKind,
   type ConfigurationView,
+  type RiskRubricView,
   type SeedableConfigurationKind,
   qcRulesBodyProblems,
+  riskRubricBodyProblems,
 } from '@rai/shared/schemas/cases';
 import { APP_TIMEZONE } from '@rai/shared/constants';
 import { auditStore } from '../audit/store.js';
@@ -71,6 +73,11 @@ export function validateConfigurationBody(
   if (kind === 'qc_rules') {
     // W4-02: the catalogue checks the schema cannot express (a rule listed twice, params per rule ID).
     const problems = qcRulesBodyProblems(body as ConfigurationBodies['qc_rules']);
+    if (problems.length > 0) throw new ConfigurationBodyInvalid(kind, problems);
+  }
+  if (kind === 'risk_rubric') {
+    // W5-02 (W5 plan section 2): duplicate IDs, the reserved option value `unknown`, misordered tier rules.
+    const problems = riskRubricBodyProblems(body as ConfigurationBodies['risk_rubric']);
     if (problems.length > 0) throw new ConfigurationBodyInvalid(kind, problems);
   }
 }
@@ -205,5 +212,25 @@ export async function effectiveConfiguration(
     checklistTemplateVersions: (templates.body as ConfigurationBodies['checklist_templates']).versions,
     slaWorkingDays: { ai_coe: sla.ai_coe, dpo: sla.dpo, it_security: sla.it_security },
     timezone: APP_TIMEZONE,
+  };
+}
+
+/**
+ * W5-02 (W5 plan section 6): the `risk_rubric` revision in force at `at` as the `GET
+ * /api/configuration/risk-rubric/current` view, or undefined when none is (the route answers 404 `risk_rubric`).
+ */
+export async function currentRiskRubric(
+  exec: Executor,
+  at: Date = new Date(),
+): Promise<RiskRubricView | undefined> {
+  const row = await currentRevision(exec, 'risk_rubric', at);
+  if (row === undefined) return undefined;
+  const body = row.body as ConfigurationBodies['risk_rubric'];
+  return {
+    revisionId: row.id,
+    label: body.label,
+    provenance: body.provenance,
+    publishedAt: row.publishedAt.toISOString(),
+    body,
   };
 }
