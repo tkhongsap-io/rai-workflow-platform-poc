@@ -1,6 +1,20 @@
 // W3-01 / A06. Every population starts with the W0-05 scope predicate in SQL.
-import { and, count, desc, eq, getTableColumns, or, sql, type SQL } from 'drizzle-orm';
-import { alias } from 'drizzle-orm/pg-core';
+import {
+  and,
+  count,
+  desc,
+  eq,
+  exists,
+  getTableColumns,
+  inArray,
+  isNotNull,
+  isNull,
+  or,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
+import { alias, type PgColumn } from 'drizzle-orm/pg-core';
+import { LANES } from '@rai/shared/constants';
 import type { CaseStatus, LaneProjectionStatus } from '@rai/shared/schemas/cases';
 import {
   QUEUE_DEFAULTS,
@@ -12,10 +26,13 @@ import type { Actor } from '../authz/policy.js';
 import { caseScopeWhere } from '../cases/scope.js';
 import { caseStatusSql } from '../cases/status.js';
 import { fromStoredSourceRecordId } from '../cases/source-record-id.js';
-import type { Db } from '../db/client.js';
+import type { Db, Executor } from '../db/client.js';
 import { cases } from '../db/schema/case.js';
 import { packVersion } from '../db/schema/pack-version.js';
+import { qcFinding } from '../db/schema/qc-finding.js';
+import { latestDisposition, undispositioned } from '../findings/repository.js';
 import { dueDatesFor, type SlaCalendarMemo } from '../sla/due-dates.js';
+import { pendingLaneStates } from '../sla/lane-states.js';
 import { projectionColumnForLane } from '../workflow/repository.js';
 
 export const NEXT_ACTION: Record<CaseStatus, QueueItem['nextAction']> = {
@@ -32,13 +49,89 @@ export function searchPattern(search: string): string | undefined {
   return term === '' ? undefined : `%${term.replace(/[!%_\\]/g, '!$&')}%`;
 }
 
-export async function readQueue(db: Db, actor: Actor, query: QueueQuery): Promise<QueueResponse> {
+/**
+ * W6-14 (W6 plan section 8.2): the dashboard drill-down predicates over `case` and its current version `current`, AND-ed
+ * with the scope inside the `visible` sub-select, so they narrow the population before counts, options and pages. Each
+ * lands on the dashboard's own number (W6-13): `laneStatus=pending` and `sla` use the open review target set
+ * (`openReviewTargets`), `approved`/`sent_back` the projection on a current submitted version, and the finding keys
+ * one undispositioned finding on the current version. Without a drill-down key the result is empty (no predicate).
+ */
+async function drilldownPredicates(
+  tx: Executor,
+  scope: SQL,
+  query: QueueQuery,
+  current: { readyAt: PgColumn; submittedAt: PgColumn },
+  asOf: Date,
+): Promise<SQL[]> {
+  const predicates: SQL[] = [];
+  const lanes = query.lane === undefined ? LANES : [query.lane];
+  const column = (lane: (typeof LANES)[number]): PgColumn => cases[projectionColumnForLane(lane)];
+  const hasSubmitted = isNotNull(cases.currentVersionId);
+  // The `openReviewTargets` rule: a current submitted version with no successor draft that is not Ready.
+  const reviewTarget = and(
+    hasSubmitted,
+    isNull(cases.draftVersionId),
+    isNull(current.readyAt),
+    isNotNull(current.submittedAt),
+  )!;
+  if (query.laneStatus !== undefined) {
+    const status = query.laneStatus;
+    predicates.push(
+      and(
+        status === 'pending' ? reviewTarget : hasSubmitted,
+        or(...lanes.map((lane) => eq(column(lane), status))),
+      )!,
+    );
+  } else if (query.lane !== undefined && query.sla === undefined) {
+    // `lane` alone: every submitted version is reviewed in all three lanes.
+    predicates.push(hasSubmitted);
+  }
+  if (query.sla !== undefined) {
+    const matching = new Set(
+      (await pendingLaneStates(tx, asOf, scope))
+        .filter((state) => state.sla === query.sla && lanes.includes(state.lane))
+        .map((state) => state.caseId),
+    );
+    predicates.push(matching.size === 0 ? sql`false` : inArray(cases.id, [...matching]));
+  }
+  if (
+    query.findingLane !== undefined ||
+    query.findingSeverity !== undefined ||
+    query.findingKind !== undefined
+  ) {
+    const match: SQL[] = [eq(qcFinding.versionId, cases.currentVersionId), undispositioned];
+    if (query.findingLane !== undefined) match.push(eq(qcFinding.owningLane, query.findingLane));
+    if (query.findingSeverity !== undefined) match.push(eq(qcFinding.severity, query.findingSeverity));
+    if (query.findingKind !== undefined) match.push(eq(qcFinding.kind, query.findingKind));
+    // W6-09 adds the `qc_run.recheck = false` join here when the column exists (W6 plan section 5).
+    predicates.push(
+      exists(
+        tx
+          .select({ one: sql`1` })
+          .from(qcFinding)
+          .leftJoinLateral(latestDisposition, sql`true`)
+          .where(and(...match)),
+      ),
+    );
+  }
+  return predicates;
+}
+
+/** `asOf` is the application clock; only the `sla` drill-down reads it (Asia/Bangkok `today` and the horizon). */
+export async function readQueue(
+  db: Db,
+  actor: Actor,
+  query: QueueQuery,
+  asOf: Date = new Date(),
+): Promise<QueueResponse> {
   const page = query.page ?? QUEUE_DEFAULTS.page;
   const pageSize = query.pageSize ?? QUEUE_DEFAULTS.pageSize;
   return db.transaction(
     async (tx) => {
       const current = alias(packVersion, 'queue_current');
       const draft = alias(packVersion, 'queue_draft');
+      const scope = caseScopeWhere(actor);
+      const drilldown = await drilldownPredicates(tx, scope, query, current, asOf);
       const visible = tx
         .select({
           ...getTableColumns(cases),
@@ -53,7 +146,7 @@ export async function readQueue(db: Db, actor: Actor, query: QueueQuery): Promis
         .from(cases)
         .leftJoin(current, eq(current.id, cases.currentVersionId))
         .leftJoin(draft, eq(draft.id, cases.draftVersionId))
-        .where(caseScopeWhere(actor))
+        .where(and(scope, ...drilldown))
         .as('visible');
 
       const predicates: SQL[] = [];

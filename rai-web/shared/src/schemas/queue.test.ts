@@ -1,7 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Value } from 'typebox/value';
-import { QueueDrilldownQuerySchema, QueueQuerySchema, QUEUE_DEFAULTS } from './queue.js';
+import {
+  QueueDrilldownQuerySchema,
+  QueueQuerySchema,
+  QUEUE_DEFAULTS,
+  QUEUE_DRILLDOWN_KEYS,
+} from './queue.js';
 
 test('queue accepts defaults and combined Thai search with scoped filters', () => {
   assert.equal(Value.Check(QueueQuerySchema, {}), true);
@@ -62,7 +67,20 @@ test('drill-down filters validate their closed value sets', () => {
   ])
     assert.equal(Value.Check(QueueDrilldownQuerySchema, query), false, JSON.stringify(query));
 });
-test('the served queue query does not accept a drill-down filter before W6-14 applies it', () => {
-  for (const query of [{ lane: 'dpo' }, { sla: 'breached' }, { findingKind: 'defect' }])
+// W6-14 applies the drill-down filters inside the scoped query (server/src/queue/repository.ts), so the served schema
+// now accepts them; it replaces W6-01's "not accepted before W6-14" test, as that test anticipated.
+test('the served queue query accepts every drill-down key with the base filters, and still refuses riskTier', () => {
+  const drill = {
+    lane: 'dpo',
+    laneStatus: 'sent_back',
+    sla: 'due_soon',
+    findingLane: 'it_security',
+    findingSeverity: 'low',
+    findingKind: 'defect',
+  };
+  assert.equal(Value.Check(QueueQuerySchema, { ...drill, status: 'in_review', search: 'x', page: 2 }), true);
+  assert.deepEqual(QUEUE_DRILLDOWN_KEYS, Object.keys(QueueDrilldownQuerySchema.properties));
+  assert.deepEqual([...QUEUE_DRILLDOWN_KEYS].sort(), Object.keys(drill).sort());
+  for (const query of [{ lane: 'hr' }, { sla: 'overdue' }, { findingSeverity: 'info' }, { riskTier: 'high' }])
     assert.equal(Value.Check(QueueQuerySchema, query), false, JSON.stringify(query));
 });

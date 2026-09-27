@@ -5,13 +5,13 @@ import { actorOf, authorizedActor } from '../authz/middleware.js';
 import type { Db } from '../db/client.js';
 import { readQueue } from './repository.js';
 
-export function registerQueueRoutes(fastify: FastifyInstance, deps: { db: Db }): void {
+export function registerQueueRoutes(fastify: FastifyInstance, deps: { db: Db; now: () => Date }): void {
   fastify.withTypeProvider<TypeBoxTypeProvider>().get(
     '/api/queue',
     {
       config: { auth: { kind: 'action', action: 'case.list', target: 'none' } },
       schema: { querystring: QueueQuerySchema },
     },
-    (request) => readQueue(deps.db, actorOf(authorizedActor(request).principal), request.query),
+    (request) => readQueue(deps.db, actorOf(authorizedActor(request).principal), request.query, deps.now()),
   );
 }

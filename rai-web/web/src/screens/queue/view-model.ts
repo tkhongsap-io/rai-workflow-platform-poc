@@ -1,5 +1,13 @@
 import { Value } from 'typebox/value';
-import { QUEUE_DEFAULTS, QueueQuerySchema, type QueueQuery, type QueueItem } from '@rai/shared/schemas/queue';
+import { DASHBOARD_DUE_SOON_WORKING_DAYS } from '@rai/shared/constants';
+import {
+  QUEUE_DEFAULTS,
+  QUEUE_DRILLDOWN_KEYS,
+  QueueQuerySchema,
+  type QueueDrilldownQuery,
+  type QueueQuery,
+  type QueueItem,
+} from '@rai/shared/schemas/queue';
 import type { LocaleKey } from '@rai/shared/locales/keys';
 
 export type ParsedQueueQuery = { valid: true; query: QueueQuery } | { valid: false };
@@ -40,3 +48,79 @@ export const NEXT_ACTION_LABELS: Readonly<Record<QueueItem['nextAction'], Locale
   resolve_findings: 'queue.next.resolve_findings',
   review_complete: 'queue.next.review_complete',
 };
+
+/** W6-14: the dashboard drill-down keys present in a query (W6 plan section 8.2). */
+export function drilldownOf(query: QueueQuery): QueueDrilldownQuery {
+  const drill: Record<string, unknown> = {};
+  for (const key of QUEUE_DRILLDOWN_KEYS) if (query[key] !== undefined) drill[key] = query[key];
+  return drill;
+}
+
+/** The query without its drill-down; the population changes, so the list starts again at page 1. */
+export function withoutDrilldown(query: QueueQuery): QueueQuery {
+  const rest: Record<string, unknown> = { ...query, page: 1 };
+  for (const key of QUEUE_DRILLDOWN_KEYS) delete rest[key];
+  return rest;
+}
+
+/** The search form edits only the base filters; applying it keeps the drill-down the dashboard link opened. */
+export function applyQueueForm(current: QueueQuery, form: QueueQuery): QueueQuery {
+  return { ...drilldownOf(current), ...withoutDrilldown(form), page: form.page ?? 1 };
+}
+
+export interface DrilldownLabel {
+  key: keyof QueueDrilldownQuery;
+  label: LocaleKey;
+  /** A string value is itself a locale key, rendered before substitution; a number is substituted as is. */
+  params: Record<string, LocaleKey | number>;
+}
+
+/** One label per drill-down key present, in `QUEUE_DRILLDOWN_KEYS` order (th and en keys, D12). */
+export function drilldownLabels(query: QueueQuery): DrilldownLabel[] {
+  const labels: DrilldownLabel[] = [];
+  for (const key of QUEUE_DRILLDOWN_KEYS) {
+    switch (key) {
+      case 'lane':
+        if (query.lane !== undefined)
+          labels.push({ key, label: 'queue.drill.lane', params: { lane: `lane.${query.lane}` } });
+        break;
+      case 'laneStatus':
+        if (query.laneStatus !== undefined)
+          labels.push({
+            key,
+            label: 'queue.drill.lane_status',
+            params: { state: `projection.${query.laneStatus}` },
+          });
+        break;
+      case 'sla':
+        if (query.sla !== undefined)
+          labels.push({
+            key,
+            label: `queue.drill.sla.${query.sla}`,
+            params: query.sla === 'due_soon' ? { days: DASHBOARD_DUE_SOON_WORKING_DAYS } : {},
+          });
+        break;
+      case 'findingLane':
+        if (query.findingLane !== undefined)
+          labels.push({
+            key,
+            label: 'queue.drill.finding_lane',
+            params: { lane: `lane.${query.findingLane}` },
+          });
+        break;
+      case 'findingSeverity':
+        if (query.findingSeverity !== undefined)
+          labels.push({
+            key,
+            label: 'queue.drill.finding_severity',
+            params: { severity: `finding.severity.${query.findingSeverity}` },
+          });
+        break;
+      case 'findingKind':
+        if (query.findingKind !== undefined)
+          labels.push({ key, label: `queue.drill.finding_kind.${query.findingKind}`, params: {} });
+        break;
+    }
+  }
+  return labels;
+}

@@ -8,7 +8,7 @@
 
 import { and, count, eq, gt, gte, inArray, isNotNull, lte, sql, type SQL } from 'drizzle-orm';
 import { alias, type AnyPgColumn } from 'drizzle-orm/pg-core';
-import { DASHBOARD_DUE_SOON_WORKING_DAYS, LANES, type Lane } from '@rai/shared/constants';
+import { LANES, type Lane } from '@rai/shared/constants';
 import type { CaseStatus } from '@rai/shared/schemas/cases';
 import { DASHBOARD_ACTIVITY_WEEKS, type DashboardResponse } from '@rai/shared/schemas/dashboard';
 import { bangkokDate } from '@rai/shared/sla/working-days';
@@ -22,8 +22,7 @@ import { packVersion } from '../db/schema/pack-version.js';
 import { qcFinding } from '../db/schema/qc-finding.js';
 import { qcRun } from '../db/schema/qc-run.js';
 import { latestDisposition, undispositioned } from '../findings/repository.js';
-import { openReviewTargets } from '../sla/breach.js';
-import { dueDatesFor, workingDaysAfter, type SlaCalendarMemo } from '../sla/due-dates.js';
+import { pendingLaneStates } from '../sla/lane-states.js';
 import { projectionColumnForLane } from '../workflow/repository.js';
 
 type Severity = DashboardResponse['findings']['open'][number]['severity'];
@@ -91,7 +90,7 @@ async function caseCounts(tx: Executor, scope: SQL): Promise<DashboardResponse['
   return { total, byStatus };
 }
 
-async function laneCounts(tx: Executor, scope: SQL, asOf: Date, today: string): Promise<LaneRow[]> {
+async function laneCounts(tx: Executor, scope: SQL, asOf: Date): Promise<LaneRow[]> {
   const rows = new Map<Lane, LaneRow>(
     LANES.map((lane) => [lane, { lane, pending: 0, approved: 0, sentBack: 0, dueSoon: 0, breached: 0 }]),
   );
@@ -115,17 +114,12 @@ async function laneCounts(tx: Executor, scope: SQL, asOf: Date, today: string): 
     }
   }
   // Pending lanes of versions that are still the review target, with the W3-05 due dates (listSlaBreaches' rule).
-  const memo: SlaCalendarMemo = new Map();
-  for (const target of await openReviewTargets(tx, scope)) {
-    const version = { ...target, id: target.versionId };
-    const horizon = await workingDaysAfter(tx, version, asOf, DASHBOARD_DUE_SOON_WORKING_DAYS, memo);
-    for (const { lane, dueOn } of await dueDatesFor(tx, version, memo)) {
-      if (!target.pendingLanes.includes(lane)) continue;
-      const row = rows.get(lane)!;
-      row.pending += 1;
-      if (dueOn < today) row.breached += 1;
-      else if (dueOn <= horizon) row.dueSoon += 1;
-    }
+  // The queue drill-down (W6-14) filters on the same states, so each number here equals the list its link opens.
+  for (const state of await pendingLaneStates(tx, asOf, scope)) {
+    const row = rows.get(state.lane)!;
+    row.pending += 1;
+    if (state.sla === 'breached') row.breached += 1;
+    else if (state.sla === 'due_soon') row.dueSoon += 1;
   }
   return LANES.map((lane) => rows.get(lane)!);
 }
@@ -257,7 +251,7 @@ export async function readDashboard(db: Db, actor: Actor, asOf: Date): Promise<D
       asOf: asOf.toISOString(),
       today,
       cases: await caseCounts(tx, scope),
-      lanes: await laneCounts(tx, scope, asOf, today),
+      lanes: await laneCounts(tx, scope, asOf),
       findings: await findingCounts(tx, scope),
       qc: await qcCounts(tx, scope, asOf),
       risk: { available: false }, // W6-16: `case.risk_tier` once W5 writes it

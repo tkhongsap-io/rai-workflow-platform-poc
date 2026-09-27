@@ -82,3 +82,27 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+.queue-drilldown {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin: 20px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.queue-drilldown h2 {
+  margin: 0;
+  font-size: 15px;
+}
+.queue-drilldown ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
