@@ -69,6 +69,7 @@ test('the schema holds the W0-04 tables (plus W1-01 session, W1-09 fixture_set, 
       'qc_late_result', // W3-07a: durable refused append, not a QC run
       'qc_run', // W2-05
       'registry_counter', // W1-02 (0003_w1_02_registry_counter; W0-04 case.registry_id per-year sequence)
+      'risk_proposal', // W5-03
       'session', // W1-01 (0001_w1_01_session; W0-03 section 6.3)
     ],
   );
@@ -96,6 +97,7 @@ test('the schema holds the W0-04 tables (plus W1-01 session, W1-09 fixture_set, 
       'qc_finding.qc_finding_append_only', // W2-05
       'qc_late_result.qc_late_guard', // W3-07a
       'qc_run.qc_run_append_only', // W2-05
+      'risk_proposal.risk_proposal_append_only', // W5-03
     ],
   );
 
@@ -149,6 +151,8 @@ test('the schema holds the W0-04 tables (plus W1-01 session, W1-09 fixture_set, 
     'registry_counter:INSERT', // W1-02: the per-year counter is upserted inside the create transaction
     'registry_counter:SELECT',
     'registry_counter:UPDATE',
+    'risk_proposal:INSERT', // W5-03: append-only
+    'risk_proposal:SELECT',
     'session:INSERT', // W1-01: W0-03 section 6.3 session rows (last_seen_at, revoked_at, locale are the mutable columns)
     'session:SELECT',
     'session:UPDATE',

@@ -217,3 +217,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w5-01-rubric-schema-and-pure model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #204)
 - Scope: per changes/2026-09-27-w5-01-rubric-schema-and-pure/: `RiskRubricBodySchema` and `riskRubricBodyProblems` in `shared/src/schemas/cases.ts` (schema only, not registered), the pure engine `shared/src/risk/{types,score,inputs}.ts` (`tierOf`, `scoreRisk`, `canonicalInputs`, `inputsHash`, `ENGINE_VERSION`) with unit tests. No migration, no seed, no route. One PR.
+
+## 2026-09-27 20:49 — CLAIM lane-a: W5-03 risk migration and Drizzle schema (#205)
+- Author: operator=ta session=claude-code-w5-03-risk-migration-and-drizzle model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #205)
+- Scope: per changes/2026-09-27-w5-03-risk-migration-and-drizzle/: one migration (`server/drizzle/0010_w5_03_risk.sql`, class `restore-required`; renumbered by hand at rebase if another migration merges first) adding `pack_version.risk_answers`, `unknown` in `case_risk_tier_check` and the append-only `risk_proposal` table with its grant; Drizzle schema, `meta/`, migration-guard tests, the `w1-00-migrations` lists, `BUSINESS_TABLES` and the W0-04 rows. No writer, route or UI. One PR.

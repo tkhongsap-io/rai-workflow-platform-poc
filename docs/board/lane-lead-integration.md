@@ -164,3 +164,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w4-01-adr-0006 model=claude-opus-5-5 (implementation lane qc-content)
 - Takes over from: session=none (reason: new; issue #200, W4b plan #199 merged)
 - Scope: `adr/0006-qc-engine-and-extraction.md`, `adr/README.md`, threat-model rows, upload-safety section 10 note, W0-02 section 4 note (W4b plan section 15 row 2, section 19); no application code, no dependency, no decision beyond the plan's recorded provisional rulings and working assumptions.
+
+## 2026-09-27 20:49 — CLAIM lead-integration: MIGRATION-SLOT queued (W5-03, #205)
+- Author: operator=ta session=claude-code-w5-03-risk-migration-and-drizzle model=claude-opus-5-5
+- Takes over from: session=none (reason: new; W5 plan section 9 shared-file rule; the slot is held by W4-11b (#201, PR #282) at this time)
+- Scope: queued behind the W4-11b holder: the W5-03 PR opens for review with `server/drizzle/0010_w5_03_risk.sql` and `meta/` (next free number on main now) and must not merge while W4-11b holds the slot; when W4-11b merges, W5-03 takes the slot, rebases onto main and regenerates its migration by hand at the next free number (0011), keeping its hand-written SQL. Released at merge of the W5-03 PR.

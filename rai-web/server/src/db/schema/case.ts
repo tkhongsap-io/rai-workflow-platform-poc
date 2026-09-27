@@ -19,7 +19,8 @@ export const CASE_MODEL_TYPES = ['llm', 'classic_ml', 'other'] as const;
 export const CASE_DESK_STATUSES = ['draft', 'in_review', 'ready'] as const;
 export const CASE_LANE_PROJECTIONS = ['pending', 'approved', 'sent_back'] as const;
 export const CASE_READINESS = ['not_ready', 'ready'] as const;
-export const CASE_RISK_TIERS = ['high', 'medium', 'low'] as const; // written only by W5; slice 1 never writes it
+// Written only by W5 (the submit transaction, W5-05); 'unknown' added by migration 0010_w5_03_risk (W5-03).
+export const CASE_RISK_TIERS = ['high', 'medium', 'low', 'unknown'] as const;
 
 export const cases = pgTable(
   'case',
@@ -56,7 +57,10 @@ export const cases = pgTable(
     index('case_desk_status_idx').on(t.deskStatus),
     check('case_model_type_check', sql`${t.modelType} IN ('llm', 'classic_ml', 'other')`),
     check('case_desk_status_check', sql`${t.deskStatus} IN ('draft', 'in_review', 'ready')`),
-    check('case_risk_tier_check', sql`${t.riskTier} IS NULL OR ${t.riskTier} IN ('high', 'medium', 'low')`),
+    check(
+      'case_risk_tier_check',
+      sql`${t.riskTier} IS NULL OR ${t.riskTier} IN ('high', 'medium', 'low', 'unknown')`,
+    ),
     check('case_privacy_status_check', sql`${t.privacyStatus} IN ('pending', 'approved', 'sent_back')`),
     check('case_security_status_check', sql`${t.securityStatus} IN ('pending', 'approved', 'sent_back')`),
     check('case_rai_status_check', sql`${t.raiStatus} IN ('pending', 'approved', 'sent_back')`),

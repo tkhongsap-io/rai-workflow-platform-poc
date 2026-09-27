@@ -104,6 +104,7 @@ erDiagram
     ARTIFACT_SLOT }o--o| ARTIFACT : "artifact_id"
     PACK_VERSION ||--o{ LANE_DECISION : "per lane"
     PACK_VERSION ||--o{ QC_RUN : "triggered on"
+    PACK_VERSION ||--o{ RISK_PROPOSAL : "risk proposal (W5)"
     QC_RUN ||--o{ QC_FINDING : "produces"
     QC_FINDING ||--o{ DISPOSITION_EVENT : "appends"
     PACK_VERSION ||--o{ NOTIFICATION : "about"
@@ -123,7 +124,7 @@ One review case. Mutable columns are the inherited descriptive fields (owner and
 | `source_record_id` | text NOT NULL | owner / SPOC | `TPM-…`, `VRO-…` or the literal `Unknown` (L10). Never validated against an external system. |
 | `use_case_name`, `business_unit`, `business_owner`, `technical_owner` | text NOT NULL | owner / SPOC | Inherited descriptive fields. W0-09 (W0-05 section 8 reconciliation): `business_unit` is the descriptive text of the W0-02 `businessUnit` body field and `business_owner` is written by the server as the display name of the subject in `owner_subject_id` at create and at every owner change; neither is ever read for access. |
 | `use_case_group` | text NOT NULL | owner / SPOC | D11: value must exist in the current `use_case_groups` configuration revision at write time; checked in the application, not by FK (revisions are immutable and the list may change later). |
-| `risk_tier` | text NULL | workflow (W5) | `high`, `medium`, `low` or NULL. Written only by the W5 risk proposal on submit; slice 1 never writes it. Never editable by owner or SPOC. |
+| `risk_tier` | text NULL | workflow (W5) | `high`, `medium`, `low`, `unknown` or NULL (`unknown` added by migration 0010, W5-03, 2026-09-27). Written only by the W5 risk proposal on submit; slice 1 never writes it. Never editable by owner or SPOC. |
 | `privacy_status`, `security_status`, `rai_status`, `ai_readiness_status` | text NOT NULL | **workflow only** | Read-only projections; see [the projection rule](#desk-local-case-fields-and-the-four-status-projections). |
 | `vendor_involved` | boolean NOT NULL | owner / SPOC | Desk-local (W0-04 fields). Drives the slot 3/4 default in W1-04. Never exported as a registry field. |
 | `model_type` | text NOT NULL | owner / SPOC | Desk-local (W0-04 fields). `llm`, `classic_ml` or `other`. Drives the classic-ML metric-or-N/A rule in W4. Never exported. |
@@ -157,6 +158,7 @@ A draft becomes a submitted version in place: the row is mutable while `submitte
 | `ready_at` | timestamptz NULL | set once | W0-09: added for W0-06 (sections 4.9, 6 and 9.2): the Ready transition sets it once on the current version in the same transaction as `case.ready_for_launch`; the frozen-row trigger permits exactly that one change on a submitted row (`ready_at` from NULL to a value, every other column unchanged). The W0-06 `ready_version_id` is `case.current_version_id` when `desk_status = 'ready'`. |
 | `manifest_hash` | text NULL → NOT NULL at submit | yes | SHA-256 over the canonical JSON of the nine slot rows (slot, state, reason, artifact hash, filename, media type, size). Lets A07 tests and the W7-00 restore check prove a version unchanged without diffing rows. |
 | `submit_correlation_id` | text NULL | yes | Same value as the submit audit event. |
+| `risk_answers` | jsonb NOT NULL DEFAULT `'{}'` | yes | W5-03 (2026-09-27, migration 0010): the draft's risk questionnaire answers keyed by question ID, each with its value (an option value or `unknown`) and attribution (W5 plan section 6 shape; validated on write in the application by W5-04). Editable while the row is a draft; frozen at submit by the existing whole-row comparison in `pack_version_frozen` (no trigger change). |
 
 Lane state is **derived**, not stored: a lane on the current version is `pending` with no `lane_decision` row, `approved` when the row's `decision` is `approve` and `sent_back` when it is `send_back` (the W0-06 2.3 and W0-02 `LaneProjectionStatus` words). This keeps one record per decision (L8); the case projections are the only denormalisation and they are workflow-written.
 
@@ -684,3 +686,34 @@ Migration 0007 adds operational job runs, day/recipient-unique notification link
 ## W7-01 backup recipe — 2026-09-27
 
 Amendment by [W7-01](../../changes/2026-09-27-w7-01-backup-command-ci-rai/spec.md) under the [W7 plan](implementation-plan-w7.md) section 3.1 (W7-D5, W7-D6; register row "W7 delegated rulings (provisional)"). `npm run backup` implements the first half of the "Restored backup" recipe in "Schema evolution". As `rai_owner` it opens a repeatable-read, read-only transaction and exports its snapshot. In that snapshot it reads the migration journal, the row count of every public table except `session`, the frozen-table digest (`operator/frozen-digest.ts`: SHA-256 over the canonical JSON of the rows, in `id` order, of the frozen tables this spec lists under "Never rewrite immutable rows", in UTC), the `fixture_set` rows and the present artifact hashes. `pg_dump --format=custom --no-owner --exclude-table-data=public.session --snapshot=<id>` then writes `db.dump` from that same snapshot. **Session rows are excluded**, so a restore can never revive a revoked session and a backup holds no token hashes; restored users sign in again. After the dump, each referenced blob is copied into `blobs/` in this spec's layout, re-hashed on the way. `manifest.json` is written last; directories are 0700 and files 0600. The production backup target and schedule stay D10's (working assumption: none). Restore and its verification are W7-02's.
+
+## W5-03 risk proposal persistence — 2026-09-27
+
+Migration 0010 (`0010_w5_03_risk`, rollback class `restore-required`: once a submit writes `risk_tier = 'unknown'`, an older binary cannot serialize that value, so rolling back past it means restoring the pre-migration backup) adds three things without rewriting a frozen row ([W5 plan](implementation-plan-w5.md) section 5; [review](../../changes/2026-09-27-w5-03-risk-migration-and-drizzle/review.md)):
+
+- `pack_version.risk_answers` (see the `pack_version` table above);
+- `unknown` in `case_risk_tier_check` (see the `case` table above); the projection gate still admits a `risk_tier` write only under `rai.workflow_write`;
+- the `risk_proposal` entity below.
+
+### `risk_proposal`
+
+One proposed risk tier, recorded by the workflow; the explanation of how it was reached. Append-only: the trigger `risk_proposal_append_only` refuses every UPDATE and DELETE with `rai.append_only`, and `rai_app` holds `SELECT` and `INSERT` only (`rai_operator` gains nothing).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | |
+| `case_id` | uuid FK NOT NULL → `case` | Indexed (`risk_proposal_case_id_idx`). |
+| `version_id` | uuid FK NOT NULL → `pack_version` | The version the proposal is for. At most one `submit` proposal per version (`risk_proposal_one_submit_per_version_key`, partial unique index). |
+| `trigger` | text NOT NULL | `submit` (written inside the submit transaction, W5-05) or `recheck` (W6). |
+| `status` | text NOT NULL | `proposed` or `unavailable`. |
+| `unavailable_reason` | text NULL | `not_configured`, `rubric_invalid` or `engine_error`; set exactly when `status = 'unavailable'`. |
+| `tier` | text NULL | `high`, `medium`, `low` or `unknown`; set exactly when `status = 'proposed'`. |
+| `lowest_tier`, `highest_tier` | text NULL | The bounds over the Unknown answers: `high`, `medium` or `low`. |
+| `rubric_revision_id` | uuid FK NULL → `configuration_revision` | The frozen `risk_rubric` revision; NOT NULL when `proposed`, NULL only when `not_configured`. |
+| `rubric_label` | text NULL | The rubric's label at the time (for example the synthetic placeholder's). |
+| `engine_version` | text NOT NULL | The scoring engine's `ENGINE_VERSION`. |
+| `inputs_hash` | text NULL | SHA-256 of the canonical inputs, so the result can be reproduced. |
+| `explanation` | jsonb NULL | The engine's `RiskScore` minus attribution text: IDs and enumerations only, never names or free text. |
+| `correlation_id`, `created_at` | text, timestamptz NOT NULL | |
+
+Constraint `risk_proposal_status_consistency_check`: `proposed` has a tier and a rubric revision and no reason; `unavailable` has a reason and no tier. A proposal never approves anything and is never approval authority; the tier is a QC input, never a routing switch.

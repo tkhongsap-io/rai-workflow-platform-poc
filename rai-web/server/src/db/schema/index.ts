@@ -17,3 +17,4 @@ export * from './session.js';
 export * from './fixture-set.js';
 export * from './registry-counter.js';
 export * from './operator-job-run.js';
+export * from './risk-proposal.js'; // W5-03
