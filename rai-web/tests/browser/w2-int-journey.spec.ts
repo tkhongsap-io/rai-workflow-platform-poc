@@ -171,7 +171,11 @@ test.describe(`W2-INT journey on the real server: v1 → send-back → v2 → di
     // 2. One lane send-back that names a document slot (slot 2 — DPO only) with a summary.
     await signOut(page);
     await openAsReviewer(page, DPO, caseId, v1Id);
-    await expect(page.locator('[data-review-qc="empty"]')).toHaveText(t('th', 'review.findings.empty'));
+    // W4-12: the DPO lane has no scripted rule, so its run evaluated 0 rules and never reads "no defects".
+    await expect(page.locator('[data-review-qc="no_rules"]')).toContainText(
+      t('th', 'review.findings.no_rules'),
+    );
+    await expect(page.locator('[data-review-qc="empty"]')).toHaveCount(0);
     await expectAccessible(page, testInfo, { name: 'w2-int-journey-reviewer-v1-th', lang: 'th' });
 
     const sendBackLabel = t('th', 'review.action.send_back');
@@ -317,7 +321,11 @@ test.describe(`W2-INT journey on the real server: v1 → send-back → v2 → di
     // 5. Three current-version approvals → Ready on the last approve response. No Deploy control.
     await signOut(page);
     await openAsReviewer(page, DPO, caseId, v2Id);
-    await expect(page.locator('[data-review-qc="empty"]')).toHaveText(t('th', 'review.findings.empty'));
+    // W4-12: the DPO lane has no scripted rule, so its run evaluated 0 rules and never reads "no defects".
+    await expect(page.locator('[data-review-qc="no_rules"]')).toContainText(
+      t('th', 'review.findings.no_rules'),
+    );
+    await expect(page.locator('[data-review-qc="empty"]')).toHaveCount(0);
     const dpoBody = await keyboardApprove(page, 'dpo', v2Id);
     expect(dpoBody.ready).toBe(false);
     await expect(

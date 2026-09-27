@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { isLocaleKey, t } from '@rai/shared/locales/keys';
 import type { SlotNumber, SlotState } from '@rai/shared/schemas/pack';
+import { EVIDENCE_LOCATOR_KINDS, type QcRunSummary } from '@rai/shared/schemas/review';
 import { NEXT_ACTION_KEY } from '../cases/case-list.view-model.js';
 import { STATUS_LABEL_KEY } from '../../components/status-badge.js';
 import {
@@ -28,6 +29,14 @@ import {
   modelTypeKey,
   pendingCount,
   qcUnavailableReasonKey,
+  evidenceLocations,
+  evidenceLocatorKey,
+  laneRunEmptyStatus,
+  qcRunOutcome,
+  qcRunOutcomeKey,
+  qcTriggerKey,
+  ruleLabelKey,
+  unavailableRuns,
   reasonDisplay,
   reasonIsValid,
   reviewerFindingsLoadMode,
@@ -530,4 +539,104 @@ test('W3-F2: the page explains a missing decision panel only for a BU-SPOC confl
   assert.equal(laneExclusionNote({ roles: [aiCoe], view: baseView() }), null);
   // A BU SPOC with no lane grant has no decision panel to explain.
   assert.equal(laneExclusionNote({ roles: [spocCm], view: baseView() }), null);
+});
+
+// ---- W4-12: QC log, finding evidence and unavailable runs (W4a plan section 7) -------------------------------------
+
+function qcRun(overrides: Partial<QcRunSummary>): QcRunSummary {
+  return {
+    runId: 'r-1',
+    trigger: 'submit',
+    lane: null,
+    slot: null,
+    status: 'completed',
+    unavailableReason: null,
+    runner: 'deterministic',
+    runnerVersion: '0.1.0',
+    ruleRevision: 'rev-1',
+    rulesLabel: 'w4a.1',
+    rulesEvaluated: 3,
+    findingCount: 0,
+    requestedAt: '2026-09-27T06:00:00.000Z',
+    completedAt: '2026-09-27T06:00:01.000Z',
+    ...overrides,
+  };
+}
+
+test('W4-12: a finding rule label comes from its qc.rule.* key; an unknown rule has none', () => {
+  assert.equal(ruleLabelKey('PACK-SLOT-MISSING'), 'qc.rule.pack_slot_missing');
+  assert.equal(ruleLabelKey('ACC-BAND-V1-SHEET3'), 'qc.rule.acc_band_v1_sheet3');
+  assert.equal(ruleLabelKey('QC-UNAVAILABLE'), 'qc.rule.qc_unavailable');
+  assert.equal(ruleLabelKey('synthetic'), null);
+  assert.equal(ruleLabelKey('NOT-A-CATALOGUED-RULE'), null);
+});
+
+test('W4-12: evidence locations are slot and locator kind, one per distinct pair, every kind has a label', () => {
+  for (const kind of EVIDENCE_LOCATOR_KINDS) assert.ok(isLocaleKey(evidenceLocatorKey(kind)), kind);
+  assert.deepEqual(
+    evidenceLocations([
+      { slot: 1, artifactId: 'a-1', locator: { kind: 'section', heading: '4. Hallucination and accuracy' } },
+      { slot: 1, artifactId: 'a-1', locator: { kind: 'section', heading: 'another heading' } },
+      { slot: 1, artifactId: 'a-1', locator: { kind: 'page', page: 3 } },
+      { slot: null, artifactId: null, locator: { kind: 'absent' } },
+    ]),
+    [
+      { slot: 1, kind: 'section' },
+      { slot: 1, kind: 'page' },
+      { slot: null, kind: 'absent' },
+    ],
+  );
+  assert.deepEqual(evidenceLocations(undefined), []);
+});
+
+test('W4-12: a run reads unavailable, 0 rules evaluated, findings or no findings; the first two are never a clean pass', () => {
+  assert.equal(
+    qcRunOutcome(
+      qcRun({ status: 'unavailable', unavailableReason: 'timeout', rulesEvaluated: 0, findingCount: 1 }),
+    ),
+    'unavailable',
+  );
+  assert.equal(qcRunOutcome(qcRun({ rulesEvaluated: 0, findingCount: 0 })), 'no_rules');
+  assert.equal(qcRunOutcome(qcRun({ rulesEvaluated: 3, findingCount: 2 })), 'findings');
+  assert.equal(qcRunOutcome(qcRun({ rulesEvaluated: 3, findingCount: 0 })), 'no_findings');
+  // A row written before migration 0009 recorded no count: it cannot claim rules were evaluated.
+  assert.equal(qcRunOutcome(qcRun({ rulesEvaluated: null, findingCount: 0 })), 'not_recorded');
+  for (const outcome of ['unavailable', 'no_rules', 'findings', 'no_findings', 'not_recorded'] as const)
+    assert.ok(isLocaleKey(qcRunOutcomeKey(outcome)), outcome);
+  for (const trigger of ['upload', 'submit', 'approve_attempt'] as const)
+    assert.ok(isLocaleKey(qcTriggerKey(trigger)), trigger);
+});
+
+test('W4-12: every unavailable run of the version, from any trigger, in log order', () => {
+  const runs = [
+    qcRun({ runId: 'u', trigger: 'upload', slot: 2, status: 'unavailable', unavailableReason: 'timeout' }),
+    qcRun({ runId: 's', trigger: 'submit' }),
+    qcRun({
+      runId: 'a',
+      trigger: 'approve_attempt',
+      lane: 'dpo',
+      status: 'unavailable',
+      unavailableReason: 'runner_error',
+    }),
+  ];
+  assert.deepEqual(
+    unavailableRuns(runs).map((r) => r.runId),
+    ['u', 'a'],
+  );
+});
+
+test("W4-12: the lane result names 0 rules evaluated instead of 'no defects'; without the run's row it stays as before", () => {
+  const laneRun = { runId: 'a', status: 'completed' as const, findings: [] };
+  const runs = [qcRun({ runId: 'a', trigger: 'approve_attempt', lane: 'ai_coe', rulesEvaluated: 0 })];
+  assert.equal(laneRunEmptyStatus(laneRun, runs), 'no_rules');
+  assert.equal(
+    laneRunEmptyStatus(laneRun, [
+      qcRun({ runId: 'a', trigger: 'approve_attempt', lane: 'ai_coe', rulesEvaluated: 2 }),
+    ]),
+    'empty',
+  );
+  assert.equal(laneRunEmptyStatus(laneRun, []), 'empty');
+  assert.equal(laneRunEmptyStatus(null, runs), 'none_stored');
+  for (const status of ['empty', 'no_rules', 'none_stored'] as const)
+    assert.ok(isLocaleKey(`review.findings.${status}`), status);
 });

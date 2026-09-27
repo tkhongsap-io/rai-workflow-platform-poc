@@ -50,6 +50,7 @@ import { readSlotsWithArtifacts } from '../versions/repository.js';
 import { nextMonotonicStamp } from '../workflow/monotonic-stamp.js';
 import { staleAt } from '../workflow/refs.js';
 import {
+  evidenceView,
   findLatestApproveAttemptRun,
   findLatestSubmitRun,
   insertQcFinding,
@@ -320,6 +321,7 @@ async function persistResult(
   for (const finding of result.findings) {
     const findingId = uuidv7(run.stamp.getTime());
     const slot = slotOfFinding(finding);
+    const evidence = evidenceForStore(finding);
     await insertQcFinding(tx, {
       id: findingId,
       runId: run.id,
@@ -330,7 +332,7 @@ async function persistResult(
       ruleRevision: finding.ruleRevision,
       severity: finding.severity,
       owningLane: finding.owningLane,
-      evidence: evidenceForStore(finding),
+      evidence,
       metric: finding.measure?.metric ?? null,
       denominator: finding.measure?.denominator ?? null,
       threshold: finding.measure?.threshold ?? null,
@@ -346,6 +348,7 @@ async function persistResult(
       owningLane: finding.owningLane,
       messageKey: finding.message.key,
       messageParams: { ...finding.message.params },
+      evidence: evidenceView(evidence), // W4-12: the read shape of what was stored
     });
   }
   return { status: 'completed', runId: run.id, findings };
@@ -388,6 +391,7 @@ async function appendUnavailableFinding(
   const owningLane = outageOwningLane(request);
   const findingId = uuidv7(run.stamp.getTime());
   const messageParams = { reason, trigger: request.trigger, rulesEvaluated: 0 };
+  const evidence = [{ artifact_id: null, content_hash: null, slot: null, locator: { kind: 'absent' } }];
   await insertQcFinding(tx, {
     id: findingId,
     runId: run.id,
@@ -398,7 +402,7 @@ async function appendUnavailableFinding(
     ruleRevision: request.qcRulesRevision,
     severity: 'high',
     owningLane,
-    evidence: [{ artifact_id: null, content_hash: null, slot: null, locator: { kind: 'absent' } }],
+    evidence,
     metric: null,
     denominator: null,
     threshold: null,
@@ -414,6 +418,7 @@ async function appendUnavailableFinding(
     owningLane,
     messageKey: 'qc.finding.unavailable',
     messageParams,
+    evidence: evidenceView(evidence),
   };
 }
 

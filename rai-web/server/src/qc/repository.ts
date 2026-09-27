@@ -2,7 +2,7 @@
 import { and, asc, desc, eq, isNull } from 'drizzle-orm';
 import type { Lane } from '@rai/shared/constants';
 import type { QcTrigger, QcUnavailableReason } from '@rai/shared/qc/types';
-import type { StoredFindingSummary } from '@rai/shared/schemas/review';
+import type { EvidenceLocatorView, FindingEvidence, StoredFindingSummary } from '@rai/shared/schemas/review';
 import type { PackVersionRow } from '../cases/repository.js';
 import type { Executor, Tx } from '../db/client.js';
 import { qcFinding } from '../db/schema/qc-finding.js';
@@ -162,5 +162,60 @@ export function storedFindingSummary(row: QcFindingRow): StoredFindingSummary {
     owningLane: row.owningLane as Lane,
     messageKey: row.messageKey,
     messageParams,
+    evidence: evidenceView(row.evidence),
   };
+}
+
+const SLOTS: ReadonlySet<unknown> = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+const isNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+
+/** A stored locator in the read shape, or undefined when it is not one of the W0-07 3.3 kinds. Copies known fields only. */
+function locatorView(value: unknown): EvidenceLocatorView | undefined {
+  if (!isRecord(value)) return undefined;
+  switch (value.kind) {
+    case 'page': {
+      if (!isNumber(value.page)) return undefined;
+      const r = value.region;
+      return isRecord(r) && isNumber(r.x) && isNumber(r.y) && isNumber(r.w) && isNumber(r.h)
+        ? { kind: 'page', page: value.page, region: { x: r.x, y: r.y, w: r.w, h: r.h } }
+        : { kind: 'page', page: value.page };
+    }
+    case 'text_range':
+      return isNumber(value.start) && isNumber(value.end)
+        ? { kind: 'text_range', start: value.start, end: value.end }
+        : undefined;
+    case 'cell':
+      return typeof value.sheet === 'string' && typeof value.cell === 'string'
+        ? { kind: 'cell', sheet: value.sheet, cell: value.cell }
+        : undefined;
+    case 'section':
+      return typeof value.heading === 'string' ? { kind: 'section', heading: value.heading } : undefined;
+    case 'absent':
+      return { kind: 'absent' };
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * W4-12: stored `qc_finding.evidence` ({artifact_id, content_hash, slot, locator, excerpt_hash?}) as the read shape
+ * `{ slot, artifactId, locator }`. Locators only: the content and excerpt hashes are never served, and an entry
+ * whose locator is not a W0-07 3.3 kind is left out.
+ */
+export function evidenceView(stored: unknown): FindingEvidence[] {
+  if (!Array.isArray(stored)) return [];
+  const out: FindingEvidence[] = [];
+  for (const entry of stored) {
+    if (!isRecord(entry)) continue;
+    const locator = locatorView(entry.locator);
+    if (locator === undefined) continue;
+    out.push({
+      slot: SLOTS.has(entry.slot) ? (entry.slot as FindingEvidence['slot']) : null,
+      artifactId: typeof entry.artifact_id === 'string' ? entry.artifact_id : null,
+      locator,
+    });
+  }
+  return out;
 }

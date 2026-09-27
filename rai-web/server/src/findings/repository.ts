@@ -6,12 +6,14 @@ import type { QcTrigger } from '@rai/shared/qc/types';
 import type {
   DispositionKind,
   FindingWithDisposition,
+  QcRunSummary,
   StoredFindingSummary,
 } from '@rai/shared/schemas/review';
 import type { Executor, Tx } from '../db/client.js';
 import { dispositionEvent } from '../db/schema/disposition-event.js';
 import { qcFinding } from '../db/schema/qc-finding.js';
 import { qcRun } from '../db/schema/qc-run.js';
+import { configurationRevision } from '../db/schema/configuration-revision.js';
 import { packVersion } from '../db/schema/pack-version.js';
 import { storedFindingSummary, type QcFindingRow } from '../qc/repository.js';
 
@@ -72,6 +74,55 @@ export async function listFindingsForVersion(
   return rows.map((row) => ({
     ...storedFindingSummary(row.finding),
     latestDisposition: row.latestDisposition as DispositionKind | null,
+  }));
+}
+
+/**
+ * W4-12: a version's QC runs in `requested_at` order (then id), with the `label` of the `qc_rules` revision the run
+ * recorded (null when its `rule_revision` names no `qc_rules` revision, e.g. a version frozen before W4-02) and the
+ * count of findings the run stored. One query; reads only.
+ */
+export async function listQcRunsForVersion(
+  exec: Executor,
+  caseId: string,
+  versionId: string,
+): Promise<QcRunSummary[]> {
+  const findingCount = exec
+    .select({ n: sql<number>`count(*)::int`.as('n') })
+    .from(qcFinding)
+    .where(eq(qcFinding.runId, qcRun.id));
+  const rows = await exec
+    .select({
+      run: qcRun,
+      rulesLabel: sql<string | null>`${configurationRevision.body}->>'label'`,
+      findingCount: sql<number>`(${findingCount})`,
+    })
+    .from(qcRun)
+    .innerJoin(packVersion, eq(qcRun.versionId, packVersion.id))
+    .leftJoin(
+      configurationRevision,
+      and(
+        eq(configurationRevision.kind, 'qc_rules'),
+        sql`${configurationRevision.id}::text = ${qcRun.ruleRevision}`,
+      ),
+    )
+    .where(and(eq(qcRun.versionId, versionId), eq(packVersion.caseId, caseId)))
+    .orderBy(asc(qcRun.requestedAt), asc(qcRun.id));
+  return rows.map(({ run, rulesLabel, findingCount: count }) => ({
+    runId: run.id,
+    trigger: run.trigger as QcRunSummary['trigger'],
+    lane: run.lane as Lane | null,
+    slot: run.slot as QcRunSummary['slot'],
+    status: run.status as QcRunSummary['status'],
+    unavailableReason: run.unavailableReason as QcRunSummary['unavailableReason'],
+    runner: run.engineId,
+    runnerVersion: run.runnerVersion,
+    ruleRevision: run.ruleRevision,
+    rulesLabel: rulesLabel ?? null,
+    rulesEvaluated: run.rulesEvaluated,
+    findingCount: Number(count),
+    requestedAt: run.requestedAt.toISOString(),
+    completedAt: run.completedAt.toISOString(),
   }));
 }
 

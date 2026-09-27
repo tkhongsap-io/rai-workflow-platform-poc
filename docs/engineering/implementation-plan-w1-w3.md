@@ -770,6 +770,14 @@ Added by W2-02 (lane decision / send-back) and extended by W2-05 (findings/dispo
 
 Approve records `lane_decision` (`approve`), writes the lane projection, audits `lane.approved`. Send-back records `send_back` with feedback, writes the projection, creates version N+1 draft when none exists (`draft.successor_created`), queues a `send_back` notification to the owner, audits `lane.sent_back`. Ready is not evaluated here (W2-06). The recorded decision, its feedback included, is read back as `SubmittedVersion.decisions` (7.6).
 
+**W4-12 amendment (2026-09-27): finding evidence and the qc-runs read.** [W4a plan](implementation-plan-w4a.md) section 7. The finding read shapes `StoredFindingSummary` (the lane `qc-run` response) and `FindingWithDisposition` (`GET …/versions/{versionId}/findings`) gain `evidence: Array<{ slot, artifactId, locator }>`: locators only, where `locator` is the W0-07 3.3 `EvidenceLocator` (`page`, `text_range`, `cell`, `section`, `absent`); `excerptHash` and `contentHash` are never served, and a stored entry whose locator is not one of those kinds is left out. The real server always sends `evidence`; the schema marks it optional only so the in-memory API substitute, which W4a does not extend (W4a plan section 11), still validates. A new read:
+
+| Endpoint | Request | Success | Errors |
+|---|---|---|---|
+| `GET /api/cases/{caseId}/versions/{versionId}/qc-runs` | none | `200 VersionQcRunsResponse` (`runs`, in `requested_at` then `id` order) | exactly the findings read's: `401`; `403` (W0-05 `version.view` on the case: another owner, another BU); `404` for a malformed, unknown or other-case version, or an unknown case for an `all_cases` holder |
+
+`QcRunSummary = { runId, trigger, lane, slot, status, unavailableReason, runner, runnerVersion, ruleRevision, rulesLabel, rulesEvaluated, findingCount, requestedAt, completedAt }`. `runner` is `qc_run.engine_id`; `runnerVersion` reads `unrecorded` on rows written before migration 0009; `ruleRevision` is the recorded revision ID (W4a plan section 3) and `rulesLabel` the `label` of the `qc_rules` revision with that ID, `null` when it names none; `rulesEvaluated` is `null` on rows before migration 0009; `findingCount` counts the run's stored findings, its QC-UNAVAILABLE finding included. A draft's runs are read on the draft's version ID by whoever may read that draft's findings. The read writes nothing. Schemas in `rai-web/shared/src/schemas/review.ts`.
+
 ### 7.8 W3 shapes
 
 W3-01 adds the scoped queue query here (search by `sourceRecordId`, status, owner, `useCaseGroup` or all; counts; pagination; filter options). Delivery-status shape for W3-07 comes with W3-03. W3-08 extends the substitute from those shapes.

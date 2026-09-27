@@ -141,6 +141,48 @@ export const LaneQcRunRequestSchema = Type.Object({
 });
 export type LaneQcRunRequest = Static<typeof LaneQcRunRequestSchema>;
 
+/**
+ * W4-12: where a finding's evidence points (W0-07 3.3 `EvidenceLocator`). References only: the runner never returns
+ * an excerpt, and the read shapes never carry `excerptHash` or `contentHash`.
+ */
+export const EvidenceLocatorSchema = Type.Union([
+  Type.Object({
+    kind: Type.Literal('page'),
+    page: Type.Number(),
+    region: Type.Optional(
+      Type.Object({ x: Type.Number(), y: Type.Number(), w: Type.Number(), h: Type.Number() }),
+    ),
+  }),
+  Type.Object({ kind: Type.Literal('text_range'), start: Type.Number(), end: Type.Number() }),
+  Type.Object({ kind: Type.Literal('cell'), sheet: Type.String(), cell: Type.String() }),
+  Type.Object({ kind: Type.Literal('section'), heading: Type.String() }),
+  Type.Object({ kind: Type.Literal('absent') }),
+]);
+export type EvidenceLocatorView = Static<typeof EvidenceLocatorSchema>;
+export const EVIDENCE_LOCATOR_KINDS = ['page', 'text_range', 'cell', 'section', 'absent'] as const;
+export type EvidenceLocatorKind = (typeof EVIDENCE_LOCATOR_KINDS)[number];
+
+const FindingSlotSchema = Type.Union([
+  Type.Literal(1),
+  Type.Literal(2),
+  Type.Literal(3),
+  Type.Literal(4),
+  Type.Literal(5),
+  Type.Literal(6),
+  Type.Literal(7),
+  Type.Literal(8),
+  Type.Literal(9),
+  Type.Null(),
+]);
+
+/** W4-12: one evidence entry of a stored finding as the read shapes serve it (locators only). */
+export const FindingEvidenceSchema = Type.Object({
+  slot: FindingSlotSchema,
+  artifactId: Type.Union([Type.String(), Type.Null()]),
+  locator: EvidenceLocatorSchema,
+});
+export type FindingEvidence = Static<typeof FindingEvidenceSchema>;
+
 export const StoredFindingSummarySchema = Type.Object({
   findingId: Type.String(),
   ruleId: Type.String(),
@@ -166,6 +208,11 @@ export const StoredFindingSummarySchema = Type.Object({
   messageKey: Type.String(),
   /** D12 message params from the QC finding; optional so older rows without them still type-check. */
   messageParams: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()]))),
+  /**
+   * W4-12: where the evidence points. The real server always serves it; optional so the in-memory API substitute,
+   * which W4a does not extend (W4a plan section 11), still validates.
+   */
+  evidence: Type.Optional(Type.Array(FindingEvidenceSchema)),
 });
 export type StoredFindingSummary = Static<typeof StoredFindingSummarySchema>;
 
@@ -197,6 +244,7 @@ export const FindingWithDispositionSchema = Type.Object({
   owningLane: LaneSchema,
   messageKey: Type.String(),
   messageParams: Type.Optional(Type.Record(Type.String(), Type.Union([Type.String(), Type.Number()]))),
+  evidence: Type.Optional(Type.Array(FindingEvidenceSchema)), // W4-12; see StoredFindingSummary
   latestDisposition: Type.Union([DispositionKindSchema, Type.Null()]),
 });
 export type FindingWithDisposition = Static<typeof FindingWithDispositionSchema>;
@@ -220,3 +268,45 @@ export const LaneQcRunResponseSchema = Type.Object({
   findings: Type.Array(StoredFindingSummarySchema),
 });
 export type LaneQcRunResponse = Static<typeof LaneQcRunResponseSchema>;
+
+export const QC_UNAVAILABLE_REASONS = [
+  'timeout',
+  'runner_error',
+  'not_configured',
+  'artifact_unreadable',
+] as const;
+export type QcUnavailableReasonName = (typeof QC_UNAVAILABLE_REASONS)[number];
+
+/**
+ * W4-12: one QC run of a version as GET …/versions/{versionId}/qc-runs serves it (W4a plan section 7). `runner` is
+ * `qc_run.engine_id`; `ruleRevision` the recorded revision ID; `rulesLabel` the `label` of the `qc_rules` revision
+ * with that ID (null when it names none); `rulesEvaluated` is null on rows written before migration 0009.
+ */
+export const QcRunSummarySchema = Type.Object({
+  runId: Type.String(),
+  trigger: Type.Union([Type.Literal('upload'), Type.Literal('submit'), Type.Literal('approve_attempt')]),
+  lane: Type.Union([LaneSchema, Type.Null()]),
+  slot: FindingSlotSchema,
+  status: Type.Union([Type.Literal('completed'), Type.Literal('unavailable')]),
+  unavailableReason: Type.Union([
+    Type.Literal('timeout'),
+    Type.Literal('runner_error'),
+    Type.Literal('not_configured'),
+    Type.Literal('artifact_unreadable'),
+    Type.Null(),
+  ]),
+  runner: Type.String(),
+  runnerVersion: Type.String(),
+  ruleRevision: Type.String(),
+  rulesLabel: Type.Union([Type.String(), Type.Null()]),
+  rulesEvaluated: Type.Union([Type.Integer({ minimum: 0 }), Type.Null()]),
+  findingCount: Type.Integer({ minimum: 0 }),
+  requestedAt: Type.String(),
+  completedAt: Type.String(),
+});
+export type QcRunSummary = Static<typeof QcRunSummarySchema>;
+
+export const VersionQcRunsResponseSchema = Type.Object({
+  runs: Type.Array(QcRunSummarySchema),
+});
+export type VersionQcRunsResponse = Static<typeof VersionQcRunsResponseSchema>;

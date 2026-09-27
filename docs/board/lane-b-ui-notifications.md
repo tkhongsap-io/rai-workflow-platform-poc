@@ -153,3 +153,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w3-f5-thai-desk-complete model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #167)
 - Scope: per changes/2026-09-26-w3-f5-thai-desk-complete/. One PR.
+
+## 2026-09-27 13:51 — CLAIM lane-b: W4-12 QC log, evidence and unavailable runs in the UI (#189)
+- Author: operator=ta session=claude-code-w4-12-qc-log-ui model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #189)
+- Scope: per changes/2026-09-27-w4-12-qc-log-ui/: finding read shapes gain `evidence` (locators only), `GET …/versions/{versionId}/qc-runs` scoped like the findings read, the QC log on the version view, every unavailable run before the decision controls, rule label, rule ID, evidence location and owning lane on a finding row, W0-02 section 7 amendment. One PR.

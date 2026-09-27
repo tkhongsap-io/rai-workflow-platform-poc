@@ -5,11 +5,18 @@
 // (W0-05: the SPA only shows what the API returned).
 
 import { LANE_MAPPING_V1, lanesForSlot, type Lane, type LaneMapping } from '@rai/shared/constants';
-import type { LocaleKey } from '@rai/shared/locales/keys';
+import { isLocaleKey, type LocaleKey } from '@rai/shared/locales/keys';
 import type { RoleScope } from '@rai/shared/schemas/auth';
 import type { CaseView, LaneProjectionStatus } from '@rai/shared/schemas/cases';
 import type { NotApplicableReason, SlotNumber, SlotState } from '@rai/shared/schemas/pack';
-import type { DispositionKind, StoredFindingSummary } from '@rai/shared/schemas/review';
+import type {
+  DispositionKind,
+  EvidenceLocatorKind,
+  FindingEvidence,
+  LaneQcRunResponse,
+  QcRunSummary,
+  StoredFindingSummary,
+} from '@rai/shared/schemas/review';
 import type { ExpectedVersion, FrozenSlot, SubmittedVersion } from '@rai/shared/schemas/versions';
 import { NON_VENDOR_DEFAULT_REASON_KEY } from '@rai/shared/schemas/pack';
 
@@ -359,4 +366,69 @@ export function qcUnavailableReasonKey(
     case undefined:
       return 'review.qc.reason.unreported';
   }
+}
+
+// ---- W4-12: QC log, finding evidence and unavailable runs (W4a plan section 7) -------------------------------------
+
+/** The `qc.rule.*` label key of a rule ID (W4-03 keys), or null when the catalogue has none: show the ID alone. */
+export function ruleLabelKey(ruleId: string): LocaleKey | null {
+  const key = `qc.rule.${ruleId.toLowerCase().replace(/-/g, '_')}`;
+  return isLocaleKey(key) ? key : null;
+}
+
+export function evidenceLocatorKey(kind: EvidenceLocatorKind): LocaleKey {
+  return `review.evidence.locator.${kind}` as LocaleKey;
+}
+
+/** Where a finding's evidence points, as slot and locator kind: one entry per distinct pair, in stored order. */
+export function evidenceLocations(
+  evidence: readonly FindingEvidence[] | undefined,
+): Array<{ slot: FindingEvidence['slot']; kind: EvidenceLocatorKind }> {
+  const out: Array<{ slot: FindingEvidence['slot']; kind: EvidenceLocatorKind }> = [];
+  for (const entry of evidence ?? []) {
+    if (out.some((seen) => seen.slot === entry.slot && seen.kind === entry.locator.kind)) continue;
+    out.push({ slot: entry.slot, kind: entry.locator.kind });
+  }
+  return out;
+}
+
+/**
+ * How one run reads in the QC log. `unavailable` and `no_rules` are never a clean pass (A08); `not_recorded` is a
+ * row written before migration 0009, which recorded no rule count and so cannot claim that any rule ran.
+ */
+export type QcRunOutcome = 'unavailable' | 'no_rules' | 'findings' | 'no_findings' | 'not_recorded';
+
+export function qcRunOutcome(
+  run: Pick<QcRunSummary, 'status' | 'rulesEvaluated' | 'findingCount'>,
+): QcRunOutcome {
+  if (run.status === 'unavailable') return 'unavailable';
+  if (run.findingCount > 0) return 'findings';
+  if (run.rulesEvaluated === null) return 'not_recorded';
+  return run.rulesEvaluated === 0 ? 'no_rules' : 'no_findings';
+}
+
+export function qcRunOutcomeKey(outcome: QcRunOutcome): LocaleKey {
+  return `qc_log.outcome.${outcome}` as LocaleKey;
+}
+
+export function qcTriggerKey(trigger: QcRunSummary['trigger']): LocaleKey {
+  return `qc_log.trigger.${trigger}` as LocaleKey;
+}
+
+/** Every unavailable run of the version, whatever its trigger, in log (requested_at) order. */
+export function unavailableRuns(runs: readonly QcRunSummary[]): QcRunSummary[] {
+  return runs.filter((run) => run.status === 'unavailable');
+}
+
+/**
+ * The status line of a lane with no finding to show: `none_stored` when no lane run was loaded; `no_rules` when the
+ * lane run completed but evaluated 0 rules (never "no defects"); otherwise `empty`, the lane run's clean result.
+ */
+export function laneRunEmptyStatus(
+  laneRun: Pick<LaneQcRunResponse, 'runId' | 'status'> | null,
+  runs: readonly QcRunSummary[],
+): 'empty' | 'no_rules' | 'none_stored' {
+  if (laneRun === null) return 'none_stored';
+  const row = runs.find((run) => run.runId === laneRun.runId);
+  return row !== undefined && row.status === 'completed' && row.rulesEvaluated === 0 ? 'no_rules' : 'empty';
 }

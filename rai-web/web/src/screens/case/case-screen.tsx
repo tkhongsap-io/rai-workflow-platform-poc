@@ -3,7 +3,7 @@
 // 404 shows the envelope's message key (a 401 drops the session in the API client). The grants only choose which
 // controls to offer; the API decides access.
 
-import { useEffect, useRef, useState, type JSX } from 'react';
+import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import type { SessionInfo } from '@rai/shared/schemas/auth';
 import type { ArtifactRef } from '@rai/shared/schemas/artifacts';
@@ -21,6 +21,7 @@ import { CaseOverview } from './case-overview.js';
 import { LaneDecisions } from './lane-decisions.js';
 import { PackEditor, type PendingSettings } from './pack-editor.js';
 import { PackFrozen } from './pack-frozen.js';
+import { QcLog } from './qc-log.js';
 import { ReviewerWorkspace } from './reviewer-workspace.js';
 import type { ArtifactLookup } from './slot-rows.js';
 import { VersionNav } from './version-nav.js';
@@ -85,6 +86,11 @@ export function CaseScreen(): JSX.Element {
   const [busy, setBusy] = useState<'idle' | 'saving' | 'submitting'>('idle');
   const [editorError, setEditorError] = useState<unknown>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
+  // W4-12: bumped when a workspace records a lane-QC run, so the QC log reads the version's runs again.
+  const [qcLogToken, setQcLogToken] = useState(0);
+  const onQcRunRecorded = useCallback(() => {
+    setQcLogToken((n) => n + 1);
+  }, []);
   // A notice belongs to the view it was raised on: a route change clears it unless it names the new route (the
   // submit notice names the version it opens).
   const [noticeRoute, setNoticeRoute] = useState(versionId);
@@ -281,6 +287,8 @@ export function CaseScreen(): JSX.Element {
       }}
       onLaneDecided={onLaneDecided}
       onDispositionRecorded={onDispositionRecorded}
+      qcLogToken={qcLogToken}
+      onQcRunRecorded={onQcRunRecorded}
     />
   );
 }
@@ -306,6 +314,8 @@ interface BodyProps {
   onDismissError: () => void;
   onLaneDecided: (response: LaneDecisionResponse) => void;
   onDispositionRecorded: (response: DispositionResponse) => void;
+  qcLogToken: number;
+  onQcRunRecorded: () => void;
 }
 
 /**
@@ -452,6 +462,7 @@ function CaseScreenBody(props: BodyProps): JSX.Element {
                   session={props.session}
                   onDecided={props.onLaneDecided}
                   onDispositionRecorded={props.onDispositionRecorded}
+                  onQcRunRecorded={props.onQcRunRecorded}
                 />
               ))}
               <LaneDecisions
@@ -459,6 +470,11 @@ function CaseScreenBody(props: BodyProps): JSX.Element {
                 decisions={versionState.version.decisions}
               />
               <PackFrozen version={versionState.version} versions={state.versions} />
+              <QcLog
+                caseId={caseId}
+                versionId={versionState.version.versionId}
+                refreshKey={props.qcLogToken}
+              />
             </>
           ) : versionState.kind === 'error' ? (
             <ErrorNotice error={versionState.error}>

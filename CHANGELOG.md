@@ -2,6 +2,7 @@
 
 ## 2026-09-27
 
+- W4-12 (#189): finding reads carry `evidence` (slot, artifact, locator; no hashes); `GET …/versions/{versionId}/qc-runs` lists a version's runs with runner, rule revision and label, rules evaluated and finding count, scoped like the findings read; the version view shows a QC log; a lane's workspace shows every unavailable run before the decision controls; a 0-rule run is never "no findings"; finding rows name rule, evidence location and owning lane.
 - W4-04 (#188): a save-draft attach that changes a slot fires one upload QC run on that slot (lane NULL, slot recorded), tracked by the shutdown drain; slot 9 fires none; an upload outage is owned by the slot's lane (slot 5: AI/COE) and reused per version and lane; late and send-back-closed results write nothing; the substitute scripts lose their upload entries.
 - W4-13 (#187): `QC_MODE=deterministic` binds the W4a runner in every environment and is the `.env.example` default; `QC_MODE=substitute` is refused (exit 78) under `NODE_ENV=production` or a non-local identity mode; readiness `qc.kind` names the bound runner; CI and the test harness pin `substitute`.
 - W4-03 (#186): the `deterministic` QC runner executes the W4a metadata rules (`PACK-SLOT-MISSING`, `PACK-STAGE-MISMATCH`, new `PACK-NA-VENDOR-DOC`) from pack data only; `QC_MODE=deterministic` binds it in the test environment only, for the real-server test (W4-13 widens it).
