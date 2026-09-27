@@ -46,6 +46,7 @@ import { UPLOAD_LIMIT_DEFAULTS } from '@rai/server/config';
 import { createIdentityAdapter } from '@rai/server/identity/adapter';
 import { createFixtureIdentityProvider } from '@rai/server/identity/fixture';
 import { createPgSessionStore } from '@rai/server/identity/session';
+import { UNFROZEN_KINDS } from '@rai/server/versions/freeze';
 import { manifestHash } from '@rai/server/versions/manifest';
 import { laneOpenRecipientsFromIdentities } from '@rai/server/versions/open-lanes';
 import { AuditEventMissing, withWorkflowTransaction } from '@rai/server/versions/transaction';
@@ -412,11 +413,30 @@ describe(`W1-05 submit freezes an immutable version (A07) — ${SET}, fx-case-no
     assert.equal(row.checklist_template_version, NONVENDOR.checklistTemplateVersion);
     assert.equal(row.submit_correlation_id, correlationId);
     assert.equal(row.ready_at, null);
-    // frozen_configuration names every seeded kind's revision in force (W0-04: one FK, every kind in the jsonb).
+    // frozen_configuration names every seeded kind's revision in force (W0-04: one FK, every kind in the jsonb),
+    // except the kinds that are not evidence about a case (W6-02 UNFROZEN_KINDS: desk_controls, group_role_mapping).
     const revisions = (await db.owner.execute(sql`SELECT id, kind FROM configuration_revision ORDER BY kind`))
       .rows as Array<{ id: string; kind: string }>;
-    assert.ok(revisions.length >= 5);
-    assert.deepEqual(row.frozen_configuration, Object.fromEntries(revisions.map((r) => [r.kind, r.id])));
+    const unfrozen = new Set<string>(UNFROZEN_KINDS);
+    assert.ok(
+      revisions.some((r) => r.kind === 'desk_controls'),
+      'the seed publishes desk_controls (W6-02)',
+    );
+    const frozenKinds = revisions.filter((r) => !unfrozen.has(r.kind));
+    for (const kind of [
+      'calendar',
+      'checklist_templates',
+      'operator_recipients',
+      'qc_rules',
+      'sla',
+      'use_case_groups',
+    ])
+      assert.ok(
+        frozenKinds.some((r) => r.kind === kind),
+        `${kind} is frozen`,
+      );
+    assert.deepEqual(row.frozen_configuration, Object.fromEntries(frozenKinds.map((r) => [r.kind, r.id])));
+    assert.ok(!('desk_controls' in (row.frozen_configuration as object)), 'desk controls are never frozen');
     assert.ok(Object.values(row.frozen_configuration as Record<string, string>).includes(config.revisionId));
     assert.equal((row.frozen_configuration as Record<string, string>)['qc_rules'], qcRules[0]!.id);
     assert.ok('sla' in (row.frozen_configuration as object)); // W3-05 reads the SLA values from here

@@ -29,6 +29,8 @@ export const AUDIT_ACTIONS = [
   'artifact.uploaded',
   'artifact.downloaded',
   'configuration.published',
+  'configuration.draft_saved', // W6-02 (W6 plan section 10): refs are the kind and draft version only
+  'configuration.draft_discarded', // W6-02
   'notification.queued',
   'notification.failed',
   'audit.read',

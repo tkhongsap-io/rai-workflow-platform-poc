@@ -55,7 +55,7 @@ export interface RevisionInForce {
 }
 
 export interface FrozenConfiguration {
-  /** W0-04 `frozen_configuration`: `{kind: revision_id}` for every kind that has a revision in force. */
+  /** W0-04 `frozen_configuration`: `{kind: revision_id}` for every frozen kind that has a revision in force. */
   byKind: Partial<Record<ConfigurationKind, string>>;
   /**
    * W0-04 `configuration_revision_id`: the `qc_rules` revision when one is in force (W0-04: "the one most often
@@ -77,9 +77,21 @@ export class NoConfigurationInForce extends Error {
 
 const VIEW_KINDS: readonly ConfigurationKind[] = ['use_case_groups', 'checklist_templates', 'sla'];
 
+/**
+ * W6-02 (W6 plan section 2.1, "Not frozen"): kinds that are not evidence about a case and are never frozen on a
+ * version. `desk_controls` is read per request (W6-17); `group_role_mapping` is read at start by the identity adapter
+ * and has never been published, so no existing version changes.
+ */
+export const UNFROZEN_KINDS = [
+  'desk_controls',
+  'group_role_mapping',
+] as const satisfies readonly ConfigurationKind[];
+const UNFROZEN: ReadonlySet<ConfigurationKind> = new Set(UNFROZEN_KINDS);
+
 export function resolveFrozenConfiguration(revisions: readonly RevisionInForce[]): FrozenConfiguration {
   const byKind: Partial<Record<ConfigurationKind, string>> = {};
   for (const kind of CONFIGURATION_KINDS) {
+    if (UNFROZEN.has(kind)) continue;
     const row = revisions.find((r) => r.kind === kind);
     if (row !== undefined) byKind[kind] = row.id;
   }

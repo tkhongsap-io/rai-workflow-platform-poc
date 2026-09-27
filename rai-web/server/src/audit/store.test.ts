@@ -32,6 +32,8 @@ test('the action vocabulary is the W0-06 9.4 list plus the W0-04 and W0-03 addit
     'case.ready_for_launch',
     'qc.run_recorded',
     'configuration.published',
+    'configuration.draft_saved', // W6-02 (W6 plan section 10)
+    'configuration.draft_discarded', // W6-02
     'audit.read',
     'identity.signed_in',
   ]) {

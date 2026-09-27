@@ -1,5 +1,16 @@
 # Development log
 
+## W6-02 configuration drafts, change note and restore — 2026-09-27
+
+Second W6 ticket (#214). The desk's store can now hold an Admin's configuration change as a draft, publish it with a note, and roll it back, without ever changing a published revision. Nothing a user can see changes yet: the routes are W6-04 and the screens W6-05 onwards.
+
+- **Drafts.** Each kind (SLA, calendar, checklist templates, QC rules and so on) can have one working draft. It may be half-finished; only publishing checks it. Every save and discard names the draft version it expects, so two Admins can never silently overwrite each other.
+- **Publish and change note.** Publishing copies the draft into a new numbered revision, with the Admin's note on the revision itself, and removes the draft. It is refused if someone else published in the meantime.
+- **Restore.** An older revision can be brought back by publishing a copy of it as the next number, linked to the one it restores, so history only moves forward. Restoring the revision already in force is refused.
+- **Desk controls.** A new configuration kind holds the three incident switches (freeze writes, pause mail, pause QC), seeded all off; W6-17 makes them act.
+
+Desk controls and the identity mapping are not recorded on a submitted version, because neither is evidence about a case. The application's database account may now delete a draft, and nothing else; every such delete is audited. Rolling back past this change needs a backup restore, and the migration says so. [Review](changes/2026-09-27-w6-02-configuration-drafts-change-note/review.md).
+
 ## W7-05 `network` sign-in fails closed without https; test seams guarded — 2026-09-27
 
 Third W7 ticket (#209). The `network` sign-in mode, the one a closed-network host would run before W8, now refuses to start when the desk's public address is plain `http`. Off loopback, `http` would carry the session cookie in clear, so the process stops with `base_url_not_https` before it contacts any identity provider and before it listens, exactly as `production` already did. The W7-08 tests need to sign a synthetic account in without a real provider, so the start-up function gained a code-exchange test seam. That seam decides who a user is, so it is refused unless the process runs under `NODE_ENV=test` on a loopback address. The existing discovery seam is harmless on its own but is now refused under `NODE_ENV=production`. It is checked after the configuration, so every existing refusal keeps its reason and the W4-13 start-up tests pass unchanged. The identity spec (W0-03) now lists `network` in the https rule and records that W7 runs `network` with the allow-list source only. Its open question, whether the W7 rehearsal is networked, is ticked as answered: the walkthrough runs in `fixture` mode and W7-08 proves `network`. Synthetic data only; nothing is deployed. [Review](changes/2026-09-27-w7-05-network-fail-closed-amendments/review.md).

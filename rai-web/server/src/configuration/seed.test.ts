@@ -1,11 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { scoreRisk } from '@rai/shared/risk/score';
-import { CONFIGURATION_SEED, SEED_KINDS } from './seed.js';
+import { CONFIGURATION_SEED, SEED_KINDS, UNSEEDED_KINDS } from './seed.js';
 import { ConfigurationBodyInvalid, validateConfigurationBody } from './store.js';
 
+// W6-02 (W6 plan section 3, 11.2): assert by kind, never by count or order, so each package's seeded kind (W5
+// `risk_rubric`) is one more membership line here.
+const SEEDED = new Set<string>(SEED_KINDS);
+
 test('the seed holds the ticket-named kinds with the recorded values (D01, D06, D11, W0-08)', () => {
-  assert.deepEqual([...SEED_KINDS].sort(), [
+  for (const kind of [
     'calendar',
     'checklist_templates',
     'operator_recipients',
@@ -13,7 +17,9 @@ test('the seed holds the ticket-named kinds with the recorded values (D01, D06, 
     'risk_rubric',
     'sla',
     'use_case_groups',
-  ]);
+    'desk_controls', // W6-02
+  ])
+    assert.ok(SEEDED.has(kind), `${kind} is seeded`);
   assert.deepEqual(CONFIGURATION_SEED.sla, { dpo: 3, ai_coe: 5, it_security: 5 });
   assert.equal(CONFIGURATION_SEED.calendar.timezone, 'Asia/Bangkok');
   assert.deepEqual(CONFIGURATION_SEED.operator_recipients.addresses, ['operator-digest@rai-desk.example']);
@@ -60,6 +66,25 @@ test('qc_rules revision 1 (w4a.1) catalogues both template versions; v2.0 has no
     attachedForbiddenAt: { idea: [8] },
     notYetForbiddenAt: { pre_launch: [1, 2, 3, 4, 5, 6, 7, 8] },
   });
+});
+
+test('desk_controls is seeded with every switch off (W6 plan section 7, Q12)', () => {
+  assert.deepEqual(CONFIGURATION_SEED.desk_controls, {
+    writesFrozen: false,
+    mailPaused: false,
+    qcPaused: false,
+  });
+});
+
+test('registered and seeded kinds are separate: no UNSEEDED_KINDS member is seeded (W6 plan section 3)', () => {
+  assert.deepEqual([...UNSEEDED_KINDS], ['group_role_mapping']);
+  for (const kind of UNSEEDED_KINDS) {
+    assert.ok(
+      !SEEDED.has(kind),
+      `${kind} is never seeded (W6 plan section 6: no identity mapping in the seed)`,
+    );
+    assert.ok(!(kind in CONFIGURATION_SEED), kind);
+  }
 });
 
 test('every seed body validates against its shared schema', () => {

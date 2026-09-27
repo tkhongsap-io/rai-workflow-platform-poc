@@ -5,6 +5,7 @@ import { NON_VENDOR_DEFAULT_REASON_KEY } from '@rai/shared/schemas/pack';
 import type { ArtifactRef } from '@rai/shared/schemas/artifacts';
 import {
   NoConfigurationInForce,
+  UNFROZEN_KINDS,
   VersionNotSubmitted,
   frozenSlotsOf,
   laneMappingContent,
@@ -81,6 +82,22 @@ describe('W1-05 frozen configuration (W0-04 frozen_configuration / configuration
     ]);
     assert.equal(frozen.configurationRevisionId, 'rev-qc');
     assert.equal(frozen.byKind.qc_rules, 'rev-qc');
+  });
+  it('skips the kinds that are not evidence about a case: desk_controls and group_role_mapping (W6-02)', () => {
+    assert.deepEqual([...UNFROZEN_KINDS].sort(), ['desk_controls', 'group_role_mapping']);
+    const frozen = resolveFrozenConfiguration([
+      ...inForce,
+      { kind: 'desk_controls', id: 'rev-desk', publishedAt: at('2026-01-06T00:00:00Z') },
+      { kind: 'group_role_mapping', id: 'rev-map', publishedAt: at('2026-01-07T00:00:00Z') },
+    ]);
+    assert.deepEqual(Object.keys(frozen.byKind).sort(), [
+      'calendar',
+      'checklist_templates',
+      'operator_recipients',
+      'sla',
+      'use_case_groups',
+    ]);
+    assert.equal(frozen.configurationRevisionId, 'rev-sla', 'an unfrozen kind never becomes the FK');
   });
   it('refuses to freeze when no view kind is in force', () => {
     assert.throws(
