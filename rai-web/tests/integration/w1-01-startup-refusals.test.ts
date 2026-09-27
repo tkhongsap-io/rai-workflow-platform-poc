@@ -129,6 +129,38 @@ test('W4-13: the real process refuses QC_MODE=substitute with a non-local identi
   assert.equal(probe, undefined, 'nothing listens');
   assert.ok(!r.stdout.includes('process.started'));
 });
+// W7-05 (W7 plan section 5.1): S17 extended to network. A synthetic allow-list configuration with an http base URL
+// is refused inside the adapter's pure parse, before discovery, so the synthetic issuer is never contacted.
+test('W7-05 S17: the real process in network mode with an http PUBLIC_BASE_URL exits 78 base_url_not_https, never listening', async () => {
+  const port = await freePort();
+  const r = await run({
+    ...baseEnv(port),
+    NODE_ENV: 'development',
+    HOST: '0.0.0.0',
+    TRUST_PROXY: 'true',
+    PUBLIC_BASE_URL: `http://127.0.0.1:${port}`,
+    RAI_IDENTITY_MODE: 'network',
+    RAI_IDENTITY_NETWORK_SOURCE: 'allow-list',
+    RAI_IDENTITY_OIDC_ISSUER_URL: 'https://idp.rai-desk.test',
+    RAI_IDENTITY_OIDC_CLIENT_ID: 'synthetic-oidc-client',
+    RAI_IDENTITY_OIDC_CLIENT_SECRET: 'synthetic-oidc-secret',
+    RAI_IDENTITY_ALLOW_LIST_JSON: JSON.stringify({
+      version: 1,
+      entries: [
+        { email: 'admin@rai-desk.example', roles: [{ role: 'admin', scope: { kind: 'all_cases' } }] },
+      ],
+    }),
+    QC_MODE: 'deterministic',
+  });
+  assert.equal(r.code, 78);
+  assert.deepEqual(JSON.parse(r.stderr.trim().split('\n').at(-1)!), {
+    event: 'process.refused',
+    reason: 'base_url_not_https',
+  });
+  const probe = await fetch(`http://127.0.0.1:${port}/api/session`).catch(() => undefined);
+  assert.equal(probe, undefined, 'nothing listens');
+  assert.ok(!r.stdout.includes('process.started'));
+});
 
 test('the real process in fixture mode under NODE_ENV=test serves the fixture picker from @rai/fixtures and answers 401 without a session', async () => {
   const port = await freePort();

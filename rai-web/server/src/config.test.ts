@@ -82,6 +82,33 @@ test('local-google refuses a non-loopback bind host before listen (W0-03 S2, W0-
   }
 });
 
+// W7-05 (W7 plan section 5.1): the W0-02 section 5 HOST row as a table. A non-loopback bind is accepted only for
+// network and production; local-google (S2) and fixture (S14) refuse it with bind_not_loopback.
+test('HOST=0.0.0.0 is accepted only for network and production, refused for local-google and fixture (W7-05)', () => {
+  const table = [
+    ['network', 'development', 'ok'],
+    ['network', 'production', 'ok'],
+    ['production', 'production', 'ok'],
+    ['local-google', 'development', 'bind_not_loopback'],
+    ['fixture', 'test', 'bind_not_loopback'],
+  ] as const;
+  for (const [mode, nodeEnv, expected] of table) {
+    const env = withEnv({
+      NODE_ENV: nodeEnv,
+      RAI_IDENTITY_MODE: mode,
+      HOST: '0.0.0.0',
+      QC_MODE: 'deterministic',
+    });
+    if (expected === 'ok') {
+      const config = parseConfig(env);
+      assert.equal(config.host, '0.0.0.0', `${mode}/${nodeEnv}`);
+      assert.equal(config.identity.mode, mode);
+    } else {
+      assert.equal(reasonOf(env), expected, `${mode}/${nodeEnv}`);
+    }
+  }
+});
+
 test('an unknown or missing identity mode refuses to start (S1) without distinguishing the two', () => {
   assert.equal(reasonOf(withEnv({ RAI_IDENTITY_MODE: 'nonsense' })), 'mode_unknown');
   assert.equal(reasonOf(withEnv({ RAI_IDENTITY_MODE: undefined })), 'mode_unknown');

@@ -21,7 +21,7 @@ import { createDb, type DbHandle } from './db/client.js';
 import { currentRevision } from './configuration/store.js';
 import { createIdentityAdapter, type Discovery, type GroupMappingSource } from './identity/adapter.js';
 import type { FixtureIdentity } from './identity/fixture.js';
-import { openidClientDiscovery } from './identity/oidc.js';
+import { openidClientDiscovery, type Exchange } from './identity/oidc.js';
 import { IdentityStartupError } from './identity/types.js';
 import type { Emitter } from './observability/log.js';
 import { startedFields } from './observability/started.js';
@@ -47,7 +47,13 @@ export interface StartOverrides {
   fixtureBusinessUnits?: readonly string[];
   /** Test seam for the run-time `@rai/fixtures` import. */
   importFixture?: ImportFixture;
+  /** Discovery seam; refused under NODE_ENV=production (checked after parse, W7-05). S18 still validates it. */
   discovery?: Discovery;
+  /**
+   * Code-exchange seam (W7-05): returns the claims a principal is minted from, so it is refused before parse
+   * unless NODE_ENV=test and HOST is loopback, in every identity mode. Defaults to openid-client's code grant.
+   */
+  exchange?: Exchange;
   now?: () => Date;
   /** The built SPA directory to serve; defaults to rai-web/web/dist. */
   webDistDir?: string;
@@ -126,6 +132,8 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
     (env.NODE_ENV !== 'test' || env.RAI_IDENTITY_MODE !== 'fixture' || !isLoopbackHost(env.HOST ?? ''))
   )
     return refuse('test_qc_override_forbidden', exit);
+  if (overrides.exchange !== undefined && (env.NODE_ENV !== 'test' || !isLoopbackHost(env.HOST ?? '')))
+    return refuse('test_exchange_override_forbidden', exit);
   let config;
   try {
     config = parseConfig(env);
@@ -133,6 +141,9 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
     if (err instanceof ConfigError) return refuse(err.reason, exit);
     throw err;
   }
+  // After parse, so every parse reason keeps precedence (W7 plan section 14 risk 1).
+  if (overrides.discovery !== undefined && config.nodeEnv === 'production')
+    return refuse('test_discovery_override_forbidden', exit);
 
   // Without a web build the process serves the API alone (the integration suites spawn main.ts through tsx); in
   // production a missing bundle is a misconfiguration, not a reason to answer 404 on every page.
@@ -165,6 +176,7 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
     discovery: overrides.discovery ?? openidClientDiscovery,
     groupMappingSource,
     ...(fixtureUsers === undefined ? {} : { fixtureUsers }),
+    ...(overrides.exchange === undefined ? {} : { exchange: overrides.exchange }),
     ...clock,
   });
   try {

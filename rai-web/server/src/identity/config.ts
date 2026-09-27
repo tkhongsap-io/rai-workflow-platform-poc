@@ -1,5 +1,5 @@
 // W0-03 section 5: the pure part of the start-up validation. `parseIdentityConfig(env, bind)` decides every row a
-// read of the environment and the bind target can decide (S1-S10, S13-S15, S17) and returns either the typed
+// read of the environment and the bind target can decide (S1-S10, S13-S15, S17; S17 covers network from W7-05) and returns either the typed
 // identity configuration or the first refusal reason. No I/O, no clock, no network: ID-01 drives this table with
 // no Postgres and no process spawn. S11, S12, S16 and S18 need the discovered issuer, the revision store and the
 // bound address; they run inside `start()` (adapter.ts) against injected seams.
@@ -147,6 +147,9 @@ export function parseIdentityConfig(
       };
     }
     case 'network': {
+      // S17 (W7-05): a network deployment binds off loopback, so a plain-http base URL would send the session
+      // cookie in clear without `Secure` or `__Host-`. Checked first, for both sources, before discovery.
+      if (bind.publicBaseUrl.protocol !== 'https:') return refused('base_url_not_https');
       const source = env.RAI_IDENTITY_NETWORK_SOURCE?.trim();
       if (source !== 'allow-list' && source !== 'ad') return refused('network_source_unknown'); // S6
       const clientId = secret(env, 'RAI_IDENTITY_OIDC_CLIENT_ID');
