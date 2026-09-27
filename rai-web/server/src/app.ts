@@ -20,6 +20,10 @@ import { registerAuthorization, type ScopeFactsSource } from './authz/middleware
 import { registerCaseRoutes, type CaseRouteDeps } from './cases/routes.js';
 import { registerQueueRoutes } from './queue/routes.js';
 import { registerDashboardRoutes } from './dashboard/routes.js';
+import {
+  registerAdminConfigurationRoutes,
+  type AdminConfigurationRouteDeps,
+} from './configuration/routes.js';
 import { registerPackRoutes, type PackRouteDeps } from './pack/routes.js';
 import { registerVersionRoutes, type VersionRouteDeps } from './versions/routes.js';
 import { createSubmitTrigger } from './qc/submit-trigger.js';
@@ -85,6 +89,8 @@ export interface AppDeps {
   decide?: Omit<DecideRouteDeps, Injected>;
   /** Findings disposition and the lane QC run. Needs `identity`. */
   findings?: Omit<FindingsRouteDeps, 'qc' | Injected> & { qc?: QcBinding };
+  /** W6-04: the Admin configuration API (`/api/admin/configuration`). Needs `identity`. */
+  configuration?: Omit<AdminConfigurationRouteDeps, Injected>;
   /** The built SPA to serve from web/dist (static.ts); absent when there is no web build (API only). */
   static?: StaticOptions;
   /** Test seam: where the pino lines go instead of stdout, so a suite can assert on emitted events. */
@@ -291,6 +297,13 @@ export function buildApp(deps: AppDeps): App {
         registerCaseRoutes(instance, { ...caseDeps, ...dbAndClock(), emitter });
         registerQueueRoutes(instance, dbAndClock());
         registerDashboardRoutes(instance, dbAndClock());
+        done();
+      });
+    }
+    const configurationDeps = deps.configuration;
+    if (configurationDeps !== undefined) {
+      void fastify.register((instance, _opts, done) => {
+        registerAdminConfigurationRoutes(instance, { ...configurationDeps, ...dbAndClock(), emitter });
         done();
       });
     }

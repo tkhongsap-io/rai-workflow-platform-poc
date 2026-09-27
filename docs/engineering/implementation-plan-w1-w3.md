@@ -840,6 +840,8 @@ W3-05 adds the due-date and breach-query shapes in `rai-web/shared/src/schemas/s
 
 No audit-read endpoint (W2-08 reconstructs the journey from the table through `tests/support`; an Admin/operator read arrives with W3-07's operator view under W0-10), no configuration write (W6), no lane, finding, disposition or Ready endpoint (W2), no search (W3), no risk (W5), no external-register call of any kind (L3, L6).
 
+**W6-04 annotation (2026-09-28).** The "no configuration write (W6)" item is now served: `/api/admin/configuration` (index, revision list and detail, draft read, save, discard, publish and restore; `config.read_revisions` and `config.publish`, Admin only) as the [W6 plan](implementation-plan-w6.md) section 4.2 and the 7.10 Admin configuration shapes fix. See [W6-04 spec](../../changes/2026-09-27-w6-04-admin-configuration-api/spec.md). The W1 contract itself is unchanged.
+
 ### 7.10 W6 shapes
 
 **W6-01 amendment (2026-09-27).** [W6 plan](implementation-plan-w6.md) sections 4.2, 4.3, 8.1 and 8.2; provisional agent-team rulings under Ta's delegation of 2026-09-27. Contract only: W6-04, W6-09, W6-13 and W6-14 serve these shapes.
