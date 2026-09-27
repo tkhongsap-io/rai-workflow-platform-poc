@@ -1,0 +1,19 @@
+# Specification
+
+Source: [W7 plan](../../docs/engineering/implementation-plan-w7.md) section 9 row W7-10 (the plan wins over issue #210), sections 1.2 (W7-D13, D15, D16, D18, D19), 2 (`REHEARSAL_OUT_DIR`), 11 and 13.
+
+Done when:
+
+1. **Templates** exist at `docs/operations/rehearsal/{rehearsal-plan,deficiency-log,timing-sheet,acceptance-report}-template.md`, render as plain Markdown (headings, tables, no HTML) and link each other and their sources (the W7 plan, the register, `docs/acceptance.md`, BUILD_PLAN); `node scripts/check-links.mjs` passes. Each states "synthetic data only" for agent runs and that a real rehearsal's contents never enter Git (W7-D18). A `README.md` in the folder indexes them.
+   - Rehearsal plan: run identity (run ID, commit, fixture set identity, modes), scope (the section 11 cases), roles, the steps in guide order with the step IDs the timer uses, preconditions, stop rules.
+   - Deficiency log: the W7-D16 blocking definition verbatim in substance, one row per deficiency (ID, step, severity blocking/non-blocking, description, evidence pointer, W7-15.n issue, status).
+   - Timing sheet: columns identical to `timings.csv` (`TIMING_CSV_COLUMNS`), and a statement that timings are recorded without a target (W7-D15 A).
+   - Acceptance report: the W7-D15 synthetic pass criteria as a checklist, the pending items (W7-D19, operator review of the guide, operator-run rollback), and proposed real PoC acceptance criteria labelled as a proposal awaiting Ta and Nakhun, never as accepted.
+2. **`rai-web/tests/rehearsal/timing.ts`** (test support, not product code):
+   - `resolveRehearsalOutDir(env, where?)`: `REHEARSAL_OUT_DIR` unset or blank → `<rai-web>/.local/rehearsal`; otherwise resolved against the working directory. Refused with `RehearsalConfigError('invalid:REHEARSAL_OUT_DIR')` unless the path is strictly inside `<rai-web>/.local/`, including when it is outside the repository.
+   - `createStepTimer(runId, options?)`: `runId` must match `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$` and not be `.`/`..`-like (`invalid:runId`); resolves the directory as above; `options` may inject `env`, `cwd`, `raiWebRoot` and `now` (for tests). The run directory is `<out>/<runId>`; after creating it, its real path must still be inside the real path of `<rai-web>/.local/` (a symlink escape is refused).
+   - `start(stepId, { section? })`, `end(stepId, { outcome?, note? })` (outcome `completed` default, `failed`, `skipped`), `time(stepId, fn, opts)` (records `failed` and rethrows when `fn` throws), `entries()`. Starting an open step, ending a step not started, or an empty step ID → `TimingError`.
+   - Each `end` rewrites `timings.json` (`{ runId, startedAt, updatedAt, steps: [...] }`) and `timings.csv` (header `TIMING_CSV_COLUMNS` = `run_id,step_id,section,started_at,ended_at,duration_ms,outcome,note`, RFC 4180 quoting, CRLF line ends, text cells beginning with `=`, `+`, `-`, `@` prefixed with `'`), so a run that dies mid-way keeps every completed step. Times are ISO-8601 UTC; `duration_ms` is `end - start` in whole milliseconds and never negative.
+3. **Unit tests** `rai-web/tests/rehearsal/timing.test.ts` run in `npm run test:unit` and cover: default and relative resolution; refusal outside `.local/` (repo root, `rai-web/`, `.local` itself, a sibling like `.localx`, outside the repository); invalid run IDs; symlink escape; the JSON and CSV contents with an injected clock; CSV quoting and formula guard; `time()` success and failure; the step-state errors; a partially completed run leaves files for the ended steps; the timing-sheet template's columns equal `TIMING_CSV_COLUMNS`.
+4. `tests/tsconfig.json` includes `rehearsal/**/*.ts` (typecheck and lint cover it); `test:unit` includes `tests/rehearsal/*.test.ts`; TESTING's `test:unit` line names it.
+5. Full plan section 10 gate green (without `test:rehearsal`, which starts at W7-12).

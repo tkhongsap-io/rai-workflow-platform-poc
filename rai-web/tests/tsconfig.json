@@ -7,6 +7,6 @@
     "types": ["node"],
     "lib": ["ES2024", "DOM", "DOM.Iterable"]
   },
-  "include": ["support/**/*.ts", "integration/**/*.ts", "browser/**/*.ts"],
+  "include": ["support/**/*.ts", "integration/**/*.ts", "browser/**/*.ts", "rehearsal/**/*.ts"],
   "references": [{ "path": "../shared" }, { "path": "../server" }, { "path": "../fixtures" }]
 }

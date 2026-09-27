@@ -32,7 +32,7 @@
     "build": "npm run build -w shared && npm run build -w web && npm run build -w server",
     "start": "node server/dist/main.js",
     "check:substitute-absent": "node scripts/check-substitute-absent.mjs",
-    "test:unit": "NODE_ENV=test RAI_IDENTITY_MODE=fixture node --import tsx --conditions=rai-source --test 'server/src/**/*.test.ts' 'shared/src/**/*.test.ts' 'web/src/**/*.test.ts' 'fixtures/src/**/*.test.ts' 'tests/performance/*.test.ts'",
+    "test:unit": "NODE_ENV=test RAI_IDENTITY_MODE=fixture node --import tsx --conditions=rai-source --test 'server/src/**/*.test.ts' 'shared/src/**/*.test.ts' 'web/src/**/*.test.ts' 'fixtures/src/**/*.test.ts' 'tests/performance/*.test.ts' 'tests/rehearsal/*.test.ts'",
     "test:integration": "NODE_ENV=test RAI_IDENTITY_MODE=fixture node --import tsx --conditions=rai-source --test --test-concurrency=1 'tests/integration/**/*.test.ts'",
     "test": "npm run test:unit && npm run test:integration",
     "test:browser": "npm run test:browser:server && npm run test:browser:substitute",

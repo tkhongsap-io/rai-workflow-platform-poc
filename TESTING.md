@@ -97,7 +97,7 @@ Submit and versions (W1-05, W0-02 section 7.6, W0-06 4.3, W0-04 "Submit" row): `
 Test, lint, typecheck:
 
 ```sh
-npm run test:unit          # node:test over server, shared, web, fixtures and tests/performance sources; no database
+npm run test:unit          # node:test over server, shared, web, fixtures, tests/performance and tests/rehearsal sources; no database
 npm run test:integration   # node:test against the real Postgres + in-process substitutes (identity, QC, mail sink)
 npm test                   # unit then integration
 npm run test:browser       # both Playwright suites below, in order
