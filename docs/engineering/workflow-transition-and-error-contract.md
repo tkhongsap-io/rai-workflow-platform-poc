@@ -516,6 +516,8 @@ Rules: every error response has `Cache-Control: no-store`; `forbidden` and `unau
 - **Not found, `configuration`.** `NotFoundResource` gains `configuration`: an Admin configuration route naming a kind outside `CONFIGURATION_KINDS`, or a revision that does not exist or is of another kind. Only Admin reaches it (every other role is 403 `role` first).
 - **Desk frozen.** Nothing is written. The client shows `error.desk_frozen` and does not retry; reads continue.
 
+**W5-02 amendment (2026-09-27): not found, `risk_rubric`.** [W5 plan](implementation-plan-w5.md) section 6. `NotFoundResource` gains `risk_rubric`: `GET /api/configuration/risk-rubric/current` when no `risk_rubric` revision is in force (a database seeded before W5-02). Every signed-in role may reach it; nothing is written. The `not_found` details union shown in 8.2 and in W0-02 section 7 therefore reads `'case' | 'version' | 'finding' | 'artifact' | 'notification' | 'configuration' | 'risk_rubric'`.
+
 ### 8.4 Out-of-scope references: recorded by W0-05 (closed at W0 exit)
 
 Out-of-scope references answer `forbidden` (403), conditioned on non-guessable route identifiers; ADR-0003 assigned the choice to W0-05, which recorded it in its section 4 with the threat-model reasoning, and W0-09 closed this item on 2026-09-21. Because checks run authorization before existence (section 4), a caller outside the case's scope gets 403 whether or not the case exists, so existence is not disclosed by the 403/404 difference. If the identifier rule ever changes (routes keyed on `registry_id`), W0-05 section 4 flips the answer to 404 in its own contract PR and this section follows.

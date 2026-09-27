@@ -56,4 +56,27 @@ Worktree `/tmp/rai-w5-02-register-risk-rubric-seed`, Postgres project `rai-risk`
 
 | Round | Head | Reviewer | Verdict | Notes                                                                                                                          |
 | ----- | ---- | -------- | ------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| -     | -    | -        | pending | Two independent reviewer verdicts on the PR head, and green CI on that head, are recorded here before merge (D03 ticket flow). |
+| 1 | `9785c03` | contract reviewer | PASS | Every item of the plan's W5-02 row met; no decision invented. Non-blocking: amend the W0-06/W0-02/W0-10 `not_found` unions for `risk_rubric` (done in round 2). |
+| 1 | `9785c03` | correctness reviewer | PASS | Registration, publish validation, seed, endpoint and freeze match the plan. Polish items deferred below. |
+
+Round 1 CI was still pending on the unit and browser jobs at review time; the rebased head is gated again locally (below) and CI reruns on the pushed head. Final verdicts on the rebased head are for the next review round.
+
+## Round 2 (rebase onto main after W6-01 and W4-09a)
+
+- **Conflict resolution, keeping both behaviours.** `shared/src/errors.ts`: `NotFoundResource` keeps W6-01's `configuration` and adds `risk_rubric`; W6-01's `VersionStaleDetails` and `ConfigurationStaleDetails` are kept unchanged. `shared/src/schemas/observability.ts`: the `not_found.targetType` values are `case, version, finding, artifact, notification, configuration, risk_rubric, route`. `CHANGELOG.md`, `DEVLOG.md` (W5-02 kept as top entry) and the lane-a board stream (both CLAIMs kept, append order) merged by hand; no formatter on them. No migration on either side.
+- **Reviewer note taken**: dated "W5-02 amendment (2026-09-27)" notes in W0-06 section 8.3 (`workflow-transition-and-error-contract.md`, which also states the widened `not_found` details union of 8.2 and W0-02 section 7) and in W0-10 (`observability-contract.md`, `not_found` `targetType`).
+- **Deferred (polish, no change here)**: `currentRiskRubric` returns the stored body without re-validating it; W5-05 and W5-07 should still treat a body failing validation on read as `rubric_invalid`. Databases seeded before W5-02 answer 404 (the plan's not-configured path, already tested). The route may move to a configuration router in W6.
+
+| Command, round 2 (from `rai-web/` unless noted, `.env` sourced) | Result |
+| --- | --- |
+| `git rebase origin/main` (onto `9a12485`), conflicts resolved as above | rebased |
+| `docker compose -p rai-risk up -d --wait` (55383), `npm ci` | ok |
+| `npm run lint` | exit 0 |
+| `npm run typecheck` | exit 0 |
+| `npm run test:unit` | exit 0, 787 pass, 0 fail |
+| `npm run test:integration` | exit 0, 387 pass, 0 fail |
+| `npm run build && npm run check:substitute-absent` | exit 0 |
+| `npm run test:browser:server` | exit 0, 202 passed |
+| `npm run test:browser:substitute` | exit 0, 48 passed |
+| `node scripts/check-links.mjs` (root) | exit 0 |
+| `git diff --check` (root) | exit 0 |

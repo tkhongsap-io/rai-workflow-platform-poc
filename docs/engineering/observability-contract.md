@@ -279,6 +279,8 @@ The user-facing message for every category is a locale key (D12) in `rai-web/sha
 
 `not_found`'s `targetType` also admits `configuration` (the W0-06 8.3 resource of the same amendment). The W6 log events (`configuration.published`, `configuration.publish_refused`, `desk_controls.changed`, `desk.write_refused`, the `recheck` field on `qc.run.*`) are added to §3.3 by the tickets that emit them (W6 plan section 10).
 
+**W5-02 amendment (2026-09-27).** `not_found`'s `targetType` also admits `risk_rubric` (W0-06 8.3 amendment of the same date: no risk rubric revision in force). `SafeErrorFieldsSchema` lists it.
+
 ### 6.2 Stack sanitization for `internal_error`
 
 Stacks are kept only for `internal_error`. Before logging, the stack is passed through `sanitizeStack`: frames only (file, line, function), the message line replaced by `err.name` plus a fixed message key, and any `openid-client`, `pg` or Fastify validation error unwrapped to its `code` so that a provider response body, a connection string or an echoed request body cannot ride along. `stackHash` (SHA-256 of the sanitized frames) lets the operator view group repeats without storing every stack.
