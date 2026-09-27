@@ -151,3 +151,12 @@ test('isLoopbackHost accepts only 127.0.0.1, ::1 and localhost', () => {
   for (const h of ['0.0.0.0', '::', '10.0.0.5', 'desk.example.test', '127.0.0.1.example'])
     assert.equal(isLoopbackHost(h), false, h);
 });
+
+test('QC_MODE=deterministic is a test-environment value until W4-13 (W4-03 real-server evidence, W4a plan section 8)', () => {
+  assert.equal(parseConfig(withEnv({ QC_MODE: 'deterministic' })).qc.mode, 'deterministic');
+  assert.equal(parseConfig(withEnv({})).qc.mode, 'substitute');
+  const localGoogle = { RAI_IDENTITY_MODE: 'local-google', QC_MODE: 'deterministic' };
+  assert.equal(reasonOf(withEnv({ ...localGoogle, NODE_ENV: 'development' })), 'invalid:QC_MODE');
+  assert.equal(reasonOf(withEnv({ ...localGoogle, NODE_ENV: 'production' })), 'invalid:QC_MODE');
+  assert.equal(reasonOf(withEnv({ QC_MODE: undefined })), 'missing:QC_MODE');
+});

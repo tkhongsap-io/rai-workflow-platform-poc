@@ -1,9 +1,9 @@
 // W4-03 (W4a plan section 4): the deterministic runner behind the real orchestrator, on the real Postgres, through
-// the in-process fixture app with the runner injected (QC_MODE=deterministic arrives with W4-13, which adds the
-// real-server test). Submit findings for each W4a metadata rule, the two-lane slot-5 case (two findings, each owned
-// and dispositionable only by its lane), replay of completed runs, `rules: null` answered `not_configured` by the
-// runner itself, and `rules_evaluated` counting executed metadata rules only. Fixture set slice1-synthetic@1; slot
-// and stage changes are made on the synthetic draft before submit.
+// the in-process fixture app with the runner injected (the spawned-server evidence under QC_MODE=deterministic is
+// w4a-int-deterministic-server.test.ts). Submit findings for each W4a metadata rule, the two-lane slot-5 case (two
+// findings, each owned and dispositionable only by its lane), replay of completed runs, `rules: null` answered
+// `not_configured` by the runner itself, and `rules_evaluated` counting executed metadata rules only. Fixture set
+// slice1-synthetic@1; slot and stage changes are made on the synthetic draft before submit.
 
 import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';

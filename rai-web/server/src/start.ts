@@ -28,6 +28,8 @@ import { startedFields } from './observability/started.js';
 import { WEB_DIST_DIR, webDistPresent } from './static.js';
 import { migrationFileCount } from './db/migrate.js';
 import type { QcRunner, VersionRef } from '@rai/shared/qc/types';
+import { createDeterministicQcRunner } from './qc/deterministic/runner.js';
+import { qcKindOf } from './qc/kind.js';
 
 type ConfiguredQcRunner = QcRunner & { probe(): Promise<'ok' | 'unavailable' | 'disabled'> };
 type ImportFixture = (specifier: string) => Promise<unknown>;
@@ -106,6 +108,11 @@ async function loadQcSubstituteRunner(
   return new qc.ScriptedQcRunner({ fixtureCaseIdOf: (version) => byCaseId.get(version.caseId), ...clock });
 }
 
+/** The W4a runner (W4-03); in-process and storage-free, so its probe is always ok. */
+function deterministicRunner(clock: { now?: () => Date }): ConfiguredQcRunner {
+  return { ...createDeterministicQcRunner(clock), probe: () => Promise.resolve('ok') };
+}
+
 /** process.refused (W0-10 3.3): the reason code only, never a value; written before any logger exists. */
 function refuse(reason: string, exit: (code: number) => never): never {
   console.error(JSON.stringify({ event: 'process.refused', reason }));
@@ -137,10 +144,13 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
   const importFixture = overrides.importFixture ?? ((specifier: string) => import(specifier));
   const fixtures = await Promise.all([
     importFixtureModule<FixtureUsersModule>(importFixture, 'data/users'),
-    // A production process stays unbound even if fixtures can import.
-    config.qc.mode === 'substitute' && config.nodeEnv !== 'production'
-      ? (overrides.qcRunner ?? loadQcSubstituteRunner(importFixture, clock))
-      : undefined,
+    // A production process stays unbound even if fixtures can import. `deterministic` parses only under
+    // NODE_ENV=test until W4-13 (config.ts).
+    config.qc.mode === 'deterministic'
+      ? (overrides.qcRunner ?? deterministicRunner(clock))
+      : config.qc.mode === 'substitute' && config.nodeEnv !== 'production'
+        ? (overrides.qcRunner ?? loadQcSubstituteRunner(importFixture, clock))
+        : undefined,
   ]).catch(() => undefined);
   if (fixtures === undefined) return refuse('fixtures_import_failed', exit);
   const [usersModule, qcRunner] = fixtures;
@@ -189,7 +199,7 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
         identity: () => adapter.health(),
         loopbackBind: isLoopbackHost(config.host),
         mailKind: config.mail.mode === 'sink-memory' ? 'memory' : 'file',
-        qcKind: 'substitute',
+        qcKind: qcRunner === undefined ? 'substitute' : qcKindOf(qcRunner.identity),
         build: { commit: config.buildCommit, schemaVersion },
       },
       {

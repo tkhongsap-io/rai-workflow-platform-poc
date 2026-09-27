@@ -10,8 +10,8 @@
 //     approve attempt without a lane make the whole run `unavailable:runner_error`: the runner cannot vouch for a
 //     shorter result, so it never returns one.
 //
-// Its output passes W0-07 3.4 steps 4-5 unchanged; the orchestrator validates it like any runner's. Selection by
-// `QC_MODE` is W4-13.
+// Its output passes W0-07 3.4 steps 4-5 unchanged; the orchestrator validates it like any runner's. start.ts binds it
+// for `QC_MODE=deterministic`, which config.ts accepts only under NODE_ENV=test until W4-13.
 import { LANE_MAPPINGS_BY_VERSION } from '@rai/shared/constants';
 import type {
   QcFinding,
