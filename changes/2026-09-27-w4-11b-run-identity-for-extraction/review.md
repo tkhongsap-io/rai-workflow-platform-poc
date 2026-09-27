@@ -23,7 +23,7 @@ Framed in [intent](intent.md), [spec](spec.md) and [plan](plan.md). Source: [W4b
 - **`modelUsage` requires all three numbers** and `model` all three identities; a row with only some would be served as null. `recordRun` always writes the model block whole, so this does not arise from product code.
 - **Changed expectations in existing tests.** The plan widens `QcRunSummary` and the desk-health `unavailableQc` row, so `tests/integration/w4-12-qc-runs.test.ts` (its full-shape `deepEqual` gains the four fields, null except `unavailableDetail: 'unspecified'` on the simulated DPO outage), `web/src/screens/case/view-model.test.ts` `qcRun()`, `web/src/api/client.test.ts`, `tests/browser/support/operator-rehearsal.ts` and `shared/src/schemas/observability.test.ts` gained the fields. No assertion was removed or loosened.
 - **Invalid engine hides the unavailable reason** (round 1 note). `checkedResult` checks `engine` before it looks at `status`, so an unavailable result (for example `timeout`) that carries an invalid engine is recorded as `runner_error` / `engine_identity_invalid` and its original reason is not kept. Kept as is: it fails closed, the run is still unavailable either way, and a runner that sends a malformed identity is itself the defect worth surfacing.
-- **Migration renumbered at rebase (round 1).** W5-03 (#205) merged `0010_w5_03_risk` while this PR held 0010. The branch was rebased onto `origin/main` (`c5a267d`); main's `meta/_journal.json` and `0010_snapshot.json` were taken as they are, `npm run migrate:generate` produced idx 11 and `0011_snapshot.json`, and the generated SQL (byte-identical to the hand-reviewed body) was replaced by the hand-written file, now `0011_w4_11b_run_extraction_identity.sql`, with the journal tag renamed to match. `drizzle-kit generate` afterwards reports no drift. References to "migration 0010" for this ticket in the code comments, the change records, W0-02, W0-04, W0-10, DEVLOG and CHANGELOG now say 0011. The integration test finds its migration by tag, so it now runs on a 0010 database; only its title changed.
+- **Migration renumbered at rebase (round 1).** W5-03 (#205) merged `0010_w5_03_risk` while this PR held 0010. The branch was rebased onto `origin/main` (`c5a267d`); main's `meta/_journal.json` and `0010_snapshot.json` were taken as they are, `npm run migrate:generate` produced idx 11 and `0011_snapshot.json`, and the generated SQL (byte-identical to the hand-reviewed body) was replaced by the hand-written file, now `0011_w4_11b_run_extraction_identity.sql`, with the journal tag renamed to match. `drizzle-kit generate` afterwards reports no drift. References to "migration 0010" for this ticket in the code comments, the change records, W0-02, W0-04, W0-10, DEVLOG and CHANGELOG now say 0011. (Round 2: the rebase had also changed three references to W5-03's own migration 0010 in W0-04, the `case.risk_tier` row, the `pack_version.risk_answers` row and the dated W5-03 section; those three lines were restored exactly as on `origin/main`, so only this ticket's references differ.) The integration test finds its migration by tag, so it now runs on a 0010 database; only its title changed.
 - **MIGRATION-SLOT.** Claimed on `docs/board/lane-lead-integration.md` in this PR (plan section 15.2); released at merge.
 
 ## Round 1 changes
@@ -39,6 +39,12 @@ Deferred (not changed here):
 - The qc-runs read serves `model` / `modelUsage` as null when only some of their columns are set; W4-07b must keep writing the model block whole through `recordRun`.
 - The substitute's `simulated:<reason>` details are stored as `unspecified`, so W4-12b's UI will show `unspecified` for every substitute outage; W4-06a (substitute scripts) or W4-12b can switch to bounded codes.
 - W7-03 adds the `additive` class entry for `0011_w4_11b_run_extraction_identity` when it rebases (its class map is not on main).
+
+## Round 2 changes
+
+- Restored the three W5-03 migration references in `docs/engineering/persistence-and-artifact-store.md` (W0-04) that the round 1 rebase had changed from 0010 to 0011: the `case.risk_tier` row, the `pack_version.risk_answers` row and the dated "W5-03 risk proposal persistence" section. They now match `origin/main` exactly; `git diff origin/main` on that file shows only this ticket's added W4-11b paragraph.
+- The engine-label pattern is exported once as `QC_ENGINE_LABEL_PATTERN` from `shared/src/qc/types.ts` and used by both `shared/src/qc/validate.ts` (runner-result check) and `shared/src/schemas/review.ts` (qc-runs read), so the two cannot drift apart. No behaviour change; the existing tests on both sides cover it.
+- Round 1 verdict rows marked "(pre-rebase)"; PR description updated to name migration 0011.
 
 ## Commands and results
 
@@ -70,12 +76,25 @@ Worktree `/tmp/rai-w4-11b-run-identity-for-extraction`, Postgres project `rai-qc
 | `npm run test:browser:substitute` | 48 passed |
 | `node scripts/check-links.mjs` (root) | 394 Markdown files, 1141 links, 0 broken |
 | `git diff --check` (root) | clean |
+| **Round 2**, head after the W0-04 restore and shared pattern, fresh `rai-qc-core` database | |
+| `npm run lint` | exit 0 |
+| `npm run typecheck` | exit 0 |
+| `npm run test:unit` | 741/741 |
+| `npm run test:integration` | 391/391, 0 skipped |
+| `npm run build && npm run check:substitute-absent` | exit 0; 711 files scanned, 0 with the marker |
+| `npm run test:browser:server` | 202 passed |
+| `npm run test:browser:substitute` | 48 passed |
+| `node scripts/check-links.mjs` (root) | 394 Markdown files, 1141 links, 0 broken |
+| `git diff --check` (root) | clean |
+| `git diff origin/main -- docs/engineering/persistence-and-artifact-store.md` | only the added W4-11b paragraph; no removed lines |
 
 ## Review verdicts
 
 | Round | Head | Reviewer | Verdict | Notes |
 |---|---|---|---|---|
-| 1 | `4d87003` | reviewer 1 | pass, notes | tsc, lint, unit 653/653 locally; CI unit and browser still pending at the verdict, the other jobs green. Notes: engine checked before status (now a Deviation), unbounded read-schema strings (fixed), optional `qc.extract.failed` fields (deferred), verdict table (this row). |
-| 1 | `4d87003` | reviewer 2 | pass, notes | tsc, lint, unit 653/653 locally; integration and browser relied on the recorded results. Notes: `typeof` check (fixed), partial model block reads as null (deferred), substitute `unspecified` (deferred), W7-03 class entry (deferred). |
-| 1 | `4d87003` | merge queue | conflict | Migration 0010 taken by W5-03 on main; rebased and regenerated at 0011 (Round 1 changes). |
-| 2 | rebased head | - | pending | Two independent reviewer verdicts on the new head, and green CI on that head, are recorded here before merge (D03 ticket flow). |
+| 1 | `4d87003` (pre-rebase) | reviewer 1 | pass, notes | tsc, lint, unit 653/653 locally; CI unit and browser still pending at the verdict, the other jobs green. Notes: engine checked before status (now a Deviation), unbounded read-schema strings (fixed), optional `qc.extract.failed` fields (deferred), verdict table (this row). |
+| 1 | `4d87003` (pre-rebase) | reviewer 2 | pass, notes | tsc, lint, unit 653/653 locally; integration and browser relied on the recorded results. Notes: `typeof` check (fixed), partial model block reads as null (deferred), substitute `unspecified` (deferred), W7-03 class entry (deferred). |
+| 1 | `4d87003` (pre-rebase) | merge queue | conflict | Migration 0010 taken by W5-03 on main; rebased and regenerated at 0011 (Round 1 changes). |
+| 2 | `c344276` | reviewer 1 | changes requested | W0-04 contract: the rebase renumbered three W5-03 references (0010 to 0011); restored (Round 2 changes). Also: tsc, lint, unit 741/741 locally. |
+| 2 | `c344276` | reviewer 2 | pass, notes | tsc, lint, unit 741/741; renumber verified (0010 snapshot and SQL identical to main, 0011 prevId chains). Notes: pre-rebase head label (fixed), duplicated engine-label pattern (fixed), PR body still names 0010 (fixed), deferred items unchanged. |
+| 3 | round 2 fix head | - | pending | Two independent reviewer verdicts on the new head, and green CI on that head, are recorded here before merge (D03 ticket flow). |

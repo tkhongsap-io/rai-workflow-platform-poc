@@ -6,7 +6,7 @@
 import { Type } from 'typebox';
 import { Value } from 'typebox/value';
 import { LANES, type Lane, type LaneMapping, owningLaneRule } from '../constants.js';
-import { QC_RULE_ID_PATTERN, type FindingScope, type QcFinding } from './types.js';
+import { QC_ENGINE_LABEL_PATTERN, QC_RULE_ID_PATTERN, type FindingScope, type QcFinding } from './types.js';
 
 const SlotSchema = Type.Union([1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => Type.Literal(n)));
 const LaneSchema = Type.Union(LANES.map((lane) => Type.Literal(lane)));
@@ -119,7 +119,7 @@ export const QcFindingSchema = Type.Object(
 );
 
 // W4-11b: an extractor, model or prompt identity is an identifier, never free text such as an exception message.
-const ENGINE_LABEL = Type.String({ pattern: '^[A-Za-z0-9][A-Za-z0-9._+/@:-]{0,127}$' });
+const ENGINE_LABEL = Type.String({ pattern: QC_ENGINE_LABEL_PATTERN });
 const INT32 = Type.Integer({ minimum: 0, maximum: 2_147_483_647 }); // qc_run integer columns
 const MICROS = Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }); // qc_run bigint, read as a number
 

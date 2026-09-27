@@ -7,6 +7,7 @@ import { Type, type Static } from 'typebox';
 import type { Lane } from '../constants.js';
 import { ExpectedVersionSchema } from './versions.js';
 import { SlotNumberSchema } from './slots.js';
+import { QC_ENGINE_LABEL_PATTERN } from '../qc/types.js';
 
 // Explicit literals (not LANES[i]): noUncheckedIndexedAccess makes indexed access `Lane | undefined`.
 export const LaneSchema = Type.Union([
@@ -286,7 +287,7 @@ export type QcUnavailableReasonName = (typeof QC_UNAVAILABLE_REASONS)[number];
  * unavailable run (a bounded code or `unspecified`; null when none). The model cost is not served. The identity
  * labels use the `QcEngineIdentitySchema` label bound and the detail the qc_run CHECK pattern (review round 1).
  */
-const QC_RUN_ENGINE_LABEL = Type.String({ pattern: '^[A-Za-z0-9][A-Za-z0-9._+/@:-]{0,127}$' });
+const QC_RUN_ENGINE_LABEL = Type.String({ pattern: QC_ENGINE_LABEL_PATTERN });
 const QC_RUN_UNAVAILABLE_DETAIL = Type.String({ pattern: '^[a-z0-9_]{1,64}$' });
 
 export const QcRunSummarySchema = Type.Object({

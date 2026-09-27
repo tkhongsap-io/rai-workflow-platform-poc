@@ -116,6 +116,11 @@ export interface QcFinding {
 
 export const QC_RULE_ID_PATTERN = /^[A-Z]+(-[A-Z0-9]+)+$/;
 
+// W4-11b: the bounded identifier shape for engine identity labels (extractor version,
+// model provider, model ID, prompt revision). Shared by the runner-result check and the
+// qc-runs read schema so the two cannot drift apart.
+export const QC_ENGINE_LABEL_PATTERN = '^[A-Za-z0-9][A-Za-z0-9._+/@:-]{0,127}$';
+
 export type QcUnavailableReason = 'timeout' | 'runner_error' | 'not_configured' | 'artifact_unreadable';
 
 /** W4-11b (W4b plan section 5): the model a run used. No external provider value exists (WA-D08, decision 6). */
