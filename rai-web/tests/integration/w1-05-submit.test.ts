@@ -76,13 +76,8 @@ const nameOf = (id: string) => findFixtureUser(id)!.displayName;
 const NONVENDOR = findFixtureCase('fx-case-nonvendor')!; // owner-a, B1, vendorInvolved false, seven slots attached
 const MISSING_SLOT = findFixtureCase('fx-case-missing-slot')!; // owner-a, B1, a missing and a not-yet slot
 const HR_CASE = findFixtureCase('fx-case-hr-dualrole')!; // owner-a, B2
-const PROJECTIONS = [
-  'privacy_status',
-  'security_status',
-  'rai_status',
-  'ai_readiness_status',
-  'risk_tier',
-] as const;
+// W5-05 (W5 plan section 0, intended change 1): `risk_tier` left this list; submit now writes the recorded proposal.
+const PROJECTIONS = ['privacy_status', 'security_status', 'rai_status', 'ai_readiness_status'] as const;
 
 let db: TestDatabase;
 let app: FastifyInstance;
@@ -519,7 +514,7 @@ describe(`W1-05 submit freezes an immutable version (A07) — ${SET}, fx-case-no
     assert.equal(event?.actorRole, 'bu_spoc');
   });
 
-  it('the projected status fields are untouched by submit: the three lane projections stay pending, readiness not_ready, risk tier null', async () => {
+  it('the projected status fields are untouched by submit: the three lane projections stay pending, readiness not_ready; risk tier is the recorded proposal', async () => {
     const owner = await signIn(OWNER_A);
     const before = await caseRow(NONVENDOR.caseId);
     await submitOk(owner, NONVENDOR.caseId);
@@ -529,11 +524,13 @@ describe(`W1-05 submit freezes an immutable version (A07) — ${SET}, fx-case-no
     assert.equal(after.security_status, 'pending');
     assert.equal(after.rai_status, 'pending');
     assert.equal(after.ai_readiness_status, 'not_ready');
-    assert.equal(after.risk_tier, null);
+    // W5-05: no answers under the seeded SYNTHETIC PLACEHOLDER rubric, so the proposal is all-Unknown.
+    assert.equal(before.risk_tier, null);
+    assert.equal(after.risk_tier, 'unknown');
     const view = (await getCase(owner, NONVENDOR.caseId)).json<CaseView>();
     assert.equal(view.privacyStatus, 'pending');
     assert.equal(view.aiReadinessStatus, 'not_ready');
-    assert.equal(view.riskTier, null);
+    assert.equal(view.riskTier, 'unknown');
     assert.equal((await audit('lane.opened')).length, 3); // W2-01 (d): three lanes open with submit
   });
 });
@@ -998,9 +995,13 @@ describe(`W1-05 version navigation (A07) — ${SET}, fx-case-nonvendor, fx-case-
     assert.equal(
       (await audit()).filter(
         (e) =>
-          !['version.submitted', 'lane.opened', 'identity.signed_in', 'configuration.published'].includes(
-            e.action,
-          ),
+          ![
+            'version.submitted',
+            'risk.proposed', // W5-05 (intended change 2): every submit records its risk proposal
+            'lane.opened',
+            'identity.signed_in',
+            'configuration.published',
+          ].includes(e.action),
       ).length,
       0, // reads write no audit row; the seed, the sign-ins and the submit lanes are the only other events
     );

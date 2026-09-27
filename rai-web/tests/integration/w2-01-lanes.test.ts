@@ -2,7 +2,7 @@
 // LANE_MAPPINGS_BY_VERSION / slotsForLane) and lane_open notification rows for every fixture identity that holds
 // the lane (including the dual-role DPO) in the same transaction as the freeze; a database fault after the first
 // notification insert rolls the whole submit back (draft unsubmitted, zero lane.opened, zero notification);
-// risk_tier = high still opens all three (no routing); Idempotency-Key replay returns the original 201 and writes
+// risk_tier = high (W5-05: reached through three high draft answers) still opens all three (no routing); Idempotency-Key replay returns the original 201 and writes
 // no second set. Fixture set slice1-synthetic@1; identities from W0-03 section 7.
 
 import { after, before, beforeEach, describe, it } from 'node:test';
@@ -297,15 +297,30 @@ describe(`W2-01 submit opens three lanes atomically — ${SET}, fx-case-nonvendo
   });
 
   it('risk_tier = high still opens all three lanes (no routing or skip)', async () => {
-    await db.raw('app', async (client) => {
-      await client.query('BEGIN');
-      await client.query(`SET LOCAL rai.workflow_write = 'on'`);
-      await client.query(`UPDATE "case" SET risk_tier = 'high' WHERE id = $1`, [NONVENDOR.caseId]);
-      await client.query('COMMIT');
-    });
-    assert.equal((await caseRow(NONVENDOR.caseId)).risk_tier, 'high');
+    // W5-05 (W5 plan section 9, intended change 3): submit now writes the recorded proposal to risk_tier, so a raw
+    // UPDATE before submit would be overwritten. High is reached through three high answers saved on the draft
+    // (slot 1, the evidence every placeholder question cites, is attached on fx-case-nonvendor).
     const owner = await signIn(OWNER_A);
+    const { draft } = await current(owner, NONVENDOR.caseId);
+    assert.equal(draft.slots[1].state, 'attached');
+    const saved = await app.inject({
+      method: 'PUT',
+      url: `/api/cases/${NONVENDOR.caseId}/draft`,
+      headers: { 'content-type': 'application/json', ...asUser(owner) },
+      payload: {
+        expectedVersion: { versionId: draft.draftId, revision: draft.draftRevision },
+        riskAnswers: { RQ1: 'public', RQ2: 'automated', RQ4: 'customers' },
+      },
+    });
+    assert.equal(saved.statusCode, 200, saved.body);
     const { version } = await submitOk(owner, NONVENDOR.caseId);
+    const proposal = (
+      await db.owner.execute(
+        sql`SELECT status, tier FROM risk_proposal WHERE version_id = ${version.versionId}`,
+      )
+    ).rows as Array<{ status: string; tier: string | null }>;
+    assert.deepEqual(proposal, [{ status: 'proposed', tier: 'high' }]);
+    assert.equal((await caseRow(NONVENDOR.caseId)).risk_tier, 'high');
     const opened = (await audit('lane.opened')).filter((e) => e.targetVersionId === version.versionId);
     assert.equal(opened.length, 3);
     assert.deepEqual(

@@ -19,6 +19,11 @@
 //                     `case.resubmit` when the locked draft had a parent), commit. A failure while opening any
 //                     lane rolls everything back. The route schedules pack QC only after this promise resolves
 //                     with a fresh commit; the response never waits.
+// W5-05 (W5 plan section 4, R-4; W0-06 4.3 amended): right after the freeze, the same transaction scores the frozen
+// risk answers against the frozen `risk_rubric` revision (risk/propose.ts), inserts the append-only `risk_proposal`
+// row, writes its tier to `case.risk_tier` in the close-draft UPDATE (NULL when unavailable) and audits
+// `risk.proposed` after `version.submitted` / `version.resubmitted` and before the `lane.opened` rows. A proposal
+// problem never fails the submit. The `risk.proposal.*` log line is emitted after commit, fresh submits only.
 
 import { CURRENT_LANE_MAPPING } from '@rai/shared/constants';
 import { InvalidInputError, NotFoundError } from '@rai/shared/errors';
@@ -64,6 +69,15 @@ import {
   readSubmittedVersion,
 } from './repository.js';
 import { withWorkflowTransaction, type ActionContext, type WorkflowResult } from './transaction.js';
+import type { ErrorCapture } from '../observability/errors.js';
+import type { Emitter } from '../observability/log.js';
+import {
+  proposeAtSubmit,
+  riskAuditRef,
+  tierForCase,
+  type ProposeAtSubmitResult,
+  type RiskEngine,
+} from '../risk/propose.js';
 
 export interface VersionServiceDeps {
   db: Db;
@@ -74,6 +88,12 @@ export interface VersionServiceDeps {
   laneOpenRecipients?: LaneOpenRecipients;
   /** W3-F2: lane reviewers' BU-SPOC grants; a reviewer who is SPOC of the case's BU gets no lane-opened mail. */
   laneReviewerSpocUnits?: LaneReviewerSpocUnits;
+  /** W5-05: the `risk.proposal.*` lines after commit; absent in suites that build no app. */
+  emitter?: Emitter;
+  /** W5-05: where an engine error goes (`errors.internal`); the submit still commits. */
+  errors?: ErrorCapture;
+  /** W5-05 test seam: replaces the shared scoring engine (the injected engine error). Production never sets it. */
+  riskEngine?: RiskEngine;
 }
 
 export const SUBMIT_ACTION = 'case.submit' as const;
@@ -137,9 +157,10 @@ export async function submitDraft(
   // W3-F1: resolved before the transaction opens, so the lookup never takes a second pool connection while the
   // case lock is held. The same directory as the reads; the actor is only its fallback; no directory, no name.
   const submitterName = (await deps.subjects?.resolve(ctx.actor.subjectId, ctx.actor))?.displayName;
+  let proposal: ProposeAtSubmitResult | undefined; // W5-05: set by the transaction, logged after it commits
   // Digest always uses case.submit so a replay after the draft is closed still matches (W2-04: do not derive
   // the digest from post-commit state). The stored action may be case.resubmit via storeAction.
-  return withWorkflowTransaction<SubmittedVersion>(
+  const result = await withWorkflowTransaction<SubmittedVersion>(
     deps.db,
     caseId,
     {
@@ -174,8 +195,20 @@ export async function submitDraft(
           manifestHash: manifestHash(slots.manifest),
           submitCorrelationId: ctx.correlationId,
         });
+        // W5-05: the risk proposal, scored on what was just frozen; never throws.
+        proposal = await proposeAtSubmit(tx, {
+          caseId: before.id,
+          versionId: version.id,
+          riskAnswers: version.riskAnswers,
+          rubricRevisionId: frozen.byKind.risk_rubric,
+          slotRows: slots.rows,
+          now,
+          correlationId: ctx.correlationId,
+          ...(deps.riskEngine === undefined ? {} : { engine: deps.riskEngine }),
+        });
         const after = await closeDraftOnCase(tx, before, version.id, now, {
           resetAiReadiness: isResubmit,
+          riskTier: tierForCase(proposal.outcome),
         });
         // A version just frozen has no decisions yet.
         const body = withSubmitterName(
@@ -213,6 +246,14 @@ export async function submitDraft(
           afterRef: caseRef(after),
           occurredAt: now,
         });
+        // W5-05 (W0-06 9.4 amended): the proposal, after the submit event and before the lanes open.
+        await audit({
+          action: 'risk.proposed',
+          targetCaseId: before.id,
+          targetVersionId: version.id,
+          targetRef: riskAuditRef(proposal.row.id, proposal.outcome),
+          occurredAt: now,
+        });
         // W2-01 (d)+(f): three lane.opened audits then lane_open notification rows; same correlation id.
         await openLanesOnSubmit({
           tx,
@@ -237,6 +278,33 @@ export async function submitDraft(
       },
     },
   );
+  if (!result.replayed && proposal !== undefined) reportProposal(deps, proposal);
+  return result;
+}
+
+/** W5-05 (W5 plan section 8): the post-commit log line of a fresh submit's proposal, and an engine error's capture. */
+function reportProposal(deps: VersionServiceDeps, { row, outcome, durationMs }: ProposeAtSubmitResult): void {
+  if (outcome.engineError !== undefined) deps.errors?.internal(outcome.engineError);
+  if (row.status === 'proposed')
+    deps.emitter?.log('risk.proposal.recorded', {
+      proposalId: row.id,
+      caseId: row.caseId,
+      versionId: row.versionId,
+      status: row.status,
+      tier: row.tier,
+      rubricRevision: row.rubricRevisionId,
+      engineVersion: row.engineVersion,
+      unknownCount: outcome.unknownCount,
+      durationMs,
+    });
+  else
+    deps.emitter?.log('risk.proposal.unavailable', {
+      proposalId: row.id,
+      caseId: row.caseId,
+      versionId: row.versionId,
+      reason: row.unavailableReason,
+      ...(row.rubricRevisionId === null ? {} : { rubricRevision: row.rubricRevisionId }),
+    });
 }
 
 /** `GET /api/cases/{caseId}/versions`: ascending by versionNumber; empty while never submitted. */

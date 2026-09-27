@@ -229,7 +229,7 @@ export async function caseViewFrom(
     vendorInvolved: row.vendorInvolved,
     modelType: row.modelType as CaseView['modelType'],
     status,
-    riskTier: row.riskTier, // null throughout slice 1 (D07 before W5)
+    riskTier: row.riskTier as CaseView['riskTier'], // W5-05: the latest submit's proposal (CHECK-bound); NULL when unavailable or before W5
     privacyStatus: row.privacyStatus as CaseView['privacyStatus'],
     securityStatus: row.securityStatus as CaseView['securityStatus'],
     raiStatus: row.raiStatus as CaseView['raiStatus'],

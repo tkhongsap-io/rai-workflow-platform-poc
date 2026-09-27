@@ -315,6 +315,8 @@ export function buildApp(deps: AppDeps): App {
         registerVersionRoutes(instance, {
           ...routeDeps,
           ...dbAndClock(),
+          emitter, // W5-05: the risk.proposal.* lines
+          errors, // W5-05: a risk engine error
           ...(qc === undefined
             ? {}
             : { afterSubmit: createSubmitTrigger({ ...qc, ...dbAndClock(), emitter, errors }, drain) }),

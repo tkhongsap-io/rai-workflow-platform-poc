@@ -7,6 +7,7 @@
 
 import { and, asc, eq, isNotNull, sql } from 'drizzle-orm';
 import type { ArtifactRef } from '@rai/shared/schemas/artifacts';
+import type { RiskTier } from '@rai/shared/schemas/cases';
 import { toArtifactRef } from '../artifacts/pipeline.js';
 import type { CaseRow, PackVersionRow } from '../cases/repository.js';
 import { deskStatusFor } from '../cases/status.js';
@@ -71,7 +72,8 @@ export class CaseRowChanged extends Error {
  * W0-04 "Submit" / "Resubmit" row on the case: `current_version_id = the version`, `draft_version_id = NULL`
  * (no open draft after submit; W2-03 creates N+1 later), `desk_status = 'in_review'`, the three lane
  * projections `pending` (W0-06 4.10: every submission reopens all lanes; a no-op for v1), `row_version + 1`.
- * Runs under `rai.workflow_write`, which `withWorkflowTransaction` set. `risk_tier` is untouched.
+ * Runs under `rai.workflow_write`, which `withWorkflowTransaction` set. W5-05: `risk_tier` = the tier of the risk
+ * proposal the same transaction recorded for this version (`unknown` included; NULL when it is unavailable).
  * First submit leaves `ai_readiness_status` untouched; resubmit (W2-04) also sets it to `not_ready`.
  */
 export async function closeDraftOnCase(
@@ -79,7 +81,7 @@ export async function closeDraftOnCase(
   before: CaseRow,
   versionId: string,
   now: Date,
-  opts?: { resetAiReadiness?: boolean },
+  opts: { resetAiReadiness?: boolean; riskTier: RiskTier | null },
 ): Promise<CaseRow> {
   const [row] = await tx
     .update(cases)
@@ -90,7 +92,8 @@ export async function closeDraftOnCase(
       privacyStatus: 'pending',
       securityStatus: 'pending',
       raiStatus: 'pending',
-      ...(opts?.resetAiReadiness === true ? { aiReadinessStatus: 'not_ready' as const } : {}),
+      riskTier: opts.riskTier,
+      ...(opts.resetAiReadiness === true ? { aiReadinessStatus: 'not_ready' as const } : {}),
       rowVersion: sql`${cases.rowVersion} + 1`,
       updatedAt: now,
     })

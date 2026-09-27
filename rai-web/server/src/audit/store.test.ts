@@ -29,6 +29,7 @@ test('the action vocabulary is the W0-06 9.4 list plus the W0-04 and W0-03 addit
     'draft.saved',
     'version.submitted',
     'lane.opened',
+    'risk.proposed', // W5-05 (W0-06 9.4 amended)
     'case.ready_for_launch',
     'qc.run_recorded',
     'configuration.published',
