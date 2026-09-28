@@ -121,3 +121,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w7-08-a01-network-clause-suite model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #233)
 - Scope: per changes/2026-09-27-w7-08-a01-network-clause-suite/: `rai-web/tests/integration/w7-08-network-a01.test.ts` with `rai-web/tests/support/network-sign-in.ts` (W7 plan section 5.2 items 1-7 on loopback in `network` mode, allow-list source, stub OIDC discovery and exchange seams; no non-loopback bind, no provider call), a `start.test.ts` network start case, the `docs/acceptance.md` A01 evidence line, W0-03 ID-16 evidence pointer and the threat-model W7-08 link. One PR; no migration, no product code.
+
+## 2026-09-28 — CLAIM lane-c: W4-08a evaluation harness core and report (#237)
+- Author: operator=ta session=claude-code-w4-08a-evaluation-harness-core model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #237)
+- Scope: per changes/2026-09-27-w4-08a-evaluation-harness-core-and/: `rai-web/tests/evaluation/*` (`run.ts` CLI, `load-set.ts`, `harness.ts`, `grade.ts`, `report.ts`, `identity.ts`, `thresholds.json`, unit tests), pure moves of `checkedResult` to `server/src/qc/check-result.ts` and of the request builder to `server/src/qc/request.ts` (`qc/orchestrator.ts` imports them), `npm run eval:qc` and the `test:unit` glob in `package.json`, `tests/tsconfig.json` include, TESTING eval commands. Dev split only; no gate or `--verify` (W4-08b). One PR; no migration.
