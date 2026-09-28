@@ -20,6 +20,8 @@
 // no synthetic default (section 6), so Admin publishes it or nothing does.
 
 import type {
+  AccClassicMlMetricParams,
+  AccExtractionNotHallucinationParams,
   AccMetricCitedParams,
   ClaimLabels,
   ConfigurationBodies,
@@ -99,6 +101,33 @@ export const ACC_METRIC_CITED_PARAMS: AccMetricCitedParams = {
   claimSource: 'grammar',
 };
 
+/**
+ * W4-06b (W4b plan section 3.3; WA-D09, provisional): `ACC-EXTRACTION-NOT-HALLUCINATION` reads slot 1, so only the
+ * AI/COE approve attempt reads it (decision 28). An extraction metric cited on the hallucination item is flagged.
+ */
+export const ACC_EXTRACTION_NOT_HALLUCINATION_PARAMS: AccExtractionNotHallucinationParams = {
+  slots: [1],
+  labels: CLAIM_LABELS,
+  items: { hallucination: { en: ['hallucination'], th: ['การหลอน'] } },
+  extractionMetrics: ['extraction_accuracy'],
+  claimSource: 'grammar',
+};
+
+/**
+ * W4-06b (W4b plan section 3.3; WA-D09, provisional): `ACC-CLASSIC-ML-METRIC` reads slot 1 on the AI/COE approve
+ * attempt (decision 28). The matching metrics are agent-team values until D09 names each sheet's metric: `f1` (the
+ * W4-09a dev vocabulary) and the usual classification metrics.
+ */
+export const ACC_CLASSIC_ML_METRIC_PARAMS: AccClassicMlMetricParams = {
+  slots: [1],
+  labels: CLAIM_LABELS,
+  items: {
+    classic_ml_performance: { en: ['model performance'], th: ['ประสิทธิภาพของโมเดล'] },
+  },
+  matchingMetrics: ['f1', 'precision', 'recall', 'auc_roc', 'accuracy'],
+  claimSource: 'grammar',
+};
+
 const W4B_CONTENT_RULES: readonly QcRule[] = [
   {
     ruleId: 'ACC-METRIC-CITED',
@@ -112,9 +141,16 @@ const W4B_CONTENT_RULES: readonly QcRule[] = [
     engine: 'content',
     triggers: ['approve_attempt'],
     severity: 'high',
+    params: ACC_EXTRACTION_NOT_HALLUCINATION_PARAMS, // W4-06b: with its params schema (plan 3.3)
   },
   { ruleId: 'ACC-BAND-V1-SHEET3', engine: 'content', triggers: ['approve_attempt'], severity: 'high' },
-  { ruleId: 'ACC-CLASSIC-ML-METRIC', engine: 'content', triggers: ['approve_attempt'], severity: 'medium' },
+  {
+    ruleId: 'ACC-CLASSIC-ML-METRIC',
+    engine: 'content',
+    triggers: ['approve_attempt'],
+    severity: 'medium',
+    params: ACC_CLASSIC_ML_METRIC_PARAMS, // W4-06b: with its params schema (plan 3.3)
+  },
 ];
 const V1_SHEET3_RULES = [...W4A_METADATA_RULES, ...W4B_CONTENT_RULES];
 

@@ -273,6 +273,36 @@ export const AccMetricCitedParamsSchema = Type.Object(
   { additionalProperties: false },
 );
 export type AccMetricCitedParams = Static<typeof AccMetricCitedParamsSchema>;
+/**
+ * `ACC-EXTRACTION-NOT-HALLUCINATION` (W4-06b, plan section 3.3): the slots it may read, labels, the hallucination item
+ * and the extraction metrics that are never a hallucination rate.
+ */
+export const AccExtractionNotHallucinationParamsSchema = Type.Object(
+  {
+    slots: ContentSlotListSchema,
+    labels: ClaimLabelsSchema,
+    items: Type.Object({ hallucination: BilingualLabelListSchema }, { additionalProperties: false }),
+    extractionMetrics: Type.Array(MetricIdSchema, { minItems: 1, uniqueItems: true }),
+    claimSource: ClaimSourceSchema,
+  },
+  { additionalProperties: false },
+);
+export type AccExtractionNotHallucinationParams = Static<typeof AccExtractionNotHallucinationParamsSchema>;
+/**
+ * `ACC-CLASSIC-ML-METRIC` (W4-06b, plan section 3.3): the slots it may read, labels, the model-performance item and
+ * the metrics that match a classic-ML model (source spec: "that sheet's matching metric or N/A").
+ */
+export const AccClassicMlMetricParamsSchema = Type.Object(
+  {
+    slots: ContentSlotListSchema,
+    labels: ClaimLabelsSchema,
+    items: Type.Object({ classic_ml_performance: BilingualLabelListSchema }, { additionalProperties: false }),
+    matchingMetrics: Type.Array(MetricIdSchema, { minItems: 1, uniqueItems: true }),
+    claimSource: ClaimSourceSchema,
+  },
+  { additionalProperties: false },
+);
+export type AccClassicMlMetricParams = Static<typeof AccClassicMlMetricParamsSchema>;
 /** The fields every content rule's params share (the runner reads these before the rule runs). */
 export interface ContentRuleBaseParams {
   slots: number[];
@@ -284,6 +314,8 @@ export interface ContentRuleBaseParams {
 export const QC_RULE_PARAMS_SCHEMAS = Object.freeze({
   'PACK-STAGE-MISMATCH': StageMismatchParamsSchema,
   'ACC-METRIC-CITED': AccMetricCitedParamsSchema, // W4-06a
+  'ACC-EXTRACTION-NOT-HALLUCINATION': AccExtractionNotHallucinationParamsSchema, // W4-06b
+  'ACC-CLASSIC-ML-METRIC': AccClassicMlMetricParamsSchema, // W4-06b
 });
 export const QcRuleEntrySchema = Type.Object(
   {
