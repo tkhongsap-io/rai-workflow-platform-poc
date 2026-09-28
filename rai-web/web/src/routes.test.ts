@@ -33,3 +33,8 @@ test('operator route is additive and keeps its same-origin sign-in return path',
   assert.equal(ROUTES.queue, '/queue');
   assert.equal(ROUTES.cases, '/cases');
 });
+
+test('dashboard route is additive and survives sign-in (W6-15)', () => {
+  assert.equal(ROUTES.dashboard, '/dashboard');
+  assert.equal(safeReturnTo(ROUTES.dashboard), '/dashboard');
+});

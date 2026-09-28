@@ -168,3 +168,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w7-09-sign-in-method-endpoint model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #218)
 - Scope: per changes/2026-09-27-w7-09-sign-in-method-endpoint/: public `GET /auth/sign-in-method` (`fixture` | `google` | `organization`, no issuer, client or tenant value), the sign-in screen's provider button and note labelled from it, new th/en keys, W0-02 section 7.2 amendment. One PR.
+
+## 2026-09-28 07:08 — CLAIM lane-b: W6-15 Dashboard UI (#232)
+- Author: operator=ta session=claude-code-w6-15-dashboard-ui model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #232)
+- Scope: per changes/2026-09-27-w6-15-dashboard-ui/: the `/dashboard` screen over `GET /api/dashboard` (status, lanes and SLA, findings, QC, risk and activity tiles as captioned tables with aria-hidden bars), every non-zero countable number linked to its W6-14 queue drill-down, empty state, "Dashboard" first in the primary navigation, `dashboard.*` locale keys (th and en), browser `w6-15-dashboard.spec.ts`. One PR.

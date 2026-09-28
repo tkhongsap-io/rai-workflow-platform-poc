@@ -6,6 +6,8 @@ export const ROUTES = Object.freeze({
   signIn: '/sign-in',
   cases: '/cases',
   queue: '/queue',
+  /** W6-15: the desk dashboard (W6 plan section 9), for every signed-in role. */
+  dashboard: '/dashboard',
   operatorDeskHealth: '/operator/desk-health',
   newCase: '/cases/new',
   case: (caseId: string) => `/cases/${encodeURIComponent(caseId)}`,

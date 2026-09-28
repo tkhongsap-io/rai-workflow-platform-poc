@@ -8,6 +8,7 @@
 
 import { Value } from 'typebox/value';
 import { DeskHealthReportSchema, type DeskHealthReport } from '@rai/shared/schemas/observability';
+import { DashboardResponseSchema, type DashboardResponse } from '@rai/shared/schemas/dashboard';
 import {
   isErrorCode,
   type ErrorCode,
@@ -61,6 +62,7 @@ export const API_PATHS = Object.freeze({
   fixtureSignIn: '/auth/fixture/sign-in',
   cases: '/api/cases',
   queue: '/api/queue',
+  dashboard: '/api/dashboard', // W6-15 (W6-13 route)
   operatorDeskHealth: '/api/operator/desk-health',
   configuration: '/api/configuration/current',
   riskRubric: '/api/configuration/risk-rubric/current', // W5-07 (W5-02 route)
@@ -254,6 +256,12 @@ export function createApiClient(fetchImpl: FetchLike = (input, init) => fetch(in
     getDeskHealth: async (): Promise<DeskHealthReport> => {
       const report = await request<unknown>('GET', API_PATHS.operatorDeskHealth);
       if (!Value.Check(DeskHealthReportSchema, report)) throw new InvalidResponseError();
+      return report;
+    },
+    /** W6-15: the scoped dashboard counts (W6-13); the SPA never derives or filters a count itself. */
+    getDashboard: async (): Promise<DashboardResponse> => {
+      const report = await request<unknown>('GET', API_PATHS.dashboard);
+      if (!Value.Check(DashboardResponseSchema, report)) throw new InvalidResponseError();
       return report;
     },
     getQueue: (query: QueueQuery = {}) =>

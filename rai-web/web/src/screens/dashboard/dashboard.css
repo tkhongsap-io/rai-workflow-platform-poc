@@ -1,0 +1,99 @@
+/* W6-15: the dashboard tiles. A responsive grid; each table scrolls inside its own tile on a narrow screen, so the
+   page never scrolls sideways. Bars are decoration (aria-hidden); the number beside each bar is the text. */
+.dashboard-screen {
+  overflow-wrap: anywhere;
+}
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  margin-block-start: 1rem;
+}
+/* Three columns on a wide screen; a tile with many columns (lanes, findings, activity) takes two of them. */
+@media (min-width: 64rem) {
+  .dashboard-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .dashboard-tile-wide {
+    grid-column: span 2;
+  }
+}
+.dashboard-grid .card + .card {
+  margin-block-start: 0;
+}
+.dashboard-tile {
+  min-width: 0;
+}
+.dashboard-tile h2 {
+  font-size: 1.1rem;
+  margin: 0 0 0.5rem;
+}
+.dashboard-table {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.dashboard-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.dashboard-table caption {
+  text-align: start;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+  padding-block-end: 0.5rem;
+}
+.dashboard-table th,
+.dashboard-table td {
+  overflow-wrap: normal;
+  padding: 0.35rem 0.5rem;
+  border-block-end: 1px solid var(--border);
+  text-align: start;
+  vertical-align: top;
+}
+.dashboard-table thead th {
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--color-muted);
+  overflow-wrap: normal;
+}
+.dashboard-table tbody th,
+.dashboard-table tfoot th {
+  font-weight: 500;
+}
+.dashboard-table tfoot th,
+.dashboard-table tfoot td {
+  font-weight: 700;
+  border-block-end: 0;
+}
+.dashboard-num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.dashboard-num a {
+  display: inline-block;
+  min-width: 1.5rem;
+  font-weight: 600;
+  color: var(--color-link);
+}
+.dashboard-alert {
+  color: var(--danger-ink);
+}
+td.dashboard-alert a {
+  color: var(--danger-ink);
+}
+.dashboard-bar {
+  display: block;
+  inline-size: 100%;
+  min-inline-size: 3rem;
+  block-size: 0.4rem;
+  margin-block-start: 0.25rem;
+  background: var(--surface-alt);
+  border-radius: var(--radius-sm);
+}
+.dashboard-bar > span {
+  display: block;
+  block-size: 100%;
+  background: var(--color-link);
+  border-radius: var(--radius-sm);
+}
