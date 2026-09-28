@@ -136,7 +136,7 @@ test('fail closed before reading: unknown rule, wrong trigger, bad params, model
     assert.deepEqual(extracted, [], name);
     assert.equal(reads.size, 0, name);
   }
-  // The seeded approve-attempt selection lists the ACC-* rules W4-06b-c implement later; until then the runner
+  // The seeded llm approve-attempt selection lists ACC-BAND-V1-SHEET3, which W4-06c implements; until then the runner
   // refuses to vouch for a shorter result.
   const seeded = await run({ rules: seededRules('approve_attempt') });
   assert.deepEqual(outcome(seeded.result), { reason: 'runner_error', detail: 'unknown_content_rule' });

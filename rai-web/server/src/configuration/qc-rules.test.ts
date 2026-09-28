@@ -2,7 +2,11 @@
 // Beyond the shared schema, a template may not list one rule ID twice and `params` are checked per rule ID.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ACC_METRIC_CITED_PARAMS } from './seed.js';
+import {
+  ACC_CLASSIC_ML_METRIC_PARAMS,
+  ACC_EXTRACTION_NOT_HALLUCINATION_PARAMS,
+  ACC_METRIC_CITED_PARAMS,
+} from './seed.js';
 import { ConfigurationBodyInvalid, validateConfigurationBody } from './store.js';
 
 const stageParams = { attachedForbiddenAt: { idea: [8] }, notYetForbiddenAt: { pre_launch: [1, 2, 3] } };
@@ -140,4 +144,47 @@ test('W4-06a: ACC-METRIC-CITED params are required and schema-checked (slots, bi
         error instanceof ConfigurationBodyInvalid && /ACC-METRIC-CITED.*params/.test(error.message),
       name,
     );
+});
+
+test('W4-06b: ACC-EXTRACTION-NOT-HALLUCINATION and ACC-CLASSIC-ML-METRIC params are required and schema-checked', () => {
+  const cases: Array<[string, string, Record<string, unknown>]> = [
+    ['ACC-EXTRACTION-NOT-HALLUCINATION', 'extractionMetrics', ACC_EXTRACTION_NOT_HALLUCINATION_PARAMS],
+    ['ACC-CLASSIC-ML-METRIC', 'matchingMetrics', ACC_CLASSIC_ML_METRIC_PARAMS],
+  ];
+  for (const [ruleId, metrics, seeded] of cases) {
+    const entry = { ruleId, engine: 'content', triggers: ['approve_attempt'], severity: 'medium' };
+    const valid = structuredClone(seeded);
+    const ok = (params: unknown) =>
+      assert.doesNotThrow(() => validateConfigurationBody('qc_rules', body([{ ...entry, params }])), ruleId);
+    ok(valid);
+    ok({ ...valid, claimSource: 'grammar+model' });
+    refused(body([entry]), new RegExp(`${ruleId}.*params`));
+    const [item] = Object.keys(valid['items'] as Record<string, unknown>);
+    for (const [name, patch] of [
+      ['slot 9', (p) => (p['slots'] = [9])],
+      ['no slot', (p) => (p['slots'] = [])],
+      ['an unknown claim source', (p) => (p['claimSource'] = 'model')],
+      ['a metric that is not a key', (p) => (p[metrics] = ['Extraction Accuracy'])],
+      ['no metric', (p) => (p[metrics] = [])],
+      ['a repeated metric', (p) => (p[metrics] = ['f1', 'f1'])],
+      ['no metric list', (p) => delete p[metrics]],
+      ["the other rule's metric list", (p) => (p['acceptedMetrics'] = ['accuracy'])],
+      ['a missing item', (p) => delete (p['items'] as Record<string, unknown>)[item!]],
+      [
+        'an unknown item',
+        (p) => ((p['items'] as Record<string, unknown>)['accuracy'] = { en: ['a'], th: ['ก'] }),
+      ],
+      ['no labels', (p) => delete p['labels']],
+      ['an unknown key', (p) => (p['note'] = 'x')],
+    ] as Array<[string, (p: Record<string, unknown>) => void]>) {
+      const params = structuredClone(valid);
+      patch(params);
+      assert.throws(
+        () => validateConfigurationBody('qc_rules', body([{ ...entry, params }])),
+        (error: unknown) =>
+          error instanceof ConfigurationBodyInvalid && new RegExp(`${ruleId}.*params`).test(error.message),
+        `${ruleId}: ${name}`,
+      );
+    }
+  }
 });

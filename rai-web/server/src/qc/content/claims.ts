@@ -178,6 +178,12 @@ const UNIT_WORDS: Readonly<Record<string, ValueUnit>> = Object.freeze({
   count: 'count',
 });
 
+/** The unit a claim's `unit` field names (`%`, `percent`, `ratio`, `count`), or null when it names none. */
+export function statedUnitOf(unitText: string | undefined): ValueUnit | null {
+  const word = unitText === undefined ? undefined : normaliseLabel(unitText);
+  return word !== undefined && Object.hasOwn(UNIT_WORDS, word) ? UNIT_WORDS[word]! : null;
+}
+
 /**
  * A stated value as a decimal string and a unit: `%` → `percent`; a bare number → the stated `unit` field when it
  * names one, else `ratio` if it is at most 1 and has a decimal point, else `count`. Null when it is not a number.
@@ -188,9 +194,8 @@ export function parseValue(text: string, unitText?: string): { decimal: string; 
   const decimal = parseDecimal(percent === null ? trimmed : percent[1]!);
   if (decimal === null) return null;
   if (percent !== null) return { decimal, unit: 'percent' };
-  const unitWord = unitText === undefined ? undefined : normaliseLabel(unitText);
-  if (unitWord !== undefined && Object.hasOwn(UNIT_WORDS, unitWord))
-    return { decimal, unit: UNIT_WORDS[unitWord]! };
+  const stated = statedUnitOf(unitText);
+  if (stated !== null) return { decimal, unit: stated };
   const ratio = trimmed.includes('.') && !decimal.startsWith('-') && compareDecimal(decimal, '1') <= 0;
   return { decimal, unit: ratio ? 'ratio' : 'count' };
 }
