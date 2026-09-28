@@ -33,6 +33,10 @@ W0-W3 are authorized and have recorded synthetic engineering evidence. The [W3 e
 | L11 | A01 local vs network identity |
 | L12 | A08, A10 versioned configuration |
 
+## Evidence lines
+
+- **A01 network clause (W7-08, 2026-09-28).** A01 network clause on loopback in `network` mode; no non-loopback bind performed (D10). [`tests/integration/w7-08-network-a01.test.ts`](../rai-web/tests/integration/w7-08-network-a01.test.ts) runs the desk with source `allow-list`, a stub OIDC issuer and exchange (no provider call), real Postgres and real HTTP, and shows: readiness `network` with a loopback bind and no fixture routes; allow-listed accounts sign in with exactly their listed roles and a `__Host-` `Secure` session cookie; an unlisted verified email is 403 (`not_allow_listed`, audited, no session) and an unverified email is refused; the fixture-mode per-role direct-URL and API negatives (other owner's case, other BU, another lane, Admin approval, out-of-scope artifact download) answer the same 401/403/404 codes; an allow-list change applies at the next sign-in, not to a live session; the cross-site guard refuses a write; an `http` base URL exits 78 `base_url_not_https`. Synthetic engineering evidence only; not PoC acceptance, and the `ad` source and `production` (L4) stay W8.
+
 ## Cross-cutting negative cases
 
 Before release, test unauthorized artifact download, cross-BU access, malicious documents and prompt injection, unsupported template version, concurrent final approvals with new findings, mail replay, config tampering, audit tampering, inaccessible evidence, and backup restoration. No model output may approve a lane or grant permissions. Upload security checks can reject unsafe files; that is distinct from soft document-quality QC. See [threat model](security/threat-model.md) and [evaluation](evaluation/plan.md).

@@ -116,3 +116,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w7-02-restore-and-verify model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #216)
 - Scope: per changes/2026-09-27-w7-02-restore-and-verify/: `npm run restore` (`operator/restore.ts`) and `npm run restore:verify` (`operator/restore-verify.ts`, checks `journal`, `counts`, `frozen_digest`, `manifest_hashes`, `blobs`, `a07_frozen_slot`, `a11_audit`, `grants`), `config.ts` `DATABASE_ADMIN_URL` (`parseRestoreConfig`), W0-10 operator restore events, `.env.example`, the CI integration-job `DATABASE_ADMIN_URL` line (lead-reviewed), W0-02 section 5 key, W0-04 restore recipe, TESTING. One PR; no migration.
+
+## 2026-09-28 — CLAIM lane-c: W7-08 A01 network clause suite (#233)
+- Author: operator=ta session=claude-code-w7-08-a01-network-clause-suite model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #233)
+- Scope: per changes/2026-09-27-w7-08-a01-network-clause-suite/: `rai-web/tests/integration/w7-08-network-a01.test.ts` with `rai-web/tests/support/network-sign-in.ts` (W7 plan section 5.2 items 1-7 on loopback in `network` mode, allow-list source, stub OIDC discovery and exchange seams; no non-loopback bind, no provider call), a `start.test.ts` network start case, the `docs/acceptance.md` A01 evidence line, W0-03 ID-16 evidence pointer and the threat-model W7-08 link. One PR; no migration, no product code.
