@@ -7,6 +7,7 @@ import {
   ACC_EXTRACTION_NOT_HALLUCINATION_PARAMS,
   ACC_METRIC_CITED_PARAMS,
   CONFIGURATION_SEED,
+  PACK_CONTRADICTION_PARAMS,
   SEED_KINDS,
   UNSEEDED_KINDS,
 } from './seed.js';
@@ -60,6 +61,7 @@ test('qc_rules revision 1 (w4a.1) catalogues both template versions; v2.0 has no
     ['ACC-EXTRACTION-NOT-HALLUCINATION', 'content', 'approve_attempt', 'high'],
     ['ACC-BAND-V1-SHEET3', 'content', 'approve_attempt', 'high'],
     ['ACC-CLASSIC-ML-METRIC', 'content', 'approve_attempt', 'medium'],
+    ['PACK-CONTRADICTION', 'content', 'submit', 'medium'], // W4-06d
   ]);
   assert.deepEqual(
     rows('v2.0'),
@@ -105,6 +107,19 @@ test('qc_rules revision 1 (w4a.1) catalogues both template versions; v2.0 has no
     ['high', 'medium', 'low'],
   );
   assert.ok(!qc.templates['v2.0']!.rules.some((r) => r.ruleId === 'ACC-BAND-V1-SHEET3'));
+  // W4-06d (plan section 3.3; WA-D09, provisional): PACK-CONTRADICTION carries its params in both templates: slots 2
+  // and 5, the two seeded facts, each read from both slots, English and Thai keywords, grammar only.
+  for (const template of Object.values(qc.templates)) {
+    const entry = template.rules.find((r) => r.ruleId === 'PACK-CONTRADICTION');
+    assert.deepEqual(entry?.params, PACK_CONTRADICTION_PARAMS);
+  }
+  assert.deepEqual(PACK_CONTRADICTION_PARAMS.slots, [2, 5]);
+  assert.equal(PACK_CONTRADICTION_PARAMS.claimSource, 'grammar');
+  assert.deepEqual(PACK_CONTRADICTION_PARAMS.facts, [
+    { id: 'personal_data', slots: [2, 5] },
+    { id: 'external_vendor', slots: [2, 5] },
+  ]);
+  assert.deepEqual(Object.keys(PACK_CONTRADICTION_PARAMS.items), ['personal_data', 'external_vendor']);
   const stage = qc.templates['v2.0']!.rules.find((r) => r.ruleId === 'PACK-STAGE-MISMATCH');
   assert.deepEqual(stage?.params, {
     attachedForbiddenAt: { idea: [8] },

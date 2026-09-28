@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { IMPLEMENTED_RULES } from '@rai/shared/qc/rule-registry';
 import { CONFIGURATION_SEED } from '../configuration/seed.js';
+import { CONTENT_RULES } from './content/rules/index.js';
 import { METADATA_RULES } from './deterministic/rules/index.js';
 
 const entries = Object.entries(IMPLEMENTED_RULES);
@@ -16,15 +17,15 @@ test("the registry's metadata entries equal METADATA_RULES, rule for rule and tr
     assert.deepEqual([...rule.triggers].sort(), [...METADATA_RULES[id]!.triggers].sort(), id);
 });
 
-test('the four catalogued ACC-* rules are listed as content rules until W4b implements them', () => {
-  const content = entries.filter(([, rule]) => rule.engine === 'content').map(([id]) => id);
-  for (const id of [
-    'ACC-METRIC-CITED',
-    'ACC-EXTRACTION-NOT-HALLUCINATION',
-    'ACC-BAND-V1-SHEET3',
-    'ACC-CLASSIC-ML-METRIC',
-  ])
-    assert.ok(content.includes(id), `${id} is a content rule`);
+// W4-06d (W4b plan section 3.3, "Implemented-rule registry"): W6-03 merged first, so W4-06d adds PACK-CONTRADICTION
+// and this test: the registry's `content` entries are exactly the rules the content runner implements, with the
+// triggers each is defined for.
+test("the registry's content entries equal CONTENT_RULES, rule for rule and trigger for trigger", () => {
+  const content = entries.filter(([, rule]) => rule.engine === 'content');
+  assert.deepEqual(content.map(([id]) => id).sort(), Object.keys(CONTENT_RULES).sort());
+  for (const [id, rule] of content)
+    assert.deepEqual([...rule.triggers].sort(), [...CONTENT_RULES[id]!.triggers].sort(), id);
+  assert.deepEqual(IMPLEMENTED_RULES['PACK-CONTRADICTION'], { engine: 'content', triggers: ['submit'] });
 });
 
 test('ACC-BAND-V1-SHEET3 is isolated to the v1.0 Sheet-3 template (L12); no other rule is restricted', () => {

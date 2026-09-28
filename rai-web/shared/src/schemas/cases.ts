@@ -335,6 +335,55 @@ export const AccBandV1Sheet3ParamsSchema = Type.Object(
   { additionalProperties: false },
 );
 export type AccBandV1Sheet3Params = Static<typeof AccBandV1Sheet3ParamsSchema>;
+/** A pack fact's ID: a message-param key and a claim key (decision 30), e.g. `personal_data`. */
+const FactIdSchema = Type.String({ pattern: '^[a-z][a-z0-9_]{0,63}$' });
+/**
+ * `PACK-CONTRADICTION` (W4-06d, plan section 3.3): the slots it may read, labels, the keywords of each pack fact
+ * (`items`, keyed by fact ID) and the facts it compares, each with the slots whose artifacts state it (at least two).
+ * `packContradictionParamsProblems` checks what the schema cannot: every fact once, with keywords, on read slots only.
+ */
+export const PackContradictionParamsSchema = Type.Object(
+  {
+    slots: ContentSlotListSchema,
+    labels: ClaimLabelsSchema,
+    items: Type.Record(FactIdSchema, BilingualLabelListSchema, { minProperties: 1, maxProperties: 16 }),
+    facts: Type.Array(
+      Type.Object(
+        {
+          id: FactIdSchema,
+          slots: Type.Array(Type.Integer({ minimum: 1, maximum: 8 }), { minItems: 2, uniqueItems: true }),
+        },
+        { additionalProperties: false },
+      ),
+      { minItems: 1, maxItems: 16 },
+    ),
+    claimSource: ClaimSourceSchema,
+  },
+  { additionalProperties: false },
+);
+export type PackContradictionParams = Static<typeof PackContradictionParamsSchema>;
+
+/**
+ * The cross-field checks of `PACK-CONTRADICTION` params that passed their schema: a fact listed once, with keywords
+ * in `items`, read only from slots the rule reads (`slots`); no keywords for an unlisted fact. Empty when consistent.
+ * Publishing refuses a problem (`qcRulesBodyProblems`), and the content runner treats one as invalid params.
+ */
+export function packContradictionParamsProblems(params: PackContradictionParams): string[] {
+  const problems: string[] = [];
+  const seen = new Set<string>();
+  const read = new Set(params.slots);
+  for (const fact of params.facts) {
+    if (seen.has(fact.id)) problems.push(`fact ${fact.id} is listed twice`);
+    seen.add(fact.id);
+    if (!Object.hasOwn(params.items, fact.id)) problems.push(`fact ${fact.id} has no keywords`);
+    for (const slot of fact.slots)
+      if (!read.has(slot)) problems.push(`fact ${fact.id} reads slot ${slot}, which the rule does not read`);
+  }
+  for (const id of Object.keys(params.items))
+    if (!seen.has(id)) problems.push(`keywords ${id} belong to no fact`);
+  return problems;
+}
+
 /** The fields every content rule's params share (the runner reads these before the rule runs). */
 export interface ContentRuleBaseParams {
   slots: number[];
@@ -349,6 +398,7 @@ export const QC_RULE_PARAMS_SCHEMAS = Object.freeze({
   'ACC-EXTRACTION-NOT-HALLUCINATION': AccExtractionNotHallucinationParamsSchema, // W4-06b
   'ACC-CLASSIC-ML-METRIC': AccClassicMlMetricParamsSchema, // W4-06b
   'ACC-BAND-V1-SHEET3': AccBandV1Sheet3ParamsSchema, // W4-06c
+  'PACK-CONTRADICTION': PackContradictionParamsSchema, // W4-06d
 });
 export const QcRuleEntrySchema = Type.Object(
   {
@@ -399,6 +449,10 @@ export function qcRulesBodyProblems(body: Static<typeof QcRulesBodySchema>): str
         if (rule.params !== undefined) problems.push(`${at} ${rule.ruleId} takes no params`);
       } else if (!Value.Check(schema, rule.params)) {
         problems.push(`${at} ${rule.ruleId} params do not match its schema`);
+      } else if (rule.ruleId === 'PACK-CONTRADICTION') {
+        const params = rule.params as unknown as PackContradictionParams;
+        for (const problem of packContradictionParamsProblems(params))
+          problems.push(`${at} ${rule.ruleId} params: ${problem}`);
       }
     }
   }

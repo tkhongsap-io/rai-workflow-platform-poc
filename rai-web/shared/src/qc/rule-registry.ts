@@ -6,8 +6,8 @@
 // triggers), so the two cannot drift.
 //
 // The content rules are the four the W4a catalogue lists for W4b (W4a plan section 4), with that catalogue's
-// triggers, until W4b implements them and replaces these entries in the same PR. `PACK-CONTRADICTION` (W4-06d) and
-// `RISK-TIER-UNKNOWN` (W5-10) join in the PR that lands them or, if this one merges second, here (W6 plan 11.2).
+// triggers, and `PACK-CONTRADICTION`, added by W4-06d (W6-03 merged first); the server test also asserts the
+// `content` entries equal `CONTENT_RULES`. `RISK-TIER-UNKNOWN` (W5-10) joins in the PR that lands it (W6 plan 11.2).
 import type { QcRuleEngine } from '../schemas/cases.js';
 import type { QcTrigger } from './types.js';
 
@@ -37,4 +37,6 @@ export const IMPLEMENTED_RULES: Readonly<Record<string, ImplementedRule>> = Obje
   // The v1.0 Sheet-3 bands never apply to another template version (source spec, L12).
   'ACC-BAND-V1-SHEET3': rule('content', ['approve_attempt'], ['v1.0 Sheet3']),
   'ACC-CLASSIC-ML-METRIC': rule('content', ['approve_attempt']),
+  // W4-06d: the pack facts of slots 2 and 5, read on submit (W4b plan section 3.3).
+  'PACK-CONTRADICTION': rule('content', ['submit']),
 });

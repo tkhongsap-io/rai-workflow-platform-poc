@@ -3,9 +3,9 @@
 // findings (rule, owning lane, scope slot, evidence locators) of every content rule it implements on every upload and
 // on every lane's approve attempt, and its content part is unavailable exactly where the labels say so. W4-06b extends
 // it from ACC-METRIC-CITED to ACC-EXTRACTION-NOT-HALLUCINATION and ACC-CLASSIC-ML-METRIC (so the classic_ml cases are
-// compared too), and W4-06c to ACC-BAND-V1-SHEET3 (the v1.0 band cases and the v2.0 cases, which never select it);
-// PACK-CONTRADICTION (W4-06d) is left out of the selection and of the labels until it exists. The full per-rule
-// grading is the W4-08a harness.
+// compared too), and W4-06c to ACC-BAND-V1-SHEET3 (the v1.0 band cases and the v2.0 cases, which never select it).
+// W4-06d adds PACK-CONTRADICTION, so every submit run is compared as well (its fact, the claim key, included). The
+// full per-rule grading is the W4-08a harness.
 // Test-only (excluded from the set hash by its suffix). Synthetic documents only; nothing is written.
 
 import { test } from 'node:test';
@@ -25,7 +25,7 @@ import { renderDocument } from './render.js';
 import { readAllLabels } from './labels.js';
 import type { EvalCase, LabelFinding, LabelRun } from './types.js';
 
-/** The content rules the runner implements today (W4-06a: ACC-METRIC-CITED; W4-06b and W4-06c: three more). */
+/** The content rules the runner implements (W4-06a: ACC-METRIC-CITED; W4-06b-c: three more; W4-06d: the pack rule). */
 const IMPLEMENTED = new Set(Object.keys(CONTENT_RULES));
 
 const inProcess: Extractor = {
@@ -108,12 +108,13 @@ function requestFor(evalCase: EvalCase, run: LabelRun): QcRunRequest {
   };
 }
 
-const shapeOf = (f: Pick<LabelFinding, 'ruleId' | 'owningLane' | 'scope' | 'evidence'>) =>
+const shapeOf = (f: Pick<LabelFinding, 'ruleId' | 'owningLane' | 'scope' | 'evidence' | 'fact'>) =>
   JSON.stringify({
     ruleId: f.ruleId,
     owningLane: f.owningLane,
     slot: 'slot' in f.scope ? f.scope.slot : null,
     evidence: f.evidence,
+    fact: f.fact ?? null, // PACK-CONTRADICTION: the labelled fact is the finding's claim key (decision 30)
   });
 
 test('the content runner reproduces every labelled finding of its implemented rules, and every outage, on the dev split', async () => {
@@ -122,17 +123,18 @@ test('the content runner reproduces every labelled finding of its implemented ru
     'ACC-CLASSIC-ML-METRIC',
     'ACC-EXTRACTION-NOT-HALLUCINATION',
     'ACC-METRIC-CITED',
+    'PACK-CONTRADICTION',
   ]);
   const labels = readAllLabels();
   let compared = 0;
   let fired = 0;
   const byRule = new Map<string, number>();
   let classic = 0;
+  let submits = 0;
   for (const evalCase of EVAL_CASES) {
     const caseLabels = labels.get(evalCase.caseId);
     assert.ok(caseLabels, evalCase.caseId);
     for (const run of caseLabels.runs) {
-      if (run.trigger === 'submit') continue; // no implemented rule is a submit rule (PACK-CONTRADICTION is W4-06d)
       const request = requestFor(evalCase, run);
       if (request.rules?.length === 0) continue; // nothing implemented is selected (never, since W4-06b)
       const where = `${evalCase.caseId} ${run.trigger} ${run.trigger === 'upload' ? `slot ${run.slot}` : run.lane}`;
@@ -155,6 +157,9 @@ test('the content runner reproduces every labelled finding of its implemented ru
             slot: e.slot!,
             locator: e.locator as LabelFinding['evidence'][number]['locator'],
           })),
+          ...(f.ruleId === 'PACK-CONTRADICTION' && f.claimKey !== undefined
+            ? { fact: f.claimKey as NonNullable<LabelFinding['fact']> }
+            : {}),
         }),
       );
       const labelled = expected.findings.filter((f) => IMPLEMENTED.has(f.ruleId));
@@ -163,6 +168,7 @@ test('the content runner reproduces every labelled finding of its implemented ru
       assert.deepEqual(got.sort(), want.sort(), where);
       compared += 1;
       if (evalCase.modelType === 'classic_ml') classic += 1;
+      if (run.trigger === 'submit') submits += 1;
       fired += got.length;
     }
   }
@@ -174,4 +180,7 @@ test('the content runner reproduces every labelled finding of its implemented ru
   assert.ok((byRule.get('ACC-CLASSIC-ML-METRIC') ?? 0) >= 2, 'classic-ML rule reproduced');
   // W4-06c: the band rule is exercised by the labels (equal and above for each tier, and a missing tier).
   assert.ok((byRule.get('ACC-BAND-V1-SHEET3') ?? 0) >= 7, 'band rule reproduced');
+  // W4-06d: the pack rule is exercised by the labels (ev-dev-14: one fact, ev-dev-15: both facts).
+  assert.equal(byRule.get('PACK-CONTRADICTION'), 3, 'pack contradiction reproduced');
+  assert.ok(submits >= 20, `${submits} submit runs compared`);
 });

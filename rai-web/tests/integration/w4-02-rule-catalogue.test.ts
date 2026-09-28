@@ -146,6 +146,7 @@ describe(`W4-02 rule catalogue — ${SET}`, () => {
       'PACK-SLOT-MISSING',
       'PACK-STAGE-MISMATCH',
       'PACK-NA-VENDOR-DOC',
+      'PACK-CONTRADICTION', // W4-06d: the submit content rule (the deterministic runner skips it)
     ]);
     await runAndPersistLaneQc(deps, { ...vendor.input, lane: 'dpo' });
     // v2.0 never inherits the v1.0 Sheet-3 bands.

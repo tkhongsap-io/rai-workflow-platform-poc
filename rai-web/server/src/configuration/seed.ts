@@ -25,6 +25,7 @@ import type {
   AccExtractionNotHallucinationParams,
   AccMetricCitedParams,
   ClaimLabels,
+  PackContradictionParams,
   ConfigurationBodies,
   SeedableConfigurationKind,
 } from '@rai/shared/schemas/cases';
@@ -149,6 +150,25 @@ export const ACC_BAND_V1_SHEET3_PARAMS: AccBandV1Sheet3Params = {
   claimSource: 'grammar',
 };
 
+/**
+ * W4-06d (W4b plan section 3.3; WA-D09, provisional): `PACK-CONTRADICTION` reads slots 2 (privacy checklist) and 5
+ * (BRD) on submit and compares the two seeded pack facts across them. The keywords are the dev vocabulary's
+ * (fixtures/src/evaluation/vocabulary.ts) in English and Thai; the D09 owners retune facts and keywords as configuration.
+ */
+export const PACK_CONTRADICTION_PARAMS: PackContradictionParams = {
+  slots: [2, 5],
+  labels: CLAIM_LABELS,
+  items: {
+    personal_data: { en: ['personal data'], th: ['ข้อมูลส่วนบุคคล'] },
+    external_vendor: { en: ['external vendor'], th: ['ผู้ให้บริการภายนอก'] },
+  },
+  facts: [
+    { id: 'personal_data', slots: [2, 5] },
+    { id: 'external_vendor', slots: [2, 5] },
+  ],
+  claimSource: 'grammar',
+};
+
 const W4B_CONTENT_RULES: readonly QcRule[] = [
   {
     ruleId: 'ACC-METRIC-CITED',
@@ -177,6 +197,13 @@ const W4B_CONTENT_RULES: readonly QcRule[] = [
     triggers: ['approve_attempt'],
     severity: 'medium',
     params: ACC_CLASSIC_ML_METRIC_PARAMS, // W4-06b: with its params schema (plan 3.3)
+  },
+  {
+    ruleId: 'PACK-CONTRADICTION',
+    engine: 'content',
+    triggers: ['submit'],
+    severity: 'medium',
+    params: PACK_CONTRADICTION_PARAMS, // W4-06d: with its params schema (plan 3.3), in both templates
   },
 ];
 const V1_SHEET3_RULES = [...W4A_METADATA_RULES, ...W4B_CONTENT_RULES];
