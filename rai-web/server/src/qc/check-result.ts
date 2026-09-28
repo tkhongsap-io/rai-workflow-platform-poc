@@ -53,14 +53,20 @@ export function checkedResult(result: QcRunResult, request: QcRunRequest, stamp:
   return result;
 }
 
-/** Calls the runner under the deadline and checks its result; a throw is `runner_error`, the deadline `timeout`. */
+/**
+ * Calls the runner under the deadline and checks its result; a throw is `runner_error`, the deadline `timeout`.
+ * W4-05a: `revoke` (the request's artifact-handle revocation) runs when the deadline aborts the signal, even if the
+ * runner ignores it and has not settled, and again once the runner settles; it must be idempotent.
+ */
 export async function callRunner(
   runner: QcRunner,
   request: QcRunRequest,
   stamp: Date,
   timeoutMs: number,
+  revoke?: () => void,
 ): Promise<QcRunResult> {
   const controller = new AbortController();
+  if (revoke !== undefined) controller.signal.addEventListener('abort', revoke, { once: true });
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return checkedResult(await runner.run(request, controller.signal), request, stamp);
@@ -68,5 +74,9 @@ export async function callRunner(
     return unavailableResult(controller.signal.aborted ? 'timeout' : 'runner_error', null, stamp);
   } finally {
     clearTimeout(timer);
+    if (revoke !== undefined) {
+      controller.signal.removeEventListener('abort', revoke);
+      revoke();
+    }
   }
 }

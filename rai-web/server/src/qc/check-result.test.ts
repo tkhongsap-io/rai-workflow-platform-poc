@@ -139,3 +139,59 @@ test('callRunner checks the result, and maps a throw to runner_error and the dea
   assert.equal(aborted, true);
   assert.deepEqual(slow, unavailableResult('timeout', null, STAMP));
 });
+
+test('callRunner revokes when the deadline fires, before a runner that ignores the abort settles, and once it settles (W4-05a)', async () => {
+  const findings = await validFindings();
+  const settled: string[] = [];
+  let revokes = 0;
+  const onRevoke = (): void => {
+    revokes += 1;
+    settled.push(`revoke:${revokes}`);
+  };
+  const ok = await callRunner(
+    runnerOf(() => Promise.resolve(completed(findings))),
+    request,
+    STAMP,
+    1000,
+    onRevoke,
+  );
+  assert.equal(ok.status, 'completed');
+  assert.equal(revokes, 1, 'revoked once the runner settled');
+
+  revokes = 0;
+  settled.length = 0;
+  let release: () => void = () => undefined;
+  const late = await callRunner(
+    runnerOf(
+      () =>
+        new Promise<QcRunResult>((resolve) => {
+          // Ignores the abort; settles only after the test has seen the deadline revoke.
+          release = () => resolve(completed(findings));
+          setTimeout(() => {
+            settled.push('runner');
+            release();
+          }, 60);
+        }),
+    ),
+    request,
+    STAMP,
+    20,
+    onRevoke,
+  );
+  void late; // what a late result becomes is out of scope here (see review.md, deferred)
+  assert.deepEqual(
+    settled.slice(0, 2),
+    ['revoke:1', 'runner'],
+    'the deadline revoked before the runner settled',
+  );
+
+  revokes = 0;
+  await callRunner(
+    runnerOf(() => Promise.reject(new Error('boom'))),
+    request,
+    STAMP,
+    1000,
+    onRevoke,
+  );
+  assert.equal(revokes, 1, 'revoked after a throw');
+});

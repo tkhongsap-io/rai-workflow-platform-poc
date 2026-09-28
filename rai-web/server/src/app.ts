@@ -58,7 +58,7 @@ export interface IdentityDeps {
 
 /** What buildApp injects into every route group, so no group can hold a different database or clock. */
 type Injected = 'db' | 'now' | 'emitter' | 'errors';
-type QcBinding = Pick<QcOrchestratorDeps, 'runner' | 'timeoutMs'>;
+type QcBinding = Pick<QcOrchestratorDeps, 'runner' | 'blobs' | 'timeoutMs'>; // W4-05a: `blobs` backs read()
 
 export interface AppDeps {
   /** The database every route group reads. Absent only in substrate tests that register no such group. */
