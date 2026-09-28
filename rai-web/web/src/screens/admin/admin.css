@@ -123,3 +123,63 @@
 .admin-status:empty {
   display: none;
 }
+/* W6-06: the simple-kind editors. Fields stack on a narrow screen; a row's Remove stays beside its field. */
+.admin-editor h3 {
+  font-size: 1rem;
+  margin: 1.25rem 0 0.25rem;
+}
+.admin-editor h4 {
+  font-size: 0.95rem;
+  margin: 1rem 0 0.5rem;
+}
+.admin-editor-fieldset {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin: 0.75rem 0;
+  min-width: 0;
+  padding: 0.75rem;
+}
+.admin-editor-fieldset legend {
+  font-weight: 600;
+  padding: 0 0.25rem;
+}
+.admin-editor-sla {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+}
+.admin-editor-sla .field {
+  min-width: 9rem;
+}
+.admin-editor-list {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+}
+.admin-editor-row {
+  margin-block-end: 0.5rem;
+}
+.admin-editor-row label {
+  display: block;
+  font-size: 0.85rem;
+}
+.admin-editor-row-controls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.admin-editor-row-controls input {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 28rem;
+}
+.admin-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-block: 0.75rem 0.25rem;
+}
+.admin-problems {
+  margin: 0;
+  padding-inline-start: 1.1rem;
+}

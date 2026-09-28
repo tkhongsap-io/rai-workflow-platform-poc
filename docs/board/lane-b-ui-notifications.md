@@ -183,3 +183,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w5-09-tier-on-queue-and model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #239)
 - Scope: per changes/2026-09-27-w5-09-tier-on-queue-and/: `riskTier?` (optional) on `CaseSummary` and so `QueueItem`; the real server serves it on `GET /api/cases` and `GET /api/queue` (one column, scope unchanged); a tier chip on each queue and case-list card, no chip when absent or null; placeholder banner; `risk.*` locale keys. No filter (W6-14/W6-16), no substitute edit. One PR.
+
+## 2026-09-28 10:30 — CLAIM lane-b: W6-06 Admin UI: simple-kind editors, draft and publish (#249)
+- Author: operator=ta session=claude-code-w6-06-admin-ui-simple-kind model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #249)
+- Scope: per changes/2026-09-27-w6-06-admin-ui-simple-kind/: editors on the Admin kind page for `sla`, `calendar`, `use_case_groups`, `operator_recipients` and `checklist_templates` (`screens/admin/editors/{sla,calendar,list,recipients}-editor.tsx`), save draft with the server's problems shown, discard, start again from the revision in force, `publish-dialog.tsx` with a required change note, 409 `configuration_changed` reload, `admin.config.*` locale keys (th and en), browser `w6-06-admin-edit-publish.spec.ts`. One PR.
