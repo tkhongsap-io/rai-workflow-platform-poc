@@ -576,3 +576,69 @@ test('W7-07 BU directory: a local-google role map adds its bu_spoc business unit
     await rm(root, { recursive: true, force: true });
   }
 });
+
+// W7-08 (W7 plan section 5.2): the A01 network clause runs its sign-in and authorization items against the real
+// Postgres in tests/integration/w7-08-network-a01.test.ts, which the OBS15 policy keeps away from start.ts. This case
+// is the startServer half: `network` / `allow-list` on loopback with an https base URL, TRUST_PROXY and the two seams
+// starts, reports network readiness with a loopback bind, mounts no fixture route, and begins a sign-in against the
+// synthetic issuer with the `__Host-` transaction cookie. No Postgres (the database is unreachable here), no provider.
+test('W7-08: startServer in network mode on loopback reports network readiness, has no fixture routes and begins an OIDC sign-in', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'rai-w7-08-start-'));
+  try {
+    const port = await freePort();
+    let exchanged = 0;
+    const server = await startServer(
+      {
+        ...networkAllowListEnv(port),
+        HOST: '127.0.0.1',
+        PUBLIC_BASE_URL: 'https://desk.rai-desk.test',
+        TRUST_PROXY: 'true',
+        MAIL_MODE: 'sink-file',
+        MAIL_SINK_DIR: path.join(root, 'mail'),
+        BLOB_DIR: path.join(root, 'blobs'),
+      },
+      {
+        exit,
+        discovery: () =>
+          Promise.resolve({
+            issuer: 'https://idp.rai-desk.test',
+            authorization_endpoint: 'https://idp.rai-desk.test/authorize',
+            token_endpoint: 'https://127.0.0.1:1/token', // never reached
+          }),
+        exchange: () => {
+          exchanged += 1;
+          return Promise.resolve(undefined);
+        },
+      },
+    );
+    try {
+      const origin = `http://127.0.0.1:${port}`;
+      const proxied = { 'x-forwarded-proto': 'https' };
+      const ready = (await (await fetch(`${origin}/readyz`, { headers: proxied })).json()) as {
+        identity: unknown;
+      };
+      assert.deepEqual(ready.identity, { mode: 'network', loopbackBind: true, status: 'ok' });
+      for (const [method, url] of [
+        ['GET', '/auth/fixture/users'],
+        ['POST', '/auth/fixture/sign-in'],
+      ] as const)
+        assert.equal((await fetch(`${origin}${url}`, { method, headers: proxied })).status, 404, url);
+      const begin = await fetch(`${origin}/auth/sign-in`, {
+        method: 'POST',
+        headers: { ...proxied, 'content-type': 'application/json' },
+        body: '{}',
+      });
+      assert.equal(begin.status, 200);
+      const redirect = new URL(((await begin.json()) as { redirectUrl: string }).redirectUrl);
+      assert.equal(`${redirect.origin}${redirect.pathname}`, 'https://idp.rai-desk.test/authorize');
+      assert.equal(redirect.searchParams.get('redirect_uri'), 'https://desk.rai-desk.test/auth/callback');
+      const transaction = begin.headers.getSetCookie().find((c) => c.startsWith('__Host-rai_signin='));
+      assert.ok(transaction?.split('; ').includes('Secure'), 'the transaction cookie is __Host- and Secure');
+      assert.equal(exchanged, 0, 'no code exchange before a callback');
+    } finally {
+      await server.close();
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
