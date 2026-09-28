@@ -163,3 +163,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w5-07-questionnaire-ui model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #230)
 - Scope: per changes/2026-09-27-w5-07-questionnaire-ui-in-the/: the risk questionnaire in the pack editor (seven radio groups, Unknown, clear, evidence hint, live non-recorded preview), the placeholder rubric banner, the rubric read in the API client (404 renders "not configured"), the in-memory substitute's rubric read (R-16), `risk.*` locale keys. One PR.
+
+## 2026-09-28 04:39 — CLAIM lane-b: W7-09 sign-in method endpoint and UI (#218)
+- Author: operator=ta session=claude-code-w7-09-sign-in-method-endpoint model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #218)
+- Scope: per changes/2026-09-27-w7-09-sign-in-method-endpoint/: public `GET /auth/sign-in-method` (`fixture` | `google` | `organization`, no issuer, client or tenant value), the sign-in screen's provider button and note labelled from it, new th/en keys, W0-02 section 7.2 amendment. One PR.

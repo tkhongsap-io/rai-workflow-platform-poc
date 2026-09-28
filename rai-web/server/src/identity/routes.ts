@@ -12,7 +12,9 @@ import {
   SessionInfoSchema,
   SessionLocaleRequestSchema,
   SignInRequestSchema,
+  SignInMethodResponseSchema,
   SignInResponseSchema,
+  signInMethodOf,
   type IdentityMode,
   type Principal,
   type SessionInfo,
@@ -147,6 +149,17 @@ export function registerAuthRoutes(fastify: FastifyInstance, deps: AuthRouteDeps
     void reply.clearCookie(names.session, cookieBase);
     return reply.status(204).send();
   });
+
+  // GET /auth/sign-in-method → { method } (W7-09): public in every mode; the method only, so the sign-in screen can
+  // label its provider button after the fixture-users 404. No issuer, client, tenant or allow-list value.
+  app.get(
+    '/auth/sign-in-method',
+    { config: { auth: { kind: 'public' } }, schema: { response: { 200: SignInMethodResponseSchema } } },
+    (_request, reply) => {
+      void reply.header('cache-control', 'no-store');
+      return { method: signInMethodOf(mode) };
+    },
+  );
 
   if (mode === 'fixture') {
     const provider = deps.fixtureProvider;

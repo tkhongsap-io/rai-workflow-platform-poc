@@ -539,6 +539,8 @@ export interface SessionInfo {
 
 Deep links: a request to any `/cases/...` SPA path without a session renders the sign-in screen with `returnTo` set; after sign-in the case loads only if in scope (A05 "link alone grants nothing").
 
+**W7-09 amendment (2026-09-28): `GET /auth/sign-in-method`.** [W7 plan](implementation-plan-w7.md) sections 6 and 7. A new public route, served in every identity mode: `200 { method: 'fixture' | 'google' | 'organization' }` (`SignInMethodResponse` in `shared/src/schemas/auth.ts`, no other property), `Cache-Control: no-store`, from the running adapter's mode (`fixture` → `fixture`, `local-google` → `google`, `network` and `production` → `organization`). It never carries an issuer URL, client id, tenant id or allow-list value. W1-07's sign-in screen reads it only after `GET /auth/fixture/users` answered 404 and labels the provider button `auth.sign_in_with_google` or `auth.sign_in_with_organization`, with the note `sign_in.google_note` or `sign_in.organization_note`; a `fixture` answer after that 404, or a failed read, is shown as an error, never guessed into a button. The W1-13 substitute (fixture mode only) does not serve the route, because the screen never reads it there.
+
 ### 7.3 Case create, edit, read, list (W1-02; consumed by W1-07, W1-06)
 
 ```ts

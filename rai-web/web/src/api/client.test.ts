@@ -601,3 +601,30 @@ test('W5-07: the risk rubric read answers the view, and a 404 means "not configu
   );
   await assert.rejects(broken.getRiskRubric(), ApiError);
 });
+
+test('W7-09: getSignInMethod is a same-origin GET of /auth/sign-in-method and checks the answer', async () => {
+  const client = createApiClient((input, init) => {
+    assert.equal(input, '/auth/sign-in-method');
+    assert.equal(init?.method, 'GET');
+    assert.equal(init?.credentials, 'same-origin');
+    return Promise.resolve(new Response(JSON.stringify({ method: 'organization' })));
+  });
+  assert.deepEqual(await client.getSignInMethod(), { method: 'organization' });
+  for (const body of [{ method: 'entra' }, {}, { method: 'google', issuer: 'https://issuer.example.test' }]) {
+    await assert.rejects(createApiClient(fetchAnswering(200, body)).getSignInMethod(), InvalidResponseError);
+  }
+});
+
+test('W7-09: a 401 from the sign-in method read is the sign-in flow, never a lost session', async () => {
+  const client = createApiClient(
+    fetchAnswering(401, {
+      error: { code: 'unauthenticated', messageKey: 'error.unauthenticated', correlationId: 'c' },
+    }),
+  );
+  let calls = 0;
+  client.setUnauthenticatedHandler(() => {
+    calls += 1;
+  });
+  await assert.rejects(client.getSignInMethod(), ApiError);
+  assert.equal(calls, 0);
+});
