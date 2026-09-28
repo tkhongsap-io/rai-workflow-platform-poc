@@ -62,6 +62,7 @@ test('rulesEvaluated lists the executed metadata rules in request order; content
     'PACK-SLOT-MISSING',
     'PACK-STAGE-MISMATCH',
     'PACK-NA-VENDOR-DOC',
+    'RISK-TIER-UNKNOWN', // W5-10 (R-11)
   ]);
   const approveRules = seededRules('approve_attempt');
   assert.ok(approveRules.some((r) => r.engine === 'content'));
@@ -108,6 +109,7 @@ test('never reads document bytes: every artifact refuses read(), and a run that 
     stage: 'idea',
     vendor: true,
     slots: { 3: 'not_applicable', 4: 'not_applicable', 7: 'missing' },
+    riskProposal: { status: 'proposed', tier: 'unknown' }, // W5-10: raises RISK-TIER-UNKNOWN too
     reads,
   });
   assert.ok(request.artifacts.length > 0);
@@ -120,6 +122,7 @@ test('never reads document bytes: every artifact refuses read(), and a run that 
     'PACK-STAGE-MISMATCH',
     'PACK-NA-VENDOR-DOC',
     'PACK-NA-VENDOR-DOC',
+    'RISK-TIER-UNKNOWN',
   ]);
   assert.equal(reads.count, 0);
   const approve = await runner.run(

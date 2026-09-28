@@ -27,7 +27,7 @@ test('canonicalJson sorts keys at every depth and keeps array order', () => {
 
 test('rulesIdentity names the catalogue label, its body digest and a revision ID derived from it', () => {
   const rules = rulesIdentity(CONFIGURATION_SEED.qc_rules);
-  assert.equal(rules.label, 'w4a.1');
+  assert.equal(rules.label, 'w5.1'); // W5-10: the seeded qc_rules label
   assert.equal(
     rules.bodySha256,
     createHash('sha256').update(canonicalJson(CONFIGURATION_SEED.qc_rules)).digest('hex'),

@@ -306,6 +306,7 @@ export async function runEvalSet(set: LoadedSet, options: HarnessOptions): Promi
         stamp.getTime() + timeoutMs,
         rulesRevision,
         rules,
+        null, // W5-10: the evaluation cases carry no risk proposal, so RISK-TIER-UNKNOWN raises nothing
         uploadSlot,
       );
       const artifacts: AuthorizedArtifactRef[] = built.artifacts.map((a) => {

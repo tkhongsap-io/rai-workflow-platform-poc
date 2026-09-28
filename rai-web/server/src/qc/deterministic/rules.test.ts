@@ -8,6 +8,7 @@ import { LANE_MAPPINGS_BY_VERSION, LANES, type Lane } from '@rai/shared/constant
 import { isLocaleKey } from '@rai/shared/locales/keys';
 import type {
   QcFinding,
+  QcRiskTier,
   QcRunRequest,
   QcRunResult,
   SelectedRule,
@@ -16,9 +17,16 @@ import type {
   StageContext,
 } from '@rai/shared/qc/types';
 import { checkOwningLane, validateQcFinding } from '@rai/shared/qc/validate';
+import { RISK_TIERS, type RiskTier } from '@rai/shared/schemas/cases';
 import { NON_VENDOR_DEFAULT_REASON_KEY } from '@rai/shared/schemas/pack';
 import { createDeterministicQcRunner } from './runner.js';
-import { artifactIdOf, onlyRule, requestOf, type RequestShape } from './request-builder.test-helper.js';
+import {
+  artifactIdOf,
+  onlyRule,
+  requestOf,
+  seededRules,
+  type RequestShape,
+} from './request-builder.test-helper.js';
 
 const runner = createDeterministicQcRunner({ now: () => new Date('2026-09-27T05:00:00Z') });
 const SINGLE_LANE: ReadonlyArray<[SlotNumber, Lane]> = [
@@ -48,6 +56,8 @@ async function completed(request: QcRunRequest): Promise<QcFinding[]> {
 
 const run = (ruleId: string, shape: RequestShape) =>
   completed(requestOf({ ...shape, rules: onlyRule(ruleId, shape.trigger ?? 'submit') }));
+
+const seededRulesFor = (trigger: QcRunRequest['trigger']) => seededRules(trigger).map((r) => r.ruleId);
 
 const brief = (f: QcFinding) => ({
   ruleId: f.ruleId,
@@ -258,6 +268,79 @@ describe('PACK-NA-VENDOR-DOC: a vendor case with slot 3 or 4 N/A, owned by DPO',
   });
 });
 
+describe('RISK-TIER-UNKNOWN: the submit proposal is unknown or unavailable, one pack finding owned by AI/COE (W5-10)', () => {
+  test('the QC tier words are exactly the recorded RiskTier codes (R-9)', () => {
+    const same: [QcRiskTier] extends [RiskTier] ? ([RiskTier] extends [QcRiskTier] ? true : false) : false =
+      true;
+    assert.equal(same, true);
+    const tiers: readonly QcRiskTier[] = RISK_TIERS;
+    assert.deepEqual([...tiers], ['high', 'medium', 'low', 'unknown']);
+  });
+
+  const PACK_ABSENT = [{ artifactId: null, contentHash: null, slot: null, locator: { kind: 'absent' } }];
+
+  test('below: no proposal (a version submitted before W5), or a proposed high, medium or low tier, raises nothing', async () => {
+    assert.deepEqual(await run('RISK-TIER-UNKNOWN', { riskProposal: null }), []);
+    for (const tier of ['high', 'medium', 'low'] as const)
+      assert.deepEqual(
+        await run('RISK-TIER-UNKNOWN', { riskProposal: { status: 'proposed', tier } }),
+        [],
+        tier,
+      );
+  });
+
+  test('at: a proposed unknown tier raises one medium pack finding owned by AI/COE', async () => {
+    const findings = await run('RISK-TIER-UNKNOWN', {
+      riskProposal: { status: 'proposed', tier: 'unknown' },
+    });
+    assert.deepEqual(findings.map(brief), [
+      { ruleId: 'RISK-TIER-UNKNOWN', slot: 'pack', owningLane: 'ai_coe' },
+    ]);
+    assert.equal(findings[0]!.severity, 'medium');
+    assert.equal(findings[0]!.findingKey, 'RISK-TIER-UNKNOWN:pack');
+    assert.deepEqual(findings[0]!.message, {
+      key: 'qc.finding.risk_tier_unknown',
+      params: { status: 'unknown' },
+    });
+    assert.deepEqual(findings[0]!.evidence, PACK_ABSENT);
+  });
+
+  test('above: an unavailable proposal (no tier) raises the same finding, whatever the slots, stage or vendor flag', async () => {
+    for (const stage of STAGES)
+      for (const vendor of [false, true]) {
+        const findings = await run('RISK-TIER-UNKNOWN', {
+          stage,
+          vendor,
+          slots: { 1: 'missing' },
+          riskProposal: { status: 'unavailable', tier: null },
+        });
+        assert.deepEqual(findings.map(brief), [
+          { ruleId: 'RISK-TIER-UNKNOWN', slot: 'pack', owningLane: 'ai_coe' },
+        ]);
+        assert.deepEqual(findings[0]!.message.params, { status: 'unavailable' });
+        assert.deepEqual(findings[0]!.evidence, PACK_ABSENT);
+      }
+  });
+
+  test('the seeded selection runs it on submit only; the catalogue severity is carried', async () => {
+    const submit = await completed(requestOf({ riskProposal: { status: 'proposed', tier: 'unknown' } }));
+    assert.deepEqual(
+      submit.map((f) => f.ruleId),
+      ['RISK-TIER-UNKNOWN'],
+    );
+    for (const trigger of ['upload', 'approve_attempt'] as const)
+      assert.ok(!seededRulesFor(trigger).includes('RISK-TIER-UNKNOWN'), trigger);
+    const [rule] = onlyRule('RISK-TIER-UNKNOWN');
+    const low = await completed(
+      requestOf({
+        riskProposal: { status: 'proposed', tier: 'unknown' },
+        rules: [{ ...rule!, severity: 'low' }],
+      }),
+    );
+    assert.equal(low[0]!.severity, 'low');
+  });
+});
+
 test('no rule raises a finding on slot 9, whatever its state and the stage', async () => {
   for (const state of ['attached', 'missing', 'not_yet', 'not_applicable'] as SlotDisposition[])
     for (const stage of STAGES)
@@ -289,6 +372,8 @@ test('the catalogue severity is carried to the finding; the rule label keys exis
     'qc.rule.acc_classic_ml_metric',
     'qc.rule.qc_unavailable',
     'qc.finding.pack_na_vendor_doc',
+    'qc.rule.risk_tier_unknown',
+    'qc.finding.risk_tier_unknown',
   ])
     assert.ok(isLocaleKey(key), key);
 });

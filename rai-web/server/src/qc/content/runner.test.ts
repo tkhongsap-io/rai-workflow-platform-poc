@@ -66,11 +66,11 @@ test('rules: null is unavailable:not_configured and reads nothing', async () => 
 
 test('only content rules run: metadata rules are skipped and not counted; no content rule reads no bytes', async () => {
   // W4-06d seeds PACK-CONTRADICTION on submit, so the seeded submit selection is no longer metadata-only: take its
-  // metadata rules (the three W4a submit rules).
+  // metadata rules (the three W4a submit rules and W5-10's RISK-TIER-UNKNOWN).
   const metadataOnly = seededRules('submit').filter((r) => r.engine === 'metadata');
   assert.deepEqual(
     metadataOnly.map((r) => r.ruleId),
-    ['PACK-SLOT-MISSING', 'PACK-STAGE-MISMATCH', 'PACK-NA-VENDOR-DOC'],
+    ['PACK-SLOT-MISSING', 'PACK-STAGE-MISMATCH', 'PACK-NA-VENDOR-DOC', 'RISK-TIER-UNKNOWN'],
   );
   const submit = await run({ trigger: 'submit', rules: metadataOnly, documents: { 1: defective() } });
   assert.deepEqual(submit.result.status === 'completed' && submit.result.rulesEvaluated, []);

@@ -149,6 +149,7 @@ export function requestOf(shape: RequestShape = {}): QcRunRequest {
     artifacts,
     deadlineMs: Date.parse('2026-09-27T05:00:10Z'),
     rules: shape.rules === undefined ? onlyRules(trigger, 'ACC-METRIC-CITED') : shape.rules,
+    riskProposal: null, // W5-10 (R-17): read by the metadata part only; the content runner ignores it
   };
 }
 

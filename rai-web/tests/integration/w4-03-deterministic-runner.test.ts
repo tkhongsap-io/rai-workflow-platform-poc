@@ -82,13 +82,15 @@ async function submitCase(caseId: string) {
   return { caseId, versionId: version.versionId, correlationId };
 }
 
+// W5-10: a submit can now store two findings of one run with one created_at and random-ordered IDs (uuidv7), so
+// rows of one run are ordered by rule ID and slot.
 async function findingRows(versionId: string) {
   return (
     await db.owner.execute(
       sql`SELECT f.id, f.kind, f.slot, f.rule_id, f.owning_lane, f.severity, f.message_key, f.message_params,
                  f.evidence, r.trigger, r.lane
             FROM qc_finding f JOIN qc_run r ON r.id = f.run_id
-           WHERE f.version_id = ${versionId} ORDER BY f.created_at, f.id`,
+           WHERE f.version_id = ${versionId} ORDER BY f.created_at, f.rule_id, f.slot, f.id`,
     )
   ).rows as Array<{
     id: string;
@@ -174,13 +176,14 @@ async function freezeWithoutQcRules(versionId: string) {
 }
 
 describe(`W4-03 deterministic runner — ${SET}`, () => {
-  it('submit: PACK-SLOT-MISSING on a single-lane slot, owned by its lane; three rules evaluated; the run names the runner', async () => {
+  it('submit: PACK-SLOT-MISSING on a single-lane slot, owned by its lane; four rules evaluated; the run names the runner', async () => {
     const target = await submitCase(MISSING_SLOT.caseId);
     const outcome = await runAndPersistSubmitQc(deps(), target);
     assert.equal(outcome.status, 'completed');
     const rows = await findingRows(target.versionId);
     assert.deepEqual(brief(rows), [
       { rule: 'PACK-SLOT-MISSING', slot: 7, lane: 'it_security', trigger: 'submit' },
+      { rule: 'RISK-TIER-UNKNOWN', slot: null, lane: 'ai_coe', trigger: 'submit' }, // W5-10: the answerless draft proposes unknown
     ]);
     assert.deepEqual(
       {
@@ -202,13 +205,13 @@ describe(`W4-03 deterministic runner — ${SET}`, () => {
         status: run!.status,
         evaluated: run!.rules_evaluated,
       },
-      { engine: 'deterministic', version: SERVER_VERSION, status: 'completed', evaluated: 3 },
+      { engine: 'deterministic', version: SERVER_VERSION, status: 'completed', evaluated: 4 }, // W5-10
     );
     const completed = capture
       .lines()
       .find((l) => l.event === 'qc.run.completed' && l.correlationId === target.correlationId);
     assert.equal(completed?.fields?.runner, 'deterministic');
-    assert.equal(completed?.fields?.rulesEvaluated, 3);
+    assert.equal(completed?.fields?.rulesEvaluated, 4);
     const started = capture
       .lines()
       .find((l) => l.event === 'qc.run.started' && l.correlationId === target.correlationId);
@@ -222,6 +225,7 @@ describe(`W4-03 deterministic runner — ${SET}`, () => {
     const ideaRows = await findingRows(idea.versionId);
     assert.deepEqual(brief(ideaRows), [
       { rule: 'PACK-STAGE-MISMATCH', slot: null, lane: 'ai_coe', trigger: 'submit' },
+      { rule: 'RISK-TIER-UNKNOWN', slot: null, lane: 'ai_coe', trigger: 'submit' }, // W5-10
     ]);
     assert.equal(ideaRows[0]!.message_key, 'qc.finding.pack_stage_mismatch');
     assert.deepEqual(
@@ -236,6 +240,7 @@ describe(`W4-03 deterministic runner — ${SET}`, () => {
     const launchRows = await findingRows(preLaunch.versionId);
     assert.deepEqual(brief(launchRows), [
       { rule: 'PACK-STAGE-MISMATCH', slot: null, lane: 'ai_coe', trigger: 'submit' },
+      { rule: 'RISK-TIER-UNKNOWN', slot: null, lane: 'ai_coe', trigger: 'submit' }, // W5-10
     ]);
     assert.deepEqual(
       launchRows[0]!.evidence.map((e) => e.slot),
@@ -248,7 +253,10 @@ describe(`W4-03 deterministic runner — ${SET}`, () => {
     const target = await submitCase(NA_REASONS.caseId);
     await runAndPersistSubmitQc(deps(), target);
     const rows = await findingRows(target.versionId);
-    assert.deepEqual(brief(rows), [{ rule: 'PACK-NA-VENDOR-DOC', slot: 4, lane: 'dpo', trigger: 'submit' }]);
+    assert.deepEqual(brief(rows), [
+      { rule: 'PACK-NA-VENDOR-DOC', slot: 4, lane: 'dpo', trigger: 'submit' },
+      { rule: 'RISK-TIER-UNKNOWN', slot: null, lane: 'ai_coe', trigger: 'submit' }, // W5-10
+    ]);
     assert.deepEqual(
       { severity: rows[0]!.severity, key: rows[0]!.message_key, params: rows[0]!.message_params },
       { severity: 'medium', key: 'qc.finding.pack_na_vendor_doc', params: { slot: 4 } },
@@ -304,7 +312,7 @@ describe(`W4-03 deterministic runner — ${SET}`, () => {
     assert.deepEqual(
       runs.map((r) => [r.trigger, r.lane, r.rules_evaluated]),
       [
-        ['submit', null, 3],
+        ['submit', null, 4], // W5-10: RISK-TIER-UNKNOWN is the fourth
         ['approve_attempt', 'dpo', 1], // PACK-SLOT-MISSING; the selected content rules are not executed
         ['approve_attempt', 'it_security', 1],
       ],
@@ -317,7 +325,11 @@ describe(`W4-03 deterministic runner — ${SET}`, () => {
     const first = await runAndPersistSubmitQc(deps(), target);
     const again = await runAndPersistSubmitQc(deps(), { ...target, correlationId: randomUUID() });
     assert.equal(again.runId, first.runId);
-    assert.deepEqual(again.findings, first.findings);
+    // W5-10: the submit now stores two findings; a replay lists them in stored order (IDs share a millisecond), so
+    // they are compared by finding ID.
+    const byId = (findings: typeof first.findings) =>
+      [...findings].sort((a, b) => a.findingId.localeCompare(b.findingId));
+    assert.deepEqual(byId(again.findings), byId(first.findings));
 
     const lane = { ...target, lane: 'dpo' as const };
     const laneFirst = await runAndPersistLaneQc(deps(), lane);
@@ -328,6 +340,7 @@ describe(`W4-03 deterministic runner — ${SET}`, () => {
     assert.equal((await runRows(target.versionId)).length, 2);
     assert.deepEqual(brief(await findingRows(target.versionId)), [
       { rule: 'PACK-SLOT-MISSING', slot: 7, lane: 'it_security', trigger: 'submit' },
+      { rule: 'RISK-TIER-UNKNOWN', slot: null, lane: 'ai_coe', trigger: 'submit' }, // W5-10
       { rule: 'PACK-SLOT-MISSING', slot: 5, lane: 'dpo', trigger: 'approve_attempt' },
     ]);
   });

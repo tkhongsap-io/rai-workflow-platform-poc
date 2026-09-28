@@ -208,6 +208,7 @@ export function buildRequest(fixtureCaseId: string, options: BuildOptions): Buil
     artifacts,
     deadlineMs: 10_000,
     rules: options.rules ?? null,
+    riskProposal: null, // W5-10 (R-17): the scripted runner ignores it
   };
   return { request, reads };
 }

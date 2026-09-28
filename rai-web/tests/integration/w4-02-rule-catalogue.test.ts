@@ -133,7 +133,7 @@ async function unavailableFindings(versionId: string) {
 describe(`W4-02 rule catalogue — ${SET}`, () => {
   it('a new submit freezes the seeded qc_rules revision and QC requests carry the rules it selects', async () => {
     const seeded = await seededQcRules();
-    assert.equal(seeded.label, 'w4a.1');
+    assert.equal(seeded.label, 'w5.1');
 
     const vendor = await submitCase(VENDOR.caseId);
     assert.equal(vendor.version.configurationRevisionId, seeded.id);
@@ -146,6 +146,7 @@ describe(`W4-02 rule catalogue — ${SET}`, () => {
       'PACK-SLOT-MISSING',
       'PACK-STAGE-MISMATCH',
       'PACK-NA-VENDOR-DOC',
+      'RISK-TIER-UNKNOWN', // W5-10 (R-11)
       'PACK-CONTRADICTION', // W4-06d: the submit content rule (the deterministic runner skips it)
     ]);
     await runAndPersistLaneQc(deps, { ...vendor.input, lane: 'dpo' });
@@ -208,7 +209,7 @@ describe(`W4-02 rule catalogue — ${SET}`, () => {
     const submittedRow = (await readVersionRow(db.app, vendor.version.versionId))!;
     const frozen = await ruleContextOf(db.app, submittedRow, after);
     assert.equal(frozen.ruleRevision, seeded.id);
-    assert.equal(frozen.catalogue?.label, 'w4a.1');
+    assert.equal(frozen.catalogue?.label, 'w5.1');
 
     // The open draft of another case: the same rule the freeze uses (published strictly before the instant).
     const draftId = (
@@ -221,7 +222,7 @@ describe(`W4-02 rule catalogue — ${SET}`, () => {
     assert.equal(draft.submittedAt, null);
     const atPublish = await ruleContextOf(db.app, draft, publishedAt);
     assert.equal(atPublish.ruleRevision, seeded.id);
-    assert.equal(atPublish.catalogue?.label, 'w4a.1');
+    assert.equal(atPublish.catalogue?.label, 'w5.1');
     const inForce = await ruleContextOf(db.app, draft, after);
     assert.equal(inForce.ruleRevision, next.id);
     assert.equal(inForce.catalogue?.label, 'w4a.2');

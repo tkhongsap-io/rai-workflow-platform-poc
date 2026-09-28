@@ -5,9 +5,11 @@
 //                        public-holiday list (W6); the dates are widely published fixed-date holidays, not a claim
 //   operator_recipients  the single synthetic address of W0-08 section 8.2 (D06); never a real operator address
 //   use_case_groups      the D11 value list the W0-08 fixture cases use
-//   qc_rules             W4-02: the W4a rule catalogue, label 'w4a.1', per checklist template version (W4a plan
-//                        sections 3 and 4). Metadata rules run in W4a (W4-03); content rules are catalogued for
-//                        W4b. v2.0 has no ACC-BAND-V1-SHEET3 (L12). Severities follow W0-07 3.5; provisional until D09
+//   qc_rules             W4-02: the W4a rule catalogue per checklist template version (W4a plan sections 3 and 4).
+//                        Metadata rules run in W4a (W4-03); content rules are catalogued for W4b. v2.0 has no
+//                        ACC-BAND-V1-SHEET3 (L12). Severities follow W0-07 3.5; provisional until D09. W5-10 adds
+//                        RISK-TIER-UNKNOWN (W5 plan R-11) and sets the label 'w5.1' (the label names the last ticket
+//                        that changed the seeded body, W5 plan section 9)
 //   risk_rubric          W5-02: revision 1, label 'synthetic-placeholder.1' (W5 plan section 3). EVERY VALUE IS A
 //                        SYNTHETIC PLACEHOLDER for D07 (AI/COE): the questions, options, levels, thresholds and labels
 //                        are invented by the agent team and NOT derived from the approved questionnaire. The
@@ -65,6 +67,10 @@ const W4A_METADATA_RULES: readonly QcRule[] = [
     params: { attachedForbiddenAt: { idea: [8] }, notYetForbiddenAt: { pre_launch: LANE_GATED_SLOTS } },
   },
   { ruleId: 'PACK-NA-VENDOR-DOC', engine: 'metadata', triggers: ['submit'], severity: 'medium' },
+];
+/** W5-10 (W5 plan R-11): the submit risk proposal is unknown or unavailable; a soft AI/COE pack finding. */
+const W5_METADATA_RULES: readonly QcRule[] = [
+  { ruleId: 'RISK-TIER-UNKNOWN', engine: 'metadata', triggers: ['submit'], severity: 'medium' },
 ];
 /**
  * W4-06a (W4b plan sections 3.2 and 3.3; decision 10, WA-D09): the synthetic claim grammar's labels, in English and
@@ -206,7 +212,7 @@ const W4B_CONTENT_RULES: readonly QcRule[] = [
     params: PACK_CONTRADICTION_PARAMS, // W4-06d: with its params schema (plan 3.3), in both templates
   },
 ];
-const V1_SHEET3_RULES = [...W4A_METADATA_RULES, ...W4B_CONTENT_RULES];
+const V1_SHEET3_RULES = [...W4A_METADATA_RULES, ...W5_METADATA_RULES, ...W4B_CONTENT_RULES];
 
 type RiskRubric = ConfigurationBodies['risk_rubric'];
 type RiskQuestion = RiskRubric['questions'][number];
@@ -326,7 +332,7 @@ export const CONFIGURATION_SEED: Readonly<ConfigurationSeed> = Object.freeze({
   operator_recipients: { addresses: ['operator-digest@rai-desk.example'] },
   use_case_groups: { groups: ['customer-analytics', 'customer-service', 'field-operations'] },
   qc_rules: {
-    label: 'w4a.1',
+    label: 'w5.1',
     templates: {
       'v1.0 Sheet3': { rules: V1_SHEET3_RULES },
       // Other versions never inherit the v1.0 Sheet-3 bands (source spec, L12).

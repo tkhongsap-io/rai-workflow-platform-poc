@@ -105,6 +105,7 @@ function requestFor(evalCase: EvalCase, run: LabelRun): QcRunRequest {
     artifacts,
     deadlineMs: Date.now() + 10_000,
     rules,
+    riskProposal: null, // W5-10 (R-17): the content runner ignores it
   };
 }
 
