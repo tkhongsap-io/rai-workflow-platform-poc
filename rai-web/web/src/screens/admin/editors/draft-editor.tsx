@@ -5,6 +5,9 @@
 // started from an earlier revision is read-only until it is started again from the revision in force or discarded.
 // Every write names the draft version and revision the page showed, so an out-of-date page gets the 409 guidance
 // and a Reload, never an overwrite. Access is the server's (`config.publish`).
+//
+// W6-11: the same flow edits the JSON kinds (`JSON_KINDS`, the identity mapping) in `JsonEditor`. Text that is not a
+// JSON object is refused in the page and never sent; a served problem is labelled by its pointer.
 
 import { useCallback, useEffect, useId, useRef, useState, type JSX } from 'react';
 import type { LocaleKey } from '@rai/shared/locales/keys';
@@ -20,6 +23,8 @@ import { translateApiKey, useLocale } from '../../../i18n/locale-provider.js';
 import { diffBodies } from '../diff.js';
 import { PublishDialog, type PublishTarget } from '../publish-dialog.js';
 import { CalendarEditor } from './calendar-editor.js';
+import { JsonEditor } from './json-editor.js';
+import { isJsonKind, jsonTextOf, parseJsonBody, type JsonKind } from './json-kinds.js';
 import { ListEditor } from './list-editor.js';
 import { RecipientsEditor } from './recipients-editor.js';
 import {
@@ -40,8 +45,28 @@ const ITEM_LABEL: Readonly<Record<ListKind, LocaleKey>> = Object.freeze({
   checklist_templates: 'admin.config.editor.item.checklist_templates',
 });
 
+/** A simple kind's form, or a JSON kind's text (W6-11). */
+type EditorForm = SimpleForm | { kind: 'json'; text: string };
+
+function editorFormOf(
+  kind: SimpleKind | JsonKind,
+  body: Readonly<Record<string, unknown>> | undefined,
+): EditorForm {
+  return isJsonKind(kind) ? { kind: 'json', text: jsonTextOf(body) } : formOf(kind, body);
+}
+
+/** The body a save sends, or `undefined` when a JSON kind's text is not a JSON object (nothing is sent). */
+function editorBodyOf(
+  form: EditorForm,
+  base: Readonly<Record<string, unknown>> | undefined,
+): Record<string, unknown> | undefined {
+  if (form.kind !== 'json') return bodyOf(form, base);
+  const parsed = parseJsonBody(form.text);
+  return parsed.ok ? parsed.body : undefined;
+}
+
 export interface DraftEditorProps {
-  kind: SimpleKind;
+  kind: SimpleKind | JsonKind;
   kindLabelKey: LocaleKey;
   current: ConfigurationRevisionDetail | null;
   draft: ConfigurationDraftDetail | null;
@@ -75,7 +100,9 @@ export function DraftEditor({
 
   const savedBody = draft?.body ?? current?.body;
   const sourceKey = `${current?.revisionId ?? ''}|${draft?.draftVersion.toString() ?? ''}|${draft?.baseRevisionId ?? ''}`;
-  const [form, setForm] = useState<SimpleForm>(() => formOf(kind, savedBody));
+  const [form, setForm] = useState<EditorForm>(() => editorFormOf(kind, savedBody));
+  // W6-11: the last save of a JSON kind was refused here (the text is not a JSON object).
+  const [refused, setRefused] = useState(false);
   const [error, setError] = useState<unknown>();
   const [status, setStatus] = useState<Status>();
   const [busy, setBusy] = useState(false);
@@ -89,7 +116,8 @@ export function DraftEditor({
   const [source, setSource] = useState(sourceKey);
   if (source !== sourceKey) {
     setSource(sourceKey);
-    setForm(formOf(kind, savedBody));
+    setForm(editorFormOf(kind, savedBody));
+    setRefused(false);
     setError(undefined);
   }
 
@@ -104,8 +132,8 @@ export function DraftEditor({
 
   const currentId = current?.revisionId ?? null;
   const stale = draft !== null && draft.baseRevisionId !== currentId;
-  const body = bodyOf(form, savedBody);
-  const dirty = savedBody === undefined || diffBodies(savedBody, body).length > 0;
+  const body = editorBodyOf(form, savedBody);
+  const dirty = savedBody === undefined || body === undefined || diffBodies(savedBody, body).length > 0;
   const publishable = draft !== null && !stale && !dirty && draft.problemCount === 0;
   const hintKey: LocaleKey | undefined = stale
     ? undefined
@@ -163,7 +191,7 @@ export function DraftEditor({
 
   const targets = (draft?.problems ?? []).map((problem) => ({
     problem,
-    target: problemTarget(kind, problem.path),
+    target: isJsonKind(kind) ? ({ whole: true } as const) : problemTarget(kind, problem.path),
   }));
   const invalidLanes = new Set<SlaLane>(
     targets.flatMap(({ target }) => ('lane' in target ? [target.lane] : [])),
@@ -172,19 +200,20 @@ export function DraftEditor({
     targets.flatMap(({ target }) => ('index' in target ? [target.index] : [])),
   );
   const describedBy = targets.length > 0 ? problemsId : undefined;
-  const fieldLabel = (target: ReturnType<typeof problemTarget>): string =>
-    'lane' in target
-      ? t(`lane.${target.lane}`)
-      : 'index' in target && kind !== 'sla'
-        ? t(ITEM_LABEL[kind], { number: target.index + 1 })
-        : t('admin.config.editor.problem_whole');
+  const fieldLabel = (target: ReturnType<typeof problemTarget>, path: string): string => {
+    // A JSON kind's problem is named by its served pointer (the first segment of a schema problem).
+    if (isJsonKind(kind)) return path === '/' ? t('admin.config.editor.problem_whole') : path;
+    if ('lane' in target) return t(`lane.${target.lane}`);
+    if ('index' in target && kind !== 'sla') return t(ITEM_LABEL[kind], { number: target.index + 1 });
+    return t('admin.config.editor.problem_whole');
+  };
 
   const listProps = {
     disabled: stale,
     invalidIndexes,
     problemsId: describedBy,
     onChange: (items: string[]) => setForm({ kind: form.kind as ListKind, items }),
-    items: form.kind === 'sla' ? [] : form.items,
+    items: form.kind === 'sla' || form.kind === 'json' ? [] : form.items,
   };
 
   return (
@@ -201,10 +230,31 @@ export function DraftEditor({
           noValidate={true}
           onSubmit={(event) => {
             event.preventDefault();
-            if (!stale) void save(body, currentId, false);
+            if (stale) return;
+            if (body === undefined) {
+              setStatus(undefined);
+              setRefused(true);
+              return;
+            }
+            void save(body, currentId, false);
           }}
         >
-          {form.kind === 'sla' ? (
+          {form.kind === 'json' ? (
+            isJsonKind(kind) ? (
+              <JsonEditor
+                kind={kind}
+                text={form.text}
+                onChange={(text) => {
+                  setRefused(false);
+                  setForm({ kind: 'json', text });
+                }}
+                disabled={stale}
+                invalid={targets.length > 0}
+                refused={refused}
+                problemsId={describedBy}
+              />
+            ) : null
+          ) : form.kind === 'sla' ? (
             <SlaEditor
               values={form.values}
               onChange={(values) => setForm({ kind: 'sla', values })}
@@ -323,7 +373,7 @@ export function DraftEditor({
                     key={`${problem.path}:${problem.messageKey}:${index.toString()}`}
                     data-path={problem.path}
                   >
-                    <span className={'admin-strong'}>{fieldLabel(target)}</span>
+                    <span className={'admin-strong'}>{fieldLabel(target, problem.path)}</span>
                     {': '}
                     {translateApiKey(t, problem.messageKey, problem.params)}
                   </li>

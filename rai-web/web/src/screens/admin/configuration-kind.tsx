@@ -22,6 +22,7 @@ import { AdminLoadError } from './configuration-index.js';
 import { isConfigurationKind, kindLabelKey, ownerLabelKey } from './configuration.view-model.js';
 import { RestoreDialog, type RestoreTarget } from './restore-dialog.js';
 import { DraftEditor } from './editors/draft-editor.js';
+import { isJsonKind } from './editors/json-kinds.js';
 import { isSimpleKind } from './editors/simple-kinds.js';
 import './admin.css';
 
@@ -328,7 +329,7 @@ export function ConfigurationKindScreen(): JSX.Element {
           </section>
 
           <DraftSection draft={result.data.draft} current={result.data.current}>
-            {isSimpleKind(kind) && labelKey !== undefined ? (
+            {(isSimpleKind(kind) || isJsonKind(kind)) && labelKey !== undefined ? (
               <DraftEditor
                 kind={kind}
                 kindLabelKey={labelKey}

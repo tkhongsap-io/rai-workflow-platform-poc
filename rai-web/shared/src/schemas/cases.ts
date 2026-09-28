@@ -4,6 +4,7 @@ import { Type, type Static, type TSchema } from 'typebox';
 import { Value } from 'typebox/value';
 import type { CaseId, ConfigurationRevisionId, RegistryId, SubjectId } from '../ids.js';
 import type { Lane } from './auth.js';
+import { GroupRoleMappingSchema, type GroupRoleMapping } from './identity-mapping.js';
 import { type DraftSummarySchema } from './pack.js';
 import { type VersionSummarySchema } from './versions.js';
 
@@ -135,8 +136,8 @@ export interface ConfigurationView {
 // Configuration revision bodies (W0-04 `configuration_revision.body`: "schema per kind in rai-web/shared, validated
 // on write"). One kind per revision. The W1-00 seed publishes checklist_templates, sla, calendar, operator_recipients
 // and use_case_groups; W4-02 adds qc_rules (revision 1, 'w4a.1'); risk_rubric arrives with W5 (schema W5-01,
-// registered W5-02; content D07), group_role_mapping with W6/W8; W6-02 adds desk_controls (registered and seeded,
-// W6 plan section 3). A kind without a registered schema cannot be published (deny by default). The db copy of this
+// registered W5-02; content D07); group_role_mapping is registered by W6-11 and never seeded (values D10, W8;
+// `UNSEEDED_KINDS`); W6-02 adds desk_controls (registered and seeded, W6 plan section 3). A kind without a registered schema cannot be published (deny by default). The db copy of this
 // list (server/src/db/schema/configuration-revision.ts) changes with it; a unit test asserts they are equal.
 // ---------------------------------------------------------------------------------------------------------------
 
@@ -584,6 +585,7 @@ export const CONFIGURATION_BODY_SCHEMAS = Object.freeze({
   qc_rules: QcRulesBodySchema,
   risk_rubric: RiskRubricBodySchema, // W5-02; publishing also runs riskRubricBodyProblems
   desk_controls: DeskControlsBodySchema, // W6-02
+  group_role_mapping: GroupRoleMappingSchema, // W6-11: registered, never seeded (UNSEEDED_KINDS; values D10, W8)
 }) satisfies Partial<Record<ConfigurationKind, unknown>>;
 
 export type ConfigurationBodies = {
@@ -595,6 +597,7 @@ export type ConfigurationBodies = {
   qc_rules: Static<typeof QcRulesBodySchema>;
   risk_rubric: RiskRubricBody;
   desk_controls: Static<typeof DeskControlsBodySchema>; // W6-02
+  group_role_mapping: GroupRoleMapping; // W6-11
 };
 export type SeedableConfigurationKind = keyof ConfigurationBodies;
 

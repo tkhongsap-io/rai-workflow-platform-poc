@@ -473,7 +473,7 @@ export async function publishDraft(tx: Tx, input: PublishDraftInput): Promise<Co
   assertChangeNote(input.kind, changeNote);
   await assertPublishable(tx, input.kind, draft.body, input.mailMode);
   const published = await publishRevision(tx, {
-    kind: input.kind as SeedableConfigurationKind,
+    kind: input.kind, // every ConfigurationKind has a body type since W6-11
     body: draft.body as ConfigurationBodies[SeedableConfigurationKind], // checked by assertPublishable; publishRevision re-checks
     publishedBy: input.actor.subjectId,
     publishedRole: input.actor.role,
@@ -513,7 +513,7 @@ export async function restoreRevision(
   assertChangeNote(input.kind, input.changeNote);
   await assertPublishable(tx, input.kind, target.body, input.mailMode);
   return publishRevision(tx, {
-    kind: input.kind as SeedableConfigurationKind,
+    kind: input.kind, // every ConfigurationKind has a body type since W6-11
     body: target.body as ConfigurationBodies[SeedableConfigurationKind], // checked by assertPublishable; publishRevision re-checks
     publishedBy: input.actor.subjectId,
     publishedRole: input.actor.role,

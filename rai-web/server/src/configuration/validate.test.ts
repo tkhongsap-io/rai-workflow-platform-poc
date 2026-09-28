@@ -3,7 +3,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { ConfigurationBodies } from '@rai/shared/schemas/cases';
-import { ACC_BAND_V1_SHEET3_PARAMS, CONFIGURATION_SEED } from './seed.js';
+import {
+  GroupRoleMappingSchema as SharedGroupRoleMappingSchema,
+  type GroupRoleMapping,
+} from '@rai/shared/schemas/identity-mapping';
+import { GroupRoleMappingSchema as ServerGroupRoleMappingSchema } from '../identity/group-mapping.js';
+import { ACC_BAND_V1_SHEET3_PARAMS, CONFIGURATION_SEED, UNSEEDED_KINDS } from './seed.js';
 import { PUBLISH_PROBLEM_CODES, publishProblems, type InForceBodies } from './validate.js';
 
 type QcRules = ConfigurationBodies['qc_rules'];
@@ -36,9 +41,10 @@ test('the schema runs first: an invalid body, an unknown kind or a kind without 
   assert.equal(invalid.length, 1);
   assert.match(invalid[0]!, /^\/dpo /);
   assert.deepEqual(publishProblems('lane_mapping', {}, SEED_IN_FORCE, 'sink-file'), ['unknown kind']);
-  assert.deepEqual(publishProblems('group_role_mapping', {}, SEED_IN_FORCE, 'sink-file'), [
-    'no body schema registered for this kind yet',
-  ]);
+  // W6-11: every registered kind now has a schema, so the mapping's empty body gets schema problems only.
+  const mapping = publishProblems('group_role_mapping', {}, SEED_IN_FORCE, 'sink-file');
+  assert.ok(mapping.length > 0);
+  for (const p of mapping) assert.doesNotMatch(p, /no body schema registered/);
   // qcRulesBodyProblems still runs (a rule listed twice), before any registry check.
   const twice = catalogue('v2.0', (rules) => [...rules, rules[0]!]);
   const problems = publishProblems('qc_rules', twice, SEED_IN_FORCE, 'sink-file');
@@ -216,4 +222,57 @@ test('every cross-kind problem carries a known code after its pointer', () => {
   assert.ok(problems.length >= 3);
   for (const problem of problems)
     assert.ok((PUBLISH_PROBLEM_CODES as readonly string[]).includes(codeOf(problem) ?? ''), problem);
+});
+
+// W6-11 (W6 plan section 6): the identity mapping is registered but never seeded. Synthetic values only: the all-zero
+// tenant and `fx-group-*` IDs.
+const SYNTHETIC_MAPPING: GroupRoleMapping = {
+  kind: 'identity.group_role_mapping',
+  version: 1,
+  tenantId: '00000000-0000-0000-0000-000000000000',
+  rules: [
+    { groupObjectId: 'fx-group-owner', role: 'owner' },
+    { groupObjectId: 'fx-group-spoc-cm', role: 'bu_spoc', businessUnit: 'CM' },
+    { groupObjectId: 'fx-group-ai-coe', role: 'ai_coe' },
+    { groupObjectId: 'fx-group-dpo', role: 'dpo' },
+    { groupObjectId: 'fx-group-it-security', role: 'it_security' },
+    { groupObjectId: 'fx-group-admin', role: 'admin' },
+  ],
+};
+
+test('group_role_mapping: the server path re-exports the shared schema, and the kind stays unseeded', () => {
+  assert.equal(ServerGroupRoleMappingSchema, SharedGroupRoleMappingSchema);
+  assert.ok((UNSEEDED_KINDS as readonly string[]).includes('group_role_mapping'));
+  assert.ok(!Object.hasOwn(CONFIGURATION_SEED, 'group_role_mapping'));
+});
+
+test('group_role_mapping: a synthetic mapping may be published, under both sink modes and with nothing in force', () => {
+  for (const mode of ['sink-file', 'sink-memory'] as const) {
+    assert.deepEqual(publishProblems('group_role_mapping', SYNTHETIC_MAPPING, SEED_IN_FORCE, mode), [], mode);
+    assert.deepEqual(publishProblems('group_role_mapping', SYNTHETIC_MAPPING, {}, mode), [], mode);
+  }
+  assert.deepEqual(
+    publishProblems('group_role_mapping', { ...SYNTHETIC_MAPPING, rules: [] }, SEED_IN_FORCE, 'sink-file'),
+    [],
+  );
+});
+
+test('group_role_mapping: an invalid mapping is refused with schema problems at its pointer, never a coded one', () => {
+  const cases: Array<[unknown, RegExp]> = [
+    [{ ...SYNTHETIC_MAPPING, kind: 'group_role_mapping' }, /^\/kind /],
+    [{ ...SYNTHETIC_MAPPING, version: 2 }, /^\/version /],
+    [{ ...SYNTHETIC_MAPPING, tenantId: '' }, /^\/tenantId /],
+    [{ ...SYNTHETIC_MAPPING, rules: [{ groupObjectId: 'fx-group-x', role: 'superuser' }] }, /^\/rules\/0/],
+    [{ ...SYNTHETIC_MAPPING, rules: [{ groupObjectId: 'fx-group-x', role: 'bu_spoc' }] }, /^\/rules\/0/],
+    [{ kind: 'identity.group_role_mapping', version: 1, rules: [] }, /^\/ /],
+  ];
+  for (const [body, at] of cases) {
+    const problems = publishProblems('group_role_mapping', body, SEED_IN_FORCE, 'sink-file');
+    assert.ok(problems.length > 0, JSON.stringify(body));
+    assert.ok(
+      problems.some((p) => at.test(p)),
+      `${JSON.stringify(body)}: ${problems.join(' | ')}`,
+    );
+    for (const p of problems) assert.equal(codeOf(p), undefined, p);
+  }
 });
