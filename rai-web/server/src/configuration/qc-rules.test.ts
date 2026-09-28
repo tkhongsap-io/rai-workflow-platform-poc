@@ -3,6 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  ACC_BAND_V1_SHEET3_PARAMS,
   ACC_CLASSIC_ML_METRIC_PARAMS,
   ACC_EXTRACTION_NOT_HALLUCINATION_PARAMS,
   ACC_METRIC_CITED_PARAMS,
@@ -186,5 +187,49 @@ test('W4-06b: ACC-EXTRACTION-NOT-HALLUCINATION and ACC-CLASSIC-ML-METRIC params 
         `${ruleId}: ${name}`,
       );
     }
+  }
+});
+
+test('W4-06c: ACC-BAND-V1-SHEET3 params are required and schema-checked (tiers, bands, band metrics)', () => {
+  const ruleId = 'ACC-BAND-V1-SHEET3';
+  const entry = { ruleId, engine: 'content', triggers: ['approve_attempt'], severity: 'high' };
+  const valid = structuredClone(ACC_BAND_V1_SHEET3_PARAMS) as unknown as Record<string, unknown>;
+  const ok = (params: unknown) =>
+    assert.doesNotThrow(() => validateConfigurationBody('qc_rules', body([{ ...entry, params }])), ruleId);
+  ok(valid);
+  ok({ ...valid, claimSource: 'grammar+model' });
+  ok({ ...valid, bands: { high: '0.5', medium: '1.25', low: '3' } });
+  refused(body([entry]), /ACC-BAND-V1-SHEET3.*params/);
+  const bands = (p: Record<string, unknown>) => p['bands'] as Record<string, unknown>;
+  const tiers = (p: Record<string, unknown>) => p['tiers'] as Record<string, unknown>;
+  for (const [name, patch] of [
+    ['slot 9', (p) => (p['slots'] = [9])],
+    ['an unknown claim source', (p) => (p['claimSource'] = 'model')],
+    ['a band metric that is not a key', (p) => (p['bandMetrics'] = ['Hallucination Rate'])],
+    ['no band metric', (p) => (p['bandMetrics'] = [])],
+    ['no band metric list', (p) => delete p['bandMetrics']],
+    ['a band that is a number', (p) => (bands(p)['high'] = 1)],
+    ['a band with a percent sign', (p) => (bands(p)['high'] = '1%')],
+    ['a negative band', (p) => (bands(p)['low'] = '-3')],
+    ['a band in exponent form', (p) => (bands(p)['medium'] = '2e0')],
+    ['a missing band', (p) => delete bands(p)['low']],
+    ['an extra band', (p) => (bands(p)['critical'] = '0.5')],
+    ['no bands', (p) => delete p['bands']],
+    ['a missing tier list', (p) => delete tiers(p)['medium']],
+    ['an extra tier list', (p) => (tiers(p)['critical'] = { en: ['critical'], th: ['วิกฤต'] })],
+    ['an empty tier word list', (p) => (tiers(p)['high'] = { en: [], th: ['สูง'] })],
+    ['no tiers', (p) => delete p['tiers']],
+    ['a missing item', (p) => delete (p['items'] as Record<string, unknown>)['hallucination']],
+    ['no labels', (p) => delete p['labels']],
+    ['an unknown key', (p) => (p['note'] = 'x')],
+  ] as Array<[string, (p: Record<string, unknown>) => void]>) {
+    const params = structuredClone(valid);
+    patch(params);
+    assert.throws(
+      () => validateConfigurationBody('qc_rules', body([{ ...entry, params }])),
+      (error: unknown) =>
+        error instanceof ConfigurationBodyInvalid && /ACC-BAND-V1-SHEET3.*params/.test(error.message),
+      name,
+    );
   }
 });

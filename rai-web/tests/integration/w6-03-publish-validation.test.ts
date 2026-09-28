@@ -6,7 +6,11 @@
 import { after, before, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { applyConfigurationSeed, CONFIGURATION_SEED } from '@rai/server/configuration/seed';
+import {
+  ACC_BAND_V1_SHEET3_PARAMS,
+  applyConfigurationSeed,
+  CONFIGURATION_SEED,
+} from '@rai/server/configuration/seed';
 import {
   ConfigurationBodyInvalid,
   listRevisions,
@@ -83,7 +87,13 @@ test('publishDraft refuses an unimplemented rule, an isolated band rule and an u
   const catalogue = structuredClone(CONFIGURATION_SEED.qc_rules);
   catalogue.templates['v2.0']!.rules.push(
     { ruleId: 'ACC-NOT-BUILT', engine: 'content', triggers: ['approve_attempt'], severity: 'low' },
-    { ruleId: 'ACC-BAND-V1-SHEET3', engine: 'content', triggers: ['approve_attempt'], severity: 'high' },
+    {
+      ruleId: 'ACC-BAND-V1-SHEET3',
+      engine: 'content',
+      triggers: ['approve_attempt'],
+      severity: 'high',
+      params: ACC_BAND_V1_SHEET3_PARAMS, // W4-06c: schema-valid, so the isolation check runs
+    },
   );
   const problems = await refused(adminPublish('qc_rules', catalogue, seeded.qc_rules!.id));
   assert.deepEqual(

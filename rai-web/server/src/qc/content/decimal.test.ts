@@ -2,7 +2,7 @@
 // floats; the number conversion happens only after the comparison.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { compareDecimal, decimalToNumber, parseDecimal } from './decimal.js';
+import { compareDecimal, decimalToNumber, parseDecimal, ratioToPercent } from './decimal.js';
 
 test('parseDecimal accepts plain decimal strings and canonicalises them; anything else is null', () => {
   assert.equal(parseDecimal('1'), '1');
@@ -47,4 +47,25 @@ test('decimalToNumber converts only after the comparison', () => {
   assert.equal(decimalToNumber('2.4'), 2.4);
   assert.equal(decimalToNumber('-0.5'), -0.5);
   assert.equal(decimalToNumber('500'), 500);
+});
+
+// W4-06c (plan section 3.3, decision 11): a ratio becomes a percent exactly, on the decimal string, so a ratio at the
+// band compares equal to it (0.01 × 100 is 1, where 0.07 * 100 in binary floating point is 7.000000000000001).
+test('ratioToPercent multiplies by 100 exactly and canonicalises; too long a result is null', () => {
+  assert.equal(ratioToPercent('0.01'), '1');
+  assert.equal(ratioToPercent('0.07'), '7');
+  assert.equal(ratioToPercent('0.015'), '1.5');
+  assert.equal(ratioToPercent('0.029999'), '2.9999');
+  assert.equal(ratioToPercent('0.1'), '10');
+  assert.equal(ratioToPercent('1'), '100');
+  assert.equal(ratioToPercent('0'), '0');
+  assert.equal(ratioToPercent('-0.004'), '-0.4');
+  assert.equal(ratioToPercent('0.000000000000000001'), '0.0000000000000001');
+  assert.equal(ratioToPercent('12.5'), '1250');
+  assert.equal(compareDecimal(ratioToPercent('0.02')!, '2'), 0);
+  assert.equal(compareDecimal(ratioToPercent('0.0299999999')!, '3'), -1);
+  // The result must stay a decimal-string message param (at most 18 integer digits).
+  assert.equal(ratioToPercent('9999999999999999'), '999999999999999900');
+  assert.equal(ratioToPercent('99999999999999999'), null);
+  for (const text of ['', '1e-2', '5%', 'abc']) assert.equal(ratioToPercent(text), null, text);
 });

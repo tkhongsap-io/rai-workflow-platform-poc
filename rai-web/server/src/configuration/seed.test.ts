@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { scoreRisk } from '@rai/shared/risk/score';
 import {
+  ACC_BAND_V1_SHEET3_PARAMS,
   ACC_CLASSIC_ML_METRIC_PARAMS,
   ACC_EXTRACTION_NOT_HALLUCINATION_PARAMS,
   ACC_METRIC_CITED_PARAMS,
@@ -69,7 +70,7 @@ test('qc_rules revision 1 (w4a.1) catalogues both template versions; v2.0 has no
     for (const rule of template.rules)
       if (rule.engine === 'metadata') assert.ok(!rule.triggers.includes('upload'), rule.ruleId);
   // W4-06a (plan section 3.3): ACC-METRIC-CITED carries its params in both templates; W4-06b adds the params of
-  // ACC-EXTRACTION-NOT-HALLUCINATION and ACC-CLASSIC-ML-METRIC; ACC-BAND-V1-SHEET3 has no params schema yet (W4-06c).
+  // ACC-EXTRACTION-NOT-HALLUCINATION and ACC-CLASSIC-ML-METRIC; W4-06c those of ACC-BAND-V1-SHEET3 (below).
   for (const template of Object.values(qc.templates))
     for (const [ruleId, params] of [
       ['ACC-METRIC-CITED', ACC_METRIC_CITED_PARAMS],
@@ -88,6 +89,22 @@ test('qc_rules revision 1 (w4a.1) catalogues both template versions; v2.0 has no
   for (const metric of ACC_EXTRACTION_NOT_HALLUCINATION_PARAMS.extractionMetrics)
     assert.ok(!ACC_METRIC_CITED_PARAMS.acceptedMetrics.includes(metric), metric);
   assert.ok(ACC_CLASSIC_ML_METRIC_PARAMS.matchingMetrics.includes('f1'));
+  // W4-06c (plan section 3.3; WA-D09, provisional): ACC-BAND-V1-SHEET3 carries its params on the v1.0 Sheet3
+  // template only (v2.0 never lists it, L12): slot 1, the v1.0 Sheet-3 SL#2.1 bands in percent, strict less-than.
+  const band = qc.templates['v1.0 Sheet3']!.rules.find((r) => r.ruleId === 'ACC-BAND-V1-SHEET3');
+  assert.deepEqual(band?.params, ACC_BAND_V1_SHEET3_PARAMS);
+  assert.equal(ACC_BAND_V1_SHEET3_PARAMS.claimSource, 'grammar');
+  assert.deepEqual(ACC_BAND_V1_SHEET3_PARAMS.slots, [1]);
+  assert.deepEqual(ACC_BAND_V1_SHEET3_PARAMS.bands, { high: '1', medium: '2', low: '3' });
+  assert.deepEqual(ACC_BAND_V1_SHEET3_PARAMS.bandMetrics, ['hallucination_rate']);
+  assert.deepEqual(
+    ACC_BAND_V1_SHEET3_PARAMS.tiers.high.en.concat(
+      ACC_BAND_V1_SHEET3_PARAMS.tiers.medium.en,
+      ACC_BAND_V1_SHEET3_PARAMS.tiers.low.en,
+    ),
+    ['high', 'medium', 'low'],
+  );
+  assert.ok(!qc.templates['v2.0']!.rules.some((r) => r.ruleId === 'ACC-BAND-V1-SHEET3'));
   const stage = qc.templates['v2.0']!.rules.find((r) => r.ruleId === 'PACK-STAGE-MISMATCH');
   assert.deepEqual(stage?.params, {
     attachedForbiddenAt: { idea: [8] },

@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { ConfigurationBodies } from '@rai/shared/schemas/cases';
-import { CONFIGURATION_SEED } from './seed.js';
+import { ACC_BAND_V1_SHEET3_PARAMS, CONFIGURATION_SEED } from './seed.js';
 import { PUBLISH_PROBLEM_CODES, publishProblems, type InForceBodies } from './validate.js';
 
 type QcRules = ConfigurationBodies['qc_rules'];
@@ -86,9 +86,17 @@ test("triggers must be a subset of the registry's: a superset is refused, a subs
 });
 
 test('v2.0 may not list the v1.0 Sheet-3 band rule (L12, template isolation)', () => {
+  // W4-06c: the band rule's params schema is registered, so the entry carries its params (else the schema refuses it
+  // first and the isolation check never runs).
   const body = catalogue('v2.0', (rules) => [
     ...rules,
-    { ruleId: 'ACC-BAND-V1-SHEET3', engine: 'content', triggers: ['approve_attempt'], severity: 'high' },
+    {
+      ruleId: 'ACC-BAND-V1-SHEET3',
+      engine: 'content',
+      triggers: ['approve_attempt'],
+      severity: 'high',
+      params: ACC_BAND_V1_SHEET3_PARAMS,
+    },
   ]);
   const problems = publishProblems('qc_rules', body, SEED_IN_FORCE, 'sink-file');
   assert.equal(problems.length, 1);
@@ -196,7 +204,13 @@ test('every cross-kind problem carries a known code after its pointer', () => {
   const body = catalogue('v2.0', (rules) => [
     ...rules,
     { ruleId: 'ACC-NOT-BUILT', engine: 'content', triggers: ['upload'], severity: 'low' },
-    { ruleId: 'ACC-BAND-V1-SHEET3', engine: 'metadata', triggers: ['submit'], severity: 'high' },
+    {
+      ruleId: 'ACC-BAND-V1-SHEET3',
+      engine: 'metadata',
+      triggers: ['submit'],
+      severity: 'high',
+      params: ACC_BAND_V1_SHEET3_PARAMS, // W4-06c: schema-valid, so the cross-kind checks run
+    },
   ]);
   const problems = publishProblems('qc_rules', body, SEED_IN_FORCE, 'sink-file');
   assert.ok(problems.length >= 3);

@@ -136,10 +136,16 @@ test('fail closed before reading: unknown rule, wrong trigger, bad params, model
     assert.deepEqual(extracted, [], name);
     assert.equal(reads.size, 0, name);
   }
-  // The seeded llm approve-attempt selection lists ACC-BAND-V1-SHEET3, which W4-06c implements; until then the runner
-  // refuses to vouch for a shorter result.
+  // W4-06c: every content rule of the seeded llm approve-attempt selection is implemented (ACC-BAND-V1-SHEET3 was the
+  // last), so the seeded selection now runs to completion; an unknown rule ID is still refused (above).
   const seeded = await run({ rules: seededRules('approve_attempt') });
-  assert.deepEqual(outcome(seeded.result), { reason: 'runner_error', detail: 'unknown_content_rule' });
+  assert.equal(seeded.result.status, 'completed', JSON.stringify(seeded.result));
+  if (seeded.result.status === 'completed')
+    assert.deepEqual(seeded.result.rulesEvaluated, [
+      'ACC-METRIC-CITED',
+      'ACC-EXTRACTION-NOT-HALLUCINATION',
+      'ACC-BAND-V1-SHEET3',
+    ]);
 
   const runner = createContentQcRunner({ extractor: recordingExtractor(), now: () => AT });
   const unknownMapping = await runner.run(

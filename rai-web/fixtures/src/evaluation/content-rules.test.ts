@@ -3,8 +3,9 @@
 // findings (rule, owning lane, scope slot, evidence locators) of every content rule it implements on every upload and
 // on every lane's approve attempt, and its content part is unavailable exactly where the labels say so. W4-06b extends
 // it from ACC-METRIC-CITED to ACC-EXTRACTION-NOT-HALLUCINATION and ACC-CLASSIC-ML-METRIC (so the classic_ml cases are
-// compared too); the rules W4-06c-d add are left out of the selection and of the labels until they exist. The full
-// per-rule grading is the W4-08a harness.
+// compared too), and W4-06c to ACC-BAND-V1-SHEET3 (the v1.0 band cases and the v2.0 cases, which never select it);
+// PACK-CONTRADICTION (W4-06d) is left out of the selection and of the labels until it exists. The full per-rule
+// grading is the W4-08a harness.
 // Test-only (excluded from the set hash by its suffix). Synthetic documents only; nothing is written.
 
 import { test } from 'node:test';
@@ -24,7 +25,7 @@ import { renderDocument } from './render.js';
 import { readAllLabels } from './labels.js';
 import type { EvalCase, LabelFinding, LabelRun } from './types.js';
 
-/** The content rules the runner implements today (W4-06a: ACC-METRIC-CITED; W4-06b: the extraction and classic-ML rules). */
+/** The content rules the runner implements today (W4-06a: ACC-METRIC-CITED; W4-06b and W4-06c: three more). */
 const IMPLEMENTED = new Set(Object.keys(CONTENT_RULES));
 
 const inProcess: Extractor = {
@@ -117,6 +118,7 @@ const shapeOf = (f: Pick<LabelFinding, 'ruleId' | 'owningLane' | 'scope' | 'evid
 
 test('the content runner reproduces every labelled finding of its implemented rules, and every outage, on the dev split', async () => {
   assert.deepEqual([...IMPLEMENTED].sort(), [
+    'ACC-BAND-V1-SHEET3',
     'ACC-CLASSIC-ML-METRIC',
     'ACC-EXTRACTION-NOT-HALLUCINATION',
     'ACC-METRIC-CITED',
@@ -170,4 +172,6 @@ test('the content runner reproduces every labelled finding of its implemented ru
   assert.ok(classic >= 10, `${classic} classic_ml runs compared`);
   assert.ok((byRule.get('ACC-EXTRACTION-NOT-HALLUCINATION') ?? 0) >= 1, 'extraction rule reproduced');
   assert.ok((byRule.get('ACC-CLASSIC-ML-METRIC') ?? 0) >= 2, 'classic-ML rule reproduced');
+  // W4-06c: the band rule is exercised by the labels (equal and above for each tier, and a missing tier).
+  assert.ok((byRule.get('ACC-BAND-V1-SHEET3') ?? 0) >= 7, 'band rule reproduced');
 });
