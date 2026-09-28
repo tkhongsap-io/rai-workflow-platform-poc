@@ -50,6 +50,38 @@ Worktree `/tmp/rai-w7-16-deployment-readiness-note`, Postgres project `rai-ops` 
 | `node scripts/check-links.mjs` (repo root) | exit 0; 0 broken (after this file existed; before it, only the DEVLOG link to this file) |
 | `git diff --check` (repo root) | exit 0 |
 
+## Round 1 fixes
+
+- **Defect (correctness): the note said `RAI_SECRET_SOURCE=file` also reads the four database URLs from `RAI_SECRET_DIR`.** It does not: the file source is used only by `overlayCustody` in `identity/adapter.ts` over the seven `CUSTODY_NAMES` (`RAI_IDENTITY_*`); `DATABASE_URL`, `DATABASE_MIGRATE_URL`, `DATABASE_OPERATOR_URL` and `DATABASE_ADMIN_URL` are read from the environment only by `parseDatabaseConfig` and `parseRestoreConfig`. Section 6 now says so, including the fail-closed result (`missing:DATABASE_URL`, exit 78) and that extending the file source is a D10 custody follow-up; it adds two lists, "Keys `RAI_SECRET_SOURCE=file` reads" and "Custody keys read only from the environment". The `RAI_SECRET_SOURCE` row and the host checklist's secret-store line say the same. No product code changed.
+- **New test (written first, watched fail):** the file-source list must equal `CUSTODY_NAMES` parsed from `identity/adapter.ts`, the environment-only list must equal the table's `custody` keys minus that list, and no `DATABASE_*` URL may appear in the file list.
+- **Reviewer note taken:** the `DATABASE_URL` and `DATABASE_MIGRATE_URL` rows now say every command that opens the database parses and requires them (`parseDatabaseConfig` reads all of them), not only the server and `release:check-rollback`.
+- **Rebase:** onto `origin/main` at `d51efda` (W6-05); DEVLOG and CHANGELOG conflicts resolved by keeping both entries, W7-16 on top. No migration on either side.
+- **Deferred (non-blocking reviewer notes):** the `D10` regex in the statement test is loose (a line mentioning D10 and the topic anywhere passes); the key scanner would miss a destructured or differently named env read (acceptable under the W0-02 rule that only `config.ts` and the identity slice read the environment, and a grep found no other shape); the change folder date 2026-09-27 against 2026-09-28 elsewhere stays as disclosed under Deviations.
+
+### Round 1 commands
+
+| Command (from `rai-web/` unless noted) | Result |
+|---|---|
+| RED: `npx tsx --test server/src/deployment-readiness.test.ts` with the new test, note unchanged | fails: the note has no heading "Keys `RAI_SECRET_SOURCE=file` reads" |
+| GREEN: `NODE_ENV=test RAI_IDENTITY_MODE=fixture node --import tsx --conditions=rai-source --test server/src/deployment-readiness.test.ts` | 7/7 |
+| Mutation: `DATABASE_URL` added to the file-source list | new test fails (6 pass, 1 fail); restored, 7/7 |
+| `git rebase origin/main` | DEVLOG, CHANGELOG conflicts; both entries kept |
+| `npm ci` | exit 0 |
+| `npm run lint` | exit 0 |
+| `npm run typecheck` | exit 0 |
+| `npm run test:unit` | exit 0, 1215/1215 |
+| `npm run test:integration` | exit 0, 491/491 |
+| `npm run build && npm run check:substitute-absent` | exit 0 |
+| `npm run test:browser:server` | exit 0, 241 passed (10.1 min) |
+| `npm run test:browser:substitute` | exit 0, 48 passed (32.8 s) |
+| `node scripts/check-links.mjs` (repo root) | exit 0; 518 files, 1433 links, 0 broken |
+| `git diff --check` (repo root) | exit 0 |
+
 ## Review verdicts
 
-Pending: two independent reviewer verdicts on the exact PR head and green CI on that head (D03 ticket flow). Ta reviews the W7 exit record.
+| Round | Head | Correctness | Second reviewer | Outcome |
+|---|---|---|---|---|
+| 1 | `30b20e0` | changes requested: `RAI_SECRET_SOURCE=file` does not read the database URLs | no blocking finding; non-blocking notes | fixed in round 1 fixes above |
+| 2 | this head | pending | pending | pending |
+
+Two independent reviewer verdicts on the exact PR head and green CI on that head are required (D03 ticket flow). Ta reviews the W7 exit record.

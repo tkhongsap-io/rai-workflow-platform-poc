@@ -220,3 +220,30 @@ test('the note says nothing is deployed and leaves host, backup target, custody 
   for (const topic of ['host', 'backup target', 'custody', 'incident'])
     assert.match(note, new RegExp(`D10[^\\n]*${topic}|${topic}[^\\n]*D10`, 'i'), `D10 owns ${topic}`);
 });
+
+/** The names `RAI_SECRET_SOURCE=file` overlays, parsed from `CUSTODY_NAMES` in identity/adapter.ts (not exported). */
+function fileSourceNames(): string[] {
+  const text = readFileSync(path.join(SERVER_SRC, 'identity', 'adapter.ts'), 'utf8');
+  const block = /const CUSTODY_NAMES = \[([^\]]*)\]/.exec(text)?.[1];
+  assert.ok(block !== undefined, 'identity/adapter.ts declares CUSTODY_NAMES');
+  return [...block.matchAll(/'([A-Z][A-Z0-9_]*)'/g)].map((m) => m[1] ?? '');
+}
+
+test('the note names exactly the keys the file secret source reads, and every other custody key as environment-only', () => {
+  const note = readNote();
+  const fileKeys = listedKeys(note, 'Keys `RAI_SECRET_SOURCE=file` reads');
+  const names = fileSourceNames();
+  assert.ok(names.length > 0, 'CUSTODY_NAMES parsed');
+  assert.deepEqual(sorted(fileKeys), sorted(names), 'the file-source list matches CUSTODY_NAMES');
+  const custody = tableRows(note)
+    .filter((r) => r.value === 'custody')
+    .map((r) => r.key);
+  const envOnly = listedKeys(note, 'Custody keys read only from the environment');
+  assert.deepEqual(
+    sorted(envOnly),
+    sorted(custody.filter((k) => !names.includes(k))),
+    'custody keys the file source does not overlay are listed as environment-only',
+  );
+  for (const key of ['DATABASE_URL', 'DATABASE_MIGRATE_URL', 'DATABASE_OPERATOR_URL', 'DATABASE_ADMIN_URL'])
+    assert.ok(!fileKeys.includes(key), `${key} is not read from RAI_SECRET_DIR`);
+});

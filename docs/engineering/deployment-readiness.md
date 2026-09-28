@@ -60,8 +60,8 @@ In the table, **Production value** is either a literal the code accepts for this
 | `PORT` | server | host | platform | The port the platform routes to (1-65535). |
 | `PUBLIC_BASE_URL` | server | host | platform | The public `https` origin the proxy serves, for example `https://rai-desk.example.org`. `network` refuses a non-`https` URL (`base_url_not_https`, S17), because the session cookie is then `Secure` with the `__Host-` prefix. Mail links are built from it. |
 | `TRUST_PROXY` | server | `true` | literal | Behind the platform's TLS proxy, so the client address and protocol come from the forwarded headers. `local-google` refuses `true` (S5). |
-| `DATABASE_URL` | server, `release:check-rollback` | custody | secret store | `postgres://rai_app:…@<host>:5432/<db>`; the runtime role (section 4). Add the TLS parameters the managed service requires (for example `?sslmode=require`). |
-| `DATABASE_MIGRATE_URL` | `migrate`, `backup`, `restore`; parsed by the server | custody | secret store | `rai_owner`; the only connection that runs DDL. The server parses it but never connects with it. |
+| `DATABASE_URL` | server, `release:check-rollback`; parsed (and required) by every command that opens the database | custody | secret store | `postgres://rai_app:…@<host>:5432/<db>`; the runtime role (section 4). Add the TLS parameters the managed service requires (for example `?sslmode=require`). |
+| `DATABASE_MIGRATE_URL` | `migrate`, `backup`, `restore`; parsed (and required) by the server and every command that opens the database | custody | secret store | `rai_owner`; the only connection that runs DDL. The server parses it but never connects with it. |
 | `DATABASE_OPERATOR_URL` | `db:cleanup`, `store:verify` | custody | secret store | `rai_operator`. When empty it falls back to `DATABASE_MIGRATE_URL`, which is acceptable only locally: set it on a host. |
 | `DATABASE_ADMIN_URL` | `restore`, `restore:verify` | custody | secret store | A role with `CREATEDB` that can `SET ROLE` to `rai_app` and `rai_owner`. Only the restore commands read it; give it to the operator's shell, not the server's environment. |
 | `BLOB_DIR` | server, `backup`, `store:*`, `db:cleanup` | host | persistent volume | Absolute path on a persistent volume (section 5). Created 0700; `tmp/` is emptied at start. |
@@ -81,7 +81,7 @@ In the table, **Production value** is either a literal the code accepts for this
 | `RAI_IDENTITY_GOOGLE_CLIENT_SECRET` | server | unset | — | As above. |
 | `RAI_IDENTITY_LOCAL_ROLE_MAP` | server | unset | — | `local-google` only. |
 | `RAI_IDENTITY_ENTRA_TENANT_ID` | server | unset | — | `network`/`ad` and `production` (W8). |
-| `RAI_SECRET_SOURCE` | server | `env` | literal | `env`: secrets arrive as environment variables from the host's secret store. `file` reads one file per secret under `RAI_SECRET_DIR` instead (W7-D4, both implemented). |
+| `RAI_SECRET_SOURCE` | server | `env` | literal | `env`: secrets arrive as environment variables from the host's secret store. `file` reads only the identity secrets (section 6 lists them) from one file each under `RAI_SECRET_DIR`; the four database URLs stay environment variables either way (W7-D4, both implemented). |
 | `RAI_SECRET_DIR` | server | unset | — | Only with `RAI_SECRET_SOURCE=file` (default `/run/secrets`). |
 | `RAI_SESSION_ABSOLUTE_HOURS` | server | `12` | literal | 1-24. |
 | `RAI_SESSION_IDLE_MINUTES` | server | `120` | literal | 5-720. |
@@ -143,7 +143,29 @@ Uploaded documents are content-addressed files under `BLOB_DIR` (`sha256/…`, w
 
 ## 6. Secrets
 
-- The OIDC issuer URL, client ID and client secret, the allow-list JSON and the four database URLs come from the host's secret store. With `RAI_SECRET_SOURCE=env` the store exposes them as environment variables; with `file` each is a file named after the key under `RAI_SECRET_DIR`, read once at start. D10 decides custody and may add a vault implementation behind the same interface (W0-03 section 8).
+- The OIDC issuer URL, client ID and client secret, the allow-list JSON and the four database URLs come from the host's secret store. D10 decides custody and may add a vault implementation behind the same interface (W0-03 section 8).
+- With `RAI_SECRET_SOURCE=env` (the value section 3.1 gives) every custody key arrives as an environment variable. This is the only setting under which one mechanism serves all of them.
+- With `RAI_SECRET_SOURCE=file` only the identity secrets below are read from files, one file named after the key under `RAI_SECRET_DIR`, read once at start (`identity/adapter.ts`, `CUSTODY_NAMES`). The database URLs are **not**: `parseDatabaseConfig` and `parseRestoreConfig` read them from the environment only, for the server and for every operator command. A host that mounts them as files and not as environment variables refuses to start with `missing:DATABASE_URL` (exit 78). Under `file`, the database URLs must still be set as environment variables. Extending the file source to them is a D10 custody follow-up, not done here.
+
+#### Keys `RAI_SECRET_SOURCE=file` reads
+
+- `RAI_IDENTITY_GOOGLE_CLIENT_ID`
+- `RAI_IDENTITY_GOOGLE_CLIENT_SECRET`
+- `RAI_IDENTITY_OIDC_ISSUER_URL`
+- `RAI_IDENTITY_OIDC_CLIENT_ID`
+- `RAI_IDENTITY_OIDC_CLIENT_SECRET`
+- `RAI_IDENTITY_ALLOW_LIST_JSON`
+- `RAI_IDENTITY_ENTRA_TENANT_ID`
+
+#### Custody keys read only from the environment
+
+- `DATABASE_URL`
+- `DATABASE_MIGRATE_URL`
+- `DATABASE_OPERATOR_URL`
+- `DATABASE_ADMIN_URL`
+
+#### Handling
+
 - Never in a committed file: `rai-web/.env` is gitignored and holds only local synthetic values; `.env.example` holds placeholders (`set-in-custody`, `set-locally`), and a placeholder or empty value counts as absent, so a forgotten one refuses to start (S15).
 - No log line, readiness report, reason code or backup manifest carries a secret value (W0-10 redaction).
 - Allow-lists for the synthetic stage hold only `@rai-desk.example` addresses (W7-D4); real people's addresses need D08.
@@ -197,7 +219,7 @@ A host is ready to receive this desk when each line is true. Record the answers 
 - [ ] TLS-terminating proxy with an `https` public URL; request body limit at least `UPLOAD_MAX_PACK_BYTES`; the process bound to `0.0.0.0` on the platform port.
 - [ ] Postgres 16 where an administrator can create `rai_owner`, `rai_app`, `rai_operator` and make `rai_owner` the database owner.
 - [ ] A persistent volume for `BLOB_DIR` and `MAIL_SINK_DIR` that survives restarts and redeploys.
-- [ ] A secret store exposing environment variables (or mounted files) for the custody keys.
+- [ ] A secret store exposing the custody keys as environment variables (mounted files serve only the identity secrets; the database URLs must be environment variables, section 6).
 - [ ] `pg_dump` and `pg_restore` of the server's major version available to the operator, and a backup target off the host.
 - [ ] Health check on `/readyz`, liveness on `/healthz`, stdout log collection.
 - [ ] An OIDC client at the chosen issuer with the desk's redirect URI, and an allow-list of synthetic-stage users.
