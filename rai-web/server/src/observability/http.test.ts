@@ -48,6 +48,7 @@ const identityResolving = (resolve: () => Promise<SessionRecord | undefined>): I
     resolvePrincipal: unavailable,
     health: () => ({ mode: 'fixture', ready: true }),
     sessionPolicy: () => ({ absoluteHours: 12, idleMinutes: 30 }),
+    configuredGrants: () => [],
   },
   sessionStore: {
     create: unavailable,

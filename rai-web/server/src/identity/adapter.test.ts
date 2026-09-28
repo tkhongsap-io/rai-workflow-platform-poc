@@ -510,3 +510,109 @@ test('the file secret source overlays custody-held secrets before the parse and 
   await adapter.start(networked);
   assert.equal(adapter.health().ready, true);
 });
+
+// W7-07 (W7 plan section 5.3, W7-D12 option A): the configured (role, scope) grants, never an email, so start.ts can
+// add the allow-list's or role map's business units to the BU directory.
+test('W7-07 configuredGrants: network/allow-list returns the allow-list grants in order, deduplicated, no email', async () => {
+  const list = JSON.stringify({
+    version: 1,
+    entries: [
+      {
+        email: 'spoc.a@rai-desk.example',
+        roles: [
+          { role: 'bu_spoc', scope: { kind: 'business_unit', businessUnit: 'RET' } },
+          { role: 'bu_spoc', scope: { kind: 'business_unit', businessUnit: 'CM' } },
+        ],
+      },
+      {
+        email: 'spoc.b@rai-desk.example',
+        roles: [{ role: 'bu_spoc', scope: { kind: 'business_unit', businessUnit: 'RET' } }],
+      },
+      { email: 'dpo@rai-desk.example', roles: [{ role: 'dpo', scope: { kind: 'all_cases', lane: 'dpo' } }] },
+    ],
+  });
+  const adapter = createIdentityAdapter({
+    env: { ...networkAllowList, RAI_IDENTITY_ALLOW_LIST_JSON: list },
+    nodeEnv: 'test',
+    discovery: discoverOk,
+    groupMappingSource: noMapping,
+  });
+  assert.deepEqual(adapter.configuredGrants(), [], 'nothing before start()');
+  await adapter.start(networked);
+  const grants = adapter.configuredGrants();
+  assert.deepEqual(grants, [
+    { role: 'bu_spoc', scope: { kind: 'business_unit', businessUnit: 'RET' } },
+    { role: 'bu_spoc', scope: { kind: 'business_unit', businessUnit: 'CM' } },
+    { role: 'dpo', scope: { kind: 'all_cases', lane: 'dpo' } },
+  ]);
+  assert.ok(!JSON.stringify(grants).includes('@'), 'never an email');
+  (grants[0]!.scope as { businessUnit: string }).businessUnit = 'MUTATED';
+  assert.equal(
+    (adapter.configuredGrants()[0]!.scope as { businessUnit: string }).businessUnit,
+    'RET',
+    'a copy, not the resolver state',
+  );
+});
+
+test('W7-07 configuredGrants: local-google returns the role map grants, or none without a map; fixture and network/ad none', async () => {
+  const roleMap = JSON.stringify({
+    version: 1,
+    entries: [
+      {
+        email: 'spoc.dev@example.test',
+        roles: [{ role: 'bu_spoc', scope: { kind: 'business_unit', businessUnit: 'ENT' } }],
+      },
+    ],
+  });
+  const mapped = createIdentityAdapter({
+    env: { ...google, RAI_IDENTITY_LOCAL_ROLE_MAP: '/untracked/role-map.json' },
+    nodeEnv: 'development',
+    discovery: discoverOk,
+    groupMappingSource: noMapping,
+    readLocalRoleMap: () => Promise.resolve(roleMap),
+  });
+  await mapped.start(loopback);
+  assert.deepEqual(mapped.configuredGrants(), [
+    { role: 'bu_spoc', scope: { kind: 'business_unit', businessUnit: 'ENT' } },
+  ]);
+
+  const unmapped = createIdentityAdapter({
+    env: google,
+    nodeEnv: 'development',
+    discovery: discoverOk,
+    groupMappingSource: noMapping,
+  });
+  await unmapped.start(loopback);
+  assert.deepEqual(unmapped.configuredGrants(), [], 'the default owner role is not a configured grant');
+
+  const fixture = createIdentityAdapter({
+    env: { RAI_IDENTITY_MODE: 'fixture' },
+    nodeEnv: 'test',
+    discovery: () => Promise.reject(new Error('never called in fixture mode')),
+    groupMappingSource: noMapping,
+    fixtureUsers: [
+      {
+        fixtureUserId: 'fx-user-spoc-cm',
+        subjectId: 'fixture:fx-user-spoc-cm',
+        displayName: 'SPOC (synthetic)',
+        email: 'spoc.cm@rai-desk.example',
+        roles: [{ role: 'bu_spoc', scope: { kind: 'business_unit', businessUnit: 'CM' } }],
+      },
+    ],
+  });
+  await fixture.start(loopback);
+  assert.deepEqual(
+    fixture.configuredGrants(),
+    [],
+    'fixture grants reach the BU directory through the identity table',
+  );
+
+  const ad = createIdentityAdapter({
+    env: networkAd,
+    nodeEnv: 'test',
+    discovery: discoverOk,
+    groupMappingSource: () => mapping(tenant),
+  });
+  await ad.start(networked);
+  assert.deepEqual(ad.configuredGrants(), []);
+});

@@ -14,8 +14,7 @@ import type { Db } from './db/client.js';
 import { createFixtureIdentityProvider, type FixtureIdentity } from './identity/fixture.js';
 import { createPgSessionStore } from './identity/session.js';
 import type { IdentityAdapter } from './identity/types.js';
-import { laneOpenRecipientsFromIdentities, laneReviewerSpocUnits } from './versions/open-lanes.js';
-import { sendBackRecipientsFromIdentities } from './workflow/send-back-notice.js';
+import { createRecipientDirectory, type RecipientDirectory } from './notifications/directory.js';
 
 export interface ComposeInputs {
   /** `mail` is optional: the in-process test harness has no MAIL_MODE, which the configuration store treats as a sink. */
@@ -32,6 +31,11 @@ export interface ComposeInputs {
   qcRunner?: QcRunner | undefined;
   /** Absent: no case mail and no digest. */
   mailSink?: MailSink | undefined;
+  /**
+   * W7-07 (W7 plan section 5.3): the live recipient directory outside fixture mode (loaded by start.ts, refreshed by
+   * the sign-in hook bound here). Absent: fixed over `fixtureUsers`, the values this function derived before.
+   */
+  recipients?: RecipientDirectory | undefined;
   readiness: () => Promise<ReadinessReport>;
   now?: (() => Date) | undefined;
   /** The built SPA to serve; absent when there is no web build (API only). */
@@ -40,11 +44,12 @@ export interface ComposeInputs {
 
 export function composeAppDeps(inputs: ComposeInputs): AppDeps {
   const { config, db, fixtureUsers, qcRunner, mailSink } = inputs;
-  // The fixture identities are the only directory in slice 1; AD resolution is W8.
+  // The fixture identities name subjects in fixture mode; W7-06 subject profiles name them otherwise.
   const knownIdentities = fixtureUsers ?? [];
   const subjects = createSubjectDirectory(db, { known: knownIdentities }); // one directory for cases and versions
-  const ownerRecipients = (ownerSubjectId: string) =>
-    sendBackRecipientsFromIdentities(knownIdentities, ownerSubjectId);
+  // W7-07: mail recipients come from the directory, read at each use; fixed over the fixture identities by default.
+  const recipients = inputs.recipients ?? createRecipientDirectory({ fixtureUsers: knownIdentities });
+  const ownerRecipients = (ownerSubjectId: string) => recipients.ownerRecipients(ownerSubjectId);
   const { publicBaseUrl } = config;
   return {
     db,
@@ -55,13 +60,15 @@ export function composeAppDeps(inputs: ComposeInputs): AppDeps {
       ? {}
       : {
           digest: { publicBaseUrl },
-          notifications: { sink: mailSink, identities: knownIdentities, publicBaseUrl },
+          notifications: { sink: mailSink, identities: recipients.identities, publicBaseUrl },
         }),
     identity: {
       adapter: inputs.adapter,
       sessionStore: createPgSessionStore(db),
       facts: createScopeFactsSource(db),
       ...(fixtureUsers === undefined ? {} : { fixtureProvider: createFixtureIdentityProvider(fixtureUsers) }),
+      // W7-07: each committed non-fixture sign-in refreshes the live recipient directory (the W7-06 hook).
+      ...(inputs.recipients === undefined ? {} : { profiles: { recorded: inputs.recipients.recorded } }),
     },
     cases: { businessUnits: inputs.businessUnits, subjects },
     // W6-04: the Admin configuration API; MAIL_MODE feeds the synthetic-recipient publish check (W6-03).
@@ -76,8 +83,8 @@ export function composeAppDeps(inputs: ComposeInputs): AppDeps {
     },
     versions: {
       subjects, // W3-F1: the same directory names submitters and deciders on reads
-      laneOpenRecipients: laneOpenRecipientsFromIdentities(knownIdentities),
-      laneReviewerSpocUnits: laneReviewerSpocUnits(knownIdentities), // W3-F2
+      laneOpenRecipients: recipients.laneOpenRecipients,
+      laneReviewerSpocUnits: recipients.laneReviewerSpocUnits, // W3-F2
       qc: qcRunner === undefined ? {} : { runner: qcRunner },
     },
     decide: { sendBackRecipientsForOwner: ownerRecipients },

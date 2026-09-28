@@ -45,15 +45,21 @@ const TRANSPORT_BUILTINS = /^(node:)?(net|tls|http|https|http2|dgram|dns|child_p
 const MAIL_SDK =
   /^(nodemailer|emailjs|smtp-|smtp2go|@sendgrid\/|sendgrid|mailgun|mailjet|postmark|resend$|@resend\/|@aws-sdk\/client-ses|@aws-sdk\/client-sesv2|aws-ses|@azure\/communication-email|@mailchimp\/|mandrill|sparkpost|@postal\/|sendmail$|nodemailer-|@google-cloud\/.*mail|googleapis$|mailparser|mailcomposer|smtp-server|smtp-connection)/i;
 
+/** W7-07 (W7 plan section 5.3): the server's in-product file drop is walked by the same rule as the substitutes. */
+const FILE_DROP = path.join(RAI_WEB, 'server', 'src', 'notifications', 'file-drop.ts');
+
 test('the sink modules import only node:crypto, node:fs, node:path and @rai/shared; never a transport', () => {
+  // W7-07: `-` is allowed in an @rai/shared path so `@rai/shared/mail/file-stem` (the moved mailFileStem) matches.
   const allowed =
-    /^(node:crypto|node:fs\/promises|node:fs|node:path|@rai\/shared\/[a-z/]+|\.\.?\/[a-z./-]+\.js)$/;
-  const sinkFiles = readdirSync(SINK_DIR).filter(
-    (n) => n.endsWith('.ts') && !n.endsWith('.test.ts') && n !== 'support.ts',
-  );
+    /^(node:crypto|node:fs\/promises|node:fs|node:path|@rai\/shared\/[a-z/-]+|\.\.?\/[a-z./-]+\.js)$/;
+  const sinkFiles = readdirSync(SINK_DIR)
+    .filter((n) => n.endsWith('.ts') && !n.endsWith('.test.ts') && n !== 'support.ts')
+    .map((n) => path.join(SINK_DIR, n));
   assert.ok(sinkFiles.length >= 5, `sink sources found: ${sinkFiles.join(', ')}`);
-  for (const name of sinkFiles) {
-    const specifiers = specifiersOf(readFileSync(path.join(SINK_DIR, name), 'utf8'));
+  sinkFiles.push(FILE_DROP);
+  for (const file of sinkFiles) {
+    const name = path.relative(RAI_WEB, file);
+    const specifiers = specifiersOf(readFileSync(file, 'utf8'));
     for (const specifier of specifiers) {
       assert.doesNotMatch(specifier, TRANSPORT_BUILTINS, `${name} imports ${specifier}`);
       assert.doesNotMatch(specifier, MAIL_SDK, `${name} imports ${specifier}`);

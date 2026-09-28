@@ -5,7 +5,10 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
 import { createServer, type AddressInfo } from 'node:net';
+import os from 'node:os';
+import path from 'node:path';
 import { migrationFileCount } from './db/migrate.js';
 import { startServer } from './start.js';
 
@@ -490,4 +493,86 @@ test('W7-05 S17: network with an http PUBLIC_BASE_URL exits 78 base_url_not_http
   assert.equal(discovered, 0, 'no discovery is attempted');
   const probe = await fetch(`http://127.0.0.1:${port}/readyz`).catch(() => undefined);
   assert.equal(probe, undefined, 'nothing listens');
+});
+
+// W7-07 (W7 plan sections 2 and 5.3): the mail binding per identity mode and MAIL_MODE, with no parse change.
+// `fixture` keeps loadMailSink; `local-google` and `network` with `sink-file` bind the in-product file drop at
+// MAIL_SINK_DIR (readiness mailSink `file` / `ok`); with `sink-memory` nothing is bound, as before (`unavailable`).
+// The database is unreachable here, so the recipient directory's start-up load fails and the server still starts.
+async function mailReadiness(env: Record<string, string>) {
+  const server = await startServer(env, { exit, discovery, fixtureUsers });
+  try {
+    const res = await fetch(`http://127.0.0.1:${env.PORT}/readyz`);
+    return ((await res.json()) as { mailSink: { kind: string; status: string } }).mailSink;
+  } finally {
+    await server.close();
+  }
+}
+
+for (const [mode, mail, expected] of [
+  ['fixture', 'sink-memory', { kind: 'memory', status: 'ok' }],
+  ['fixture', 'sink-file', { kind: 'file', status: 'ok' }],
+  ['local-google', 'sink-memory', { kind: 'memory', status: 'unavailable' }],
+  ['local-google', 'sink-file', { kind: 'file', status: 'ok' }],
+  ['network', 'sink-memory', { kind: 'memory', status: 'unavailable' }],
+  ['network', 'sink-file', { kind: 'file', status: 'ok' }],
+] as const) {
+  test(`W7-07 binding: ${mode} with MAIL_MODE=${mail} reports mailSink ${expected.kind} ${expected.status}`, async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rai-w7-07-start-'));
+    try {
+      const port = await freePort();
+      const base =
+        mode === 'network'
+          ? { ...networkAllowListEnv(port), PUBLIC_BASE_URL: 'https://desk.rai-desk.test' }
+          : { ...envFor(port, mode), ...(mode === 'fixture' ? {} : { QC_MODE: 'deterministic' }) };
+      const mailDir = path.join(root, 'mail');
+      assert.deepEqual(
+        await mailReadiness({
+          ...base,
+          MAIL_MODE: mail,
+          MAIL_SINK_DIR: mailDir,
+          BLOB_DIR: path.join(root, 'blobs'),
+        }),
+        expected,
+      );
+      if (mode !== 'fixture' && mail === 'sink-file')
+        assert.equal((await stat(mailDir)).isDirectory(), true, 'the drop directory exists after the probe');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+}
+
+test('W7-07 BU directory: a local-google role map adds its bu_spoc business units to the fixture BU keys', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'rai-w7-07-bu-'));
+  try {
+    const roleMap = path.join(root, 'role-map.json');
+    await writeFile(
+      roleMap,
+      JSON.stringify({
+        version: 1,
+        entries: [
+          {
+            email: 'spoc.ent@rai-desk.example',
+            roles: [
+              { role: 'bu_spoc', scope: { kind: 'business_unit', businessUnit: 'ENT' } },
+              { role: 'bu_spoc', scope: { kind: 'business_unit', businessUnit: 'CM' } },
+            ],
+          },
+        ],
+      }),
+    );
+    const port = await freePort();
+    const server = await startServer(
+      { ...envFor(port, 'local-google'), QC_MODE: 'deterministic', RAI_IDENTITY_LOCAL_ROLE_MAP: roleMap },
+      { exit, discovery },
+    );
+    try {
+      assert.deepEqual([...server.businessUnits.list()], ['CM', 'HR', 'ENT']);
+    } finally {
+      await server.close();
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });

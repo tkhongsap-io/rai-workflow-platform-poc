@@ -54,6 +54,8 @@ export interface AllowListResolver extends RoleResolver {
   displayNameFor(email: string): string | undefined;
   /** Whether the email is listed (for the local-google default-to-owner rule). */
   has(email: string): boolean;
+  /** W7-07: every listed (role, scope) grant once, in document order, as copies; never an email. */
+  grants(): readonly RoleScope[];
 }
 
 export function createAllowListResolver(list: AllowList): AllowListResolver {
@@ -73,5 +75,11 @@ export function createAllowListResolver(list: AllowList): AllowListResolver {
     },
     displayNameFor: (email) => byEmail.get(email.toLowerCase())?.displayNameOverride,
     has: (email) => byEmail.has(email.toLowerCase()),
+    grants: () => {
+      const seen = new Map<string, RoleScope>();
+      for (const entry of byEmail.values())
+        for (const grant of entry.roles) seen.set(JSON.stringify(grant), grant);
+      return [...seen.values()].map((grant) => structuredClone(grant));
+    },
   };
 }

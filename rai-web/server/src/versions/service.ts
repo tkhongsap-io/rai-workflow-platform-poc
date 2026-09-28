@@ -71,6 +71,7 @@ import {
 import { withWorkflowTransaction, type ActionContext, type WorkflowResult } from './transaction.js';
 import type { ErrorCapture } from '../observability/errors.js';
 import type { Emitter } from '../observability/log.js';
+import { current, type Live } from '../notifications/directory.js';
 import {
   proposeAtSubmit,
   riskAuditRef,
@@ -84,10 +85,13 @@ export interface VersionServiceDeps {
   now?: () => Date;
   /** W3-F1: names for display on reads; absent means reads carry subject IDs only. */
   subjects?: SubjectDirectory;
-  /** Slice-1: fixture reviewers who hold each lane (from identity data). Empty until W8 AD resolution otherwise. */
-  laneOpenRecipients?: LaneOpenRecipients;
+  /**
+   * Slice-1: fixture reviewers who hold each lane (from identity data). W7-07: or a function the recipient directory
+   * answers at each submit (the subject profiles outside fixture mode; W7 plan section 5.3).
+   */
+  laneOpenRecipients?: Live<LaneOpenRecipients>;
   /** W3-F2: lane reviewers' BU-SPOC grants; a reviewer who is SPOC of the case's BU gets no lane-opened mail. */
-  laneReviewerSpocUnits?: LaneReviewerSpocUnits;
+  laneReviewerSpocUnits?: Live<LaneReviewerSpocUnits>;
   /** W5-05: the `risk.proposal.*` lines after commit; absent in suites that build no app. */
   emitter?: Emitter;
   /** W5-05: where an engine error goes (`errors.internal`); the submit still commits. */
@@ -265,8 +269,8 @@ export async function submitDraft(
           idempotencyKeyRef: idempotencyKeyReference,
           occurredAt: now,
           recipients: laneOpenRecipientsForCase(
-            deps.laneOpenRecipients ?? EMPTY_LANE_OPEN_RECIPIENTS,
-            deps.laneReviewerSpocUnits,
+            current(deps.laneOpenRecipients ?? EMPTY_LANE_OPEN_RECIPIENTS),
+            deps.laneReviewerSpocUnits === undefined ? undefined : current(deps.laneReviewerSpocUnits),
             before.businessUnitId,
           ),
         });

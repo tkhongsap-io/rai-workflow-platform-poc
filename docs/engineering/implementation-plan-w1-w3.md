@@ -352,7 +352,7 @@ Rules: no secret in Git, ever; `.env` is gitignored; `.env.example` (created by 
 | `RAI_SECRET_DIR` | `/run/secrets` | server | `file` source only. |
 | `RAI_SESSION_ABSOLUTE_HOURS` | `12` | server | Absolute session lifetime, 1-24 (W0-03 section 6.3). |
 | `RAI_SESSION_IDLE_MINUTES` | `120` | server | Idle session lifetime, 5-720 (W0-03 section 6.3). |
-| `MAIL_MODE` | `sink-file` | server | `sink-file` \| `sink-memory` in slice 1. No transport value exists until W7 authorizes one (W0-07). |
+| `MAIL_MODE` | `sink-file` | server | `sink-file` \| `sink-memory` in slice 1. No transport value exists until W7 authorizes one (W0-07). W7-07 (2026-09-28): `fixture` binds the W1-11 sinks; `local-google` and `network` bind the in-product file drop for `sink-file` and nothing for `sink-memory` (W7 plan sections 2 and 5.3); the parse is unchanged. |
 | `MAIL_SINK_DIR` | `./.local/mail` | server | Where `sink-file` writes one JSON file per delivery attempt. |
 | `QC_MODE` | `substitute` | server | The only slice-1 value (W1-10). W4 adds a real implementation under ADR-0006. |
 | `LOG_LEVEL` | `info` | server | pino level. |
