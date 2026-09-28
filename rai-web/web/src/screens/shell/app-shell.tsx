@@ -119,6 +119,10 @@ export function AppShell({ children }: { children: ReactNode }): JSX.Element {
       </header>
       {signedIn ? (
         <nav className={'shell-nav'} aria-label={t('shell.nav_label')}>
+          {/* W6-15: the dashboard is first, for every signed-in role (W6 plan section 9). */}
+          <NavLink to={ROUTES.dashboard} end={true}>
+            {t('dashboard.title')}
+          </NavLink>
           <NavLink to={ROUTES.queue} end={true}>
             {t('queue.title')}
           </NavLink>
