@@ -298,6 +298,7 @@ export async function listCases(
     status: r.status,
     currentVersionNumber: r.c.currentVersionId === null ? null : r.currentVersionNumber,
     updatedAt: r.c.updatedAt.toISOString(),
+    riskTier: r.c.riskTier as CaseView['riskTier'], // W5-09: always served, as CaseView (CHECK-bound)
   }));
   return { items, total: totalRow?.total ?? 0 };
 }

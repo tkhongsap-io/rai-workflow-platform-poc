@@ -612,6 +612,7 @@
   "risk.council.possible": "May require RAI Council confirmation if the tier turns out High. The desk does not record Council decisions. All three lanes remain active.",
   "risk.council.required": "High: requires RAI Council confirmation. The desk does not record Council decisions. All three lanes remain active.",
   "risk.evidence.hint": "Counts only when slot {slot} ({name}) is attached. Now: {state}",
+  "risk.list.tier": "Proposed risk tier",
   "risk.placeholder.banner": "Synthetic placeholder questionnaire: not the approved AI/COE instrument (D07 open). Tiers shown are for demonstration.",
   "risk.preview.label": "Preview: the proposal is recorded when you submit",
   "risk.preview.tier": "Proposed tier (preview)",

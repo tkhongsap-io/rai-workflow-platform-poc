@@ -15,7 +15,7 @@ import {
 } from 'drizzle-orm';
 import { alias, type PgColumn } from 'drizzle-orm/pg-core';
 import { LANES } from '@rai/shared/constants';
-import type { CaseStatus, LaneProjectionStatus } from '@rai/shared/schemas/cases';
+import type { CaseStatus, LaneProjectionStatus, RiskTier } from '@rai/shared/schemas/cases';
 import {
   QUEUE_DEFAULTS,
   type QueueItem,
@@ -238,6 +238,8 @@ export async function readQueue(
           currentVersionNumber: row.currentVersionNumber,
           latestVersionNumber: row.latestVersionNumber,
           updatedAt: row.updatedAt.toISOString(),
+          // W5-09: always served (optional in the shared type only for the frozen substitute); CHECK-bound tier or null.
+          riskTier: row.riskTier as RiskTier | null,
           lanes: dueDates.map((due) => ({
             lane: due.lane,
             due,

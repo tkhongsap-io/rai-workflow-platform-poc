@@ -9,6 +9,8 @@ import {
   withoutDrilldown,
   NEXT_ACTION_LABELS,
 } from './view-model.js';
+import type { QueueItem } from '@rai/shared/schemas/queue';
+import { riskTierChipOf, showsPlaceholderBanner } from '../cases/case-list.view-model.js';
 
 test('URL values round-trip without dropping literal Thai/wildcard filters', () => {
   const query = {
@@ -139,4 +141,30 @@ test('each drill-down key has a th/en label, in the fixed key order', () => {
   ]);
   assert.deepEqual(drilldownLabels({ page: 1 }), []);
   assert.deepEqual(drilldownLabels({ sla: 'breached' })[0]!.label, 'queue.drill.sla.breached');
+});
+
+// W5-09: a queue card reads the same chip; a substitute item without the key shows none (W5 plan section 6).
+test('queue items: the tier chip reads riskTier, and an item without the key shows no chip and no banner', () => {
+  const item: QueueItem = {
+    caseId: 'c1',
+    registryId: 'RAI-2000-0001',
+    useCaseName: 'x',
+    businessUnitId: 'CM',
+    businessUnit: 'Consumer Mobile',
+    businessOwner: 'fixture:o',
+    ownerDisplayName: 'O',
+    useCaseGroup: 'g',
+    status: 'in_review',
+    currentVersionNumber: 1,
+    latestVersionNumber: 1,
+    sourceRecordId: { kind: 'unknown' },
+    lanes: [],
+    nextAction: 'review_lanes',
+    updatedAt: '2026-09-21T00:00:00.000Z',
+  };
+  assert.equal(riskTierChipOf(item.riskTier), null);
+  assert.equal(showsPlaceholderBanner([item]), false);
+  const high: QueueItem = { ...item, riskTier: 'high' };
+  assert.equal(riskTierChipOf(high.riskTier)?.labelKey, 'risk.tier.high');
+  assert.equal(showsPlaceholderBanner([item, high]), true);
 });

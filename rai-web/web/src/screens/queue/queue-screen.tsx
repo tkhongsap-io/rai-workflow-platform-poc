@@ -10,7 +10,9 @@ import { formatDate, formatDateTime } from '../../i18n/format.js';
 import { useLocale } from '../../i18n/locale-provider.js';
 import { useSignedInSession } from '../../session/session-provider.js';
 import { ROUTES } from '../../routes.js';
-import { pageCount } from '../cases/case-list.view-model.js';
+import { PlaceholderRubricBanner } from '../../components/placeholder-rubric-banner.js';
+import { pageCount, showsPlaceholderBanner } from '../cases/case-list.view-model.js';
+import { RiskTierFact } from '../cases/risk-tier-chip.js';
 import { canCreateCase } from '../operator/desk-health.view-model.js';
 import {
   NEXT_ACTION_LABELS,
@@ -88,6 +90,7 @@ function QueueCard({ item }: { item: QueueItem }): JSX.Element {
               )}
             </dd>
           </div>
+          <RiskTierFact riskTier={item.riskTier} />
         </dl>
         {item.currentVersionNumber !== null && item.latestVersionNumber > item.currentVersionNumber ? (
           <p className={'small muted'}>
@@ -408,11 +411,16 @@ export function QueueScreen(): JSX.Element {
                   </button>
                 </div>
               ) : (
-                <ul className={'case-grid'} aria-label={t('cases.list_label')}>
-                  {response.items.map((item) => (
-                    <QueueCard key={item.caseId} item={item} />
-                  ))}
-                </ul>
+                <>
+                  {showsPlaceholderBanner(response.items) ? (
+                    <PlaceholderRubricBanner provenance={'synthetic_placeholder'} />
+                  ) : null}
+                  <ul className={'case-grid'} aria-label={t('cases.list_label')}>
+                    {response.items.map((item) => (
+                      <QueueCard key={item.caseId} item={item} />
+                    ))}
+                  </ul>
+                </>
               )}
               {response.total > response.pageSize || response.page > 1 ? (
                 <nav className={'pagination'} aria-label={t('cases.pagination_label')}>

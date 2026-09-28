@@ -632,6 +632,8 @@ export interface ConfigurationView {     // the published revision that applies 
 
 **W5-05 amendment (2026-09-28): `RiskTier` and `CaseView.riskTier`.** [W5 plan](implementation-plan-w5.md) R-9 and R-10. The opaque placeholder above is replaced by `type RiskTier = 'high' | 'medium' | 'low' | 'unknown'` (`RISK_TIERS` in `shared/src/schemas/cases.ts`). `CaseView.riskTier` is no longer null throughout: it is the tier of the latest submitted version's risk proposal, written by the submit transaction (`unknown` when missing answers or evidence leave the tier open), and NULL when that proposal is `unavailable` or no version has one. It stays a projected field: never writable through `PATCH` (422 `projected_field`). Display labels come from the rubric's `tierLabels`, a SYNTHETIC PLACEHOLDER until D07.
 
+**W5-09 amendment (2026-09-28): `riskTier` on `CaseSummary` and `QueueItem`.** [W5 plan](implementation-plan-w5.md) sections 6 and 7. `CaseSummary` gains `riskTier?: RiskTier | null` (so the W3-01 `QueueItem`, section 7.8, inherits it): the same value as `CaseView.riskTier`. It is declared optional only because the frozen in-memory API substitute builds both shapes without it; the real server always serves it on `GET /api/cases` and `GET /api/queue` (null before any submit or when the proposal was unavailable), and the web reads an absent value as null. One column on reads that are already scoped: scope, filters, counts and pages are unchanged, and `riskTier` is not a queue filter (W6-16). The queue and case-list cards show a "Proposed risk tier" chip when there is a tier, with the placeholder rubric banner once above the list.
+
 ### 7.4 Artifact upload and download (W1-03a/b; consumed by W1-06)
 
 ```ts
