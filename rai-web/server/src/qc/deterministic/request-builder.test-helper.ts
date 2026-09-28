@@ -1,4 +1,4 @@
-// W4-03 test support (unit tests only): a synthetic `QcRunRequest` with nine slot states and the seeded `w4a.1`
+// W4-03 test support (unit tests only): a synthetic `QcRunRequest` with nine slot states and the seeded `w5.1`
 // selection for its trigger. Artifacts refuse `read()`, so a rule that touched document bytes would fail the test.
 // Synthetic values only; no fixture document is involved.
 import { CURRENT_LANE_MAPPING, type Lane } from '@rai/shared/constants';
@@ -35,6 +35,8 @@ export interface RequestShape {
   /** Dispositions by slot; every other slot is `attached`. */
   slots?: Partial<Record<SlotNumber, SlotDisposition>>;
   rules?: SelectedRule[] | null;
+  /** W5-10: the version's submit proposal; defaults to null (no proposal, as for a version submitted before W5). */
+  riskProposal?: QcRunRequest['riskProposal'];
   reads?: { count: number };
 }
 
@@ -88,6 +90,7 @@ export function requestOf(shape: RequestShape = {}): QcRunRequest {
     artifacts,
     deadlineMs: Date.parse('2026-09-27T05:00:10Z'),
     rules: shape.rules === undefined ? seededRules(trigger) : shape.rules,
+    riskProposal: shape.riskProposal ?? null,
   };
 }
 

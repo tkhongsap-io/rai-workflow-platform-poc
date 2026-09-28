@@ -51,13 +51,17 @@ const submitted = {
 };
 
 test('requestOf builds a submit request over all nine slots and the artifacts with rows', () => {
-  const request = requestOf(slotRead(), caseRow, submitted, 'submit', null, 'corr-1', 1234, REVISION, RULES);
+  const request = requestOf(slotRead(), caseRow, submitted, 'submit', null, 'corr-1', 1234, REVISION, RULES, {
+    status: 'proposed',
+    tier: 'unknown',
+  });
   assert.equal(request.trigger, 'submit');
   assert.equal(request.lane, null);
   assert.equal(request.correlationId, 'corr-1');
   assert.equal(request.deadlineMs, 1234);
   assert.equal(request.qcRulesRevision, REVISION);
   assert.deepEqual(request.rules, RULES);
+  assert.deepEqual(request.riskProposal, { status: 'proposed', tier: 'unknown' }); // W5-10: passed through as given
   assert.deepEqual(request.version, {
     caseId: CASE_ID,
     versionId: VERSION_ID,
@@ -114,7 +118,7 @@ test('requestOf builds a submit request over all nine slots and the artifacts wi
 });
 
 test('requestOf: the read handle of a built request streams nothing (W4-05a binds real bytes)', async () => {
-  const request = requestOf(slotRead(), caseRow, submitted, 'submit', null, 'c', 1, REVISION, RULES);
+  const request = requestOf(slotRead(), caseRow, submitted, 'submit', null, 'c', 1, REVISION, RULES, null);
   const reader = (await request.artifacts[0]!.read()).getReader();
   const first = await Promise.race([
     reader.read(),
@@ -135,11 +139,13 @@ test('requestOf carries the lane on an approve attempt and one slot on an upload
     1,
     REVISION,
     RULES,
+    null,
   );
   assert.equal(approve.lane, 'dpo');
+  assert.equal(approve.riskProposal, null);
   assert.equal(approve.slots.length, 9);
   const draft = { ...submitted, submittedAt: null, laneMappingVersion: null };
-  const upload = requestOf(slotRead(), caseRow, draft, 'upload', null, 'c', 1, REVISION, RULES, 5);
+  const upload = requestOf(slotRead(), caseRow, draft, 'upload', null, 'c', 1, REVISION, RULES, null, 5);
   assert.deepEqual(
     upload.slots.map((s) => s.slot),
     [5],
@@ -170,6 +176,7 @@ test('requestOf refuses a submitted version without a lane mapping version', () 
         1,
         REVISION,
         RULES,
+        null,
       ),
     /submitted version has no lane_mapping_version/,
   );

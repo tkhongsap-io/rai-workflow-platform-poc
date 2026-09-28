@@ -11,7 +11,9 @@
 // run has lane NULL and its slot, never replays, shares in-flight work by runKey, and its outage finding is owned by
 // the slot's lane (slot 5: AI/COE; slot 9: no run) and reused per version and owning lane. W4-11b: a result's
 // `engine` identity (extractor version, model, prompt revision, usage) is checked at this boundary and recorded on the
-// run row and its completed / unavailable line, and an unavailable run keeps its bounded `detail`.
+// run row and its completed / unavailable line, and an unavailable run keeps its bounded `detail`. W5-10 (W5 plan
+// R-17): a submit request carries the version's recorded `submit` risk proposal (`riskProposal`, `{ status, tier }`),
+// null when the version has none; upload and approve-attempt requests always carry null. `runKey` is unchanged.
 
 import { Value } from 'typebox/value';
 import { QcUnavailableReasonSchema } from '@rai/shared/schemas/observability';
@@ -26,6 +28,7 @@ import { NotFoundError, StaleVersionError } from '@rai/shared/errors';
 import { uuidv7 } from '@rai/shared/ids';
 import type {
   QcFinding,
+  QcRiskProposal,
   QcRunRequest,
   QcRunResult,
   QcRunner,
@@ -44,6 +47,7 @@ import type { Emitter } from '../observability/log.js';
 import type { ErrorCapture } from '../observability/errors.js';
 import { runWithContext, maybeContext } from '../observability/context.js';
 import { qcLateResult } from '../db/schema/operator-job-run.js';
+import { readSubmitProposal } from '../risk/repository.js';
 import { readSlotsWithArtifacts } from '../versions/repository.js';
 import { nextMonotonicStamp } from '../workflow/monotonic-stamp.js';
 import { staleAt } from '../workflow/refs.js';
@@ -142,6 +146,8 @@ async function buildRequest(
   uploadSlot: Slot | null = null,
 ): Promise<QcRunRequest> {
   // W4-08a: the pure part lives in request.ts, so the evaluation harness builds requests the same way.
+  // W5-10 (R-17): a submit request carries the version's recorded submit proposal; every other trigger null.
+  const riskProposal = trigger === 'submit' ? await submitRiskProposal(tx, version.id) : null;
   return requestOf(
     await readSlotsWithArtifacts(tx, version.id),
     caseRow,
@@ -152,8 +158,19 @@ async function buildRequest(
     deadlineMs,
     ruleRevision,
     rules,
+    riskProposal,
     uploadSlot,
   );
+}
+
+/** W5-10 (R-17): the version's `submit` proposal as QC sees it, or null for a version submitted before W5. */
+async function submitRiskProposal(tx: Tx, versionId: string): Promise<QcRiskProposal | null> {
+  const row = await readSubmitProposal(tx, versionId);
+  if (row === undefined) return null;
+  return {
+    status: row.status as QcRiskProposal['status'],
+    tier: row.tier as QcRiskProposal['tier'],
+  };
 }
 
 interface RunRecord {

@@ -124,7 +124,7 @@ describe(`W4-12 qc-runs read and finding evidence — ${SET}`, () => {
   it('lists every run of the version in requested_at order with runner, revision, label, rules evaluated and finding count; the read writes nothing', async () => {
     const { owner, version, ai, dpo } = await vendorWithThreeRuns();
     const label = await qcRulesLabelOf(version.configurationRevisionId);
-    assert.equal(label, 'w4a.1', 'the seed publishes qc_rules revision 1 (label w4a.1)');
+    assert.equal(label, 'w5.1', 'the seed publishes qc_rules revision 1 (label w5.1)');
 
     const before = await runCount(version.versionId);
     const res = await get(owner, runsUrl(VENDOR.caseId, version.versionId));
@@ -145,7 +145,7 @@ describe(`W4-12 qc-runs read and finding evidence — ${SET}`, () => {
       runner: 'substitute-scripted',
       runnerVersion: QC_SUBSTITUTE_RUNNER_VERSION,
       ruleRevision: version.configurationRevisionId,
-      rulesLabel: 'w4a.1',
+      rulesLabel: 'w5.1',
       // W4-11b: the scripted substitute uses no extractor or model.
       extractorVersion: null,
       model: null,
@@ -365,7 +365,7 @@ describe(`W4-12 qc-runs read and finding evidence — ${SET}`, () => {
     const { runs } = res.json<VersionQcRunsResponse>();
     assert.deepEqual(
       runs.map((r) => [r.trigger, r.slot, r.lane, r.status, r.rulesEvaluated, r.findingCount, r.rulesLabel]),
-      [['upload', 1, null, 'completed', 0, 0, 'w4a.1']],
+      [['upload', 1, null, 'completed', 0, 0, 'w5.1']],
     );
 
     for (const who of [SPOC_CM, AI_COE, OTHER_OWNER]) {

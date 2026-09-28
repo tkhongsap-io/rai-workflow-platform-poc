@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto';
 import { CURRENT_LANE_MAPPING, type Lane, type Slot } from '@rai/shared/constants';
 import type {
   AuthorizedArtifactRef,
+  QcRiskProposal,
   QcRunRequest,
   QcTrigger,
   SelectedRule,
@@ -61,6 +62,7 @@ export function requestOf(
   deadlineMs: number,
   ruleRevision: string,
   rules: SelectedRule[] | null,
+  riskProposal: QcRiskProposal | null, // W5-10 (R-17): the submit proposal; null on upload and approve attempts
   uploadSlot: Slot | null = null,
 ): QcRunRequest {
   const artifactMap = read.artifacts;
@@ -118,5 +120,6 @@ export function requestOf(
     artifacts,
     deadlineMs,
     rules,
+    riskProposal,
   };
 }

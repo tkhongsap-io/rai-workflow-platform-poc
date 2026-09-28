@@ -183,6 +183,7 @@ function buildLaneQcRequest(
     artifacts,
     deadlineMs: Date.now() + 10_000,
     rules: null, // W4-02: the in-memory API keeps no rule catalogue (W4a plan section 11); the scripted runner ignores it
+    riskProposal: null, // W5-10 (R-17): an approve attempt carries no proposal
   };
 }
 

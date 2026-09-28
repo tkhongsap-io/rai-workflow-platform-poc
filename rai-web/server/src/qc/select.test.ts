@@ -20,6 +20,7 @@ test('selection returns the template rules for the trigger, in catalogue order, 
     'PACK-SLOT-MISSING',
     'PACK-STAGE-MISMATCH',
     'PACK-NA-VENDOR-DOC',
+    'RISK-TIER-UNKNOWN', // W5-10 (R-11)
     'PACK-CONTRADICTION', // W4-06d: the submit content rule
   ]);
   assert.deepEqual(ids(SEED, 'v1.0 Sheet3', 'approve_attempt', 'llm'), [
@@ -78,6 +79,7 @@ test('model_type routing: classic_ml gets ACC-CLASSIC-ML-METRIC and none of the 
         'PACK-SLOT-MISSING',
         'PACK-STAGE-MISMATCH',
         'PACK-NA-VENDOR-DOC',
+        'RISK-TIER-UNKNOWN', // W5-10 (R-11)
         'PACK-CONTRADICTION',
       ]);
 });

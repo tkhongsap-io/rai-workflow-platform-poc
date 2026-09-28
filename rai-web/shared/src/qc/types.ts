@@ -59,6 +59,25 @@ export interface QcRunRequest {
    * ignores the field.
    */
   rules: SelectedRule[] | null;
+  /**
+   * W5-10 (W5 plan R-17, W0-07 3.3 amended 2026-09-28): the version's `submit` risk proposal, loaded by the orchestrator
+   * for `submit` runs. `null` on `upload` and `approve_attempt` runs and for a version with no proposal (submitted
+   * before W5). A QC input only (R-11): the deterministic runner's RISK-TIER-UNKNOWN reads it; no tier routes, skips or
+   * grants anything. Not part of `runKey`: a version's submit proposal is fixed at submit.
+   */
+  riskProposal: QcRiskProposal | null;
+}
+
+/**
+ * W5-10: the `RiskTier` codes of `schemas/cases.ts` (R-9), spelled out here so this module keeps importing nothing
+ * but the constants (the substitute's module graph stays small); a server unit test asserts the two are equal.
+ */
+export type QcRiskTier = 'high' | 'medium' | 'low' | 'unknown';
+
+/** W5-10: what QC sees of a recorded risk proposal (W0-04 `risk_proposal.status` and `tier`); nothing else. */
+export interface QcRiskProposal {
+  status: 'proposed' | 'unavailable';
+  tier: QcRiskTier | null; // null only when unavailable
 }
 
 /** A catalogue rule as the runner receives it (W4a plan section 3); `triggers` are already applied. */

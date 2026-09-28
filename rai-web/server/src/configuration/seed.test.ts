@@ -44,9 +44,10 @@ test('the seed holds the ticket-named kinds with the recorded values (D01, D06, 
   );
 });
 
-test('qc_rules revision 1 (w4a.1) catalogues both template versions; v2.0 has no v1.0 Sheet-3 bands (W4-02)', () => {
+test('qc_rules revision 1 (w5.1) catalogues both template versions; v2.0 has no v1.0 Sheet-3 bands (W4-02)', () => {
   const qc = CONFIGURATION_SEED.qc_rules;
-  assert.equal(qc.label, 'w4a.1');
+  // W5-10 (W5 plan section 9, label rule): the label names the last ticket that changed the seeded body.
+  assert.equal(qc.label, 'w5.1');
   assert.deepEqual(
     Object.keys(qc.templates).sort(),
     [...CONFIGURATION_SEED.checklist_templates.versions].sort(),
@@ -57,6 +58,7 @@ test('qc_rules revision 1 (w4a.1) catalogues both template versions; v2.0 has no
     ['PACK-SLOT-MISSING', 'metadata', 'submit+approve_attempt', 'medium'],
     ['PACK-STAGE-MISMATCH', 'metadata', 'submit', 'medium'],
     ['PACK-NA-VENDOR-DOC', 'metadata', 'submit', 'medium'],
+    ['RISK-TIER-UNKNOWN', 'metadata', 'submit', 'medium'], // W5-10 (R-11)
     ['ACC-METRIC-CITED', 'content', 'approve_attempt+upload', 'medium'],
     ['ACC-EXTRACTION-NOT-HALLUCINATION', 'content', 'approve_attempt', 'high'],
     ['ACC-BAND-V1-SHEET3', 'content', 'approve_attempt', 'high'],

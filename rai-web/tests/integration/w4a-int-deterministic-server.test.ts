@@ -161,7 +161,10 @@ async function findings(cookie: string, caseId: string, versionId: string) {
     `/api/cases/${caseId}/versions/${versionId}/findings`,
   );
   assert.equal(res.status, 200, res.text);
-  return res.body.findings.map((f) => ({ rule: f.ruleId, slot: f.slot, lane: f.owningLane }));
+  // W5-10: one run's findings share created_at and have random-ordered IDs, so they are compared by rule and slot.
+  return res.body.findings
+    .map((f) => ({ rule: f.ruleId, slot: f.slot, lane: f.owningLane }))
+    .sort((a, b) => a.rule.localeCompare(b.rule) || (a.slot ?? 0) - (b.slot ?? 0));
 }
 
 async function laneQc(cookie: string, caseId: string, versionId: string, lane: string) {
@@ -184,17 +187,20 @@ describe(`W4a real server, QC_MODE=deterministic — ${SET}`, () => {
     assert.deepEqual(report.qc, { kind: 'deterministic', status: 'ok' });
   });
 
-  it('submit: PACK-SLOT-MISSING on slot 7 for IT/Security; the run names the runner and its version and counts three rules', async () => {
+  it('submit: PACK-SLOT-MISSING on slot 7 for IT/Security; the run names the runner and its version and counts four rules', async () => {
     const target = await editAndSubmit(MISSING_SLOT.caseId, { slots: { 5: { state: 'missing' } } });
     const run = await settledSubmitRun(target.versionId);
     assert.deepEqual(
       [run.engine_id, run.runner_version, run.status, run.rules_evaluated],
-      ['deterministic', SERVER_VERSION, 'completed', 3],
+      ['deterministic', SERVER_VERSION, 'completed', 4], // W5-10: RISK-TIER-UNKNOWN is the fourth
     );
     const owner = await signIn(OWNER);
     assert.deepEqual(
       await findings(owner, MISSING_SLOT.caseId, target.versionId),
-      [{ rule: 'PACK-SLOT-MISSING', slot: 7, lane: 'it_security' }],
+      [
+        { rule: 'PACK-SLOT-MISSING', slot: 7, lane: 'it_security' },
+        { rule: 'RISK-TIER-UNKNOWN', slot: null, lane: 'ai_coe' }, // W5-10: the answerless draft proposes unknown
+      ],
       'slot 5 has two lanes and raises nothing on submit',
     );
     const started = server.linesFor('qc.run.started').find((l) => l.correlationId === target.correlationId);
@@ -213,7 +219,7 @@ describe(`W4a real server, QC_MODE=deterministic — ${SET}`, () => {
     assert.deepEqual(
       (await runRows(target.versionId)).map((r) => [r.trigger, r.lane, r.engine_id, r.rules_evaluated]),
       [
-        ['submit', null, 'deterministic', 3],
+        ['submit', null, 'deterministic', 4],
         ['approve_attempt', 'dpo', 'deterministic', 1],
         ['approve_attempt', 'it_security', 'deterministic', 1],
       ],
@@ -225,6 +231,7 @@ describe(`W4a real server, QC_MODE=deterministic — ${SET}`, () => {
     assert.equal((await settledSubmitRun(target.versionId)).status, 'completed');
     assert.deepEqual(await findings(await signIn(OWNER), NONVENDOR.caseId, target.versionId), [
       { rule: 'PACK-STAGE-MISMATCH', slot: null, lane: 'ai_coe' },
+      { rule: 'RISK-TIER-UNKNOWN', slot: null, lane: 'ai_coe' }, // W5-10
     ]);
   });
 
@@ -233,6 +240,7 @@ describe(`W4a real server, QC_MODE=deterministic — ${SET}`, () => {
     assert.equal((await settledSubmitRun(target.versionId)).status, 'completed');
     assert.deepEqual(await findings(await signIn(OWNER), NA_REASONS.caseId, target.versionId), [
       { rule: 'PACK-NA-VENDOR-DOC', slot: 4, lane: 'dpo' },
+      { rule: 'RISK-TIER-UNKNOWN', slot: null, lane: 'ai_coe' }, // W5-10
     ]);
   });
 
@@ -323,10 +331,10 @@ describe(`W4a real server, QC_MODE=deterministic — ${SET}`, () => {
         findingCount: r.findingCount,
       })),
       [
-        ['upload', 1, null, 0],
-        ['submit', null, null, 3],
-        ['approve_attempt', null, 'dpo', 1],
-      ].map(([trigger, slot, lane, rulesEvaluated]) => ({
+        ['upload', 1, null, 0, 0],
+        ['submit', null, null, 4, 1], // W5-10: RISK-TIER-UNKNOWN evaluated and raised
+        ['approve_attempt', null, 'dpo', 1, 0],
+      ].map(([trigger, slot, lane, rulesEvaluated, findingCount]) => ({
         trigger,
         slot,
         lane,
@@ -334,9 +342,9 @@ describe(`W4a real server, QC_MODE=deterministic — ${SET}`, () => {
         runner: 'deterministic',
         runnerVersion: SERVER_VERSION,
         ruleRevision: version.body.configurationRevisionId,
-        rulesLabel: 'w4a.1',
+        rulesLabel: 'w5.1',
         rulesEvaluated,
-        findingCount: 0,
+        findingCount,
       })),
     );
     const outsider = await call(

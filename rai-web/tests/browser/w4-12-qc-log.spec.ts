@@ -180,7 +180,7 @@ test.describe(`W4-12 QC log and unavailable runs on the real server (${FIXTURE_S
       t('th', 'qc_log.outcome.no_rules'),
     );
     await expect(log.locator(`[data-qc-run-id="${dpoRun.runId}"]`)).toContainText(
-      t('th', 'qc_log.revision', { label: 'w4a.1' }),
+      t('th', 'qc_log.revision', { label: 'w5.1' }),
     );
     await expect(log.locator(`[data-qc-run-id="${uploadRunId}"]`)).toContainText(
       t('th', 'qc_log.outcome.unavailable', { reason: t('th', 'review.qc.reason.timeout') }),

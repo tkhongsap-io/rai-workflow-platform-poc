@@ -7,7 +7,7 @@
 //
 // The content rules are the four the W4a catalogue lists for W4b (W4a plan section 4), with that catalogue's
 // triggers, and `PACK-CONTRADICTION`, added by W4-06d (W6-03 merged first); the server test also asserts the
-// `content` entries equal `CONTENT_RULES`. `RISK-TIER-UNKNOWN` (W5-10) joins in the PR that lands it (W6 plan 11.2).
+// `content` entries equal `CONTENT_RULES`. `RISK-TIER-UNKNOWN` (W5-10) joined in the PR that landed it (W6 plan 11.2).
 import type { QcRuleEngine } from '../schemas/cases.js';
 import type { QcTrigger } from './types.js';
 
@@ -31,6 +31,8 @@ export const IMPLEMENTED_RULES: Readonly<Record<string, ImplementedRule>> = Obje
   'PACK-SLOT-MISSING': rule('metadata', ['submit', 'approve_attempt']),
   'PACK-STAGE-MISMATCH': rule('metadata', ['submit']),
   'PACK-NA-VENDOR-DOC': rule('metadata', ['submit']),
+  // W5-10 (W5 plan R-11): the submit risk proposal is unknown or unavailable.
+  'RISK-TIER-UNKNOWN': rule('metadata', ['submit']),
   // W4b content rules, catalogued in W4a (provisional until D09).
   'ACC-METRIC-CITED': rule('content', ['upload', 'approve_attempt']),
   'ACC-EXTRACTION-NOT-HALLUCINATION': rule('content', ['approve_attempt']),
