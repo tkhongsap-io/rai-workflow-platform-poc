@@ -119,4 +119,10 @@ export interface IdentityAdapter {
   health(): IdentityHealth;
   /** Session lifetimes (section 6.3), known after start(). */
   sessionPolicy(): { absoluteHours: number; idleMinutes: number };
+  /**
+   * W7-07 (W7 plan section 5.3, W7-D12): the (role, scope) grants the configuration names, read after start(): the
+   * allow-list in `network`/`allow-list`, the local role map in `local-google` when one is set; `[]` otherwise and
+   * before start(). Role scopes only, never an email. start.ts adds their business units to the BU directory.
+   */
+  configuredGrants(): readonly RoleScope[];
 }

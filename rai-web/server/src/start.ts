@@ -4,7 +4,9 @@
 
 import { createReadinessReader, computeReadiness } from './observability/health.js';
 import { createStoreProbes } from './observability/probes.js';
-import { loadMailSink } from './notifications/runtime.js';
+import { loadMailSink, type ConfiguredMailSink } from './notifications/runtime.js';
+import { createFileDropMailSink } from './notifications/file-drop.js';
+import { createRecipientDirectory, type RecipientDirectory } from './notifications/directory.js';
 import type { AddressInfo } from 'node:net';
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
@@ -190,18 +192,47 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
   }
 
   // The fixture BU keys apply in every identity mode, so a local-google owner (W0-03 4.1) can file a case; the W6/W8
-  // group mapping replaces them.
+  // group mapping replaces them. W7-07 (W7-D12 option A): plus the business units of the configured grants (the
+  // network allow-list, the local-google role map), read from the started adapter, never an email.
   const knownIdentities = fixtureUsers ?? [];
   const businessUnits = createBusinessUnitDirectory([
     ...(overrides.fixtureBusinessUnits ??
       usersModule?.FIXTURE_BUSINESS_UNITS.map((u) => u.businessUnitId) ??
       []),
     ...businessUnitsFromGrants(knownIdentities.flatMap((u) => [...u.roles])),
+    ...businessUnitsFromGrants(adapter.configuredGrants()),
   ]);
   const store = createFilesystemBlobStore(path.resolve(config.blobDir));
   await store.init(); // root 0700, tmp/ emptied at process start (W0-08 section 6)
-  // Only fixture identities can be synthetic mail recipients in this slice. No live directory or transport.
-  const mailSink = config.identity.mode === 'fixture' ? await loadMailSink(config) : undefined;
+  // Fixture mode keeps the fixtures' sinks and the fixture identities as recipients. W7-07 (W7 plan section 5.3,
+  // W7-D11 option A, W7-D20 option B): local-google and network with MAIL_MODE=sink-file bind the in-product file
+  // drop and a live recipient directory loaded from subject_profile before listen; with sink-memory nothing is bound,
+  // as before. No transport in any mode. A failed directory load does not stop the start: it is recorded once the
+  // app exists and the directory retries on a later read.
+  let mailSink: ConfiguredMailSink | undefined;
+  let recipients: RecipientDirectory | undefined;
+  let recipientLoadError: unknown;
+  let reportRecipientError = (_err: unknown): void => undefined; // bound to errors.internal once the app exists
+  if (config.identity.mode === 'fixture') mailSink = await loadMailSink(config);
+  else if (
+    (config.identity.mode === 'local-google' || config.identity.mode === 'network') &&
+    config.mail.mode === 'sink-file'
+  ) {
+    mailSink = createFileDropMailSink({
+      dir: config.mail.sinkDir,
+      publicBaseUrl: config.publicBaseUrl,
+      ...clock,
+    });
+    const live = createRecipientDirectory({
+      identityMode: config.identity.mode,
+      onRetryError: (err) => reportRecipientError(err),
+    });
+    recipients = live;
+    recipientLoadError = await live.load(db.db).then(
+      () => undefined,
+      (err: unknown) => err ?? new Error('recipient directory load failed'),
+    );
+  }
   const schemaVersion = String(migrationFileCount());
   // Readiness observes the exact runner and sink injected into the existing consumers.
   const readiness = createReadinessReader(() =>
@@ -230,12 +261,15 @@ export async function startServer(env: Env, overrides: StartOverrides = {}): Pro
       store,
       qcRunner,
       mailSink,
+      recipients,
       readiness,
       now: overrides.now,
       webDistDir: serveWeb ? webDistDir : undefined,
     }),
   );
   db.pool.on('error', (err) => errors.internal(err));
+  reportRecipientError = (err) => errors.internal(err);
+  if (recipientLoadError !== undefined) errors.internal(recipientLoadError);
   const close = async () => {
     await drain.close(overrides.drainMs);
     await db.close();

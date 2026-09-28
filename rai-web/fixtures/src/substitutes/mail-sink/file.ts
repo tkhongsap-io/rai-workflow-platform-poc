@@ -5,9 +5,9 @@
 // name. A rejected, forced-failed or duplicate request writes nothing. The accepted-key index is rebuilt from the
 // directory on first use, so `duplicate` survives a process restart.
 
-import { createHash } from 'node:crypto';
 import { access, constants, mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { mailFileStem } from '@rai/shared/mail/file-stem';
 import type { DeliveryReceipt, DeliveryRequest } from '@rai/shared/mail/types';
 import { BaseMailSink, type MailSinkOptions } from './base.js';
 
@@ -22,9 +22,8 @@ export interface MailSinkFile {
   receipt: DeliveryReceipt;
 }
 
-export function mailFileStem(dedupKey: string, attempt: number): string {
-  return `${createHash('sha256').update(dedupKey, 'utf8').digest('hex').slice(0, 16)}-${attempt}`;
-}
+/** Moved to @rai/shared by W7-07 so the server's file drop names files identically; re-exported unchanged. */
+export { mailFileStem };
 
 export class FileMailSink extends BaseMailSink {
   readonly identity = { sink: 'file', version: 'w1-11' } as const;

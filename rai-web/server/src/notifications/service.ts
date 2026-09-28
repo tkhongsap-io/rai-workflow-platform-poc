@@ -25,6 +25,7 @@ import { runWithContext } from '../observability/context.js';
 import type { ErrorCapture } from '../observability/errors.js';
 import type { Emitter } from '../observability/log.js';
 import { loadCommittedDigestRequest, DigestCompositionError } from './digest.js';
+import { current, type Live } from './directory.js';
 import { deliveryUpdate, nextAttempt, RETRY_BACKOFF_MS } from './retry.js';
 import { laneDueDates } from '../sla/due-dates.js';
 import {
@@ -51,7 +52,8 @@ export interface NotificationDeps {
   errors?: ErrorCapture;
   db: Db;
   sink: MailSink;
-  identities: readonly MailIdentity[];
+  /** W7-07: or a function the recipient directory answers, read once per delivery (W7 plan section 5.3). */
+  identities: Live<readonly MailIdentity[]>;
   publicBaseUrl: URL;
   emitter: Emitter;
   now?: () => Date;
@@ -103,7 +105,7 @@ export async function loadCommittedCaseRequest(
     committedAt: audit.occurredAt.toISOString(),
     correlationId: row.correlationId,
   };
-  const recipient = resolveRecipient(deps.identities, row.recipient, event, {
+  const recipient = resolveRecipient(current(deps.identities), row.recipient, event, {
     caseId: caseRow.id,
     ownerSubjectId: caseRow.ownerSubjectId,
     businessUnitId: caseRow.businessUnitId,

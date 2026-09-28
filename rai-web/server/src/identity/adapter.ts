@@ -299,5 +299,8 @@ export function createIdentityAdapter(input: CreateIdentityAdapterInput): Identi
       if (config === undefined) throw new IdentityStartupError('mode_unknown');
       return { ...config.session };
     },
+
+    // W7-07: set only where an allow-list document was parsed (network/allow-list, local-google with a role map).
+    configuredGrants: () => allowList?.grants() ?? [],
   };
 }
