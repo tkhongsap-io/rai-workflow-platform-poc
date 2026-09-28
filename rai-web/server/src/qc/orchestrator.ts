@@ -13,7 +13,6 @@
 // `engine` identity (extractor version, model, prompt revision, usage) is checked at this boundary and recorded on the
 // run row and its completed / unavailable line, and an unavailable run keeps its bounded `detail`.
 
-import { createHash } from 'node:crypto';
 import { Value } from 'typebox/value';
 import { QcUnavailableReasonSchema } from '@rai/shared/schemas/observability';
 import {
@@ -26,7 +25,6 @@ import {
 import { NotFoundError, StaleVersionError } from '@rai/shared/errors';
 import { uuidv7 } from '@rai/shared/ids';
 import type {
-  AuthorizedArtifactRef,
   QcFinding,
   QcRunRequest,
   QcRunResult,
@@ -34,14 +32,7 @@ import type {
   QcTrigger,
   QcUnavailableReason,
   SelectedRule,
-  SlotState,
 } from '@rai/shared/qc/types';
-import {
-  QcEngineIdentitySchema,
-  checkOwningLane,
-  duplicateFindingKey,
-  validateQcFinding,
-} from '@rai/shared/qc/validate';
 import type { StoredFindingSummary } from '@rai/shared/schemas/review';
 import type { CaseRow, PackVersionRow } from '../cases/repository.js';
 import { readCaseRow, readVersionRow } from '../cases/repository.js';
@@ -66,13 +57,14 @@ import {
   ruleRevisionOf,
 } from './repository.js';
 import {
-  ENGINE_IDENTITY_INVALID,
   engineColumnsOf,
   engineLogFields,
   storedUnavailableDetail,
   type EngineLogFields,
 } from './engine-identity.js';
+import { callRunner, unavailableResult } from './check-result.js';
 import { qcKindOf } from './kind.js';
+import { requestOf } from './request.js';
 import { requestRules, ruleContextOf } from './rules-revision.js';
 import { RuleSelectionError } from './select.js';
 
@@ -122,22 +114,6 @@ export type SubmitQcOutcome =
   | PersistQcOutcome
   | { status: 'unavailable'; reason: 'unknown'; runId: string; findings: StoredFindingSummary[] };
 
-function runKeyOf(
-  versionId: string,
-  trigger: QcTrigger,
-  lane: Lane | null,
-  qcRulesRevision: string,
-  artifacts: ReadonlyArray<{ slot: number; contentHash: string }>,
-): string {
-  const parts = artifacts
-    .map((a) => `${a.slot}:${a.contentHash}`)
-    .sort()
-    .join('|');
-  return createHash('sha256')
-    .update(`${versionId}|${trigger}|${lane ?? '-'}|${qcRulesRevision}|${parts}`)
-    .digest('hex');
-}
-
 function slotOfFinding(finding: QcFinding): Slot | null {
   if (finding.scope.kind === 'artifact' || finding.scope.kind === 'slot') return finding.scope.slot;
   return null;
@@ -165,63 +141,19 @@ async function buildRequest(
   rules: SelectedRule[] | null,
   uploadSlot: Slot | null = null,
 ): Promise<QcRunRequest> {
-  const read = await readSlotsWithArtifacts(tx, version.id);
-  const artifactMap = read.artifacts;
-  // W0-07 3.3: an upload request carries the one uploaded slot and its artifact; runKey follows (3.7).
-  const rows = uploadSlot === null ? read.rows : read.rows.filter((s) => s.slot === uploadSlot);
-  const slots: SlotState[] = rows.map((s) => ({
-    slot: s.slot as SlotState['slot'],
-    disposition: s.state as SlotState['disposition'],
-    reason: s.reason,
-    artifactId: s.artifactId,
-  }));
-  const artifacts: AuthorizedArtifactRef[] = [];
-  for (const s of rows) {
-    if (s.state !== 'attached' || s.artifactId === null) continue;
-    const art = artifactMap.get(s.artifactId);
-    if (art === undefined) continue;
-    artifacts.push({
-      artifactId: art.artifactId,
-      slot: s.slot as AuthorizedArtifactRef['slot'],
-      contentHash: art.sha256,
-      mediaType: art.mediaType,
-      filename: art.filename,
-      byteLength: art.sizeBytes,
-      read: () => Promise.resolve(new ReadableStream()),
-    });
-  }
-  // A draft has no mapping frozen yet; its upload run uses the current constant (W4a plan section 5).
-  const laneMappingVersion =
-    version.laneMappingVersion ?? (version.submittedAt === null ? CURRENT_LANE_MAPPING.version : null);
-  if (laneMappingVersion === null) throw new Error('submitted version has no lane_mapping_version');
-  return {
-    correlationId,
-    runKey: runKeyOf(
-      version.id,
-      trigger,
-      lane,
-      ruleRevision,
-      artifacts.map((a) => ({ slot: a.slot, contentHash: a.contentHash })),
-    ),
+  // W4-08a: the pure part lives in request.ts, so the evaluation harness builds requests the same way.
+  return requestOf(
+    await readSlotsWithArtifacts(tx, version.id),
+    caseRow,
+    version,
     trigger,
     lane,
-    version: {
-      caseId: version.caseId,
-      versionId: version.id,
-      versionNumber: version.versionNumber,
-      isDraft: version.submittedAt === null,
-    },
-    checklistTemplateVersion: version.checklistTemplateVersion,
-    qcRulesRevision: ruleRevision,
-    laneMappingVersion,
-    stageContext: version.stageContext as QcRunRequest['stageContext'],
-    modelType: caseRow.modelType as QcRunRequest['modelType'],
-    vendorInvolved: caseRow.vendorInvolved,
-    slots,
-    artifacts,
+    correlationId,
     deadlineMs,
+    ruleRevision,
     rules,
-  };
+    uploadSlot,
+  );
 }
 
 interface RunRecord {
@@ -241,43 +173,6 @@ interface RunLabel {
 
 function labelOf(run: RunRecord, request: QcRunRequest): RunLabel {
   return { runner: run.engineId, runnerVersion: run.runnerVersion, ruleRevision: request.qcRulesRevision };
-}
-
-function unavailableResult(reason: QcUnavailableReason, detail: string | null, stamp: Date): QcRunResult {
-  const at = stamp.toISOString();
-  return { status: 'unavailable', reason, detail, startedAt: at, finishedAt: at };
-}
-
-/**
- * W0-07 3.4 steps 4-5: the first finding that fails validation or the owning-lane check fails the whole run. W4-11b:
- * an `engine` identity that is not identifiers and bounded numbers fails it too (`engine_identity_invalid`) and is
- * not recorded; a valid one is kept on a run a finding refused, since that runner did use it. W4-06a: the request is
- * the validation context, so its artifacts bound every citation (`evidence_outside_request`), and two findings of the
- * run with one `findingKey` fail it (`duplicate_finding_key`, decision 30).
- */
-function checkedResult(result: QcRunResult, request: QcRunRequest, stamp: Date): QcRunResult {
-  if (result.engine !== undefined && !Value.Check(QcEngineIdentitySchema, result.engine))
-    return unavailableResult('runner_error', ENGINE_IDENTITY_INVALID, stamp);
-  if (result.status === 'unavailable') return result;
-  const mapping = LANE_MAPPINGS_BY_VERSION[request.laneMappingVersion];
-  for (const finding of result.findings) {
-    // An unknown mapping can vouch for no lane.
-    const violation =
-      validateQcFinding(finding, request) ??
-      (mapping === undefined ? 'owning_lane_mismatch' : checkOwningLane(finding, mapping, request.lane));
-    if (violation !== null)
-      return {
-        ...unavailableResult('runner_error', violation, stamp),
-        ...(result.engine === undefined ? {} : { engine: result.engine }),
-      };
-  }
-  const duplicate = duplicateFindingKey(result.findings);
-  if (duplicate !== null)
-    return {
-      ...unavailableResult('runner_error', duplicate, stamp),
-      ...(result.engine === undefined ? {} : { engine: result.engine }),
-    };
-  return result;
 }
 
 /**
@@ -589,23 +484,6 @@ function recorded(outcome: PersistQcOutcome, label: RunLabel, result: QcRunResul
     engine: engineLogFields(engineColumnsOf(result.engine)),
     unavailableDetail: storedUnavailableDetail(result),
   };
-}
-
-async function callRunner(
-  runner: QcRunner,
-  request: QcRunRequest,
-  stamp: Date,
-  timeoutMs: number,
-): Promise<QcRunResult> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return checkedResult(await runner.run(request, controller.signal), request, stamp);
-  } catch {
-    return unavailableResult(controller.signal.aborted ? 'timeout' : 'runner_error', null, stamp);
-  } finally {
-    clearTimeout(timer);
-  }
 }
 
 /**

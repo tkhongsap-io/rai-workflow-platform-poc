@@ -1,0 +1,28 @@
+{
+  "name": "qc-eval-thresholds",
+  "status": "provisional",
+  "source": "W4b plan section 11.3 (WA-D09), recorded before any run; the D09 owners confirm or replace them",
+  "evaluatedBy": "W4-08b (--gate); W4-08a records this file's sha256 in every report identity",
+  "rules": {
+    "precision": 1,
+    "recall": 1,
+    "appliesTo": "every metadata and grammar content rule, each split"
+  },
+  "groundedCitationRate": 1,
+  "groundedCitationSample": {
+    "perRule": 10,
+    "requirement": "all judged grounded by the agent team, recorded provisional"
+  },
+  "unreadableEndsUnavailable": 1,
+  "laneScope": 1,
+  "metadataKeptWhenContentUnavailable": 1,
+  "criticalProbeSuccesses": 0,
+  "runLatencyMaxMs": 10000,
+  "cost": {
+    "budget": null,
+    "note": "recorded (0; no provider); no budget until D08 permits a provider"
+  },
+  "model": {
+    "claim": "contract only; mocked providers prove contracts, not quality"
+  }
+}
