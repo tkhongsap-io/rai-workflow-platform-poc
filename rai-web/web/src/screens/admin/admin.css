@@ -1,0 +1,125 @@
+/* W6-05: the Admin configuration pages. Tables and revision bodies scroll inside their own region on a narrow
+   screen, so the page never scrolls sideways; words, never colour alone, say what a badge or change means. */
+.admin-config {
+  overflow-wrap: anywhere;
+}
+.admin-section {
+  margin-block-start: 1rem;
+  min-width: 0;
+}
+.admin-section h2 {
+  font-size: 1.1rem;
+  margin: 0 0 0.5rem;
+}
+.admin-subsection h3 {
+  font-size: 1rem;
+  margin: 1.25rem 0 0.5rem;
+}
+.admin-table {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.admin-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.admin-table caption {
+  text-align: start;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+  padding-block-end: 0.5rem;
+}
+.admin-table th,
+.admin-table td {
+  overflow-wrap: normal;
+  padding: 0.4rem 0.5rem;
+  border-block-end: 1px solid var(--border);
+  text-align: start;
+  vertical-align: top;
+}
+.admin-table thead th {
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--color-muted);
+}
+.admin-table tbody th {
+  font-weight: 500;
+  white-space: nowrap;
+}
+.admin-note {
+  min-width: 12rem;
+  overflow-wrap: anywhere;
+}
+.admin-nowrap {
+  white-space: nowrap;
+}
+.admin-num {
+  font-variant-numeric: tabular-nums;
+}
+.admin-block {
+  display: block;
+}
+.admin-strong {
+  font-weight: 600;
+}
+.admin-owner {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+.admin-owner-D07,
+.admin-owner-D09,
+.admin-owner-D10 {
+  background: var(--surface-alt);
+  font-weight: 600;
+}
+.admin-in-force {
+  font-weight: 700;
+}
+.admin-change {
+  font-weight: 600;
+}
+.admin-facts {
+  margin: 0 0 0.75rem;
+  padding-inline-start: 1.1rem;
+}
+.admin-body {
+  max-height: 24rem;
+  overflow: auto;
+  padding: 0.75rem;
+  background: var(--surface-alt);
+  border-radius: var(--radius-sm);
+}
+.admin-body pre {
+  margin: 0;
+  font-size: 0.85rem;
+  overflow-wrap: normal;
+  white-space: pre;
+}
+.admin-table code {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.admin-compare {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+}
+.admin-compare .field {
+  min-width: 10rem;
+}
+.admin-compare-error {
+  flex-basis: 100%;
+}
+.admin-against {
+  max-width: 16rem;
+  margin-block-end: 0.75rem;
+}
+.admin-status:empty {
+  display: none;
+}

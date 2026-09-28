@@ -173,3 +173,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w6-15-dashboard-ui model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #232)
 - Scope: per changes/2026-09-27-w6-15-dashboard-ui/: the `/dashboard` screen over `GET /api/dashboard` (status, lanes and SLA, findings, QC, risk and activity tiles as captioned tables with aria-hidden bars), every non-zero countable number linked to its W6-14 queue drill-down, empty state, "Dashboard" first in the primary navigation, `dashboard.*` locale keys (th and en), browser `w6-15-dashboard.spec.ts`. One PR.
+
+## 2026-09-28 09:10 — CLAIM lane-b: W6-05 Admin UI: index, history, diff, restore (#241)
+- Author: operator=ta session=claude-code-w6-05-admin-ui-index-history model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #241)
+- Scope: per changes/2026-09-27-w6-05-admin-ui-index-history/: `/admin/configuration` index, per-kind page (current, draft summary, history with change notes and version counts), two-revision diff (`admin/diff.ts`), restore dialog with a required change note, "Configuration" nav link for Admin, `admin.config.*` locale keys (th and en), browser `w6-05-admin-configuration.spec.ts`. One PR.

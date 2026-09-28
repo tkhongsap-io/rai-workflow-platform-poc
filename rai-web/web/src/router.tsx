@@ -12,6 +12,9 @@ import { QueueScreen } from './screens/queue/queue-screen.js';
 import { DashboardScreen } from './screens/dashboard/dashboard-screen.js';
 
 import { DeskHealthScreen } from './screens/operator/desk-health.js';
+import { ConfigurationIndexScreen } from './screens/admin/configuration-index.js';
+import { ConfigurationKindScreen } from './screens/admin/configuration-kind.js';
+import { RevisionDiffScreen } from './screens/admin/revision-diff.js';
 import { CaseScreen } from './screens/case/case-screen.js';
 import { CaseListScreen } from './screens/cases/case-list-screen.js';
 import { NewCaseScreen } from './screens/cases/new-case-screen.js';
@@ -96,6 +99,31 @@ export function AppRoutes(): JSX.Element {
         element={
           <RequireSession>
             <DeskHealthScreen />
+          </RequireSession>
+        }
+      />
+      {/* W6-05: the Admin configuration pages; the server decides access (a non-Admin gets its 403 notice). */}
+      <Route
+        path={ROUTES.adminConfiguration}
+        element={
+          <RequireSession>
+            <ConfigurationIndexScreen />
+          </RequireSession>
+        }
+      />
+      <Route
+        path={'/admin/configuration/:kind'}
+        element={
+          <RequireSession>
+            <ConfigurationKindScreen />
+          </RequireSession>
+        }
+      />
+      <Route
+        path={'/admin/configuration/:kind/revisions/:revisionId'}
+        element={
+          <RequireSession>
+            <RevisionDiffScreen />
           </RequireSession>
         }
       />

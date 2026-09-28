@@ -6,9 +6,24 @@
 // W1-06 adds the case-flow calls: the pack draft (7.5), artifact upload as multipart with one `file` part and
 // artifact metadata (7.4), submit and version navigation (7.6).
 
+import type { Static, TSchema } from 'typebox';
 import { Value } from 'typebox/value';
 import { DeskHealthReportSchema, type DeskHealthReport } from '@rai/shared/schemas/observability';
 import { DashboardResponseSchema, type DashboardResponse } from '@rai/shared/schemas/dashboard';
+import {
+  ConfigurationDraftResponseSchema,
+  ConfigurationIndexResponseSchema,
+  ConfigurationRevisionDetailSchema,
+  ConfigurationRevisionListResponseSchema,
+  ConfigurationRevisionSummarySchema,
+  type ConfigurationDraftResponse,
+  type ConfigurationIndexResponse,
+  type ConfigurationRevisionDetail,
+  type ConfigurationRevisionListQuery,
+  type ConfigurationRevisionListResponse,
+  type ConfigurationRevisionSummary,
+  type RestoreConfigurationRevisionRequest,
+} from '@rai/shared/schemas/configuration-admin';
 import {
   isErrorCode,
   type ErrorCode,
@@ -66,6 +81,7 @@ export const API_PATHS = Object.freeze({
   operatorDeskHealth: '/api/operator/desk-health',
   configuration: '/api/configuration/current',
   riskRubric: '/api/configuration/risk-rubric/current', // W5-07 (W5-02 route)
+  adminConfiguration: '/api/admin/configuration', // W6-05 (W6-04 routes)
   artifacts: '/api/artifacts',
 });
 
@@ -180,6 +196,12 @@ const SIGN_IN_FLOW_PATHS: ReadonlySet<string> = new Set([
   API_PATHS.fixtureSignIn,
 ]);
 
+/** A 2xx body that does not match its declared schema is refused, never rendered (as `getDeskHealth`). */
+function checked<S extends TSchema>(schema: S, body: unknown): Static<S> {
+  if (!Value.Check(schema, body)) throw new InvalidResponseError();
+  return body;
+}
+
 export function createApiClient(fetchImpl: FetchLike = (input, init) => fetch(input, init)) {
   let onUnauthenticated = (): void => undefined;
 
@@ -264,6 +286,50 @@ export function createApiClient(fetchImpl: FetchLike = (input, init) => fetch(in
       if (!Value.Check(DashboardResponseSchema, report)) throw new InvalidResponseError();
       return report;
     },
+    // W6-05: the Admin configuration reads and restore (W6-04). The server answers 403 to a non-Admin; every 200 is
+    // checked against its W6-01 schema before a screen renders it.
+    getConfigurationIndex: async (): Promise<ConfigurationIndexResponse> =>
+      checked(ConfigurationIndexResponseSchema, await request<unknown>('GET', API_PATHS.adminConfiguration)),
+    listConfigurationRevisions: async (
+      kind: string,
+      query: ConfigurationRevisionListQuery = {},
+    ): Promise<ConfigurationRevisionListResponse> =>
+      checked(
+        ConfigurationRevisionListResponseSchema,
+        await request<unknown>('GET', `${API_PATHS.adminConfiguration}/${enc(kind)}/revisions`, {
+          query: { page: query.page, pageSize: query.pageSize },
+        }),
+      ),
+    getConfigurationRevision: async (
+      kind: string,
+      revisionId: string,
+    ): Promise<ConfigurationRevisionDetail> =>
+      checked(
+        ConfigurationRevisionDetailSchema,
+        await request<unknown>(
+          'GET',
+          `${API_PATHS.adminConfiguration}/${enc(kind)}/revisions/${enc(revisionId)}`,
+        ),
+      ),
+    getConfigurationDraft: async (kind: string): Promise<ConfigurationDraftResponse> =>
+      checked(
+        ConfigurationDraftResponseSchema,
+        await request<unknown>('GET', `${API_PATHS.adminConfiguration}/${enc(kind)}/draft`),
+      ),
+    /** Publishes a copy of the revision as the next one (Q3); 409 when the revision in force moved, 422 refused. */
+    restoreConfigurationRevision: async (
+      kind: string,
+      revisionId: string,
+      body: RestoreConfigurationRevisionRequest,
+    ): Promise<ConfigurationRevisionSummary> =>
+      checked(
+        ConfigurationRevisionSummarySchema,
+        await request<unknown>(
+          'POST',
+          `${API_PATHS.adminConfiguration}/${enc(kind)}/revisions/${enc(revisionId)}/restore`,
+          { body },
+        ),
+      ),
     getQueue: (query: QueueQuery = {}) =>
       request<QueueResponse>('GET', API_PATHS.queue, {
         query: {
