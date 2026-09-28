@@ -628,3 +628,107 @@ test('W7-09: a 401 from the sign-in method read is the sign-in flow, never a los
   await assert.rejects(client.getSignInMethod(), ApiError);
   assert.equal(calls, 0);
 });
+
+// W6-05: the Admin configuration reads and restore (W6-04 routes). Access is the server's: a 403 is an ApiError.
+const W6_SUMMARY = {
+  revisionId: 'r-2',
+  kind: 'sla',
+  revisionNumber: 2,
+  publishedAt: '2026-09-27T01:00:00.000Z',
+  publishedBy: 'fx-user-admin',
+  changeNote: 'DPO four days (synthetic)',
+  restoresRevisionNumber: null,
+  inForce: true,
+  frozenOnVersionCount: 0,
+};
+
+function recording(
+  body: unknown,
+  status = 200,
+): {
+  calls: { input: string; init: RequestInit | undefined }[];
+  fetch: FetchLike;
+} {
+  const calls: { input: string; init: RequestInit | undefined }[] = [];
+  return {
+    calls,
+    fetch: (input, init) => {
+      calls.push({ input, init });
+      return Promise.resolve(new Response(JSON.stringify(body), { status }));
+    },
+  };
+}
+
+test('W6-05: the configuration index and revision list are schema-checked GETs with encoded paths', async () => {
+  const index = recording({
+    kinds: [{ kind: 'sla', editable: true, valuesOwner: 'admin', current: W6_SUMMARY, draft: null }],
+  });
+  const got = await createApiClient(index.fetch).getConfigurationIndex();
+  assert.equal(got.kinds[0]?.kind, 'sla');
+  assert.equal(index.calls[0]?.input, '/api/admin/configuration');
+  assert.equal(index.calls[0]?.init?.method, 'GET');
+
+  const list = recording({ items: [W6_SUMMARY], total: 1 });
+  await createApiClient(list.fetch).listConfigurationRevisions('sla', { page: 2, pageSize: 25 });
+  assert.equal(list.calls[0]?.input, '/api/admin/configuration/sla/revisions?page=2&pageSize=25');
+  const encoded = recording({ items: [], total: 0 });
+  await createApiClient(encoded.fetch).listConfigurationRevisions('a/b');
+  assert.equal(encoded.calls[0]?.input, '/api/admin/configuration/a%2Fb/revisions');
+
+  const revision = recording({ ...W6_SUMMARY, body: { dpo: 4, ai_coe: 5, it_security: 5 } });
+  const detail = await createApiClient(revision.fetch).getConfigurationRevision('sla', 'r/2');
+  assert.deepEqual(detail.body, { dpo: 4, ai_coe: 5, it_security: 5 });
+  assert.equal(revision.calls[0]?.input, '/api/admin/configuration/sla/revisions/r%2F2');
+
+  const draft = recording({ draft: null });
+  assert.deepEqual(await createApiClient(draft.fetch).getConfigurationDraft('sla'), { draft: null });
+  assert.equal(draft.calls[0]?.input, '/api/admin/configuration/sla/draft');
+});
+
+test('W6-05: an Admin configuration read that does not match its schema is refused, never rendered', async () => {
+  for (const [call, body] of [
+    [
+      (c: ReturnType<typeof createApiClient>) => c.getConfigurationIndex(),
+      { kinds: [{ kind: 'lane_mapping' }] },
+    ],
+    [
+      (c: ReturnType<typeof createApiClient>) => c.listConfigurationRevisions('sla'),
+      { items: [{}], total: 1 },
+    ],
+    [(c: ReturnType<typeof createApiClient>) => c.getConfigurationRevision('sla', 'r'), W6_SUMMARY], // no body
+    [(c: ReturnType<typeof createApiClient>) => c.getConfigurationDraft('sla'), {}],
+  ] as const) {
+    await assert.rejects(call(createApiClient(fetchAnswering(200, body))), InvalidResponseError);
+  }
+  const forbidden = createApiClient(
+    fetchAnswering(403, { error: { code: 'forbidden', messageKey: 'error.forbidden', correlationId: 'c' } }),
+  );
+  await assert.rejects(forbidden.getConfigurationIndex(), (err: unknown) => {
+    assert.ok(err instanceof ApiError);
+    assert.equal(err.status, 403);
+    return true;
+  });
+});
+
+test('W6-05: restore POSTs the expected revision in force and the change note, and checks the 201', async () => {
+  const restored = { ...W6_SUMMARY, revisionId: 'r-3', revisionNumber: 3, restoresRevisionNumber: 1 };
+  const call = recording(restored, 201);
+  const got = await createApiClient(call.fetch).restoreConfigurationRevision('sla', 'r-1', {
+    expectedCurrentRevisionId: 'r-2',
+    changeNote: 'Back to the D01 seed',
+  });
+  assert.equal(got.restoresRevisionNumber, 1);
+  assert.equal(call.calls[0]?.input, '/api/admin/configuration/sla/revisions/r-1/restore');
+  assert.equal(call.calls[0]?.init?.method, 'POST');
+  assert.deepEqual(JSON.parse(call.calls[0]?.init?.body as string), {
+    expectedCurrentRevisionId: 'r-2',
+    changeNote: 'Back to the D01 seed',
+  });
+  await assert.rejects(
+    createApiClient(fetchAnswering(201, { revisionId: 'r-3' })).restoreConfigurationRevision('sla', 'r-1', {
+      expectedCurrentRevisionId: 'r-2',
+      changeNote: 'x',
+    }),
+    InvalidResponseError,
+  );
+});

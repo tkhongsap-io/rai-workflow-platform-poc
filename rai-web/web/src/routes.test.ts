@@ -38,3 +38,11 @@ test('dashboard route is additive and survives sign-in (W6-15)', () => {
   assert.equal(ROUTES.dashboard, '/dashboard');
   assert.equal(safeReturnTo(ROUTES.dashboard), '/dashboard');
 });
+
+test('admin configuration routes are additive, encode their segments and survive sign-in (W6-05)', () => {
+  assert.equal(ROUTES.adminConfiguration, '/admin/configuration');
+  assert.equal(ROUTES.adminConfigurationKind('sla'), '/admin/configuration/sla');
+  assert.equal(ROUTES.adminConfigurationKind('a b'), '/admin/configuration/a%20b');
+  assert.equal(ROUTES.adminConfigurationRevision('sla', 'r/1'), '/admin/configuration/sla/revisions/r%2F1');
+  assert.equal(safeReturnTo(ROUTES.adminConfigurationKind('sla')), '/admin/configuration/sla');
+});

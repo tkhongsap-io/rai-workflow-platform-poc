@@ -135,6 +135,10 @@ export function AppShell({ children }: { children: ReactNode }): JSX.Element {
           {isOperatorAdmin(state.session) ? (
             <NavLink to={ROUTES.operatorDeskHealth}>{t('operator.title')}</NavLink>
           ) : null}
+          {/* W6-05: beside "Desk health" for Admin (presentation only; the server answers 403 to anyone else). */}
+          {isOperatorAdmin(state.session) ? (
+            <NavLink to={ROUTES.adminConfiguration}>{t('admin.config.title')}</NavLink>
+          ) : null}
         </nav>
       ) : null}
       <main id={MAIN_CONTENT_ID} className={'shell-main'} tabIndex={-1}>

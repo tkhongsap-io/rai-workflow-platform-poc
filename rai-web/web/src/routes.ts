@@ -9,6 +9,13 @@ export const ROUTES = Object.freeze({
   /** W6-15: the desk dashboard (W6 plan section 9), for every signed-in role. */
   dashboard: '/dashboard',
   operatorDeskHealth: '/operator/desk-health',
+  /** W6-05: the Admin configuration index (W6 plan section 9); the server decides access (403 for a non-Admin). */
+  adminConfiguration: '/admin/configuration',
+  /** W6-05: one kind (current, draft, history); also the W6-04 `refreshPath` of a 409 `configuration_changed`. */
+  adminConfigurationKind: (kind: string) => `/admin/configuration/${encodeURIComponent(kind)}`,
+  /** W6-05: one revision of a kind, with the two-revision diff (`?against=<revisionId>`) and restore. */
+  adminConfigurationRevision: (kind: string, revisionId: string) =>
+    `/admin/configuration/${encodeURIComponent(kind)}/revisions/${encodeURIComponent(revisionId)}`,
   newCase: '/cases/new',
   case: (caseId: string) => `/cases/${encodeURIComponent(caseId)}`,
   /** A frozen submitted version of a case (W1-06; W0-02 7.6 deep link). */
