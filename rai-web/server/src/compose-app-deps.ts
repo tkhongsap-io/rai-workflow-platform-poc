@@ -18,7 +18,9 @@ import { laneOpenRecipientsFromIdentities, laneReviewerSpocUnits } from './versi
 import { sendBackRecipientsFromIdentities } from './workflow/send-back-notice.js';
 
 export interface ComposeInputs {
-  config: Pick<AppConfig, 'nodeEnv' | 'log' | 'trustProxy' | 'publicBaseUrl' | 'upload'>;
+  /** `mail` is optional: the in-process test harness has no MAIL_MODE, which the configuration store treats as a sink. */
+  config: Pick<AppConfig, 'nodeEnv' | 'log' | 'trustProxy' | 'publicBaseUrl' | 'upload'> &
+    Partial<Pick<AppConfig, 'mail'>>;
   db: Db;
   /** Started (start() succeeded) before composition. */
   adapter: IdentityAdapter;
@@ -62,6 +64,8 @@ export function composeAppDeps(inputs: ComposeInputs): AppDeps {
       ...(fixtureUsers === undefined ? {} : { fixtureProvider: createFixtureIdentityProvider(fixtureUsers) }),
     },
     cases: { businessUnits: inputs.businessUnits, subjects },
+    // W6-04: the Admin configuration API; MAIL_MODE feeds the synthetic-recipient publish check (W6-03).
+    configuration: { subjects, ...(config.mail === undefined ? {} : { mailMode: config.mail.mode }) },
     artifacts: { store: inputs.store, limits: config.upload },
     // W4-04: the upload-triggered QC run, bound in app.ts with the drain, only when a runner is bound. Without one the
     // submit run records not_configured (A08), so upload runs would only stack identical outage rows.

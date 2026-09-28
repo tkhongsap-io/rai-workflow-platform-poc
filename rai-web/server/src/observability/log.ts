@@ -119,6 +119,13 @@ export const EVENT_CATALOGUE = Object.freeze({
     level: 'error',
     fields: ['proposalId', 'caseId', 'versionId', 'reason', 'rubricRevision'],
   },
+  // W6-04 (W6 plan section 10): an Admin publish or restore, after commit, and its refusal. No body value, address or
+  // change note; `problemCount` is the number of 422 fields (0 for a stale 409).
+  'configuration.published': {
+    level: 'info',
+    fields: ['kind', 'revisionId', 'revisionNumber', 'restoresRevisionId'],
+  },
+  'configuration.publish_refused': { level: 'warn', fields: ['kind', 'reason', 'problemCount'] },
   'mail.enqueued': {
     level: 'info',
     fields: ['notificationId', 'eventType', 'caseId', 'versionId', 'lane', 'recipientCount'],
