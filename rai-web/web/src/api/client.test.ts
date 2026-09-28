@@ -732,3 +732,96 @@ test('W6-05: restore POSTs the expected revision in force and the change note, a
     InvalidResponseError,
   );
 });
+
+// W6-06: the draft writes (W6-04 routes). Each 2xx body is checked; a 409 stays an ApiError for the reload guidance.
+const W6_DRAFT = {
+  kind: 'sla',
+  baseRevisionId: 'r-2',
+  draftVersion: 1,
+  updatedBy: 'fx-user-admin',
+  updatedAt: '2026-09-28T01:00:00.000Z',
+  changeNote: null,
+  problemCount: 1,
+  body: { dpo: 0, ai_coe: 5, it_security: 5 },
+  problems: [{ path: '/dpo', messageKey: 'validation.configuration.schema' }],
+};
+
+test('W6-06: save draft PUTs the base, the expected draft version and the body, and checks the 200', async () => {
+  const call = recording(W6_DRAFT);
+  const got = await createApiClient(call.fetch).saveConfigurationDraft('sla', {
+    baseRevisionId: 'r-2',
+    expectedDraftVersion: null,
+    body: { dpo: 0, ai_coe: 5, it_security: 5 },
+  });
+  assert.equal(got.problems[0]?.path, '/dpo');
+  assert.equal(call.calls[0]?.input, '/api/admin/configuration/sla/draft');
+  assert.equal(call.calls[0]?.init?.method, 'PUT');
+  assert.deepEqual(JSON.parse(call.calls[0]?.init?.body as string), {
+    baseRevisionId: 'r-2',
+    expectedDraftVersion: null,
+    body: { dpo: 0, ai_coe: 5, it_security: 5 },
+  });
+  await assert.rejects(
+    createApiClient(fetchAnswering(200, { ...W6_DRAFT, problems: undefined })).saveConfigurationDraft('sla', {
+      baseRevisionId: null,
+      expectedDraftVersion: null,
+      body: {},
+    }),
+    InvalidResponseError,
+  );
+});
+
+test('W6-06: discard DELETEs with the expected draft version; publish POSTs and checks the 201', async () => {
+  const discarded: { input: string; init: RequestInit | undefined }[] = [];
+  await createApiClient((input, init) => {
+    discarded.push({ input, init });
+    return Promise.resolve(new Response(null, { status: 204 }));
+  }).discardConfigurationDraft('use/groups', { expectedDraftVersion: 3 });
+  assert.equal(discarded[0]?.input, '/api/admin/configuration/use%2Fgroups/draft');
+  assert.equal(discarded[0]?.init?.method, 'DELETE');
+  assert.deepEqual(JSON.parse(discarded[0]?.init?.body as string), { expectedDraftVersion: 3 });
+
+  const call = recording({ ...W6_SUMMARY, revisionId: 'r-3', revisionNumber: 3 }, 201);
+  const published = await createApiClient(call.fetch).publishConfigurationDraft('sla', {
+    expectedDraftVersion: 2,
+    expectedCurrentRevisionId: 'r-2',
+    changeNote: 'DPO four days (synthetic)',
+  });
+  assert.equal(published.revisionNumber, 3);
+  assert.equal(call.calls[0]?.input, '/api/admin/configuration/sla/draft/publish');
+  assert.equal(call.calls[0]?.init?.method, 'POST');
+  assert.deepEqual(JSON.parse(call.calls[0]?.init?.body as string), {
+    expectedDraftVersion: 2,
+    expectedCurrentRevisionId: 'r-2',
+    changeNote: 'DPO four days (synthetic)',
+  });
+  await assert.rejects(
+    createApiClient(fetchAnswering(201, { revisionId: 'r-3' })).publishConfigurationDraft('sla', {
+      expectedDraftVersion: 2,
+      expectedCurrentRevisionId: null,
+      changeNote: 'x',
+    }),
+    InvalidResponseError,
+  );
+  const stale = createApiClient(
+    fetchAnswering(409, {
+      error: {
+        code: 'stale_version',
+        messageKey: 'error.stale_version',
+        correlationId: 'c',
+        details: {
+          reason: 'configuration_changed',
+          guidanceKey: 'error.stale_version.guidance.configuration_changed',
+        },
+      },
+    }),
+  );
+  await assert.rejects(
+    stale.publishConfigurationDraft('sla', {
+      expectedDraftVersion: 1,
+      expectedCurrentRevisionId: 'r-2',
+      changeNote: 'n',
+    }),
+    (err: unknown) => err instanceof ApiError && err.status === 409 && err.code === 'stale_version',
+  );
+});

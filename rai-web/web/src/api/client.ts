@@ -11,18 +11,23 @@ import { Value } from 'typebox/value';
 import { DeskHealthReportSchema, type DeskHealthReport } from '@rai/shared/schemas/observability';
 import { DashboardResponseSchema, type DashboardResponse } from '@rai/shared/schemas/dashboard';
 import {
+  ConfigurationDraftDetailSchema,
   ConfigurationDraftResponseSchema,
   ConfigurationIndexResponseSchema,
   ConfigurationRevisionDetailSchema,
   ConfigurationRevisionListResponseSchema,
   ConfigurationRevisionSummarySchema,
+  type ConfigurationDraftDetail,
   type ConfigurationDraftResponse,
   type ConfigurationIndexResponse,
   type ConfigurationRevisionDetail,
   type ConfigurationRevisionListQuery,
   type ConfigurationRevisionListResponse,
   type ConfigurationRevisionSummary,
+  type DiscardConfigurationDraftRequest,
+  type PublishConfigurationDraftRequest,
   type RestoreConfigurationRevisionRequest,
+  type SaveConfigurationDraftRequest,
 } from '@rai/shared/schemas/configuration-admin';
 import {
   isErrorCode,
@@ -329,6 +334,29 @@ export function createApiClient(fetchImpl: FetchLike = (input, init) => fetch(in
           `${API_PATHS.adminConfiguration}/${enc(kind)}/revisions/${enc(revisionId)}/restore`,
           { body },
         ),
+      ),
+    // W6-06: the draft writes (W6-04). A 409 `configuration_changed` stays an ApiError for the reload guidance.
+    /** Creates or replaces the kind's draft; the answer lists what publishing would refuse today (Q18). */
+    saveConfigurationDraft: async (
+      kind: string,
+      body: SaveConfigurationDraftRequest,
+    ): Promise<ConfigurationDraftDetail> =>
+      checked(
+        ConfigurationDraftDetailSchema,
+        await request<unknown>('PUT', `${API_PATHS.adminConfiguration}/${enc(kind)}/draft`, { body }),
+      ),
+    discardConfigurationDraft: (kind: string, body: DiscardConfigurationDraftRequest) =>
+      request<undefined>('DELETE', `${API_PATHS.adminConfiguration}/${enc(kind)}/draft`, { body }),
+    /** Publishes the draft as the next revision with the person's change note. */
+    publishConfigurationDraft: async (
+      kind: string,
+      body: PublishConfigurationDraftRequest,
+    ): Promise<ConfigurationRevisionSummary> =>
+      checked(
+        ConfigurationRevisionSummarySchema,
+        await request<unknown>('POST', `${API_PATHS.adminConfiguration}/${enc(kind)}/draft/publish`, {
+          body,
+        }),
       ),
     getQueue: (query: QueueQuery = {}) =>
       request<QueueResponse>('GET', API_PATHS.queue, {

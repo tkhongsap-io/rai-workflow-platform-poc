@@ -1,10 +1,10 @@
 // W6-05 (W6 plan sections 2.3, 4.2 and 9, Q16): one configuration kind. The revision in force and its body, the
-// draft waiting (editing it is W6-06), and the history newest first with each revision's change note, publisher,
+// draft waiting (W6-06: edited, saved, discarded and published here for the simple kinds), and the history newest first with each revision's change note, publisher,
 // what it restored and how many submitted versions froze it (`frozenOnVersionCount`, as served). From here the Admin
 // compares two revisions and restores an earlier one with a change note. Access is the server's: a non-Admin sees
 // its 403 notice, and a segment that is not a kind its 404.
 
-import { useCallback, useEffect, useId, useState, type FormEvent, type JSX } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type JSX } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   CONFIGURATION_REVISION_LIST_DEFAULTS,
@@ -21,6 +21,8 @@ import { ROUTES } from '../../routes.js';
 import { AdminLoadError } from './configuration-index.js';
 import { isConfigurationKind, kindLabelKey, ownerLabelKey } from './configuration.view-model.js';
 import { RestoreDialog, type RestoreTarget } from './restore-dialog.js';
+import { DraftEditor } from './editors/draft-editor.js';
+import { isSimpleKind } from './editors/simple-kinds.js';
 import './admin.css';
 
 interface KindData {
@@ -159,9 +161,12 @@ function CompareForm({ kind, items }: { kind: string; items: ConfigurationRevisi
 function DraftSection({
   draft,
   current,
+  children,
 }: {
   draft: ConfigurationDraftDetail | null;
   current: ConfigurationRevisionDetail | null;
+  /** W6-06: the kind's editor, when it has one. */
+  children?: JSX.Element | undefined;
 }): JSX.Element {
   const { t, locale } = useLocale();
   return (
@@ -188,7 +193,7 @@ function DraftSection({
           <li>{t('admin.config.draft.problems', { count: draft.problemCount })}</li>
         </ul>
       )}
-      <p className={'small muted'}>{t('admin.config.draft.editing_later')}</p>
+      {children ?? <p className={'small muted'}>{t('admin.config.draft.editing_later')}</p>}
     </section>
   );
 }
@@ -202,6 +207,12 @@ export function ConfigurationKindScreen(): JSX.Element {
   const [result, setResult] = useState<Result>();
   const [target, setTarget] = useState<RestoreTarget>();
   const [restored, setRestored] = useState<{ from: number; to: number }>();
+  // W6-06: the outcome of a publish or discard from the editor, focused because the control that asked for it goes.
+  const [edited, setEdited] = useState<{ published: number } | { discarded: true }>();
+  const editedRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (edited !== undefined) editedRef.current?.focus();
+  }, [edited]);
 
   useEffect(() => {
     // A reload keeps the table on screen (focus stays on the control that asked for it) until new data arrives.
@@ -255,6 +266,25 @@ export function ConfigurationKindScreen(): JSX.Element {
                 {t('admin.config.restored', restored)}
               </p>
             )}
+            {edited === undefined ? null : 'published' in edited ? (
+              <p
+                className={'notice notice-success'}
+                data-testid={'admin-config-published'}
+                ref={editedRef}
+                tabIndex={-1}
+              >
+                {t('admin.config.editor.published', { number: edited.published })}
+              </p>
+            ) : (
+              <p
+                className={'notice notice-success'}
+                data-testid={'admin-config-discarded'}
+                ref={editedRef}
+                tabIndex={-1}
+              >
+                {t('admin.config.editor.discarded')}
+              </p>
+            )}
           </div>
 
           <section
@@ -297,7 +327,36 @@ export function ConfigurationKindScreen(): JSX.Element {
             )}
           </section>
 
-          <DraftSection draft={result.data.draft} current={result.data.current} />
+          <DraftSection draft={result.data.draft} current={result.data.current}>
+            {isSimpleKind(kind) && labelKey !== undefined ? (
+              <DraftEditor
+                kind={kind}
+                kindLabelKey={labelKey}
+                current={result.data.current}
+                draft={result.data.draft}
+                onDraftSaved={(draft) => {
+                  setRestored(undefined);
+                  setEdited(undefined);
+                  setResult((previous) =>
+                    previous?.kind === 'loaded'
+                      ? { kind: 'loaded', data: { ...previous.data, draft } }
+                      : previous,
+                  );
+                }}
+                onPublished={(summary) => {
+                  setRestored(undefined);
+                  setEdited({ published: summary.revisionNumber });
+                  setGeneration((value) => value + 1);
+                }}
+                onDiscarded={() => {
+                  setRestored(undefined);
+                  setEdited({ discarded: true });
+                  setGeneration((value) => value + 1);
+                }}
+                onReload={reload}
+              />
+            ) : undefined}
+          </DraftSection>
 
           <section className={'card admin-section'} aria-labelledby={'admin-config-history-title'}>
             <h2 id={'admin-config-history-title'}>{t('admin.config.history.title')}</h2>
@@ -361,6 +420,7 @@ export function ConfigurationKindScreen(): JSX.Element {
                                 aria-label={t('admin.config.restore_label', { number: item.revisionNumber })}
                                 onClick={() => {
                                   setRestored(undefined);
+                                  setEdited(undefined);
                                   setTarget({
                                     kind,
                                     revision: item,
