@@ -199,9 +199,91 @@ export const StageMismatchParamsSchema = Type.Object(
   { attachedForbiddenAt: StageSlotsSchema, notYetForbiddenAt: StageSlotsSchema },
   { additionalProperties: false },
 );
+// W4-06a (W4b plan sections 3.2 and 3.3; decision 10, WA-D09): the synthetic claim grammar's bilingual label lists
+// are catalogue data, never code, so the D09 owners can retune them. Every content rule's params carry `slots` (never
+// slot 9), `labels`, `items` and `claimSource`; each rule adds its own fields. Provisional until D09.
+const LabelWordSchema = Type.String({ minLength: 1, maxLength: 100 });
+/** One bilingual label list: the words that mean one thing, in English and in Thai (matched after NFC + case fold). */
+export const BilingualLabelListSchema = Type.Object(
+  {
+    en: Type.Array(LabelWordSchema, { minItems: 1, maxItems: 20, uniqueItems: true }),
+    th: Type.Array(LabelWordSchema, { minItems: 1, maxItems: 20, uniqueItems: true }),
+  },
+  { additionalProperties: false },
+);
+/** The grammar's column keys (plan section 3.2); a `key: value` pair or an XLSX header cell names one of them. */
+export const CLAIM_COLUMN_KEYS = [
+  'item',
+  'question',
+  'answer',
+  'metric',
+  'value',
+  'unit',
+  'denominator',
+  'threshold',
+  'evidence',
+  'tier',
+] as const;
+export type ClaimColumnKey = (typeof CLAIM_COLUMN_KEYS)[number];
+export const ClaimLabelsSchema = Type.Object(
+  {
+    keys: Type.Object(
+      {
+        item: BilingualLabelListSchema,
+        question: BilingualLabelListSchema,
+        answer: BilingualLabelListSchema,
+        metric: BilingualLabelListSchema,
+        value: BilingualLabelListSchema,
+        unit: BilingualLabelListSchema,
+        denominator: BilingualLabelListSchema,
+        threshold: BilingualLabelListSchema,
+        evidence: BilingualLabelListSchema,
+        tier: BilingualLabelListSchema,
+      },
+      { additionalProperties: false },
+    ),
+    // Answers normalise to yes | no | na; any other word is `unknown`.
+    answers: Type.Object(
+      { yes: BilingualLabelListSchema, no: BilingualLabelListSchema, na: BilingualLabelListSchema },
+      { additionalProperties: false },
+    ),
+  },
+  { additionalProperties: false },
+);
+export type ClaimLabels = Static<typeof ClaimLabelsSchema>;
+const ContentSlotListSchema = Type.Array(Type.Integer({ minimum: 1, maximum: 8 }), {
+  minItems: 1,
+  uniqueItems: true,
+}); // no content rule reads slot 9 (plan section 3.3)
+/** `grammar`: claims come from the grammar only (the seed). `grammar+model`: the model port may propose (W4-07). */
+const ClaimSourceSchema = Type.Union([Type.Literal('grammar'), Type.Literal('grammar+model')]);
+const MetricIdSchema = Type.String({ pattern: '^[a-z][a-z0-9_]{0,63}$' }); // a message-param key (plan 3.1)
+/** `ACC-METRIC-CITED` (plan section 3.3): the slots it may read, labels, the two items it judges, accepted metrics. */
+export const AccMetricCitedParamsSchema = Type.Object(
+  {
+    slots: ContentSlotListSchema,
+    labels: ClaimLabelsSchema,
+    items: Type.Object(
+      { hallucination: BilingualLabelListSchema, accuracy: BilingualLabelListSchema },
+      { additionalProperties: false },
+    ),
+    acceptedMetrics: Type.Array(MetricIdSchema, { minItems: 1, uniqueItems: true }),
+    claimSource: ClaimSourceSchema,
+  },
+  { additionalProperties: false },
+);
+export type AccMetricCitedParams = Static<typeof AccMetricCitedParamsSchema>;
+/** The fields every content rule's params share (the runner reads these before the rule runs). */
+export interface ContentRuleBaseParams {
+  slots: number[];
+  labels: ClaimLabels;
+  claimSource: 'grammar' | 'grammar+model';
+}
+
 /** Rule-specific `params`, schema-checked per rule ID on write. A rule without an entry here carries no params. */
 export const QC_RULE_PARAMS_SCHEMAS = Object.freeze({
   'PACK-STAGE-MISMATCH': StageMismatchParamsSchema,
+  'ACC-METRIC-CITED': AccMetricCitedParamsSchema, // W4-06a
 });
 export const QcRuleEntrySchema = Type.Object(
   {

@@ -8,6 +8,7 @@ import { Value } from 'typebox/value';
 import { LANES, type Lane, type LaneMapping, owningLaneRule } from '../constants.js';
 import {
   CELL_REFERENCE_PATTERN,
+  CLAIM_KEY_PATTERN,
   QC_ENGINE_LABEL_PATTERN,
   QC_RULE_ID_PATTERN,
   type FindingScope,
@@ -111,6 +112,7 @@ export const QcFindingSchema = Type.Object(
     ruleRevision: Type.String({ minLength: 1 }),
     trigger: TriggerSchema,
     scope: FindingScopeSchema,
+    claimKey: Type.Optional(Type.String({ pattern: CLAIM_KEY_PATTERN })), // W4-06a, decision 30
     severity: Type.Union([Type.Literal('high'), Type.Literal('medium'), Type.Literal('low')]),
     owningLane: LaneSchema,
     evidence: Type.Array(EvidenceLocationSchema, { minItems: 1 }),
@@ -204,13 +206,25 @@ export type QcFindingViolation =
   | 'schema_violation'
   | 'owning_lane_mismatch'
   | 'owning_lane_slot_informational'
-  | 'finding_outside_lane';
+  | 'finding_outside_lane'
+  // W4-06a (W4b plan section 3.1): evidence citing an artifact the request did not carry; a string message param
+  // that is not a key, key list, item reference, decimal or the template version; two findings of one run with one
+  // `findingKey` (a run-level check, `duplicateFindingKey`, decision 30).
+  | 'evidence_outside_request'
+  | 'message_param_text'
+  | 'duplicate_finding_key';
 
 /** The request fields a finding is checked against (a subset of `QcRunRequest`). */
 export interface QcFindingContext {
   trigger: QcFinding['trigger'];
   qcRulesRevision: string;
   checklistTemplateVersion: string;
+  /**
+   * W4-06a: the request's artifacts. When present, every evidence entry that cites an artifact must cite one of these
+   * (same ID, hash and slot), or the finding is `evidence_outside_request`. Optional so the frozen in-memory API
+   * substitute's context literal stays valid (decision 19); the orchestrator always passes the request, which has it.
+   */
+  artifacts?: ReadonlyArray<{ artifactId: string; contentHash: string; slot: number }>;
 }
 
 const EVIDENCE_FIELDS = new Set(['artifactId', 'contentHash', 'slot', 'locator', 'excerptHash']);
@@ -230,8 +244,52 @@ export function scopeKeyOf(scope: FindingScope): string {
   }
 }
 
-export function findingKeyOf(ruleId: string, scope: FindingScope): string {
-  return `${ruleId}:${scopeKeyOf(scope)}`;
+/**
+ * `${ruleId}:${scopeKey}`, plus `:${claimKey}` when the finding carries a claim key (W4-06a, decision 30), so two
+ * defective claims in one scope have two keys while every metadata finding keeps its key.
+ */
+export function findingKeyOf(ruleId: string, scope: FindingScope, claimKey?: string): string {
+  const base = `${ruleId}:${scopeKeyOf(scope)}`;
+  return claimKey === undefined ? base : `${base}:${claimKey}`;
+}
+
+/**
+ * W4-06a (W4b plan section 3.1): the only shapes a string message param may take. The validator is pure and knows
+ * no catalogue, so it checks shape, not membership; free text (document text) matches none of them.
+ */
+export const MESSAGE_PARAM_PATTERNS: readonly RegExp[] = Object.freeze([
+  /^[a-z][a-z0-9_]{0,63}$/, // a key: a field name, fact ID, metric ID or slot name
+  /^[a-z][a-z0-9_]{0,63}(,[a-z][a-z0-9_]{0,63}){1,15}$/, // a comma list of keys, no spaces
+  /^\d+(\.\d+){0,3}$/, // an item reference such as 2.1
+  /^-?\d{1,18}(\.\d{1,18})?$/, // a decimal string
+]);
+
+/** A string message param is allowed when it matches a pattern or is exactly the request's template version. */
+export function isAllowedMessageParam(value: string, checklistTemplateVersion: string): boolean {
+  return value === checklistTemplateVersion || MESSAGE_PARAM_PATTERNS.some((pattern) => pattern.test(value));
+}
+
+function citesOutsideRequest(
+  evidence: QcFinding['evidence'],
+  artifacts: NonNullable<QcFindingContext['artifacts']>,
+): boolean {
+  return evidence.some((entry) => {
+    if (entry.artifactId === null) return entry.contentHash !== null;
+    return !artifacts.some(
+      (a) =>
+        a.artifactId === entry.artifactId && a.contentHash === entry.contentHash && a.slot === entry.slot,
+    );
+  });
+}
+
+/** W4-06a (decision 30): the run-level check. Two findings of one run with one `findingKey` fail the whole run. */
+export function duplicateFindingKey(findings: readonly QcFinding[]): 'duplicate_finding_key' | null {
+  const seen = new Set<string>();
+  for (const finding of findings) {
+    if (seen.has(finding.findingKey)) return 'duplicate_finding_key';
+    seen.add(finding.findingKey);
+  }
+  return null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -271,7 +329,13 @@ export function validateQcFinding(value: unknown, context: QcFindingContext): Qc
   if (finding.trigger !== context.trigger) return 'trigger_mismatch';
   if (finding.measure !== null && finding.measure.thresholdSource !== context.checklistTemplateVersion)
     return 'threshold_source_mismatch';
-  if (finding.findingKey !== findingKeyOf(finding.ruleId, finding.scope)) return 'finding_key_mismatch';
+  for (const param of Object.values(finding.message.params))
+    if (typeof param === 'string' && !isAllowedMessageParam(param, context.checklistTemplateVersion))
+      return 'message_param_text';
+  if (context.artifacts !== undefined && citesOutsideRequest(finding.evidence, context.artifacts))
+    return 'evidence_outside_request';
+  if (finding.findingKey !== findingKeyOf(finding.ruleId, finding.scope, finding.claimKey))
+    return 'finding_key_mismatch';
   return null;
 }
 

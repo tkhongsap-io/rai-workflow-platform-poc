@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { scoreRisk } from '@rai/shared/risk/score';
-import { CONFIGURATION_SEED, SEED_KINDS, UNSEEDED_KINDS } from './seed.js';
+import { ACC_METRIC_CITED_PARAMS, CONFIGURATION_SEED, SEED_KINDS, UNSEEDED_KINDS } from './seed.js';
 import { ConfigurationBodyInvalid, validateConfigurationBody } from './store.js';
 
 // W6-02 (W6 plan section 3, 11.2): assert by kind, never by count or order, so each package's seeded kind (W5
@@ -61,6 +61,13 @@ test('qc_rules revision 1 (w4a.1) catalogues both template versions; v2.0 has no
   for (const template of Object.values(qc.templates))
     for (const rule of template.rules)
       if (rule.engine === 'metadata') assert.ok(!rule.triggers.includes('upload'), rule.ruleId);
+  // W4-06a (plan section 3.3): ACC-METRIC-CITED carries its params in both templates; the other ACC-* rules have no
+  // params schema yet (W4-06b-c add theirs with their params).
+  for (const template of Object.values(qc.templates)) {
+    const cited = template.rules.find((r) => r.ruleId === 'ACC-METRIC-CITED');
+    assert.deepEqual(cited?.params, ACC_METRIC_CITED_PARAMS);
+    assert.equal((cited?.params as { claimSource?: string }).claimSource, 'grammar');
+  }
   const stage = qc.templates['v2.0']!.rules.find((r) => r.ruleId === 'PACK-STAGE-MISMATCH');
   assert.deepEqual(stage?.params, {
     attachedForbiddenAt: { idea: [8] },
