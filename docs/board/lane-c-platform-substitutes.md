@@ -126,3 +126,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w4-08a-evaluation-harness-core model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #237)
 - Scope: per changes/2026-09-27-w4-08a-evaluation-harness-core-and/: `rai-web/tests/evaluation/*` (`run.ts` CLI, `load-set.ts`, `harness.ts`, `grade.ts`, `report.ts`, `identity.ts`, `thresholds.json`, unit tests), pure moves of `checkedResult` to `server/src/qc/check-result.ts` and of the request builder to `server/src/qc/request.ts` (`qc/orchestrator.ts` imports them), `npm run eval:qc` and the `test:unit` glob in `package.json`, `tests/tsconfig.json` include, TESTING eval commands. Dev split only; no gate or `--verify` (W4-08b). One PR; no migration.
+
+## 2026-09-28 — CLAIM lane-c: W7-16 deployment-readiness note (#234)
+- Author: operator=ta session=claude-code-w7-16-deployment-readiness-note model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #234)
+- Scope: per changes/2026-09-27-w7-16-deployment-readiness-note/: `docs/engineering/deployment-readiness.md` (W7 plan section 12: build and start, every `config.ts` key with its production value or custody source, database roles, blob storage, secrets, health, operations, known limits; a generic Node 24 + managed Postgres 16 host with Replit as an example) and a unit test that holds the note's configuration table to the keys the code reads. One PR; no migration, no product code; nothing deployed.

@@ -302,6 +302,8 @@ The loader records `{ runId, caseIds, versionIds }` to `REHEARSAL_OUT_DIR/<runId
 
 ## 12. Deployment-readiness note (W7-16)
 
+*Note (2026-09-28, W7-16): written as [deployment-readiness.md](deployment-readiness.md) and held to the code by `server/src/deployment-readiness.test.ts`. Two facts found while writing it: a workspace install links `@rai/fixtures` without building it, so the release step removes that link before `npm start` (else `fixtures_import_failed`); and `QC_MODE=content` (W4-13b) and the W6-17 desk controls are not on `main` yet, so the note lists their keys as planned and says so.*
+
 `docs/engineering/deployment-readiness.md`, for one Node 24 process plus Postgres 16 on a generic host (a later Replit target included). It states that nothing is deployed and that host, backup target, custody and incident channels are D10's. Contents:
 - **Build and start:** `npm ci`, `npm run build`, `npm run migrate` as a release step with `DATABASE_MIGRATE_URL` (never at start), `npm start` (`node server/dist/main.js`); `NODE_ENV=production` requires `web/dist` (`start.ts` refuses `missing:web/dist`).
 - **Configuration:** every `config.ts` key with its production value or custody source; `RAI_IDENTITY_MODE=network`, source `allow-list`; `HOST=0.0.0.0` and the platform `PORT`; `PUBLIC_BASE_URL` https; `TRUST_PROXY=true` behind the platform proxy; `QC_MODE=content` with `QC_MODEL=disabled` and the `QC_EXTRACT_*` keys of the W4b plan section 2 (`QC_MODE=deterministic` as the documented fallback that takes extraction out of service at restart); the W6 desk controls as the incident switches; `MAIL_MODE=sink-file` (no transport); `LOG_PRETTY=false`; `BUILD_COMMIT`.
