@@ -36,6 +36,7 @@ Choices made under Ta's delegation of 2026-09-27 where the plan is silent; each 
 - **Rule placement in the seed**: after the three W4a metadata rules, before the content rules, in both templates (the label rule of section 9 is unaffected; W4-13c, which depends on W5-10, keeps it and sets `w4b.1`).
 - **Replay ordering noticed, not fixed**: a replayed run lists its findings in stored order, which for findings of one run is arbitrary (same `created_at`, random ID tail). No reader depends on the order today; the tests now compare order-independently. Fixing the store order is outside this ticket.
 - **Rebase onto W4-08a (#316)**: main gained W4-08a while this branch was in its gate; it moved the pure request builder into `qc/request.ts` and added the evaluation harness. The conflict in `orchestrator.ts` was resolved by loading the proposal in `buildRequest` and passing it to `requestOf`; DEVLOG and CHANGELOG keep both entries, this one on top. No migration on either side. The full gate was rerun on the rebased head (table below), plus `npm run eval:qc`.
+- **Rebase onto W4-06d (#320) and W6-06 (#318), round 1**: the merge queue's rebase hit conflicts because W4-06d added `PACK-CONTRADICTION` (a submit content rule) to the same seeded submit lists. Resolved keeping both behaviours, in catalogue order (the W4a metadata rules, then `RISK-TIER-UNKNOWN`, then the content rules): `server/src/qc/select.test.ts` (the v1.0 list and W4-06d's both-templates loop, now with both rules), `tests/integration/w4-02-rule-catalogue.test.ts` (submit list), the `shared/src/qc/rule-registry.ts` header comment; docs, DEVLOG, CHANGELOG and the board keep both entries (this ticket's entries on top in DEVLOG and CHANGELOG, its CLAIM after W4-06d's). After the rebase one more existing expectation follows from the seed change (row item 2): W4-06d's `server/src/qc/content/runner.test.ts` asserts the seeded submit *metadata* rules are the three W4a rules; it now lists `RISK-TIER-UNKNOWN` too (the test's point, that the content runner skips and does not count metadata rules, is unchanged). The seed label stays `w5.1` (W4-06d kept `w4a.1`; W5-10's label rule in plan section 9 applies).
 - **Local `.env` only**: `RAI_PG_TOOLS=docker-compose:rai-risk` (this lane's compose project; the first integration run failed the W7-01/W7-02 backup tests with `pg_tools_container_not_found` under the `.env.example` value `rai-dev`). `.env` is not committed.
 
 ## Commands and results
@@ -66,7 +67,27 @@ Worktree `/tmp/rai-w5-10-risk-tier-unknown-qc`, Postgres project `rai-risk` on 5
 | `npm run test:unit` | exit 0, 1260 pass, 0 fail (includes W7-16's test, 7 pass) |
 | `node scripts/check-links.mjs` (root); `git diff --check origin/main...HEAD` | exit 0, 530 Markdown files, 1455 links, 0 broken; exit 0 |
 | Integration and browser suites | not rerun after this rebase: W7-16 changes no code they exercise (the 1422-link / 500 / 244 / 48 results above are on `e4c6cbe` plus this branch) |
+| Round 1: rebased onto `origin/main` `0a35d9b` (W6-06, W4-06d); conflicts resolved as in Deviations; `npm ci`; fresh `rai-risk` database. Full gate: | |
+| `npm run lint`; `npm run typecheck` | exit 0; exit 0 |
+| `npm run test:unit` | first 1 fail (`server/src/qc/content/runner.test.ts` seeded submit metadata list, updated as in Deviations), then exit 0, 1279 pass, 0 fail |
+| `npm run test:integration` | exit 0, 500 pass, 0 fail |
+| `npm run build && npm run check:substitute-absent` | exit 0; 1075 files scanned, 0 with the marker |
+| `npm run test:browser:server` | exit 0, 256 passed |
+| `npm run test:browser:substitute` | exit 0, 48 passed |
+| `node scripts/check-links.mjs` (root); `git diff --check` | exit 0, 538 Markdown files, 1468 links, 0 broken; exit 0 |
 
 ## Review verdicts
 
-To be recorded by the independent reviewers on the PR head.
+| Round | Head | Reviewer | Verdict | Notes |
+| --- | --- | --- | --- | --- |
+| 1 | `7f8a230` | reviewer agent A | pass | tsc -b, lint, unit (1260) exit 0; R-17 option (a) as planned; rule matches section 8 / R-11; existing test changes match row items (1)-(4); order-only fixes justified |
+| 1 | `7f8a230` | reviewer agent B | pass | head confirmed; unit 1260 pass; riskProposal required, runKey unchanged, loaded in the QC transaction for submit only; waive by AI/COE only |
+| 1 | `7f8a230` | merge queue | conflict | rebase onto `0a35d9b` conflicted with W4-06d; resolved in round 1 (Deviations) and the full gate rerun |
+
+Round 1 non-blocking notes, deferred (not fixed here):
+
+- Replayed-run finding order is arbitrary for findings of one millisecond (already under Deviations); a follow-up issue is worth filing to fix the store order.
+- `QcRiskTier` duplicates `RiskTier` (kept for the substitute module-graph reason in Deviations; an equality test guards drift).
+- `submitRiskProposal` (`server/src/qc/orchestrator.ts`) casts `status` and `tier` instead of parsing them; the DB CHECK constraints make it safe today, and a fail-closed guard belongs with the W6 recheck rows that could loosen the schema.
+- The integration test deletes a `risk_proposal` row past the append-only trigger to simulate a pre-W5 version (test only).
+- Every answerless fixture submit now carries a soft `RISK-TIER-UNKNOWN` finding that gates Ready; later Ready journeys (W4-13c, W4-INT-a/b, W6-08, W7-11/12) must be written with it present, as the plan's merge order says.
