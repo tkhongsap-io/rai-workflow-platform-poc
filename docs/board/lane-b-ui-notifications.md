@@ -178,3 +178,8 @@ See [README](README.md) for the convention. Append-only; record corrections as n
 - Author: operator=ta session=claude-code-w6-05-admin-ui-index-history model=claude-opus-5-5
 - Takes over from: session=none (reason: new; ticket #241)
 - Scope: per changes/2026-09-27-w6-05-admin-ui-index-history/: `/admin/configuration` index, per-kind page (current, draft summary, history with change notes and version counts), two-revision diff (`admin/diff.ts`), restore dialog with a required change note, "Configuration" nav link for Admin, `admin.config.*` locale keys (th and en), browser `w6-05-admin-configuration.spec.ts`. One PR.
+
+## 2026-09-28 04:10 — CLAIM lane-b: W5-09 Tier on queue and case list (#239)
+- Author: operator=ta session=claude-code-w5-09-tier-on-queue-and model=claude-opus-5-5
+- Takes over from: session=none (reason: new; ticket #239)
+- Scope: per changes/2026-09-27-w5-09-tier-on-queue-and/: `riskTier?` (optional) on `CaseSummary` and so `QueueItem`; the real server serves it on `GET /api/cases` and `GET /api/queue` (one column, scope unchanged); a tier chip on each queue and case-list card, no chip when absent or null; placeholder banner; `risk.*` locale keys. No filter (W6-14/W6-16), no substitute edit. One PR.

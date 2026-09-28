@@ -3,7 +3,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Principal } from '@rai/shared/schemas/auth';
-import { pageCount, scopeLineFor, toRowModel } from './case-list.view-model.js';
+import type { CaseSummary } from '@rai/shared/schemas/cases';
+import { LOCALE_CATALOGUES } from '@rai/shared/locales/keys';
+import {
+  pageCount,
+  riskTierChipOf,
+  scopeLineFor,
+  showsPlaceholderBanner,
+  toRowModel,
+} from './case-list.view-model.js';
 
 const base: Omit<Principal, 'roles'> = {
   subjectId: 'fixture:x',
@@ -92,4 +100,51 @@ test('page count never drops below one', () => {
   assert.equal(pageCount(25, 25), 1);
   assert.equal(pageCount(26, 25), 2);
   assert.equal(pageCount(5, 0), 5);
+});
+
+// W5-09 (W5 plan sections 6 and 7): the tier chip on each card. The shared type declares `riskTier` optional (the
+// frozen substitute omits it); the web reads absent as null, and null shows no chip.
+const summary: CaseSummary = {
+  caseId: 'c1',
+  registryId: 'RAI-2000-0001',
+  useCaseName: 'Churn Propensity Scoring',
+  businessUnitId: 'CM',
+  businessUnit: 'Consumer Mobile',
+  businessOwner: 'fixture:fx-user-owner-cm',
+  useCaseGroup: 'customer-analytics',
+  status: 'in_review',
+  currentVersionNumber: 1,
+  updatedAt: '2026-09-21T00:00:00.000Z',
+};
+
+test('tier chip: each tier has its th/en label and a distinct tone; Unknown is never styled as Low', () => {
+  assert.deepEqual(riskTierChipOf('high'), { tier: 'high', labelKey: 'risk.tier.high', tone: 'danger' });
+  assert.deepEqual(riskTierChipOf('medium'), { tier: 'medium', labelKey: 'risk.tier.medium', tone: 'warn' });
+  assert.deepEqual(riskTierChipOf('low'), { tier: 'low', labelKey: 'risk.tier.low', tone: 'ok' });
+  assert.deepEqual(riskTierChipOf('unknown'), {
+    tier: 'unknown',
+    labelKey: 'risk.tier.unknown',
+    tone: 'muted',
+  });
+  const tones = (['high', 'medium', 'low', 'unknown'] as const).map((tier) => riskTierChipOf(tier)!.tone);
+  assert.equal(new Set(tones).size, tones.length, 'no two tiers share a tone');
+  for (const locale of ['th', 'en'] as const) {
+    assert.ok(LOCALE_CATALOGUES[locale]['risk.list.tier'].length > 0);
+    for (const tier of ['high', 'medium', 'low', 'unknown'] as const)
+      assert.ok(LOCALE_CATALOGUES[locale][riskTierChipOf(tier)!.labelKey].length > 0);
+  }
+});
+
+test('tier chip: absent (the substitute) and null (no proposal, or unavailable) show no chip', () => {
+  assert.equal(riskTierChipOf(undefined), null);
+  assert.equal(riskTierChipOf(null), null);
+  assert.equal(toRowModel(summary).riskTier, null);
+  assert.equal(toRowModel({ ...summary, riskTier: null }).riskTier, null);
+  assert.deepEqual(toRowModel({ ...summary, riskTier: 'unknown' }).riskTier, riskTierChipOf('unknown'));
+});
+
+test('the placeholder banner shows once a card on the page shows a tier, never for a page without one', () => {
+  assert.equal(showsPlaceholderBanner([]), false);
+  assert.equal(showsPlaceholderBanner([summary, { ...summary, riskTier: null }]), false);
+  assert.equal(showsPlaceholderBanner([summary, { ...summary, riskTier: 'low' }]), true);
 });

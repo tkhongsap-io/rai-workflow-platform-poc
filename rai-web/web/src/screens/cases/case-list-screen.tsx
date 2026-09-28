@@ -15,7 +15,15 @@ import { useLocale } from '../../i18n/locale-provider.js';
 import { useSignedInSession } from '../../session/session-provider.js';
 import { ROUTES } from '../../routes.js';
 import { canCreateCase } from '../operator/desk-health.view-model.js';
-import { pageCount, scopeLineFor, toRowModel, type CaseRowModel } from './case-list.view-model.js';
+import { PlaceholderRubricBanner } from '../../components/placeholder-rubric-banner.js';
+import {
+  pageCount,
+  scopeLineFor,
+  showsPlaceholderBanner,
+  toRowModel,
+  type CaseRowModel,
+} from './case-list.view-model.js';
+import { RiskTierFact } from './risk-tier-chip.js';
 
 /** `key` names the request (page and reload counter) a result belongs to; a stale key means "loading". */
 type ListResult =
@@ -56,6 +64,7 @@ function CaseCard({ row }: { row: CaseRowModel }): JSX.Element {
                 : t('cases.version_number', { versionNumber: row.versionNumber })}
             </dd>
           </div>
+          <RiskTierFact riskTier={row.riskTier?.tier} />
         </dl>
         <div className={'case-card-foot'}>
           <div>
@@ -159,11 +168,16 @@ export function CaseListScreen(): JSX.Element {
               {newCaseLink}
             </div>
           ) : (
-            <ul className={'case-grid'} aria-label={t('cases.list_label')}>
-              {state.response.items.map((item) => (
-                <CaseCard key={item.caseId} row={toRowModel(item)} />
-              ))}
-            </ul>
+            <>
+              {showsPlaceholderBanner(state.response.items) ? (
+                <PlaceholderRubricBanner provenance={'synthetic_placeholder'} />
+              ) : null}
+              <ul className={'case-grid'} aria-label={t('cases.list_label')}>
+                {state.response.items.map((item) => (
+                  <CaseCard key={item.caseId} row={toRowModel(item)} />
+                ))}
+              </ul>
+            </>
           )}
           {state.response.total > state.response.pageSize ? (
             <nav className={'pagination'} aria-label={t('cases.pagination_label')}>

@@ -87,6 +87,12 @@ export interface CaseSummary {
   status: CaseStatus;
   currentVersionNumber: number | null;
   updatedAt: string;
+  /**
+   * W5-09: the case's proposed risk tier, as `CaseView.riskTier` (null before any submit or when the proposal was
+   * unavailable). Optional only because the frozen in-memory API substitute builds this shape (and `QueueItem`)
+   * without it; the real server always serves it, and the web reads an absent value as null (no chip).
+   */
+  riskTier?: RiskTier | null;
 }
 
 export const CaseCreateRequestSchema = CaseWritableFieldsSchema;
