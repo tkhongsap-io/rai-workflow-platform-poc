@@ -173,8 +173,8 @@ test('bodies are validated on write: a wrong shape, an unknown kind and a kind w
     ConfigurationBodyInvalid,
   );
   assert.throws(() => validateConfigurationBody('lane_mapping', {}), /unknown kind/);
-  // W5-02 registered risk_rubric; group_role_mapping (W6/W8) is still a kind without a schema.
-  assert.throws(() => validateConfigurationBody('group_role_mapping', {}), /no body schema registered/);
+  // W5-02 registered risk_rubric; W6-11 registered group_role_mapping (never seeded), so its empty body is invalid.
+  assert.throws(() => validateConfigurationBody('group_role_mapping', {}), ConfigurationBodyInvalid);
   assert.throws(() => validateConfigurationBody('risk_rubric', {}), ConfigurationBodyInvalid);
 });
 

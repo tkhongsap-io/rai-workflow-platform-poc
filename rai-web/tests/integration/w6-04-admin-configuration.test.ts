@@ -163,7 +163,7 @@ describe('reads', () => {
     assert.equal(owners.risk_rubric, 'D07');
     assert.equal(owners.group_role_mapping, 'D10');
     assert.equal(owners.sla, 'admin');
-    assert.equal(entry(i, 'group_role_mapping').editable, false); // no body schema until W6-11
+    assert.equal(entry(i, 'group_role_mapping').editable, true); // W6-11 registered its body schema
     assert.equal(entry(i, 'group_role_mapping').current, null);
     for (const kind of Object.keys(CONFIGURATION_SEED)) {
       const e = entry(i, kind);

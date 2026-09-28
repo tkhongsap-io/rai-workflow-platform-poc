@@ -408,7 +408,8 @@ test('publishDraft refuses a stale draft, a moved current revision, a moved base
   );
   assert.deepEqual(moved.current, { revisionId: other.id, draftVersion: 2 });
 
-  // A registered kind without a body schema (group_role_mapping until W6-11) can be drafted but not published.
+  // A body its schema refuses can be drafted but not published (group_role_mapping: registered by W6-11, and a body
+  // without version, tenantId or rules is invalid).
   await inTx((tx) =>
     saveDraft(tx, {
       kind: 'group_role_mapping',

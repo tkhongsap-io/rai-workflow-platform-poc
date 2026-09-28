@@ -183,3 +183,16 @@
   margin: 0;
   padding-inline-start: 1.1rem;
 }
+/* W6-11: the JSON editor (identity mapping). The text keeps its indentation and never widens the page. */
+.admin-editor-json .notice {
+  margin-block: 0.5rem 0.75rem;
+}
+.admin-json-text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.45;
+  min-height: 16em;
+  tab-size: 2;
+  white-space: pre;
+  overflow-x: auto;
+}

@@ -1,42 +1,18 @@
-// W0-03 section 9.2: the AD group-to-role mapping (shape only; values are W6 and W8 under D10) and its resolver
-// (section 4.3). The mapping is an Admin-editable configuration revision of kind `identity.group_role_mapping`
-// read once at start through the injected `groupMappingSource`; nothing in this repository contains a real group id.
-// Resolution reads the token's `groups` claim only; an overage indicator is refused, never looked up.
+// W0-03 section 9.2: the AD group-to-role mapping's resolver (section 4.3). The body schema moved to
+// `@rai/shared/schemas/identity-mapping` in W6-11 (W6 plan section 6) and is re-exported here, so no import breaks; it
+// is the `group_role_mapping` configuration kind (body literal `identity.group_role_mapping`), read once at start
+// through the injected `groupMappingSource`. Nothing in this repository contains a real group id. Resolution reads the
+// token's `groups` claim only; an overage indicator is refused, never looked up.
 
-import { Type, type Static } from 'typebox';
-import { Value } from 'typebox/value';
 import type { RoleScope } from '@rai/shared/schemas/auth';
+import { type GroupRoleMapping } from '@rai/shared/schemas/identity-mapping';
 import { SignInRefused, type RoleResolver, type VerifiedLogin } from './types.js';
 
-export const GroupRoleMappingSchema = Type.Object({
-  kind: Type.Literal('identity.group_role_mapping'),
-  version: Type.Literal(1),
-  tenantId: Type.String({ minLength: 1 }), // must equal RAI_IDENTITY_ENTRA_TENANT_ID or start-up refuses (S12)
-  rules: Type.Array(
-    Type.Union([
-      Type.Object({ groupObjectId: Type.String({ minLength: 1 }), role: Type.Literal('owner') }),
-      Type.Object({
-        groupObjectId: Type.String({ minLength: 1 }),
-        role: Type.Literal('bu_spoc'),
-        businessUnit: Type.String({ minLength: 1 }),
-      }),
-      Type.Object({
-        groupObjectId: Type.String({ minLength: 1 }),
-        role: Type.Union([
-          Type.Literal('ai_coe'),
-          Type.Literal('dpo'),
-          Type.Literal('it_security'),
-          Type.Literal('admin'),
-        ]),
-      }),
-    ]),
-  ),
-});
-export type GroupRoleMapping = Static<typeof GroupRoleMappingSchema>;
-
-export function isGroupRoleMapping(value: unknown): value is GroupRoleMapping {
-  return Value.Check(GroupRoleMappingSchema, value);
-}
+export {
+  GroupRoleMappingSchema,
+  isGroupRoleMapping,
+  type GroupRoleMapping,
+} from '@rai/shared/schemas/identity-mapping';
 
 function pairFor(rule: GroupRoleMapping['rules'][number]): RoleScope {
   switch (rule.role) {

@@ -189,14 +189,14 @@ test('bodies are validated on write against the shared schema; a kind without a 
   await assert.rejects(
     withTransaction(db.app, (tx) =>
       publishRevision(tx, {
-        kind: 'group_role_mapping' as never, // W5-02 registered risk_rubric; this kind still has no schema
+        kind: 'group_role_mapping' as never, // W6-11 registered the mapping (never seeded): an empty body is invalid
         body: {} as never,
         publishedBy: 'system',
         publishedRole: 'system',
         correlationId: randomUUID(),
       }),
     ),
-    /no body schema registered/,
+    ConfigurationBodyInvalid,
   );
   // W5-02: risk_rubric is validated by its schema and by riskRubricBodyProblems (W5 plan section 2).
   const duplicate = structuredClone(CONFIGURATION_SEED.risk_rubric);
