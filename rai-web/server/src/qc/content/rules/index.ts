@@ -4,6 +4,7 @@ import { ACC_BAND_V1_SHEET3 } from './acc-band-v1-sheet3.js';
 import { ACC_CLASSIC_ML_METRIC } from './acc-classic-ml-metric.js';
 import { ACC_EXTRACTION_NOT_HALLUCINATION } from './acc-extraction-not-hallucination.js';
 import { ACC_METRIC_CITED } from './acc-metric-cited.js';
+import { PACK_CONTRADICTION } from './pack-contradiction.js';
 import type { ContentRule } from './rule.js';
 
 export const CONTENT_RULES: Readonly<Record<string, ContentRule>> = Object.freeze({
@@ -11,4 +12,5 @@ export const CONTENT_RULES: Readonly<Record<string, ContentRule>> = Object.freez
   'ACC-EXTRACTION-NOT-HALLUCINATION': ACC_EXTRACTION_NOT_HALLUCINATION,
   'ACC-BAND-V1-SHEET3': ACC_BAND_V1_SHEET3,
   'ACC-CLASSIC-ML-METRIC': ACC_CLASSIC_ML_METRIC,
+  'PACK-CONTRADICTION': PACK_CONTRADICTION,
 });

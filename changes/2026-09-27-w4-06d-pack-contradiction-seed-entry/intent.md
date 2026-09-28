@@ -1,0 +1,9 @@
+# Intent: PACK-CONTRADICTION (W4-06d, #244)
+
+W4-06a to W4-06c gave QC a content runner, the provisional synthetic claim grammar and the four `ACC-*` evidence rules, all read on upload or on an approve attempt. Nothing yet reads the pack as a whole on submit: a privacy checklist (slot 2) that says the use case processes no personal data while the BRD (slot 5) says it does passes QC silently, and the reviewers have to spot the conflict themselves.
+
+This ticket adds the last W4b content rule, `PACK-CONTRADICTION`: on submit, the content runner reads the pack facts stated in slots 2 and 5 (seed: `personal_data` and `external_vendor`) and raises one pack finding for each fact the two documents state with different `yes`/`no` answers. Each finding cites the two places (one per document, by locator and excerpt hash, never text), carries the fact ID as its claim key so two contradicting facts stay two separately dispositionable findings (decision 30), and is owned by AI/COE as every pack finding is (W0-06 7.1). Agreeing facts and facts one document does not state raise nothing.
+
+The facts, their keywords and which slots each is read from are catalogue `params` with a registered schema, seeded in both templates, so the seed still validates and the D09 owners can retune them. W6-03 has merged, so the implemented-rule registry gains the entry in this PR, together with the test that the registry's `content` entries are exactly the rules the content runner implements.
+
+It is W4b ticket 15 (track T4, rules) and implements the [W4b plan](../../docs/engineering/implementation-plan-w4b.md) section 15 row W4-06d and sections 3.1-3.3 under the register rows "Ta's delegation (2026-09-27)" and "W4b delegated rulings (provisional)". The runner stays unbound in every `QC_MODE` until W4-13b. D07-D10 stay open; the fact list and keywords are provisional until D09 (WA-D09). Synthetic data only; no network call; no migration.

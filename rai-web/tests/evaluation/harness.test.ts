@@ -74,25 +74,14 @@ test('on the dev split every catalogue rule grades 1.00, every part matches its 
     grade.rules.filter((r) => r.inCatalogue && r.tp > 0).length >= 5,
     'metadata and content rules fire',
   );
-  // PACK-CONTRADICTION (W4-06d) is labelled but not yet in the seeded catalogue: until it is, the submit content part
-  // selects no rule and completes where the labels expect an unreadable slot 2 or 5 to make it unavailable. The
-  // harness reports that disagreement; the labels are never changed to fit (decision 14).
-  const contradictionSeeded = catalogueRulesOf(CONFIGURATION_SEED.qc_rules).some(
-    (r) => r.ruleId === 'PACK-CONTRADICTION',
-  );
-  if (contradictionSeeded) assert.deepEqual(grade.parts.mismatches, []);
-  else {
-    assert.ok(grade.parts.mismatches.length > 0);
-    for (const m of grade.parts.mismatches) {
-      assert.deepEqual([m.trigger, m.part], ['submit', 'content'], JSON.stringify(m));
-      assert.deepEqual(m.expected, { status: 'unavailable', reason: 'artifact_unreadable' });
-      assert.deepEqual(m.actual, { status: 'completed', reason: null, detail: null });
-    }
-    const contradiction = grade.rules.find((r) => r.ruleId === 'PACK-CONTRADICTION')!;
-    assert.equal(contradiction.inCatalogue, false);
-    assert.equal(contradiction.fn, contradiction.labelled);
-  }
-  // Every part outside that gap matches its label.
+  // W4-06d seeds PACK-CONTRADICTION, so the submit content part reads slots 2 and 5: an unreadable one makes it
+  // unavailable as the labels expect, and the rule grades like every other (W4-08a left this gap reported).
+  const contradiction = grade.rules.find((r) => r.ruleId === 'PACK-CONTRADICTION')!;
+  assert.equal(contradiction.inCatalogue, true);
+  assert.equal(contradiction.tp, contradiction.labelled);
+  assert.equal(contradiction.labelled, 3);
+  assert.deepEqual(grade.parts.mismatches, []);
+  // Every part matches its label.
   assert.equal(grade.parts.statusMatched, grade.parts.total - grade.parts.mismatches.length);
   assert.ok(grade.parts.expectedUnavailable >= 5);
   assert.equal(grade.laneScope.foreignLaneFindings, 0);

@@ -41,5 +41,10 @@ export interface ContentRule {
   readonly triggers: readonly QcTrigger[];
   /** The rule's registered params schema (`QC_RULE_PARAMS_SCHEMAS`); its params list `slots` and `claimSource`. */
   readonly paramsSchema: TSchema;
+  /**
+   * W4-06d: what the schema cannot express, over params that passed it (the same check a publish runs). A non-empty
+   * answer is invalid params: the run fails before a byte is read.
+   */
+  readonly paramsProblems?: (params: unknown) => readonly string[];
   evaluate(input: ContentRuleInput): QcFinding[];
 }

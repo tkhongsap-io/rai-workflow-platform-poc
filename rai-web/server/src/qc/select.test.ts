@@ -20,6 +20,7 @@ test('selection returns the template rules for the trigger, in catalogue order, 
     'PACK-SLOT-MISSING',
     'PACK-STAGE-MISMATCH',
     'PACK-NA-VENDOR-DOC',
+    'PACK-CONTRADICTION', // W4-06d: the submit content rule
   ]);
   assert.deepEqual(ids(SEED, 'v1.0 Sheet3', 'approve_attempt', 'llm'), [
     'PACK-SLOT-MISSING',
@@ -69,13 +70,16 @@ test('model_type routing: classic_ml gets ACC-CLASSIC-ML-METRIC and none of the 
     for (const model of ['llm', 'other'] as const)
       for (const trigger of TRIGGERS)
         assert.ok(!ids(SEED, template, trigger, model).includes('ACC-CLASSIC-ML-METRIC'));
-  // Metadata rules are not routed by model type.
-  for (const model of MODEL_TYPES)
-    assert.deepEqual(ids(SEED, 'v2.0', 'submit', model), [
-      'PACK-SLOT-MISSING',
-      'PACK-STAGE-MISMATCH',
-      'PACK-NA-VENDOR-DOC',
-    ]);
+  // Metadata rules are not routed by model type, and neither is PACK-CONTRADICTION (W4-06d): every model type's
+  // submit reads the pack facts.
+  for (const template of ['v1.0 Sheet3', 'v2.0'])
+    for (const model of MODEL_TYPES)
+      assert.deepEqual(ids(SEED, template, 'submit', model), [
+        'PACK-SLOT-MISSING',
+        'PACK-STAGE-MISMATCH',
+        'PACK-NA-VENDOR-DOC',
+        'PACK-CONTRADICTION',
+      ]);
 });
 
 test('an unknown template version is a selection error, never an empty (clean) selection', () => {

@@ -7,6 +7,7 @@ import {
   ACC_CLASSIC_ML_METRIC_PARAMS,
   ACC_EXTRACTION_NOT_HALLUCINATION_PARAMS,
   ACC_METRIC_CITED_PARAMS,
+  PACK_CONTRADICTION_PARAMS,
 } from './seed.js';
 import { ConfigurationBodyInvalid, validateConfigurationBody } from './store.js';
 
@@ -229,6 +230,56 @@ test('W4-06c: ACC-BAND-V1-SHEET3 params are required and schema-checked (tiers, 
       () => validateConfigurationBody('qc_rules', body([{ ...entry, params }])),
       (error: unknown) =>
         error instanceof ConfigurationBodyInvalid && /ACC-BAND-V1-SHEET3.*params/.test(error.message),
+      name,
+    );
+  }
+});
+
+test('W4-06d: PACK-CONTRADICTION params are required, schema-checked and consistent (facts, keywords, slots)', () => {
+  const ruleId = 'PACK-CONTRADICTION';
+  const entry = { ruleId, engine: 'content', triggers: ['submit'], severity: 'medium' };
+  const valid = structuredClone(PACK_CONTRADICTION_PARAMS) as unknown as Record<string, unknown>;
+  const ok = (params: unknown) =>
+    assert.doesNotThrow(() => validateConfigurationBody('qc_rules', body([{ ...entry, params }])), ruleId);
+  ok(valid);
+  ok({ ...valid, claimSource: 'grammar+model' });
+  // A third fact, read from slots 2 and 3, once slot 3 is listed.
+  ok({
+    ...valid,
+    slots: [2, 3, 5],
+    items: { ...(valid['items'] as object), model_training: { en: ['training'], th: ['การฝึก'] } },
+    facts: [...(valid['facts'] as unknown[]), { id: 'model_training', slots: [2, 3] }],
+  });
+  refused(body([entry]), /PACK-CONTRADICTION.*params/);
+  const items = (p: Record<string, unknown>) => p['items'] as Record<string, unknown>;
+  const facts = (p: Record<string, unknown>) => p['facts'] as Array<Record<string, unknown>>;
+  for (const [name, patch] of [
+    ['slot 9', (p) => (p['slots'] = [2, 9])],
+    ['no slot', (p) => (p['slots'] = [])],
+    ['an unknown claim source', (p) => (p['claimSource'] = 'model')],
+    ['no facts', (p) => (p['facts'] = [])],
+    ['no fact list', (p) => delete p['facts']],
+    ['a fact ID that is not a key', (p) => (facts(p)[0]!['id'] = 'Personal Data')],
+    ['a fact read from one slot only', (p) => (facts(p)[0]!['slots'] = [2])],
+    ['a fact read from slot 9', (p) => (facts(p)[0]!['slots'] = [2, 9])],
+    ['a fact with an unknown key', (p) => (facts(p)[0]!['note'] = 'x')],
+    ['an item key that is not a fact ID', (p) => (items(p)['Personal Data'] = { en: ['a'], th: ['ก'] })],
+    ['an item without Thai', (p) => (items(p)['personal_data'] = { en: ['personal data'] })],
+    ['no items', (p) => delete p['items']],
+    ['no labels', (p) => delete p['labels']],
+    ['an unknown key', (p) => (p['note'] = 'x')],
+    // Cross-field (packContradictionParamsProblems): what the schema cannot express.
+    ['a fact listed twice', (p) => facts(p).push({ ...facts(p)[0]! })],
+    ['a fact without keywords', (p) => delete items(p)['external_vendor']],
+    ['keywords for no fact', (p) => (items(p)['model_training'] = { en: ['training'], th: ['การฝึก'] })],
+    ['a fact slot the rule does not read', (p) => (facts(p)[1]!['slots'] = [2, 6])],
+  ] as Array<[string, (p: Record<string, unknown>) => void]>) {
+    const params = structuredClone(valid);
+    patch(params);
+    assert.throws(
+      () => validateConfigurationBody('qc_rules', body([{ ...entry, params }])),
+      (error: unknown) =>
+        error instanceof ConfigurationBodyInvalid && /PACK-CONTRADICTION.*params/.test(error.message),
       name,
     );
   }

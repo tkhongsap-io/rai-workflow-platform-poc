@@ -3,9 +3,9 @@
 // deterministic runner keeps the `metadata` rules as the other run part of the same trigger (decision 27, W4-18).
 //
 //   1. Decide before reading. `rules === null` → `not_configured`. An unknown content rule, a trigger the rule is not
-//      defined for, params that fail its schema, an unknown lane mapping or an approve attempt without a lane →
-//      `runner_error`. A rule whose `claimSource` is `grammar+model` → `not_configured` / `model_disabled`: no model
-//      port exists before W4-07. No byte is read on any of these paths.
+//      defined for, params that fail its schema or the rule's own cross-field check (W4-06d), an unknown lane
+//      mapping or an approve attempt without a lane → `runner_error`. A rule whose `claimSource` is `grammar+model` →
+//      `not_configured` / `model_disabled`: no model port exists before W4-07. No byte is read on any of these paths.
 //   2. Lane scope (decisions 22 and 28). A rule reads only its readable slots: on upload, `params.slots` ∩ the
 //      single-lane slots of the version's mapping ∩ the uploaded slot; on submit, `params.slots`; on an approve attempt,
 //      `params.slots` ∩ the run lane's slots. Slot 9 is never read. A rule with nothing in scope reads nothing, emits
@@ -124,6 +124,7 @@ function plan(request: QcRunRequest): { rules: PlannedRule[]; mapping: LaneMappi
     if (impl === undefined) throw runnerError('unknown_content_rule');
     if (!impl.triggers.includes(request.trigger)) throw runnerError('unsupported_rule_trigger');
     if (!Value.Check(impl.paramsSchema, rule.params)) throw runnerError('invalid_rule_params');
+    if ((impl.paramsProblems?.(rule.params).length ?? 0) > 0) throw runnerError('invalid_rule_params');
     const params = rule.params as unknown as ContentRuleBaseParams;
     rules.push({ rule, impl, params, slots: readableSlots(params, request, mapping) });
   }

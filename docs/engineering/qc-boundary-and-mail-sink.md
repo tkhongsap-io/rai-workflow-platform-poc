@@ -268,6 +268,15 @@ Severity: `high` for `ACC-BAND-V1-SHEET3` and `ACC-EXTRACTION-NOT-HALLUCINATION`
 
 - Its params (`slots` `[1]`, the shared `labels`, `items`, `bandMetrics`, `tiers` with English and Thai words, `bands` as non-negative decimal strings, `claimSource`) are schema-checked on every publish; the seed carries them on the `v1.0 Sheet3` entry; the seed label stays `w4a.1`.
 
+**W4-06d amendment (2026-09-28): the pack contradiction rule.** [W4b plan](implementation-plan-w4b.md) section 3.3, decisions 10, 28 and 30 (provisional until D09; the fact list and keywords are working assumption WA-D09). The `content` runner also executes `PACK-CONTRADICTION`, the only submit content rule, so every content rule the seeded catalogue lists is implemented. `IMPLEMENTED_RULES` lists it (`content`, `submit`), and a server test keeps the registry's `content` entries equal to `CONTENT_RULES`.
+
+| `ruleId` | Trigger | Slots read, owning lane | Fires when (W4b provisional) | Severity (seed) | Evidence, measure, message |
+|---|---|---|---|---|---|
+| `PACK-CONTRADICTION` | submit | `params.slots` (seed 2 and 5), each fact compared across its own `params.facts[].slots`; pack → AI/COE | Two different attached artifacts state the same fact (`params.facts`, seed `personal_data` and `external_vendor`; a claim whose item by `params.items` keywords is the fact) with different `yes`/`no` answers. `na` and unrecognised answers state nothing; two answers inside one artifact, agreeing facts and facts one artifact states are not findings. Selected for every `model_type` | medium | One finding per contradicting fact, pack scope, `claimKey` = the fact ID (`findingKey` `PACK-CONTRADICTION:pack:<fact>`); evidence = two entries in slot order, the first statement and the first statement of another artifact with the other answer, each with its locator and `excerptHash`; `measure` null; message `qc.finding.pack_contradiction` with params `{ fact, slotA, slotB }` |
+
+- Its params (`slots`, the shared `labels`, `items` keyed by fact ID, `facts` of `{ id, slots }` with at least two slots each, `claimSource`) are schema-checked on every publish, plus a cross-field check (`packContradictionParamsProblems`: each fact once, with keywords, on read slots only; no keywords without a fact) that publishing refuses and the runner treats as `runner_error` / `invalid_rule_params`. The seed carries them in both templates; the seed label stays `w4a.1`.
+- An unreadable slot 2 or 5 makes the submit content part unavailable (`artifact_unreadable`), never clean; the submit metadata part keeps its findings (decision 27, W4-18).
+
 ### 3.6 Owning lane and the QC-unavailable finding
 
 Every stored finding carries `owningLane` because D05 makes the owning lane the authority for waived and N/A dispositions and the confirmer of the owner's proposed "fixed" (W2-05). The value comes from the **W0-06 owning-lane assignment rule** ([section 7](workflow-transition-and-error-contract.md#7-owning-lane-assignment)), which this spec applies and does not extend:
