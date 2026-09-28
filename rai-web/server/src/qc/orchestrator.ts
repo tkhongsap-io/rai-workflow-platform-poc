@@ -11,7 +11,9 @@
 // run has lane NULL and its slot, never replays, shares in-flight work by runKey, and its outage finding is owned by
 // the slot's lane (slot 5: AI/COE; slot 9: no run) and reused per version and owning lane. W4-11b: a result's
 // `engine` identity (extractor version, model, prompt revision, usage) is checked at this boundary and recorded on the
-// run row and its completed / unavailable line, and an unavailable run keeps its bounded `detail`.
+// run row and its completed / unavailable line, and an unavailable run keeps its bounded `detail`. W4-05a: the request's
+// artifact handles read the stored bytes through the optional `blobs` store (artifact-handles.ts) and are revoked once
+// the runner settles or the deadline fires; every path that builds a request without calling the runner revokes too.
 
 import { Value } from 'typebox/value';
 import { QcUnavailableReasonSchema } from '@rai/shared/schemas/observability';
@@ -34,6 +36,7 @@ import type {
   SelectedRule,
 } from '@rai/shared/qc/types';
 import type { StoredFindingSummary } from '@rai/shared/schemas/review';
+import type { BlobStore } from '../artifacts/blob-store.js';
 import type { CaseRow, PackVersionRow } from '../cases/repository.js';
 import { readCaseRow, readVersionRow } from '../cases/repository.js';
 import type { Db, Tx } from '../db/client.js';
@@ -62,6 +65,7 @@ import {
   storedUnavailableDetail,
   type EngineLogFields,
 } from './engine-identity.js';
+import { authorizedHandles } from './artifact-handles.js';
 import { callRunner, unavailableResult } from './check-result.js';
 import { qcKindOf } from './kind.js';
 import { requestOf } from './request.js';
@@ -78,6 +82,11 @@ export interface QcOrchestratorDeps {
   errors?: ErrorCapture;
   db: Db;
   runner?: QcRunner;
+  /**
+   * W4-05a: the store the request's `read()` handles stream from. Absent: every `read()` rejects (`store_unbound`);
+   * the metadata runners never read. compose-app-deps always passes it.
+   */
+  blobs?: BlobStore;
   now?: () => Date;
   timeoutMs?: number;
 }
@@ -129,8 +138,15 @@ function evidenceForStore(finding: QcFinding): unknown {
   }));
 }
 
+/** A built request and the revocation of its artifact handles (W4-05a). */
+interface BuiltRequest {
+  request: QcRunRequest;
+  revoke: () => void;
+}
+
 async function buildRequest(
   tx: Tx,
+  blobs: BlobStore | undefined,
   caseRow: CaseRow,
   version: PackVersionRow,
   trigger: QcTrigger,
@@ -140,9 +156,9 @@ async function buildRequest(
   ruleRevision: string,
   rules: SelectedRule[] | null,
   uploadSlot: Slot | null = null,
-): Promise<QcRunRequest> {
+): Promise<BuiltRequest> {
   // W4-08a: the pure part lives in request.ts, so the evaluation harness builds requests the same way.
-  return requestOf(
+  const request = requestOf(
     await readSlotsWithArtifacts(tx, version.id),
     caseRow,
     version,
@@ -154,6 +170,10 @@ async function buildRequest(
     rules,
     uploadSlot,
   );
+  // W4-05a: requestOf's placeholder read() is replaced by live, revocable handles over the store (metadata, and so the
+  // runKey, unchanged). Built last, so nothing above can throw after a handle exists.
+  const { refs: artifacts, revoke } = authorizedHandles(blobs, request.artifacts);
+  return { request: { ...request, artifacts }, revoke };
 }
 
 interface RunRecord {
@@ -531,6 +551,25 @@ async function recordLate(
 }
 
 /**
+ * W4-05a: runs `body` and revokes, in `finally`, the handles of every request it built (through `track`), so a path
+ * that never calls the runner (unbound, a rule selection error, an in-flight join, a thrown error) leaves no live
+ * handle. `callRunner` (given `built.revoke`) has already revoked the handles of a request the runner saw; revoking twice is a no-op.
+ */
+async function withRevocation<T>(
+  body: (track: (built: BuiltRequest) => QcRunRequest) => Promise<T>,
+): Promise<T> {
+  const revokes: Array<() => void> = [];
+  try {
+    return await body((built) => {
+      revokes.push(built.revoke);
+      return built.request;
+    });
+  } finally {
+    for (const revoke of revokes) revoke();
+  }
+}
+
+/**
  * Runs submit or lane QC and persists its defect findings or an unavailable run row, replaying a recorded run
  * where {@link replayPrior} says so (W0-07 3.4 step 2 / 3.7). An unbound runner records `unbound` /
  * not_configured under the first lock.
@@ -550,82 +589,95 @@ async function runQc(deps: QcOrchestratorDeps, input: RunQcInput): Promise<Submi
   const timeoutMs = deps.timeoutMs ?? QC_TIMEOUT_MS;
   const { runner } = deps;
 
-  const prepared = await withTransaction(deps.db, async (tx) => {
-    const { caseRow, version } = await loadOpenSubmittedTarget(tx, input);
-    const replayed = await replayPrior(tx, input, version, runner !== undefined);
-    if (replayed !== undefined) return { kind: 'replayed' as const, outcome: replayed };
+  return withRevocation(async (track) => {
+    const prepared = await withTransaction(deps.db, async (tx) => {
+      const { caseRow, version } = await loadOpenSubmittedTarget(tx, input);
+      const replayed = await replayPrior(tx, input, version, runner !== undefined);
+      if (replayed !== undefined) return { kind: 'replayed' as const, outcome: replayed };
 
-    const stamp = nextMonotonicStamp(clock);
-    const run = { id: uuidv7(stamp.getTime()), stamp, correlationId: input.correlationId };
-    // W4-02: the rules of the recorded qc_rules revision for this template, trigger and model type (plan section 3).
-    const context = await ruleContextOf(tx, version, stamp);
-    let rules: SelectedRule[] | null = null;
-    let selectionError: RuleSelectionError | undefined;
-    try {
-      rules = requestRules(
-        context,
-        version.checklistTemplateVersion,
+      const stamp = nextMonotonicStamp(clock);
+      const run = { id: uuidv7(stamp.getTime()), stamp, correlationId: input.correlationId };
+      // W4-02: the rules of the recorded qc_rules revision for this template, trigger and model type (plan section 3).
+      const context = await ruleContextOf(tx, version, stamp);
+      let rules: SelectedRule[] | null = null;
+      let selectionError: RuleSelectionError | undefined;
+      try {
+        rules = requestRules(
+          context,
+          version.checklistTemplateVersion,
+          input.trigger,
+          caseRow.modelType as QcRunRequest['modelType'],
+        );
+      } catch (error) {
+        if (!(error instanceof RuleSelectionError)) throw error;
+        selectionError = error;
+      }
+      const built = await buildRequest(
+        tx,
+        deps.blobs,
+        caseRow,
+        version,
         input.trigger,
-        caseRow.modelType as QcRunRequest['modelType'],
+        input.lane,
+        input.correlationId,
+        stamp.getTime() + timeoutMs,
+        context.ruleRevision,
+        rules,
       );
-    } catch (error) {
-      if (!(error instanceof RuleSelectionError)) throw error;
-      selectionError = error;
-    }
-    const request = await buildRequest(
-      tx,
-      caseRow,
-      version,
-      input.trigger,
-      input.lane,
-      input.correlationId,
-      stamp.getTime() + timeoutMs,
-      context.ruleRevision,
-      rules,
-    );
-    if (runner === undefined) {
-      const notConfigured = unavailableResult('not_configured', null, stamp);
-      const unbound = { ...run, engineId: UNBOUND_ENGINE_ID, runnerVersion: UNBOUND_RUNNER_VERSION };
-      const outcome = await persistResult(tx, version, request, notConfigured, unbound);
-      return recorded(outcome, labelOf(unbound, request), notConfigured);
-    }
-    const bound = { ...run, engineId: runner.identity.runner, runnerVersion: runner.identity.runnerVersion };
-    if (selectionError !== undefined) {
-      // No trustworthy rule list (an unknown template version): an outage under the bound runner, never a clean
-      // pass, recorded without calling the runner.
-      const failed = unavailableResult('runner_error', selectionError.detail, stamp);
-      const outcome = await persistResult(tx, version, request, failed, bound);
-      return recorded(outcome, labelOf(bound, request), failed);
-    }
-    return { kind: 'ready' as const, request, run: bound, runner };
-  });
-  if (prepared.kind !== 'ready') return settle(deps, input, prepared, performance.now());
-
-  const { request, run } = prepared;
-  deps.emitter?.log('qc.run.started', {
-    qcRunId: run.id,
-    caseId: input.caseId,
-    versionId: input.versionId,
-    trigger: input.trigger,
-    ...(input.lane === null ? {} : { lane: input.lane }),
-    qcKind: qcKindOf(prepared.runner.identity),
-    ...labelOf(run, request),
-  });
-  const startedAt = performance.now();
-  const result = await callRunner(prepared.runner, request, run.stamp, timeoutMs);
-
-  try {
-    const stored = await withTransaction(deps.db, async (tx): Promise<Settled> => {
-      const { version } = await loadOpenSubmittedTarget(tx, input);
-      const replayed = await replayPrior(tx, input, version, true);
-      if (replayed !== undefined) return { kind: 'replayed', outcome: replayed };
-      return recorded(await persistResult(tx, version, request, result, run), labelOf(run, request), result);
+      const request = track(built);
+      if (runner === undefined) {
+        const notConfigured = unavailableResult('not_configured', null, stamp);
+        const unbound = { ...run, engineId: UNBOUND_ENGINE_ID, runnerVersion: UNBOUND_RUNNER_VERSION };
+        const outcome = await persistResult(tx, version, request, notConfigured, unbound);
+        return recorded(outcome, labelOf(unbound, request), notConfigured);
+      }
+      const bound = {
+        ...run,
+        engineId: runner.identity.runner,
+        runnerVersion: runner.identity.runnerVersion,
+      };
+      if (selectionError !== undefined) {
+        // No trustworthy rule list (an unknown template version): an outage under the bound runner, never a clean
+        // pass, recorded without calling the runner.
+        const failed = unavailableResult('runner_error', selectionError.detail, stamp);
+        const outcome = await persistResult(tx, version, request, failed, bound);
+        return recorded(outcome, labelOf(bound, request), failed);
+      }
+      return { kind: 'ready' as const, built, run: bound, runner };
     });
-    return settle(deps, input, stored, startedAt);
-  } catch (error) {
-    if (error instanceof StaleVersionError) await recordLate(deps, input, run.id, result, clock);
-    throw error;
-  }
+    if (prepared.kind !== 'ready') return settle(deps, input, prepared, performance.now());
+
+    const { built, run } = prepared;
+    const { request } = built;
+    deps.emitter?.log('qc.run.started', {
+      qcRunId: run.id,
+      caseId: input.caseId,
+      versionId: input.versionId,
+      trigger: input.trigger,
+      ...(input.lane === null ? {} : { lane: input.lane }),
+      qcKind: qcKindOf(prepared.runner.identity),
+      ...labelOf(run, request),
+    });
+    const startedAt = performance.now();
+    const result = await callRunner(prepared.runner, request, run.stamp, timeoutMs, built.revoke);
+
+    try {
+      const stored = await withTransaction(deps.db, async (tx): Promise<Settled> => {
+        const { version } = await loadOpenSubmittedTarget(tx, input);
+        const replayed = await replayPrior(tx, input, version, true);
+        if (replayed !== undefined) return { kind: 'replayed', outcome: replayed };
+        return recorded(
+          await persistResult(tx, version, request, result, run),
+          labelOf(run, request),
+          result,
+        );
+      });
+      return settle(deps, input, stored, startedAt);
+    } catch (error) {
+      if (error instanceof StaleVersionError) await recordLate(deps, input, run.id, result, clock);
+      throw error;
+    }
+  });
 }
 
 function emitUnavailable(
@@ -738,81 +790,86 @@ async function runUploadQc(deps: QcOrchestratorDeps, input: UploadQcInput): Prom
   const timeoutMs = deps.timeoutMs ?? QC_TIMEOUT_MS;
   const { runner } = deps;
 
-  // Read only: the request (and its runKey) for the row as it is now; nothing is written before the runner answers.
-  const prepared = await withTransaction(deps.db, async (tx) => {
-    const { caseRow, version } = await loadUploadTarget(tx, input);
-    const stamp = nextMonotonicStamp(clock);
-    // Plan section 3: a draft reads the qc_rules revision in force at the upload instant; a submitted row its own.
-    const context = await ruleContextOf(tx, version, stamp);
-    let rules: SelectedRule[] | null = null;
-    let selectionError: RuleSelectionError | undefined;
-    try {
-      rules = requestRules(
-        context,
-        version.checklistTemplateVersion,
-        'upload',
-        caseRow.modelType as QcRunRequest['modelType'],
-      );
-    } catch (error) {
-      if (!(error instanceof RuleSelectionError)) throw error;
-      selectionError = error;
-    }
-    const request = await buildRequest(
-      tx,
-      caseRow,
-      version,
-      'upload',
-      null,
-      input.correlationId,
-      stamp.getTime() + timeoutMs,
-      context.ruleRevision,
-      rules,
-      input.slot,
-    );
-    return { request, stamp, selectionError };
-  });
-  const { request, stamp, selectionError } = prepared;
-
-  return inFlight(uploadFlights, deps.db, request.runKey, async () => {
-    const base = { id: uuidv7(stamp.getTime()), stamp, correlationId: input.correlationId };
-    let run: RunRecord;
-    let result: QcRunResult;
-    let startedAt = performance.now();
-    if (runner === undefined) {
-      run = { ...base, engineId: UNBOUND_ENGINE_ID, runnerVersion: UNBOUND_RUNNER_VERSION };
-      result = unavailableResult('not_configured', null, stamp);
-    } else {
-      run = { ...base, engineId: runner.identity.runner, runnerVersion: runner.identity.runnerVersion };
-      if (selectionError !== undefined) {
-        // No trustworthy rule list: an outage under the bound runner, never a clean pass (plan section 3).
-        result = unavailableResult('runner_error', selectionError.detail, stamp);
-      } else {
-        deps.emitter?.log('qc.run.started', {
-          qcRunId: run.id,
-          caseId: input.caseId,
-          versionId: input.versionId,
-          trigger: 'upload',
-          qcKind: qcKindOf(runner.identity),
-          ...labelOf(run, request),
-        });
-        startedAt = performance.now();
-        result = await callRunner(runner, request, stamp, timeoutMs);
-      }
-    }
-    try {
-      const stored = await withTransaction(deps.db, async (tx): Promise<Settled> => {
-        const { version } = await loadUploadTarget(tx, input); // re-checked under the lock: Ready or closed refuses
-        return recorded(
-          await persistResult(tx, version, request, result, run),
-          labelOf(run, request),
-          result,
+  return withRevocation(async (track) => {
+    // Read only: the request (and its runKey) for the row as it is now; nothing is written before the runner answers.
+    const prepared = await withTransaction(deps.db, async (tx) => {
+      const { caseRow, version } = await loadUploadTarget(tx, input);
+      const stamp = nextMonotonicStamp(clock);
+      // Plan section 3: a draft reads the qc_rules revision in force at the upload instant; a submitted row its own.
+      const context = await ruleContextOf(tx, version, stamp);
+      let rules: SelectedRule[] | null = null;
+      let selectionError: RuleSelectionError | undefined;
+      try {
+        rules = requestRules(
+          context,
+          version.checklistTemplateVersion,
+          'upload',
+          caseRow.modelType as QcRunRequest['modelType'],
         );
-      });
-      return settle(deps, input, stored, startedAt) as PersistQcOutcome;
-    } catch (error) {
-      if (error instanceof StaleVersionError) await recordLate(deps, input, run.id, result, clock);
-      throw error;
-    }
+      } catch (error) {
+        if (!(error instanceof RuleSelectionError)) throw error;
+        selectionError = error;
+      }
+      const built = await buildRequest(
+        tx,
+        deps.blobs,
+        caseRow,
+        version,
+        'upload',
+        null,
+        input.correlationId,
+        stamp.getTime() + timeoutMs,
+        context.ruleRevision,
+        rules,
+        input.slot,
+      );
+      // Tracked inside the callback, as in runQc, so a failed commit still revokes the built handles. A caller that
+      // joins another caller's in-flight run never hands its own handles to a runner.
+      return { built, request: track(built), stamp, selectionError };
+    });
+    const { built, request, stamp, selectionError } = prepared;
+
+    return inFlight(uploadFlights, deps.db, request.runKey, async () => {
+      const base = { id: uuidv7(stamp.getTime()), stamp, correlationId: input.correlationId };
+      let run: RunRecord;
+      let result: QcRunResult;
+      let startedAt = performance.now();
+      if (runner === undefined) {
+        run = { ...base, engineId: UNBOUND_ENGINE_ID, runnerVersion: UNBOUND_RUNNER_VERSION };
+        result = unavailableResult('not_configured', null, stamp);
+      } else {
+        run = { ...base, engineId: runner.identity.runner, runnerVersion: runner.identity.runnerVersion };
+        if (selectionError !== undefined) {
+          // No trustworthy rule list: an outage under the bound runner, never a clean pass (plan section 3).
+          result = unavailableResult('runner_error', selectionError.detail, stamp);
+        } else {
+          deps.emitter?.log('qc.run.started', {
+            qcRunId: run.id,
+            caseId: input.caseId,
+            versionId: input.versionId,
+            trigger: 'upload',
+            qcKind: qcKindOf(runner.identity),
+            ...labelOf(run, request),
+          });
+          startedAt = performance.now();
+          result = await callRunner(runner, request, stamp, timeoutMs, built.revoke);
+        }
+      }
+      try {
+        const stored = await withTransaction(deps.db, async (tx): Promise<Settled> => {
+          const { version } = await loadUploadTarget(tx, input); // re-checked under the lock: Ready or closed refuses
+          return recorded(
+            await persistResult(tx, version, request, result, run),
+            labelOf(run, request),
+            result,
+          );
+        });
+        return settle(deps, input, stored, startedAt) as PersistQcOutcome;
+      } catch (error) {
+        if (error instanceof StaleVersionError) await recordLate(deps, input, run.id, result, clock);
+        throw error;
+      }
+    });
   });
 }
 

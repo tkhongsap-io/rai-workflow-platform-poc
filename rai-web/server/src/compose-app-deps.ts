@@ -43,7 +43,9 @@ export interface ComposeInputs {
 }
 
 export function composeAppDeps(inputs: ComposeInputs): AppDeps {
-  const { config, db, fixtureUsers, qcRunner, mailSink } = inputs;
+  const { config, db, fixtureUsers, qcRunner, mailSink, store } = inputs;
+  // W4-05a: every QC binding carries the store, so the request's read() handles stream the stored bytes.
+  const qc = qcRunner === undefined ? undefined : { runner: qcRunner, blobs: store };
   // The fixture identities name subjects in fixture mode; W7-06 subject profiles name them otherwise.
   const knownIdentities = fixtureUsers ?? [];
   const subjects = createSubjectDirectory(db, { known: knownIdentities }); // one directory for cases and versions
@@ -73,24 +75,24 @@ export function composeAppDeps(inputs: ComposeInputs): AppDeps {
     cases: { businessUnits: inputs.businessUnits, subjects },
     // W6-04: the Admin configuration API; MAIL_MODE feeds the synthetic-recipient publish check (W6-03).
     configuration: { subjects, ...(config.mail === undefined ? {} : { mailMode: config.mail.mode }) },
-    artifacts: { store: inputs.store, limits: config.upload },
+    artifacts: { store, limits: config.upload },
     // W4-04: the upload-triggered QC run, bound in app.ts with the drain, only when a runner is bound. Without one the
     // submit run records not_configured (A08), so upload runs would only stack identical outage rows.
     pack: {
       limits: config.upload,
       subjects, // W5-04: names the risk answerers on the draft read
-      ...(qcRunner === undefined ? {} : { qc: { runner: qcRunner } }),
+      ...(qc === undefined ? {} : { qc }),
     },
     versions: {
       subjects, // W3-F1: the same directory names submitters and deciders on reads
       laneOpenRecipients: recipients.laneOpenRecipients,
       laneReviewerSpocUnits: recipients.laneReviewerSpocUnits, // W3-F2
-      qc: qcRunner === undefined ? {} : { runner: qcRunner },
+      qc: qc ?? { blobs: store },
     },
     decide: { sendBackRecipientsForOwner: ownerRecipients },
     findings: {
       readyRecipientsForOwner: ownerRecipients,
-      ...(qcRunner === undefined ? {} : { qc: { runner: qcRunner } }),
+      ...(qc === undefined ? {} : { qc }),
     },
     ...(inputs.webDistDir === undefined ? {} : { static: { root: inputs.webDistDir } }),
   };
