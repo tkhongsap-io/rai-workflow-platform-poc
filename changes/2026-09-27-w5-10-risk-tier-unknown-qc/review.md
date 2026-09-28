@@ -61,6 +61,11 @@ Worktree `/tmp/rai-w5-10-risk-tier-unknown-qc`, Postgres project `rai-risk` on 5
 | `npm run test:browser:substitute` | exit 0, 48 passed |
 | `node scripts/check-links.mjs` (root) | exit 0; 525 Markdown files, 1422 relative links, 0 broken |
 | `git diff --check` (root) | exit 0 |
+| Rebased again onto `origin/main` `7d81ab8` (W7-16: a docs note and `server/src/deployment-readiness.test.ts`; only DEVLOG and CHANGELOG overlapped, both entries kept). Rerun: | |
+| `npm run typecheck`; `npm run lint` | exit 0; exit 0 |
+| `npm run test:unit` | exit 0, 1260 pass, 0 fail (includes W7-16's test, 7 pass) |
+| `node scripts/check-links.mjs` (root); `git diff --check origin/main...HEAD` | exit 0, 530 Markdown files, 1455 links, 0 broken; exit 0 |
+| Integration and browser suites | not rerun after this rebase: W7-16 changes no code they exercise (the 1422-link / 500 / 244 / 48 results above are on `e4c6cbe` plus this branch) |
 
 ## Review verdicts
 
