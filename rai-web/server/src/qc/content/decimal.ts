@@ -40,3 +40,20 @@ export function compareDecimal(a: string, b: string): -1 | 0 | 1 {
 export function decimalToNumber(decimal: string): number {
   return Number(decimal);
 }
+
+/**
+ * W4-06c (plan section 3.3, decision 11): a ratio as a percent, `ratio × 100`, computed on the decimal string (the
+ * point moves two places), never in binary floating point. Canonical; null when `ratio` is not a decimal string or the
+ * result has more than 18 integer digits (it would no longer be a decimal-string message param).
+ */
+export function ratioToPercent(ratio: string): string | null {
+  const canonical = parseDecimal(ratio);
+  if (canonical === null) return null;
+  const negative = canonical.startsWith('-');
+  const [integer, fraction = ''] = (negative ? canonical.slice(1) : canonical).split('.');
+  const padded = fraction.padEnd(2, '0');
+  const shifted = `${integer}${padded.slice(0, 2)}`.replace(/^0+(?=\d)/, '');
+  const rest = padded.slice(2);
+  if (shifted.length > 18) return null;
+  return parseDecimal(`${negative ? '-' : ''}${shifted}${rest === '' ? '' : `.${rest}`}`);
+}

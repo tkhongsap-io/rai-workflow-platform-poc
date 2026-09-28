@@ -20,6 +20,7 @@
 // no synthetic default (section 6), so Admin publishes it or nothing does.
 
 import type {
+  AccBandV1Sheet3Params,
   AccClassicMlMetricParams,
   AccExtractionNotHallucinationParams,
   AccMetricCitedParams,
@@ -128,6 +129,26 @@ export const ACC_CLASSIC_ML_METRIC_PARAMS: AccClassicMlMetricParams = {
   claimSource: 'grammar',
 };
 
+/**
+ * W4-06c (W4b plan section 3.3; WA-D09, provisional): `ACC-BAND-V1-SHEET3` reads slot 1 on the AI/COE approve attempt
+ * (decision 28) and applies the v1.0 Sheet-3 SL#2.1 bands to a stated hallucination rate, in percent, strict
+ * less-than (so equal fails). Listed on the `v1.0 Sheet3` template only (L12). Tier words: the dev vocabulary's English
+ * words and their Thai equivalents.
+ */
+export const ACC_BAND_V1_SHEET3_PARAMS: AccBandV1Sheet3Params = {
+  slots: [1],
+  labels: CLAIM_LABELS,
+  items: { hallucination: { en: ['hallucination'], th: ['การหลอน'] } },
+  bandMetrics: ['hallucination_rate'],
+  tiers: {
+    high: { en: ['high'], th: ['สูง'] },
+    medium: { en: ['medium'], th: ['ปานกลาง'] },
+    low: { en: ['low'], th: ['ต่ำ'] },
+  },
+  bands: { high: '1', medium: '2', low: '3' },
+  claimSource: 'grammar',
+};
+
 const W4B_CONTENT_RULES: readonly QcRule[] = [
   {
     ruleId: 'ACC-METRIC-CITED',
@@ -143,7 +164,13 @@ const W4B_CONTENT_RULES: readonly QcRule[] = [
     severity: 'high',
     params: ACC_EXTRACTION_NOT_HALLUCINATION_PARAMS, // W4-06b: with its params schema (plan 3.3)
   },
-  { ruleId: 'ACC-BAND-V1-SHEET3', engine: 'content', triggers: ['approve_attempt'], severity: 'high' },
+  {
+    ruleId: 'ACC-BAND-V1-SHEET3',
+    engine: 'content',
+    triggers: ['approve_attempt'],
+    severity: 'high',
+    params: ACC_BAND_V1_SHEET3_PARAMS, // W4-06c: with its params schema (plan 3.3); v1.0 Sheet3 only (below)
+  },
   {
     ruleId: 'ACC-CLASSIC-ML-METRIC',
     engine: 'content',

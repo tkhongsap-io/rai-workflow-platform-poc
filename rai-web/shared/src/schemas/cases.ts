@@ -303,6 +303,32 @@ export const AccClassicMlMetricParamsSchema = Type.Object(
   { additionalProperties: false },
 );
 export type AccClassicMlMetricParams = Static<typeof AccClassicMlMetricParamsSchema>;
+/** A non-negative decimal string (a band in percent), as `decimal.ts` parses it: no sign, exponent or `%`. */
+const BandDecimalSchema = Type.String({ pattern: '^\\d{1,18}(\\.\\d{1,18})?$' });
+/**
+ * `ACC-BAND-V1-SHEET3` (W4-06c, plan section 3.3): the slots it may read, labels, the hallucination item, the metrics
+ * whose value is banded, the tier words (a claim's `tier` field) and each tier's band in percent (strict less-than
+ * passes). The bands are those of checklist template v1.0 Sheet 3 only (L12); the catalogue lists the rule there only.
+ */
+export const AccBandV1Sheet3ParamsSchema = Type.Object(
+  {
+    slots: ContentSlotListSchema,
+    labels: ClaimLabelsSchema,
+    items: Type.Object({ hallucination: BilingualLabelListSchema }, { additionalProperties: false }),
+    bandMetrics: Type.Array(MetricIdSchema, { minItems: 1, uniqueItems: true }),
+    tiers: Type.Object(
+      { high: BilingualLabelListSchema, medium: BilingualLabelListSchema, low: BilingualLabelListSchema },
+      { additionalProperties: false },
+    ),
+    bands: Type.Object(
+      { high: BandDecimalSchema, medium: BandDecimalSchema, low: BandDecimalSchema },
+      { additionalProperties: false },
+    ),
+    claimSource: ClaimSourceSchema,
+  },
+  { additionalProperties: false },
+);
+export type AccBandV1Sheet3Params = Static<typeof AccBandV1Sheet3ParamsSchema>;
 /** The fields every content rule's params share (the runner reads these before the rule runs). */
 export interface ContentRuleBaseParams {
   slots: number[];
@@ -316,6 +342,7 @@ export const QC_RULE_PARAMS_SCHEMAS = Object.freeze({
   'ACC-METRIC-CITED': AccMetricCitedParamsSchema, // W4-06a
   'ACC-EXTRACTION-NOT-HALLUCINATION': AccExtractionNotHallucinationParamsSchema, // W4-06b
   'ACC-CLASSIC-ML-METRIC': AccClassicMlMetricParamsSchema, // W4-06b
+  'ACC-BAND-V1-SHEET3': AccBandV1Sheet3ParamsSchema, // W4-06c
 });
 export const QcRuleEntrySchema = Type.Object(
   {
